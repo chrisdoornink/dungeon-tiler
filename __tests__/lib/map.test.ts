@@ -1,4 +1,4 @@
-import { generateMap, countRooms, areAllFloorsConnected } from '../../lib/map';
+import { generateMap, countRooms, areAllFloorsConnected, generateMapCenterOut } from '../../lib/map';
 
 describe('Map Generation', () => {
   it('should generate a 25x25 grid', () => {
@@ -92,5 +92,36 @@ describe('Map Generation', () => {
     
     expect(roomCount).toBeGreaterThanOrEqual(1);
     expect(roomCount).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('Center-Out Map Generation', () => {
+  it('should generate a map with a single room in the center between 9 and 100 tiles in size', () => {
+    const map = generateMapCenterOut();
+    
+    // Check grid dimensions
+    expect(map.length).toBe(25);
+    expect(map[0].length).toBe(25);
+    
+    // Count all floor tiles in the map
+    let floorCount = 0;
+    for (let y = 0; y < map.length; y++) {
+      for (let x = 0; x < map[0].length; x++) {
+        if (map[y][x] === 0) { // If floor tile
+          floorCount++;
+        }
+      }
+    }
+    
+    // Should have between 9 and 100 floor tiles
+    expect(floorCount).toBeGreaterThanOrEqual(9);
+    expect(floorCount).toBeLessThanOrEqual(100);
+    
+    // Should have exactly one room
+    const roomCount = countRooms(map);
+    expect(roomCount).toBe(1);
+    
+    // Verify that floors are connected
+    expect(areAllFloorsConnected(map)).toBe(true);
   });
 });

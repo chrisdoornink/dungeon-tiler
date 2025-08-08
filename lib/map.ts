@@ -140,6 +140,45 @@ export function countRooms(grid: number[][]): number {
 }
 
 /**
+ * Generate a map using a center-out algorithm
+ * Creates a map with a single room in the center between 9 and 100 tiles in size
+ * @returns 25x25 grid with floor (0) and wall (1) tiles
+ */
+export function generateMapCenterOut(): number[][] {
+  // Initialize grid with walls
+  const grid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(WALL));
+  
+  // Determine the center of the grid
+  const centerY = Math.floor(GRID_SIZE / 2);
+  const centerX = Math.floor(GRID_SIZE / 2);
+  
+  // Determine random room size between 3x3 (9 tiles) and 10x10 (100 tiles)
+  // We'll pick a random width and height between 3 and 10
+  const roomWidth = Math.floor(Math.random() * 8) + 3; // 3 to 10
+  const roomHeight = Math.floor(Math.random() * 8) + 3; // 3 to 10
+  
+  // Calculate room boundaries, ensuring it's centered
+  const startY = centerY - Math.floor(roomHeight / 2);
+  const endY = startY + roomHeight - 1;
+  const startX = centerX - Math.floor(roomWidth / 2);
+  const endX = startX + roomWidth - 1;
+  
+  // Carve out the room as floor
+  for (let y = startY; y <= endY; y++) {
+    for (let x = startX; x <= endX; x++) {
+      grid[y][x] = FLOOR;
+    }
+  }
+  
+  // Ensure perimeter walls are intact
+  enforcePerimeterWalls(grid);
+  
+  return grid;
+}
+
+// Removed createRadiatingCorridors function since it's no longer used with the new algorithm
+
+/**
  * Check if two rooms overlap
  */
 function roomsOverlap(roomA: Room, roomB: Room): boolean {
