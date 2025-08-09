@@ -9,11 +9,17 @@ const GRID_HEIGHT = 25;
 interface TilemapGridProps {
   tilemap: number[][];
   tileTypes: Record<number, TileType>;
+  subtypes?: number[][];
 }
 
-export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes }) => {
+export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, subtypes }) => {
   // Ensure the grid is exactly the required size
   const normalizedTilemap = ensureGridSize(tilemap, GRID_WIDTH, GRID_HEIGHT);
+  
+  // Normalize subtypes if provided, otherwise create a grid of zeros
+  const normalizedSubtypes = subtypes ? 
+    ensureGridSize(subtypes, GRID_WIDTH, GRID_HEIGHT) : 
+    Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0));
   
   return (
     <div 
@@ -25,22 +31,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes }) 
         data-testid="tilemap-grid-container"
         style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
       >
-        {renderTileGrid(normalizedTilemap, tileTypes)}
+        {renderTileGrid(normalizedTilemap, tileTypes, normalizedSubtypes)}
       </div>
     </div>
   );
 };
 
 // Render the grid of tiles
-function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>) {
+function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][]) {
   return grid.flatMap((row, rowIndex) => 
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
+      const subtype = subtypes[rowIndex][colIndex];
       return (
         <div key={`${rowIndex}-${colIndex}`}>
           <Tile 
             tileId={tileId}
             tileType={tileType}
+            subtype={subtype}
           />
         </div>
       );

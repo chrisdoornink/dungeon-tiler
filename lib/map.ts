@@ -147,6 +147,15 @@ export function countRooms(grid: number[][]): number {
 /**
  * Map data structure that includes both tiles and subtypes
  */
+// Subtype enum values for better readability
+export enum TileSubtype {
+  NONE = 0,
+  EXIT = 1,
+  DOOR = 2,
+  KEY = 3,
+  LOCK = 4
+}
+
 export interface MapData {
   tiles: number[][];
   subtypes: number[][];
@@ -164,6 +173,138 @@ export function generateMapWithSubtypes(): MapData {
     tiles,
     subtypes
   };
+}
+
+/**
+ * Generate a map with door and exit subtypes
+ * Places exactly one door and one exit on wall tiles adjacent to floor tiles
+ * @returns MapData object with door and exit subtypes placed
+ */
+export function generateMapWithDoorAndExit(): MapData {
+  // Start with a basic map with subtypes
+  const mapData = generateMapWithSubtypes();
+  
+  // Find all wall tiles that are adjacent to at least one floor tile
+  const wallsNextToFloor: Array<[number, number]> = [];
+  
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      // Check if this is a wall tile
+      if (mapData.tiles[y][x] === WALL) {
+        // Check if it's adjacent to at least one floor tile
+        const hasAdjacentFloor = (
+          (y > 0 && mapData.tiles[y-1][x] === FLOOR) ||              // North
+          (y < GRID_SIZE-1 && mapData.tiles[y+1][x] === FLOOR) ||    // South
+          (x > 0 && mapData.tiles[y][x-1] === FLOOR) ||              // West
+          (x < GRID_SIZE-1 && mapData.tiles[y][x+1] === FLOOR)       // East
+        );
+        
+        if (hasAdjacentFloor) {
+          wallsNextToFloor.push([y, x]);
+        }
+      }
+    }
+  }
+  
+  // If we don't have at least two valid positions, return the basic map
+  if (wallsNextToFloor.length < 2) {
+    console.warn('Not enough walls next to floor tiles for door and exit placement');
+    return mapData;
+  }
+  
+  // Shuffle the array of valid wall positions
+  for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [wallsNextToFloor[i], wallsNextToFloor[j]] = [wallsNextToFloor[j], wallsNextToFloor[i]];
+  }
+  
+  // Place the door (first wall)
+  const [doorY, doorX] = wallsNextToFloor[0];
+  mapData.subtypes[doorY][doorX] = TileSubtype.DOOR;
+  
+  // Place the exit (second wall)
+  const [exitY, exitX] = wallsNextToFloor[1];
+  mapData.subtypes[exitY][exitX] = TileSubtype.EXIT;
+  
+  return mapData;
+}
+
+/**
+ * Generate a map with key and lock subtypes
+ * Places exactly one key on a floor tile and one lock on a wall tile adjacent to floor
+ * @returns MapData object with key and lock subtypes placed
+ */
+export function generateMapWithKeyAndLock(): MapData {
+  // Start with a map that already has door and exit
+  const mapData = generateMapWithDoorAndExit();
+  
+  // Find all available floor tiles for key placement
+  const floorTiles: Array<[number, number]> = [];
+  
+  // Find all available wall tiles next to floor for lock placement
+  const wallsNextToFloor: Array<[number, number]> = [];
+  
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      // Skip tiles that already have subtypes
+      if (mapData.subtypes[y][x] !== TileSubtype.NONE) {
+        continue;
+      }
+      
+      // Check for floor tiles for key placement
+      if (mapData.tiles[y][x] === FLOOR) {
+        floorTiles.push([y, x]);
+      }
+      // Check for wall tiles next to floor for lock placement
+      else if (mapData.tiles[y][x] === WALL) {
+        const hasAdjacentFloor = (
+          (y > 0 && mapData.tiles[y-1][x] === FLOOR) ||              // North
+          (y < GRID_SIZE-1 && mapData.tiles[y+1][x] === FLOOR) ||    // South
+          (x > 0 && mapData.tiles[y][x-1] === FLOOR) ||              // West
+          (x < GRID_SIZE-1 && mapData.tiles[y][x+1] === FLOOR)       // East
+        );
+        
+        if (hasAdjacentFloor) {
+          wallsNextToFloor.push([y, x]);
+        }
+      }
+    }
+  }
+  
+  // If we don't have enough valid positions, return the map without key/lock
+  if (floorTiles.length < 1 || wallsNextToFloor.length < 1) {
+    console.warn('Not enough valid tiles for key and lock placement');
+    return mapData;
+  }
+  
+  // Shuffle the arrays for random placement
+  for (let i = floorTiles.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [floorTiles[i], floorTiles[j]] = [floorTiles[j], floorTiles[i]];
+  }
+  
+  for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [wallsNextToFloor[i], wallsNextToFloor[j]] = [wallsNextToFloor[j], wallsNextToFloor[i]];
+  }
+  
+  // Place the key on a floor tile
+  const [keyY, keyX] = floorTiles[0];
+  mapData.subtypes[keyY][keyX] = TileSubtype.KEY;
+  
+  // Place the lock on a wall next to floor
+  const [lockY, lockX] = wallsNextToFloor[0];
+  mapData.subtypes[lockY][lockX] = TileSubtype.LOCK;
+  
+  return mapData;
+}
+
+/**
+ * Generate a complete map with all subtypes (door, exit, key, lock)
+ * @returns MapData object with all subtypes properly placed
+ */
+export function generateCompleteMap(): MapData {
+  return generateMapWithKeyAndLock();
 }
 
 export function countCenterOutRooms(grid: number[][]): number {
@@ -199,7 +340,8 @@ export function countCenterOutRooms(grid: number[][]): number {
  * @param visited Visited tiles array (unused but kept for interface consistency)
  * @returns Room object if a rectangular room is found, null otherwise
  */
-function findRectangularRoom(grid: number[][], startX: number, startY: number, _visited: boolean[][]): Room | null {
+function findRectangularRoom(grid: number[][], startX: number, startY: number, visited: boolean[][]): Room | null {
+  // visited parameter isn't used but kept for interface consistency
   // Try to find the bounds of a rectangular room
   const minX = startX;
   const minY = startY;
@@ -324,7 +466,8 @@ export function generateMapCenterOut(): number[][] {
   
   const totalTiles = GRID_SIZE * GRID_SIZE;
   const targetMinFloor = Math.floor(totalTiles * 0.35); // 35% - more reasonable for distinct rooms
-  const targetMaxFloor = Math.floor(totalTiles * 0.60); // 60%
+  // Target max floor used as an upper bound in floorCoverage check below
+  const maxFloorCoverage = Math.floor(totalTiles * 0.60); // 60%
   
   // If we don't have enough floor tiles, moderately expand rooms while maintaining separation
   let attempts = 0;
