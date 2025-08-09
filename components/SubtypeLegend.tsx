@@ -6,7 +6,8 @@ const subtypeInfo = {
   1: { name: 'Exit', color: '#4ade80' }, // Green
   2: { name: 'Door', color: '#a78bfa' }, // Purple
   3: { name: 'Key', color: '#facc15' },  // Yellow
-  4: { name: 'Lock', color: '#f87171' }  // Red
+  4: { name: 'Lock', color: '#f87171' },  // Red
+  5: { name: 'Player', color: '#3b82f6' }  // Blue
 };
 
 export const SubtypeLegend: React.FC = () => {

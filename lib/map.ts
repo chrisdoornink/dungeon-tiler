@@ -153,7 +153,8 @@ export enum TileSubtype {
   EXIT = 1,
   DOOR = 2,
   KEY = 3,
-  LOCK = 4
+  LOCK = 4,
+  PLAYER = 5
 }
 
 export interface MapData {
@@ -304,7 +305,187 @@ export function generateMapWithKeyAndLock(): MapData {
  * @returns MapData object with all subtypes properly placed
  */
 export function generateCompleteMap(): MapData {
-  return generateMapWithKeyAndLock();
+  const mapData = generateMapWithKeyAndLock();
+  return addPlayerToMap(mapData);
+}
+
+/**
+ * Add a player character to the map on a random floor tile
+ * @param mapData The map data to add a player to
+ * @returns The updated map data with a player added
+ */
+export function addPlayerToMap(mapData: MapData): MapData {
+  // Find all available floor tiles for player placement
+  const floorTiles: Array<[number, number]> = [];
+  
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      // Only consider floor tiles that don't have any subtype
+      if (mapData.tiles[y][x] === FLOOR && mapData.subtypes[y][x] === TileSubtype.NONE) {
+        floorTiles.push([y, x]);
+      }
+    }
+  }
+  
+  // If we don't have any valid positions, return the map without a player
+  if (floorTiles.length === 0) {
+    console.warn('No valid floor tiles for player placement');
+    return mapData;
+  }
+  
+  // Choose a random floor tile for player placement
+  const randomIndex = Math.floor(Math.random() * floorTiles.length);
+  const [playerY, playerX] = floorTiles[randomIndex];
+  
+  // Place the player
+  mapData.subtypes[playerY][playerX] = TileSubtype.PLAYER;
+  
+  return mapData;
+}
+
+/**
+ * Find the current player position on the map
+ * @param mapData The map data to search for player
+ * @returns The [y, x] coordinates of the player or null if not found
+ */
+export function findPlayerPosition(mapData: MapData): [number, number] | null {
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (mapData.subtypes[y][x] === TileSubtype.PLAYER) {
+        return [y, x];
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Enum representing possible movement directions
+ */
+export enum Direction {
+  UP,
+  RIGHT,
+  DOWN,
+  LEFT
+}
+
+/**
+ * Game state interface for tracking player inventory and game progress
+ */
+export interface GameState {
+  hasKey: boolean;
+  mapData: MapData;
+}
+
+/**
+ * Initialize a new game state with a newly generated map
+ * @returns A new GameState object
+ */
+export function initializeGameState(): GameState {
+  return {
+    hasKey: false,
+    mapData: generateCompleteMap()
+  };
+}
+
+/**
+ * Move the player in the specified direction if possible
+ * @param gameState Current game state
+ * @param direction Direction to move
+ * @returns Updated game state after movement attempt
+ */
+export function movePlayer(gameState: GameState, direction: Direction): GameState {
+  const position = findPlayerPosition(gameState.mapData);
+  if (!position) return gameState; // No player found
+  
+  const [currentY, currentX] = position;
+  let newY = currentY;
+  let newX = currentX;
+  
+  // Calculate new position based on direction
+  switch (direction) {
+    case Direction.UP:
+      newY = Math.max(0, currentY - 1);
+      break;
+    case Direction.RIGHT:
+      newX = Math.min(GRID_SIZE - 1, currentX + 1);
+      break;
+    case Direction.DOWN:
+      newY = Math.min(GRID_SIZE - 1, currentY + 1);
+      break;
+    case Direction.LEFT:
+      newX = Math.max(0, currentX - 1);
+      break;
+  }
+  
+  // If position didn't change, return unchanged state
+  if (newY === currentY && newX === currentX) return gameState;
+  
+  // Deep clone the map data to avoid modifying the original
+  const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
+  const newGameState = { ...gameState, mapData: newMapData };
+  
+  // Check if the new position is a wall
+  if (newMapData.tiles[newY][newX] === WALL) {
+    // Check if it's a door or lock
+    const subtype = newMapData.subtypes[newY][newX];
+    
+    // If it's a door, player can pass through
+    if (subtype === TileSubtype.DOOR) {
+      // Convert the door to floor when player passes through
+      newMapData.tiles[newY][newX] = FLOOR;
+      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      
+      // Move player to the new position
+      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+    } 
+    // If it's a lock and player has key, unlock it
+    else if (subtype === TileSubtype.LOCK && newGameState.hasKey) {
+      // Convert the lock to floor when unlocked
+      newMapData.tiles[newY][newX] = FLOOR;
+      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      
+      // Move player to the new position and consume the key
+      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+      newGameState.hasKey = false;
+    } 
+    // If it's an exit, player wins (for now just pass through)
+    else if (subtype === TileSubtype.EXIT) {
+      // Convert the exit to floor when player passes through
+      newMapData.tiles[newY][newX] = FLOOR;
+      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      
+      // Move player to the new position
+      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+      
+      // Here you would typically trigger a win condition
+      console.log('Player found the exit!');
+    }
+    
+    // For regular walls, do nothing - player cannot move there
+    return newGameState;
+  }
+  
+  // If the new position is a floor tile
+  if (newMapData.tiles[newY][newX] === FLOOR) {
+    const subtype = newMapData.subtypes[newY][newX];
+    
+    // If it's a key, pick it up
+    if (subtype === TileSubtype.KEY) {
+      newGameState.hasKey = true;
+      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      console.log('Player picked up a key!');
+    }
+    
+    // Move player to the new position
+    newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
+    newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+  }
+  
+  return newGameState;
 }
 
 /**

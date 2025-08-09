@@ -4,7 +4,7 @@ import {
   areAllFloorsConnected,
   generateMapWithSubtypes,
   generateMapWithDoorAndExit,
-  generateMapWithKeyAndLock,
+  generateMapWithKeyAndLock
 } from "../../lib/map";
 
 describe("Map Generation", () => {
