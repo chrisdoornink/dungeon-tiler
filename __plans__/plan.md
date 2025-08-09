@@ -1,4 +1,6 @@
-# Refactor Components into Separate Files
+## Dungeon Tiler Plan File
+
+Refer to the coding methodology in `__plans__/coding_methodology.md` before taking any action in here.
 
 ## Notes
 
@@ -55,7 +57,8 @@
   - [x] Implement minimum code to pass DT-5 tests
   - [x] Refactor if needed after DT-5 tests pass
 - [x] start using the new algorithm in the TilemapGrid component once it is ready
-- [ ] Refactor the center-out algorithm to generate a single room in the center of the grid between 9 and 100 tiles in size. The rest should be walls.
+- [x] Refactor the center-out algorithm to generate a single room in the center of the grid between 9 and 100 tiles in size. The rest should be walls.
+- [x] Refactor the center-out algorithm to generate a random number of rooms between 1 and 4 in the center of the grid between 9 and 100 tiles in size. The rest should be walls.
 
 ## Current Goal
 
