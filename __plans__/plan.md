@@ -63,116 +63,16 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] The Grid should at least 50% floor tiles and at most 75% floor tiles
 - [x] Walls and floors can have subtypes, stored as enum values in an array of numbers.
 - [x] Subtypes are displayed next to the tile number in each grid cell.
-- [ ] Make the wall tile text visible, light text over the dark tile please
-- [ ] There should always be a single wall tile in the grid with the type 2 which will be "door" AND the type 1 which will be "exit". The exit tile should be placed next to a floor tile.
-- [ ] There may be a wall or tile with the type 3 which will be 'key'. A key will correspond to a lock which will be type 4. Type 3 and 4 always need to be used together and need to reference each other so that the key can unlock the lock.
-- [ ]
+- [x] Make the wall tile text visible, light text over the dark tile please
+- [x] There should always be a single wall tile in the grid with the type 2 which will be "door" AND the type 1 which will be "exit". The exit tile should be placed next to a floor tile.
+- [x] There may be a wall or tile with the type 3 which will be 'key'. A key will correspond to a lock which will be type 4. Type 3 and 4 always need to be used together and need to reference each other so that the key can unlock the lock.
+- [ ] Ensure that subtypes can change based on user actions and are not static after generation of map
+- [ ] A User is represented by a tile with the type 5 which will be "player". The player tile should be placed on a floor tile.
+- [ ] When the user clicks the right arrow key the player should move one tile to the right if the tile is a floor tile.
+- [ ] When the user clicks the left arrow key the player should move one tile to the left if the tile is a floor tile.
+- [ ] When the user clicks the up arrow key the player should move one tile up if the tile is a floor tile.
+- [ ] When the user clicks the down arrow key the player should move one tile down if the tile is a floor tile.
+- [ ] When the player moves to a tile with a subtype the subtype should be removed from the tile.
+- [ ] When the player moves to a tile with a subtype the subtype should be added to an inventory array.
 
 ## Current Goal
-
-Determine next feature or audit (DT-7)
-
-## DT-1: TilemapGrid Initial Implementation
-
-The following rules should be applied and tested:
-
-- The Grid bounds are 25 x 25
-- The grid should be centered on the page
-- The grid should be responsive
-- The entire grid should be visible
-
-## DT-2: TilemapGrid Generation Rules
-
-THe TilemapGrid currently generates a 25x25 grid of tiles but they do not have any types assigned to them. Other than the top left 20 tiles, they are all 0 (floor).
-
-We want a generation process that creates a random tilemap of the specified size (25x25) with a mix of tile types (floor and wall).
-
-The generation process should be as follows:
-
-- The grid should be generated randomly
-- The grid should be generated with a mix of tile types (floor and wall)
-- The walls should be connected to each other and form a continuous path
-- There can be rooms of floor tiles surrounded by walls
-- There should be no more than 4 rooms in a grid
-- THe majority of the perimeter should be walls
-- any dead space between the 4 rooms and the perimeter should be filled with walls
-- there should be at least half floor tiles and up to 75% floor tiles
-
-It should regenerate on a page refresh
-
-## DT-3: TilemapGrid Generation Rules Follow-up
-
-I missed some details in DT-2 that we'll need to address:
-
-- The floors should be connected to each other and form a continuous path. THe connection points are theh tiles directly above, below, left, and right of each other.
-- Diagonal connections are not allowed.
-- Ensure the rules in DT-2 are still followed.
-
-## DT-4: TilemapGrid Generation Rules Follow-up 2
-
-Make a test to ensure the number of rooms is between 1 and 4.
-
-## DT-5: TilemapGrid Generation Rules Follow-up 3
-
-I want to try a different algorithm for generating the tilemap.
-
-- Keep the existing map.ts algorithm
-- Create a new algorithm in a new file called lib/map-center-out-algorithm.ts
-- start using the new algorithm in the TilemapGrid component once it is ready
-- The new algorithm should generate a tilemap with the same rules as the existing algorithm but with a different approach
-
-The algorythm should start in the center of the grid (12,12) and work its way outwards, carving rooms and corridors as it goes. Follow these details as closely as you can:
-
-Algorithm 1. Init
-
-    •	Fill grid with 0 (Wall).
-    •	Reserve perimeter as 0 (Wall) and never carve beyond margin.
-
-    2.	Seed central room
-
-    •	Center = (10,10).
-    •	Pick w,h in [4..8], clamp to box within margins.
-    •	Carve rectangle to 1 (Floor).
-
-    3.	Place more rooms
-
-    •	Maintain rooms[] (rects) and frontier[] (edges of carved rooms).
-    •	While floor_count < target_floor and rooms.length < room_count:
-    •	Pick a random existing room and a random side (N/E/S/W).
-    •	Sample new room size (w,h in [4..8]).
-    •	Compute a candidate rectangle offset from that side with buffer tiles of Wall between rooms.
-    •	Validate:
-    •	Inside bounds (respect margin).
-    •	Does not overlap any existing Floor.
-    •	Leaves at least buffer tiles of Wall around it.
-    •	If valid:
-    •	Carve rectangle to 1 (Floor).
-    •	Carve exactly one doorway (D) in the shared wall between the two rooms (choose a cell centrally along the shared side). This prevents meandering hallways.
-    •	Push new room to rooms[].
-
-    4.	Grow area without hallways (if under target and room cap reached)
-
-    •	While floor_count < target_floor:
-    •	Pick a random room.
-    •	Attempt a bulge: carve a small 2–3 tile wide rectangular annex attached to one side with a single doorway cell; still enforce buffer.
-    •	If no valid annex after N tries, break.
-
-    5.	Connectivity guard
-
-    •	Flood-fill from the center. If some Floor is unreachable:
-    •	Connect via straight L-path: carve a shortest rectilinear path (first horizontal then vertical or vice versa), but replace exactly one tile along the shared wall with D (door) and keep the path width = 1. This adds connectors only when necessary and avoids snaky corridors.
-
-    6.	Room count validation
-
-    •	Count rooms by connected-component labeling of rectangular floor masses split by doors. If > 4, randomly pick surplus rooms and fill them back to 0 (Wall) (or skip adding them earlier). Prefer prevention over pruning by enforcing the rooms.length < room_count check.
-
-    7.	Wall continuity
-
-    •	Ensure a continuous perimeter (already true).
-    •	Because each room keeps a buffer of 1 Wall, outer walls naturally remain continuous and “dead space” stays Wall.
-
-    8.	Final checks
-
-    •	Perimeter mostly Wall (true by design).
-    •	Floors connected (by flood-fill check).
-    •	Floor ratio between 50% and 75%. If too low, repeat step 4 bulges. If too high, shrink a random room edge by 1 tile strip.
