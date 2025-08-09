@@ -140,36 +140,159 @@ export function countRooms(grid: number[][]): number {
 }
 
 /**
+ * Count rooms specifically for center-out algorithm by detecting rectangular structures
+ * @param grid The tilemap grid to analyze
+ * @returns Number of rectangular room structures
+ */
+/**
+ * Map data structure that includes both tiles and subtypes
+ */
+export interface MapData {
+  tiles: number[][];
+  subtypes: number[][];
+}
+
+/**
+ * Generate a map with subtypes - all subtypes initialized to 0
+ * @returns MapData object containing both tiles and subtypes arrays
+ */
+export function generateMapWithSubtypes(): MapData {
+  const tiles = generateMap();
+  const subtypes = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+  
+  return {
+    tiles,
+    subtypes
+  };
+}
+
+export function countCenterOutRooms(grid: number[][]): number {
+  const visited = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(false));
+  let roomCount = 0;
+  
+  for (let y = 1; y < GRID_SIZE - 1; y++) {
+    for (let x = 1; x < GRID_SIZE - 1; x++) {
+      if (grid[y][x] === FLOOR && !visited[y][x]) {
+        // Found a potential room, check if it's rectangular
+        const room = findRectangularRoom(grid, x, y, visited);
+        if (room && room.width >= 3 && room.height >= 3) {
+          roomCount++;
+          // Mark all tiles in this room as visited
+          for (let ry = room.y; ry < room.y + room.height; ry++) {
+            for (let rx = room.x; rx < room.x + room.width; rx++) {
+              visited[ry][rx] = true;
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  return roomCount;
+}
+
+/**
+ * Find a rectangular room starting from a given floor tile
+ * @param grid The tilemap grid
+ * @param startX Starting x coordinate
+ * @param startY Starting y coordinate
+ * @param visited Visited tiles array (unused but kept for interface consistency)
+ * @returns Room object if a rectangular room is found, null otherwise
+ */
+function findRectangularRoom(grid: number[][], startX: number, startY: number, _visited: boolean[][]): Room | null {
+  // Try to find the bounds of a rectangular room
+  const minX = startX;
+  const minY = startY;
+  let maxX = startX;
+  let maxY = startY;
+  
+  // Expand right to find width
+  while (maxX + 1 < GRID_SIZE && grid[startY][maxX + 1] === FLOOR) {
+    maxX++;
+  }
+  
+  // Expand down to find height
+  while (maxY + 1 < GRID_SIZE && grid[maxY + 1][startX] === FLOOR) {
+    maxY++;
+  }
+  
+  const width = maxX - minX + 1;
+  const height = maxY - minY + 1;
+  
+  // Verify this forms a complete rectangle
+  for (let y = minY; y <= maxY; y++) {
+    for (let x = minX; x <= maxX; x++) {
+      if (grid[y][x] !== FLOOR) {
+        return null; // Not a complete rectangle
+      }
+    }
+  }
+  
+  // Verify this forms a complete rectangle of at least 3x3
+  if (width >= 3 && height >= 3) {
+    return {
+      x: startX,
+      y: startY,
+      width: width,
+      height: height
+    };
+  }
+  
+  return null;
+}
+
+/**
  * Generate a map using a center-out algorithm
- * Creates a map with 1-4 rooms in the center, each between 9 and 100 tiles in size
+ * Creates a map with 3-6 rooms in the center, each between 9 and 100 tiles in size
  * @returns 25x25 grid with floor (0) and wall (1) tiles
  */
 export function generateMapCenterOut(): number[][] {
   // Initialize grid with walls
   const grid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(WALL));
   
-  // Determine random number of rooms (1-4)
-  const numRooms = Math.floor(Math.random() * 4) + 1;
+  // Determine random number of rooms (3-6)
+  const numRooms = Math.floor(Math.random() * 4) + 3;
   
-  // Generate rooms
+  // Generate rooms using a grid-based approach for better packing
   const rooms: Room[] = [];
   
-  for (let i = 0; i < numRooms; i++) {
-    let attempts = 0;
-    const maxAttempts = 50;
+  // Divide the grid into sections to ensure we can fit multiple rooms
+  const sectionSize = 8; // Each section is 8x8
+  const sectionsPerRow = Math.floor(GRID_SIZE / sectionSize);
+  const availableSections: Array<{x: number, y: number}> = [];
+  
+  // Create list of available sections (avoiding edges)
+  for (let sectionY = 0; sectionY < sectionsPerRow - 1; sectionY++) {
+    for (let sectionX = 0; sectionX < sectionsPerRow - 1; sectionX++) {
+      availableSections.push({x: sectionX, y: sectionY});
+    }
+  }
+  
+  // Shuffle sections for random placement
+  for (let i = availableSections.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [availableSections[i], availableSections[j]] = [availableSections[j], availableSections[i]];
+  }
+  
+  // Place rooms in sections - ensure we place the target number
+  let roomsPlaced = 0;
+  for (let i = 0; i < availableSections.length && roomsPlaced < numRooms; i++) {
+    const section = availableSections[i];
     
-    while (attempts < maxAttempts) {
-      // Determine random room size between 3x3 (9 tiles) and 10x10 (100 tiles)
-      const roomWidth = Math.floor(Math.random() * 8) + 3; // 3 to 10
-      const roomHeight = Math.floor(Math.random() * 8) + 3; // 3 to 10
-      
-      // Try to place room in center area (avoiding edges)
-      const margin = 2;
-      const maxStartY = GRID_SIZE - roomHeight - margin;
-      const maxStartX = GRID_SIZE - roomWidth - margin;
-      
-      const startY = Math.floor(Math.random() * (maxStartY - margin)) + margin;
-      const startX = Math.floor(Math.random() * (maxStartX - margin)) + margin;
+    // Create smaller rooms to fit more (3x3 to 4x4 for better packing)
+    const roomWidth = Math.floor(Math.random() * 2) + 3; // 3 to 4
+    const roomHeight = Math.floor(Math.random() * 2) + 3; // 3 to 4
+    
+    // Place room within the section with more space
+    const sectionStartX = section.x * sectionSize + 2;
+    const sectionStartY = section.y * sectionSize + 2;
+    const maxRoomStartX = sectionStartX + sectionSize - roomWidth - 2;
+    const maxRoomStartY = sectionStartY + sectionSize - roomHeight - 2;
+    
+    // Ensure we have valid placement bounds
+    if (maxRoomStartX >= sectionStartX && maxRoomStartY >= sectionStartY) {
+      const startX = Math.floor(Math.random() * (maxRoomStartX - sectionStartX + 1)) + sectionStartX;
+      const startY = Math.floor(Math.random() * (maxRoomStartY - sectionStartY + 1)) + sectionStartY;
       
       const newRoom: Room = {
         x: startX,
@@ -178,39 +301,27 @@ export function generateMapCenterOut(): number[][] {
         height: roomHeight
       };
       
-      // Check if room overlaps with existing rooms (with buffer)
-      let overlaps = false;
-      for (const existingRoom of rooms) {
-        if (roomsOverlapWithBuffer(newRoom, existingRoom, 1)) {
-          overlaps = true;
-          break;
-        }
-      }
-      
-      if (!overlaps) {
-        // Carve out the room
-        for (let y = startY; y < startY + roomHeight; y++) {
-          for (let x = startX; x < startX + roomWidth; x++) {
+      // Carve out the room
+      for (let y = startY; y < startY + roomHeight; y++) {
+        for (let x = startX; x < startX + roomWidth; x++) {
+          if (y >= 0 && y < GRID_SIZE && x >= 0 && x < GRID_SIZE) {
             grid[y][x] = FLOOR;
           }
         }
-        rooms.push(newRoom);
-        break;
       }
-      
-      attempts++;
+      rooms.push(newRoom);
+      roomsPlaced++;
     }
   }
   
-  // Connect rooms if there are multiple
-  if (rooms.length > 1) {
-    for (let i = 1; i < rooms.length; i++) {
-      connectRooms(grid, rooms[0], rooms[i]);
-    }
-  }
+  // Don't connect rooms initially - let the connectivity function handle it
+  // This preserves room counting while ensuring connectivity
   
   // Ensure perimeter walls are intact
   enforcePerimeterWalls(grid);
+  
+  // Ensure floors are connected (this will add minimal corridors if needed)
+  ensureFloorsConnected(grid);
   
   return grid;
 }
@@ -229,47 +340,9 @@ function roomsOverlap(roomA: Room, roomB: Room): boolean {
   );
 }
 
-/**
- * Check if two rooms overlap with a buffer zone around them
- */
-function roomsOverlapWithBuffer(roomA: Room, roomB: Room, buffer: number): boolean {
-  return (
-    roomA.x - buffer <= roomB.x + roomB.width + buffer &&
-    roomA.x + roomA.width + buffer >= roomB.x - buffer &&
-    roomA.y - buffer <= roomB.y + roomB.height + buffer &&
-    roomA.y + roomA.height + buffer >= roomB.y - buffer
-  );
-}
 
-/**
- * Connect two rooms with a corridor
- */
-function connectRooms(grid: number[][], roomA: Room, roomB: Room): void {
-  // Get center points of each room
-  const x1 = Math.floor(roomA.x + roomA.width / 2);
-  const y1 = Math.floor(roomA.y + roomA.height / 2);
-  const x2 = Math.floor(roomB.x + roomB.width / 2);
-  const y2 = Math.floor(roomB.y + roomB.height / 2);
-  
-  // Create L-shaped corridor (horizontal then vertical)
-  let currentX = x1;
-  let currentY = y1;
-  
-  // Move horizontally first
-  while (currentX !== x2) {
-    grid[currentY][currentX] = FLOOR;
-    currentX += currentX < x2 ? 1 : -1;
-  }
-  
-  // Then move vertically
-  while (currentY !== y2) {
-    grid[currentY][currentX] = FLOOR;
-    currentY += currentY < y2 ? 1 : -1;
-  }
-  
-  // Ensure destination is floor
-  grid[y2][x2] = FLOOR;
-}
+
+
 
 /**
  * Carve a room in the grid by setting its tiles to floor

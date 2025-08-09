@@ -1,4 +1,4 @@
-import { generateMap, countRooms, areAllFloorsConnected, generateMapCenterOut } from '../../lib/map';
+import { generateMap, countRooms, areAllFloorsConnected, generateMapCenterOut, countCenterOutRooms, generateMapWithSubtypes } from '../../lib/map';
 
 describe('Map Generation', () => {
   it('should generate a 25x25 grid', () => {
@@ -96,7 +96,7 @@ describe('Map Generation', () => {
 });
 
 describe('Center-Out Map Generation', () => {
-  it('should generate a map with 1-4 rooms in the center, each between 9 and 100 tiles in size', () => {
+  it('should generate a map with 3-6 rooms in the center, each between 9 and 100 tiles in size', () => {
     const map = generateMapCenterOut();
     
     // Check grid dimensions
@@ -113,16 +113,37 @@ describe('Center-Out Map Generation', () => {
       }
     }
     
-    // Should have between 9 and 400 floor tiles (1-4 rooms * 9-100 tiles each)
-    expect(floorCount).toBeGreaterThanOrEqual(9);
-    expect(floorCount).toBeLessThanOrEqual(400);
+    // Should have between 27 and 600 floor tiles (3-6 rooms * 9-100 tiles each)
+    expect(floorCount).toBeGreaterThanOrEqual(27);
+    expect(floorCount).toBeLessThanOrEqual(600);
     
-    // Should have between 1 and 4 rooms
-    const roomCount = countRooms(map);
-    expect(roomCount).toBeGreaterThanOrEqual(1);
-    expect(roomCount).toBeLessThanOrEqual(4);
+    // Should have between 3 and 6 rooms
+    const roomCount = countCenterOutRooms(map);
+    expect(roomCount).toBeGreaterThanOrEqual(3);
+    expect(roomCount).toBeLessThanOrEqual(6);
     
     // Verify that floors are connected
     expect(areAllFloorsConnected(map)).toBe(true);
+  });
+});
+
+describe('Tile Subtypes', () => {
+  it('should generate maps with tile subtypes initialized to 0', () => {
+    const mapData = generateMapWithSubtypes();
+    
+    // Check that we have both tiles and subtypes
+    expect(mapData.tiles).toBeDefined();
+    expect(mapData.subtypes).toBeDefined();
+    expect(mapData.tiles.length).toBe(25);
+    expect(mapData.subtypes.length).toBe(25);
+    expect(mapData.tiles[0].length).toBe(25);
+    expect(mapData.subtypes[0].length).toBe(25);
+    
+    // Check that all subtypes are initialized to 0
+    for (let y = 0; y < 25; y++) {
+      for (let x = 0; x < 25; x++) {
+        expect(mapData.subtypes[y][x]).toBe(0);
+      }
+    }
   });
 });

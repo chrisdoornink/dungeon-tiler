@@ -4,25 +4,36 @@ import { Tile } from '../../components/Tile';
 import '@testing-library/jest-dom';
 
 describe('Tile component', () => {
-  // First test: Tile should display its tileId
+  it('should render the tile with correct background color', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(<Tile tileId={0} tileType={mockTileType} />);
+    
+    const tile = screen.getByTestId('tile-0');
+    expect(tile).toBeInTheDocument();
+    expect(tile).toHaveStyle('background-color: #ccc');
+  });
+
   it('should display the tile ID', () => {
-    // Arrange - Set up the test data
-    const mockProps = {
-      tileId: 1,
-      tileType: {
-        id: 1,
-        name: 'wall',
-        color: '#333',
-        walkable: false
-      },
-      rowIndex: 0,
-      colIndex: 0
-    };
+    const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
+    render(<Tile tileId={1} tileType={mockTileType} />);
     
-    // Act - Render the component with the test data
-    render(<Tile {...mockProps} />);
+    const tile = screen.getByTestId('tile-1');
+    expect(tile).toHaveTextContent('1');
+  });
+
+  it('should display tile ID and subtype when subtype is provided', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(<Tile tileId={0} tileType={mockTileType} subtype={1} />);
     
-    // Assert - Check that the tile ID is displayed
-    expect(screen.getByText('1')).toBeInTheDocument();
+    const tile = screen.getByTestId('tile-0');
+    expect(tile).toHaveTextContent('0:1');
+  });
+
+  it('should display only tile ID when subtype is 0', () => {
+    const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
+    render(<Tile tileId={1} tileType={mockTileType} subtype={0} />);
+    
+    const tile = screen.getByTestId('tile-1');
+    expect(tile).toHaveTextContent('1');
   });
 });
