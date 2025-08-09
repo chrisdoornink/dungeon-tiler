@@ -7,7 +7,6 @@ import * as mapModule from '../../lib/map';
 jest.mock('../../lib/map', () => ({
   ...jest.requireActual('../../lib/map'),
   generateMap: jest.fn(),
-  generateMapCenterOut: jest.fn(),
   generateCompleteMap: jest.fn(),
   tileTypes: {
     0: { name: 'Floor', color: 'gray' },
@@ -23,7 +22,6 @@ describe('Home Component', () => {
     const mockGrid = Array(25).fill(0).map(() => Array(25).fill(0));
     const mockSubtypes = Array(25).fill(0).map(() => Array(25).fill(0));
     (mapModule.generateMap as jest.Mock).mockReturnValue(mockGrid);
-    (mapModule.generateMapCenterOut as jest.Mock).mockReturnValue(mockGrid);
     (mapModule.generateCompleteMap as jest.Mock).mockReturnValue({
       tiles: mockGrid,
       subtypes: mockSubtypes
@@ -34,12 +32,11 @@ describe('Home Component', () => {
     render(<Home />);
     expect(mapModule.generateCompleteMap).toHaveBeenCalled();
     expect(mapModule.generateMap).not.toHaveBeenCalled();
-    expect(mapModule.generateMapCenterOut).not.toHaveBeenCalled();
   });
 
   it('should use generateMap when algorithm is set to default', () => {
     render(<Home algorithm="default" />);
     expect(mapModule.generateMap).toHaveBeenCalled();
-    expect(mapModule.generateMapCenterOut).not.toHaveBeenCalled();
+    expect(mapModule.generateCompleteMap).not.toHaveBeenCalled();
   });
 });

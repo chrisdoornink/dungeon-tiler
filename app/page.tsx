@@ -1,11 +1,11 @@
 "use client";
 
-import { generateMap, generateMapCenterOut, generateCompleteMap, tileTypes, MapData } from "../lib/map";
+import { generateMap, generateCompleteMap, tileTypes, MapData } from "../lib/map";
 import { TilemapGrid } from "../components/TilemapGrid";
 import { Legend } from "../components/Legend";
 
 interface HomeProps {
-  algorithm?: "default" | "centerOut" | "complete";
+  algorithm?: "default" | "complete";
 }
 
 export default function Home({ algorithm = "complete" }: HomeProps) {
@@ -17,7 +17,7 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
     mapData = generateCompleteMap();
     tilemap = mapData.tiles;
   } else {
-    tilemap = algorithm === "centerOut" ? generateMapCenterOut() : generateMap();
+    tilemap = generateMap();
   }
 
   return (

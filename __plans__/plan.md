@@ -61,8 +61,9 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Refactor the center-out algorithm to generate a random number of rooms between 1 and 4 in the center of the grid between 9 and 100 tiles in size. The rest should be walls.
 - [x] Refactor the center-out algorithm to generate a random number of rooms between 3 and 6 in the center of the grid between 9 and 100 tiles in size. The rest should be walls.
 - [x] The Grid should at least 50% floor tiles and at most 75% floor tiles
-- [ ] Walls and floors can have subtypes, stored as enum values in an array of numbers.
-- [ ] Subtypes are displayed next to the tile number in each grid cell.
+- [x] Walls and floors can have subtypes, stored as enum values in an array of numbers.
+- [x] Subtypes are displayed next to the tile number in each grid cell.
+- [ ] Make the wall tile text visible, light text over the dark tile please
 - [ ] There should always be a single wall tile in the grid with the type 2 which will be "door" AND the type 1 which will be "exit". The exit tile should be placed next to a floor tile.
 - [ ] There may be a wall or tile with the type 3 which will be 'key'. A key will correspond to a lock which will be type 4. Type 3 and 4 always need to be used together and need to reference each other so that the key can unlock the lock.
 - [ ]
