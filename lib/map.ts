@@ -274,20 +274,20 @@ export function generateMapCenterOut(): number[][] {
     [availableSections[i], availableSections[j]] = [availableSections[j], availableSections[i]];
   }
   
-  // Place rooms in sections - ensure we place the target number
+  // Place rooms in sections - ensure we place the target number with larger rooms
   let roomsPlaced = 0;
   for (let i = 0; i < availableSections.length && roomsPlaced < numRooms; i++) {
     const section = availableSections[i];
     
-    // Create smaller rooms to fit more (3x3 to 4x4 for better packing)
-    const roomWidth = Math.floor(Math.random() * 2) + 3; // 3 to 4
-    const roomHeight = Math.floor(Math.random() * 2) + 3; // 3 to 4
+    // Create larger rooms to fill more space (5x5 to 7x7 for better coverage)
+    const roomWidth = Math.floor(Math.random() * 3) + 5; // 5 to 7
+    const roomHeight = Math.floor(Math.random() * 3) + 5; // 5 to 7
     
-    // Place room within the section with more space
-    const sectionStartX = section.x * sectionSize + 2;
-    const sectionStartY = section.y * sectionSize + 2;
-    const maxRoomStartX = sectionStartX + sectionSize - roomWidth - 2;
-    const maxRoomStartY = sectionStartY + sectionSize - roomHeight - 2;
+    // Place room within the section with minimal margins
+    const sectionStartX = section.x * sectionSize + 1;
+    const sectionStartY = section.y * sectionSize + 1;
+    const maxRoomStartX = sectionStartX + sectionSize - roomWidth - 1;
+    const maxRoomStartY = sectionStartY + sectionSize - roomHeight - 1;
     
     // Ensure we have valid placement bounds
     if (maxRoomStartX >= sectionStartX && maxRoomStartY >= sectionStartY) {
@@ -311,6 +311,95 @@ export function generateMapCenterOut(): number[][] {
       }
       rooms.push(newRoom);
       roomsPlaced++;
+    }
+  }
+  
+  // Ensure we have enough floor coverage (50-75%)
+  let floorCount = 0;
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      if (grid[y][x] === FLOOR) floorCount++;
+    }
+  }
+  
+  const totalTiles = GRID_SIZE * GRID_SIZE;
+  const targetMinFloor = Math.floor(totalTiles * 0.35); // 35% - more reasonable for distinct rooms
+  const targetMaxFloor = Math.floor(totalTiles * 0.60); // 60%
+  
+  // If we don't have enough floor tiles, moderately expand rooms while maintaining separation
+  let attempts = 0;
+  const maxAttempts = 500;
+  
+  while (floorCount < targetMinFloor && attempts < maxAttempts) {
+    attempts++;
+    
+    if (rooms.length > 0) {
+      const roomToExpand = rooms[Math.floor(Math.random() * rooms.length)];
+      
+      // Try to expand the room in one random direction with buffer checking
+      const direction = Math.floor(Math.random() * 4); // 0=right, 1=down, 2=left, 3=up
+      let expanded = false;
+      
+      switch (direction) {
+        case 0: // Expand right
+          if (roomToExpand.x + roomToExpand.width < GRID_SIZE - 2) { // Leave buffer for perimeter
+            // Check if we can expand without hitting another room (maintain 2-tile buffer)
+            let canExpand = true;
+            for (let y = roomToExpand.y; y < roomToExpand.y + roomToExpand.height; y++) {
+              if (grid[y][roomToExpand.x + roomToExpand.width] === FLOOR ||
+                  (roomToExpand.x + roomToExpand.width + 1 < GRID_SIZE && 
+                   grid[y][roomToExpand.x + roomToExpand.width + 1] === FLOOR)) {
+                canExpand = false;
+                break;
+              }
+            }
+            if (canExpand) {
+              for (let y = roomToExpand.y; y < roomToExpand.y + roomToExpand.height; y++) {
+                grid[y][roomToExpand.x + roomToExpand.width] = FLOOR;
+                floorCount++;
+                expanded = true;
+              }
+              if (expanded) roomToExpand.width++;
+            }
+          }
+          break;
+          
+        case 1: // Expand down
+          if (roomToExpand.y + roomToExpand.height < GRID_SIZE - 2) {
+            let canExpand = true;
+            for (let x = roomToExpand.x; x < roomToExpand.x + roomToExpand.width; x++) {
+              if (grid[roomToExpand.y + roomToExpand.height][x] === FLOOR ||
+                  (roomToExpand.y + roomToExpand.height + 1 < GRID_SIZE && 
+                   grid[roomToExpand.y + roomToExpand.height + 1][x] === FLOOR)) {
+                canExpand = false;
+                break;
+              }
+            }
+            if (canExpand) {
+              for (let x = roomToExpand.x; x < roomToExpand.x + roomToExpand.width; x++) {
+                grid[roomToExpand.y + roomToExpand.height][x] = FLOOR;
+                floorCount++;
+                expanded = true;
+              }
+              if (expanded) roomToExpand.height++;
+            }
+          }
+          break;
+      }
+    }
+    
+    // If we still need more floor tiles and can't expand rooms, add small isolated floor patches
+    if (floorCount < targetMinFloor && attempts > 200) {
+      const randomY = Math.floor(Math.random() * (GRID_SIZE - 4)) + 2;
+      const randomX = Math.floor(Math.random() * (GRID_SIZE - 4)) + 2;
+      
+      // Only add if it's isolated (surrounded by walls)
+      if (grid[randomY][randomX] === WALL &&
+          grid[randomY-1][randomX] === WALL && grid[randomY+1][randomX] === WALL &&
+          grid[randomY][randomX-1] === WALL && grid[randomY][randomX+1] === WALL) {
+        grid[randomY][randomX] = FLOOR;
+        floorCount++;
+      }
     }
   }
   

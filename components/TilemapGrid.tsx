@@ -37,10 +37,7 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>) {
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
       return (
-        <div
-          key={`${rowIndex}-${colIndex}`}
-          data-testid={`tile-${rowIndex}-${colIndex}`}
-        >
+        <div key={`${rowIndex}-${colIndex}`}>
           <Tile 
             tileId={tileId}
             tileType={tileType}
