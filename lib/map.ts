@@ -141,32 +141,71 @@ export function countRooms(grid: number[][]): number {
 
 /**
  * Generate a map using a center-out algorithm
- * Creates a map with a single room in the center between 9 and 100 tiles in size
+ * Creates a map with 1-4 rooms in the center, each between 9 and 100 tiles in size
  * @returns 25x25 grid with floor (0) and wall (1) tiles
  */
 export function generateMapCenterOut(): number[][] {
   // Initialize grid with walls
   const grid = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(WALL));
   
-  // Determine the center of the grid
-  const centerY = Math.floor(GRID_SIZE / 2);
-  const centerX = Math.floor(GRID_SIZE / 2);
+  // Determine random number of rooms (1-4)
+  const numRooms = Math.floor(Math.random() * 4) + 1;
   
-  // Determine random room size between 3x3 (9 tiles) and 10x10 (100 tiles)
-  // We'll pick a random width and height between 3 and 10
-  const roomWidth = Math.floor(Math.random() * 8) + 3; // 3 to 10
-  const roomHeight = Math.floor(Math.random() * 8) + 3; // 3 to 10
+  // Generate rooms
+  const rooms: Room[] = [];
   
-  // Calculate room boundaries, ensuring it's centered
-  const startY = centerY - Math.floor(roomHeight / 2);
-  const endY = startY + roomHeight - 1;
-  const startX = centerX - Math.floor(roomWidth / 2);
-  const endX = startX + roomWidth - 1;
+  for (let i = 0; i < numRooms; i++) {
+    let attempts = 0;
+    const maxAttempts = 50;
+    
+    while (attempts < maxAttempts) {
+      // Determine random room size between 3x3 (9 tiles) and 10x10 (100 tiles)
+      const roomWidth = Math.floor(Math.random() * 8) + 3; // 3 to 10
+      const roomHeight = Math.floor(Math.random() * 8) + 3; // 3 to 10
+      
+      // Try to place room in center area (avoiding edges)
+      const margin = 2;
+      const maxStartY = GRID_SIZE - roomHeight - margin;
+      const maxStartX = GRID_SIZE - roomWidth - margin;
+      
+      const startY = Math.floor(Math.random() * (maxStartY - margin)) + margin;
+      const startX = Math.floor(Math.random() * (maxStartX - margin)) + margin;
+      
+      const newRoom: Room = {
+        x: startX,
+        y: startY,
+        width: roomWidth,
+        height: roomHeight
+      };
+      
+      // Check if room overlaps with existing rooms (with buffer)
+      let overlaps = false;
+      for (const existingRoom of rooms) {
+        if (roomsOverlapWithBuffer(newRoom, existingRoom, 1)) {
+          overlaps = true;
+          break;
+        }
+      }
+      
+      if (!overlaps) {
+        // Carve out the room
+        for (let y = startY; y < startY + roomHeight; y++) {
+          for (let x = startX; x < startX + roomWidth; x++) {
+            grid[y][x] = FLOOR;
+          }
+        }
+        rooms.push(newRoom);
+        break;
+      }
+      
+      attempts++;
+    }
+  }
   
-  // Carve out the room as floor
-  for (let y = startY; y <= endY; y++) {
-    for (let x = startX; x <= endX; x++) {
-      grid[y][x] = FLOOR;
+  // Connect rooms if there are multiple
+  if (rooms.length > 1) {
+    for (let i = 1; i < rooms.length; i++) {
+      connectRooms(grid, rooms[0], rooms[i]);
     }
   }
   
@@ -188,6 +227,48 @@ function roomsOverlap(roomA: Room, roomB: Room): boolean {
     roomA.y <= roomB.y + roomB.height &&
     roomA.y + roomA.height >= roomB.y
   );
+}
+
+/**
+ * Check if two rooms overlap with a buffer zone around them
+ */
+function roomsOverlapWithBuffer(roomA: Room, roomB: Room, buffer: number): boolean {
+  return (
+    roomA.x - buffer <= roomB.x + roomB.width + buffer &&
+    roomA.x + roomA.width + buffer >= roomB.x - buffer &&
+    roomA.y - buffer <= roomB.y + roomB.height + buffer &&
+    roomA.y + roomA.height + buffer >= roomB.y - buffer
+  );
+}
+
+/**
+ * Connect two rooms with a corridor
+ */
+function connectRooms(grid: number[][], roomA: Room, roomB: Room): void {
+  // Get center points of each room
+  const x1 = Math.floor(roomA.x + roomA.width / 2);
+  const y1 = Math.floor(roomA.y + roomA.height / 2);
+  const x2 = Math.floor(roomB.x + roomB.width / 2);
+  const y2 = Math.floor(roomB.y + roomB.height / 2);
+  
+  // Create L-shaped corridor (horizontal then vertical)
+  let currentX = x1;
+  let currentY = y1;
+  
+  // Move horizontally first
+  while (currentX !== x2) {
+    grid[currentY][currentX] = FLOOR;
+    currentX += currentX < x2 ? 1 : -1;
+  }
+  
+  // Then move vertically
+  while (currentY !== y2) {
+    grid[currentY][currentX] = FLOOR;
+    currentY += currentY < y2 ? 1 : -1;
+  }
+  
+  // Ensure destination is floor
+  grid[y2][x2] = FLOOR;
 }
 
 /**

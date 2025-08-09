@@ -24,15 +24,15 @@ describe('Home Component', () => {
     (mapModule.generateMapCenterOut as jest.Mock).mockReturnValue(mockGrid);
   });
   
-  it('should use generateMap by default', () => {
+  it('should use generateMapCenterOut by default', () => {
     render(<Home />);
-    expect(mapModule.generateMap).toHaveBeenCalled();
-    expect(mapModule.generateMapCenterOut).not.toHaveBeenCalled();
-  });
-
-  it('should use generateMapCenterOut when algorithm is set to centerOut', () => {
-    render(<Home algorithm="centerOut" />);
     expect(mapModule.generateMapCenterOut).toHaveBeenCalled();
     expect(mapModule.generateMap).not.toHaveBeenCalled();
+  });
+
+  it('should use generateMap when algorithm is set to default', () => {
+    render(<Home algorithm="default" />);
+    expect(mapModule.generateMap).toHaveBeenCalled();
+    expect(mapModule.generateMapCenterOut).not.toHaveBeenCalled();
   });
 });

@@ -96,7 +96,7 @@ describe('Map Generation', () => {
 });
 
 describe('Center-Out Map Generation', () => {
-  it('should generate a map with a single room in the center between 9 and 100 tiles in size', () => {
+  it('should generate a map with 1-4 rooms in the center, each between 9 and 100 tiles in size', () => {
     const map = generateMapCenterOut();
     
     // Check grid dimensions
@@ -113,13 +113,14 @@ describe('Center-Out Map Generation', () => {
       }
     }
     
-    // Should have between 9 and 100 floor tiles
+    // Should have between 9 and 400 floor tiles (1-4 rooms * 9-100 tiles each)
     expect(floorCount).toBeGreaterThanOrEqual(9);
-    expect(floorCount).toBeLessThanOrEqual(100);
+    expect(floorCount).toBeLessThanOrEqual(400);
     
-    // Should have exactly one room
+    // Should have between 1 and 4 rooms
     const roomCount = countRooms(map);
-    expect(roomCount).toBe(1);
+    expect(roomCount).toBeGreaterThanOrEqual(1);
+    expect(roomCount).toBeLessThanOrEqual(4);
     
     // Verify that floors are connected
     expect(areAllFloorsConnected(map)).toBe(true);
