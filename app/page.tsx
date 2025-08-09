@@ -1,6 +1,6 @@
 "use client";
 
-import { generateMap, generateCompleteMap, tileTypes, MapData } from "../lib/map";
+import { generateMap, generateCompleteMap, tileTypes, MapData, initializeGameState } from "../lib/map";
 import { TilemapGrid } from "../components/TilemapGrid";
 import { Legend } from "../components/Legend";
 
@@ -25,9 +25,14 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
       <h1 className="text-3xl font-bold mb-6">Dungeon Tilemap</h1>
 
       <TilemapGrid 
-        tilemap={tilemap} 
         tileTypes={tileTypes}
-        subtypes={mapData?.subtypes}
+        initialGameState={algorithm === "complete" ? initializeGameState() : {
+          hasKey: false,
+          mapData: {
+            tiles: tilemap,
+            subtypes: mapData?.subtypes || []
+          }
+        }}
       />
 
       <div className="mt-4 mb-4">
