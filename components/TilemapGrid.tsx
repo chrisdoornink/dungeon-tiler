@@ -94,7 +94,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
         data-testid="tilemap-grid-wrapper"
       >
         <div 
-          className="border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-1"
+          className="border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-0"
           data-testid="tilemap-grid-container"
           style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
           tabIndex={0} // Make div focusable for keyboard events
@@ -178,11 +178,27 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
   // Calculate visibility for each tile
   const visibility = calculateVisibility(grid, playerPosition);
   
+  // Function to safely get a tile ID at specific coordinates
+  const getTileAt = (row: number, col: number): number | null => {
+    if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) {
+      return null; // Out of bounds
+    }
+    return grid[row][col];
+  };
+
   return grid.flatMap((row, rowIndex) => 
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
       const subtype = subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : 0;
       const isVisible = visibility[rowIndex][colIndex];
+      
+      // Get neighboring tiles
+      const neighbors = {
+        top: getTileAt(rowIndex - 1, colIndex),
+        right: getTileAt(rowIndex, colIndex + 1),
+        bottom: getTileAt(rowIndex + 1, colIndex),
+        left: getTileAt(rowIndex, colIndex - 1)
+      };
       
       return (
         <div key={`${rowIndex}-${colIndex}`}>
@@ -191,6 +207,7 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
             tileType={tileType}
             subtype={subtype}
             isVisible={isVisible}
+            neighbors={neighbors}
           />
         </div>
       );
