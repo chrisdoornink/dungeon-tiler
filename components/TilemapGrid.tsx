@@ -285,17 +285,27 @@ function renderTileGrid(
     const tileSize = 40; // px (w-10/h-10)
     const centerX = (px + 0.5) * tileSize;
     const centerY = (py + 0.5) * tileSize;
-    const r1 = 4 * tileSize; // full
-    const r2 = 5 * tileSize; // mid
-    const r3 = 6 * tileSize; // low
-    const r4 = 7 * tileSize; // nearly dark
+    // Stronger, darker fade pulled slightly inward
+    const r0 = 3.8 * tileSize; // inner safe
+    const r1 = 4.4 * tileSize; // begin fade
+    const r2 = 5.0 * tileSize; // mid fade
+    const r3 = 5.6 * tileSize; // stronger fade
+    const r4 = 6.2 * tileSize; // near dark
+    const r5 = 7.0 * tileSize; // full dark
 
-    const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px, rgba(0,0,0,0) ${r1}px, rgba(0,0,0,0.35) ${r2}px, rgba(0,0,0,0.65) ${r3}px, rgba(0,0,0,0.92) ${r4}px)`;
+    const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
+      rgba(0,0,0,0) ${r0}px,
+      rgba(0,0,0,0.20) ${r1}px,
+      rgba(0,0,0,0.50) ${r2}px,
+      rgba(0,0,0,0.80) ${r3}px,
+      rgba(0,0,0,0.95) ${r4}px,
+      rgba(0,0,0,1) ${r5}px
+    )`;
 
     tiles.push(
       <div
         key="fov-radial-overlay"
-        className="pointer-events-none absolute inset-0 mix-blend-multiply"
+        className="pointer-events-none absolute inset-0"
         style={{ backgroundImage: gradient, zIndex: 10000 }}
       />
     );

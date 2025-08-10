@@ -49,32 +49,14 @@ export const Tile: React.FC<TileProps> = ({
           : ''
     : '';
 
-  // Visual fade overlay style per tier (inline to avoid Tailwind config variability)
-  const overlayStyle = isVisible
-    ? { opacity: visibilityTier === 3 ? 0 : visibilityTier === 2 ? 0.5 : 0.8, zIndex: 999 }
-    : { opacity: 1, zIndex: 999 };
-
-  // Guaranteed darkening using CSS filter brightness
-  const brightnessValue = !isVisible
-    ? 0 // invisible handled elsewhere
-    : visibilityTier === 3
-      ? 1
-      : visibilityTier === 2
-        ? 0.7
-        : 0.4;
-  const brightnessStyle = isVisible ? { filter: `brightness(${brightnessValue})` } : {};
-
   if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
     return (
       <div 
         className={`relative w-10 h-10 flex items-center justify-center bg-blue-500 text-white font-bold ${tierClass}`}
-        style={brightnessStyle}
         data-testid={`tile-${tileId}`}
         data-neighbor-code={neighborCode}
       >
         @
-        {/* Fade overlay on top */}
-        <div className="absolute inset-0 bg-black pointer-events-none mix-blend-multiply" style={overlayStyle} />
       </div>
     );
   }
@@ -118,7 +100,7 @@ export const Tile: React.FC<TileProps> = ({
       return (
         <div 
           className={floorClasses}
-          style={{ backgroundColor: '#c8c8c8', ...brightnessStyle }} 
+          style={{ backgroundColor: '#c8c8c8' }} 
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
@@ -134,8 +116,6 @@ export const Tile: React.FC<TileProps> = ({
               {subtype.join(',')}
             </div>
           )}
-          {/* Fade overlay on top (last to ensure highest stacking) */}
-          <div className="absolute inset-0 bg-black pointer-events-none mix-blend-multiply" style={overlayStyle} />
         </div>
       );
     } else {
@@ -191,7 +171,7 @@ export const Tile: React.FC<TileProps> = ({
       return (
         <div 
           className={`${wallClasses} ${shadowClasses} ${highlightClasses}`}
-          style={{ backgroundColor: '#5a5a5a', ...brightnessStyle }}
+          style={{ backgroundColor: '#5a5a5a' }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
@@ -204,8 +184,6 @@ export const Tile: React.FC<TileProps> = ({
               {subtype.join(',')}
             </div>
           )}
-          {/* Fade overlay on top (last to ensure highest stacking) */}
-          <div className="absolute inset-0 bg-black pointer-events-none z-50" style={overlayStyle} />
         </div>
       );
     } else {
