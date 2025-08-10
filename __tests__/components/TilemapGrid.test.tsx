@@ -1,5 +1,9 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
+const pushMock = jest.fn();
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
 import { TilemapGrid } from '../../components/TilemapGrid';
 import { TileSubtype, GameState } from '../../lib/map';
 import '@testing-library/jest-dom';
@@ -36,10 +40,55 @@ describe('TilemapGrid component', () => {
     expect(gridContainer).toHaveStyle({
       gridTemplateColumns: 'repeat(25, 1fr)',
     });
-    
+
     // Should have 625 tiles (25x25)
     const tiles = screen.getAllByTestId(/^tile-/);
     expect(tiles).toHaveLength(25 * 25);
+  });
+
+  it('persists lastGame and redirects to /end when win becomes true after opening exit', () => {
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    const r = 10, c = 10;
+    // Layout: Player at (r,c), EXITKEY at (r,c+1) on floor, EXIT at (r,c+2) as wall
+    subtypes[r][c] = [TileSubtype.PLAYER];
+    subtypes[r][c+1] = [TileSubtype.EXITKEY];
+    tiles[r][c+2] = 1; // wall
+    subtypes[r][c+2] = [TileSubtype.EXIT];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+      win: false,
+    };
+
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    // Move right to pick up exit key
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+    // Move right again to open exit and step onto it
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    // Assert sessionStorage contains lastGame payload
+    const raw = window.sessionStorage.getItem('lastGame');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed).toHaveProperty('completedAt');
+    expect(parsed).toMatchObject({ hasKey: false, hasExitKey: false });
+    expect(parsed.mapData).toBeTruthy();
+
+    // Assert redirect
+    expect(pushMock).toHaveBeenCalledWith('/end');
   });
 
   it('should render circular FOV with fading tiers', () => {
@@ -55,6 +104,7 @@ describe('TilemapGrid component', () => {
       hasExitKey: false,
       mapData: { tiles, subtypes },
       showFullMap: false,
+      win: false,
     };
 
     render(
@@ -130,6 +180,7 @@ describe('TilemapGrid component', () => {
       hasExitKey: false,
       mapData: { tiles, subtypes },
       showFullMap: true,
+      win: false,
     };
 
     // Act: render with showFullMap = true

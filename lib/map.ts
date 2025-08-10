@@ -492,6 +492,7 @@ export interface GameState {
   hasExitKey: boolean;
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
+  win: boolean; // Win state when player opens exit and steps onto it
 }
 
 /**
@@ -504,6 +505,7 @@ export function initializeGameState(): GameState {
     hasExitKey: false,
     mapData: generateCompleteMap(),
     showFullMap: false,
+    win: false,
   };
 }
 
@@ -596,6 +598,7 @@ export function movePlayer(
         ].filter((type) => type !== TileSubtype.PLAYER);
         newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
         newGameState.hasExitKey = false;
+        newGameState.win = true;
 
         // Here you would typically trigger a win condition
         console.log("Player opened the exit!");

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   TileType,
   GameState,
@@ -26,6 +27,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   subtypes,
   initialGameState,
 }) => {
+  const router = useRouter();
+
   // Initialize game state
   const [gameState, setGameState] = useState<GameState>(() => {
     if (initialGameState) {
@@ -48,6 +51,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               ),
         },
         showFullMap: false,
+        win: false,
       };
     } else {
       // If no tilemap provided, generate a new game state
@@ -59,13 +63,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Auto-disable full map visibility after 3 seconds
   useEffect(() => {
-    if (!gameState.showFullMap) return;
-    const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
-      setGameState((prev) => ({ ...prev, showFullMap: false }));
-      // Note: keep behavior minimal per TDD; no extra side-effects
-    }, 3000);
-    return () => clearTimeout(timer);
+    if (gameState.showFullMap) {
+      // Auto-disable after 3 seconds
+      const timer = setTimeout(() => {
+        setGameState((prev) => ({ ...prev, showFullMap: false }));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
   }, [gameState.showFullMap]);
+
+  // Redirect to end page and persist game snapshot on win
+  useEffect(() => {
+    if (gameState.win) {
+      try {
+        const payload = {
+          completedAt: new Date().toISOString(),
+          hasKey: gameState.hasKey,
+          hasExitKey: gameState.hasExitKey,
+          mapData: gameState.mapData,
+        };
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+        }
+      } catch {
+        // no-op – storage may be unavailable in some environments
+      }
+      router.push("/end");
+    }
+  }, [gameState.win, gameState.hasKey, gameState.hasExitKey, gameState.mapData, router]);
 
   // Add keyboard event listener
   useEffect(() => {

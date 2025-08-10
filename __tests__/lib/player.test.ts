@@ -63,6 +63,7 @@ describe("Player and Dynamic Subtypes", () => {
       hasExitKey: false,
       mapData,
       showFullMap: false,
+      win: false,
     };
 
     // Attempt to move into exit without exit key
@@ -101,6 +102,7 @@ describe("Player and Dynamic Subtypes", () => {
       hasExitKey: false,
       mapData,
       showFullMap: false,
+      win: false,
     };
 
     // Step 1: move right to pick up exit key
@@ -108,11 +110,12 @@ describe("Player and Dynamic Subtypes", () => {
     expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
     expect(gameState.hasExitKey).toBe(true);
 
-    // Step 2: move right into exit; should open and consume exit key
+    // Step 2: move right into exit; should open and consume exit key and set win
     gameState = movePlayer(gameState, Direction.RIGHT);
     expect(findPlayerPosition(gameState.mapData)).toEqual([10, 12]);
     expect(gameState.mapData.tiles[10][12]).toBe(0);
     expect(gameState.hasExitKey).toBe(false);
+    expect(gameState.win).toBe(true);
   });
 
   it("should find player position correctly", () => {
@@ -224,6 +227,7 @@ describe("Player and Dynamic Subtypes", () => {
       hasExitKey: false,
       mapData: mapData,
       showFullMap: false,
+      win: false,
     };
 
     // Step 1: Move right to pick up the key
@@ -282,6 +286,7 @@ describe("Player and Dynamic Subtypes", () => {
       hasExitKey: false,
       mapData: mapData,
       showFullMap: false,
+      win: false,
     };
 
     // Step 1: Move right through the door

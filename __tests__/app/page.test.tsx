@@ -1,6 +1,9 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import Home from '../../app/page';
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}));
 import * as mapModule from '../../lib/map';
 
 // Mock the map module
@@ -54,10 +57,13 @@ describe('Home Component', () => {
     // Mock game state initialization
     (mapModule.initializeGameState as jest.Mock).mockReturnValue({
       hasKey: false,
+      hasExitKey: false,
       mapData: {
         tiles: mockGrid,
         subtypes: mockSubtypes
-      }
+      },
+      showFullMap: false,
+      win: false,
     });
     
     // Mock player position finding

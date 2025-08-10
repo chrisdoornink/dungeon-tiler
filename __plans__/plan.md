@@ -77,7 +77,8 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Add subtype 6 for lightswitch - it toggles off the visibility of the map so they can see the whole map.
 - [x] Stepping on a switch should not pick remove it from the tile.
 - [x] The lightswitch should only work for 3 seconds and then flicker back off.
-- [ ] Add subtype 7 for exitKey - it must be used to open the exit door
+- [x] Add subtype 7 for exitKey - it must be used to open the exit door
+-
 
 ### Visual Polish
 
@@ -85,3 +86,37 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Add fading tiers near FOV boundary (full/mid/low/invisible)
 
 ## Current Goal
+
+### End-Game Modal (Exit Open -> Step Onto Exit)
+
+We will implement a simple end-game modal that appears when the player opens the exit using the exit key and moves onto the exit tile.
+
+TDD Test Breakdown:
+
+- [ ] lib: Opening exit with exit key and moving onto it sets `gameState.win = true`.
+- [ ] lib: Attempting to move into exit without exit key does NOT set `gameState.win`.
+- [ ] lib: Moving onto a normal floor tile does NOT set `gameState.win`.
+- [ ] components: When `gameState.win` becomes true after a move, `TilemapGrid` renders an end-game modal with the message.
+- [ ] components: No modal is shown when `gameState.win` is false.
+- [ ] components: Modal content text is exactly the expected copy for snapshot/strict assertion.
+
+Next: Redirect to End Page and Persist Game Data
+
+TDD Test Breakdown:
+
+- [ ] components: When `win` becomes true, `TilemapGrid` stores the final game payload in `sessionStorage` under a stable key (e.g., `lastGame`) and navigates to `/end` via router push.
+- [ ] components: The storage payload contains map, inventory flags, and optional summary fields.
+- [ ] app/end: End page reads `sessionStorage.lastGame` and renders a summary view. If missing, shows a fallback message.
+- [ ] components: No redirect occurs when `win` is false.
+
+Implementation Notes:
+
+- Use Next App Router `useRouter().push('/end')`.
+- Persist to `sessionStorage` (ephemeral, per-tab) to avoid URL bloat.
+- End page is a client component that hydrates from `sessionStorage` on mount.
+
+Implementation Notes:
+
+- Add `win: boolean` to `GameState` (default `false`).
+- In `movePlayer()`, when the exit is opened using `hasExitKey` and the player moves onto it, set `win = true`.
+- In `TilemapGrid.tsx`, render a simple modal overlay when `gameState.win` is true. Keep it minimal for now.
