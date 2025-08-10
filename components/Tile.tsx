@@ -13,6 +13,7 @@ interface TileProps {
   tileType: TileType;
   subtype?: number[];
   isVisible?: boolean; // Whether this tile is in the player's field of view
+  visibilityTier?: number; // 0-3 for FOV fade tiers
   neighbors?: NeighborInfo; // Information about neighboring tiles
 }
 
@@ -22,6 +23,7 @@ export const Tile: React.FC<TileProps> = ({
   tileType,
   subtype = [],
   isVisible = true,
+  visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null }
 }) => {
   // Generate shorthand code for autotiling
@@ -37,14 +39,42 @@ export const Tile: React.FC<TileProps> = ({
   // Pixel art colors - directly use these values in the JSX
   
   // If this is a player tile
+  const tierClass = isVisible
+    ? visibilityTier === 3
+      ? 'fov-tier-3'
+      : visibilityTier === 2
+        ? 'fov-tier-2'
+        : visibilityTier === 1
+          ? 'fov-tier-1'
+          : ''
+    : '';
+
+  // Visual fade overlay style per tier (inline to avoid Tailwind config variability)
+  const overlayStyle = isVisible
+    ? { opacity: visibilityTier === 3 ? 0 : visibilityTier === 2 ? 0.5 : 0.8, zIndex: 999 }
+    : { opacity: 1, zIndex: 999 };
+
+  // Guaranteed darkening using CSS filter brightness
+  const brightnessValue = !isVisible
+    ? 0 // invisible handled elsewhere
+    : visibilityTier === 3
+      ? 1
+      : visibilityTier === 2
+        ? 0.7
+        : 0.4;
+  const brightnessStyle = isVisible ? { filter: `brightness(${brightnessValue})` } : {};
+
   if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
     return (
       <div 
-        className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white font-bold"
+        className={`relative w-10 h-10 flex items-center justify-center bg-blue-500 text-white font-bold ${tierClass}`}
+        style={brightnessStyle}
         data-testid={`tile-${tileId}`}
         data-neighbor-code={neighborCode}
       >
         @
+        {/* Fade overlay on top */}
+        <div className="absolute inset-0 bg-black pointer-events-none mix-blend-multiply" style={overlayStyle} />
       </div>
     );
   }
@@ -54,7 +84,7 @@ export const Tile: React.FC<TileProps> = ({
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
       // Create the autotiled floor style
-      let floorClasses = 'w-10 h-10 relative bg-[#c8c8c8]';
+      let floorClasses = `w-10 h-10 relative bg-[#c8c8c8] ${tierClass}`;
       
       // Add subtle texture to floors
       floorClasses += ' before:content-[""] before:absolute before:inset-0 before:bg-opacity-10 ' +
@@ -88,7 +118,7 @@ export const Tile: React.FC<TileProps> = ({
       return (
         <div 
           className={floorClasses}
-          style={{ backgroundColor: '#c8c8c8' }} 
+          style={{ backgroundColor: '#c8c8c8', ...brightnessStyle }} 
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
@@ -104,6 +134,8 @@ export const Tile: React.FC<TileProps> = ({
               {subtype.join(',')}
             </div>
           )}
+          {/* Fade overlay on top (last to ensure highest stacking) */}
+          <div className="absolute inset-0 bg-black pointer-events-none mix-blend-multiply" style={overlayStyle} />
         </div>
       );
     } else {
@@ -121,7 +153,7 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 1) {
     if (isVisible) {
       // Create the autotiled wall style
-      let wallClasses = 'w-10 h-10 relative bg-[#5a5a5a]';
+      let wallClasses = `w-10 h-10 relative bg-[#5a5a5a] ${tierClass}`;
       
       // Start with base wall style
       wallClasses += ' border border-[#3a3a3a]';
@@ -159,7 +191,7 @@ export const Tile: React.FC<TileProps> = ({
       return (
         <div 
           className={`${wallClasses} ${shadowClasses} ${highlightClasses}`}
-          style={{ backgroundColor: '#5a5a5a' }}
+          style={{ backgroundColor: '#5a5a5a', ...brightnessStyle }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
@@ -172,6 +204,8 @@ export const Tile: React.FC<TileProps> = ({
               {subtype.join(',')}
             </div>
           )}
+          {/* Fade overlay on top (last to ensure highest stacking) */}
+          <div className="absolute inset-0 bg-black pointer-events-none z-50" style={overlayStyle} />
         </div>
       );
     } else {

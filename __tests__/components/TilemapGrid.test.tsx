@@ -42,6 +42,48 @@ describe('TilemapGrid component', () => {
     expect(tiles).toHaveLength(25 * 25);
   });
 
+  it('should render circular FOV with fading tiers', () => {
+    // Arrange: 25x25 floor map with PLAYER at center
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    const c = Math.floor(size / 2); // 12
+    subtypes[c][c] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+    };
+
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    const width = 25;
+    const idx = (r: number, col: number) => r * width + col;
+    const allTiles = screen.getAllByTestId(/^tile-/);
+
+    // Distances from center (Euclidean):
+    // d=2 → (c, c+2) should be tier-3 (fully visible)
+    expect(allTiles[idx(c, c + 2)]).toHaveClass('fov-tier-3');
+    expect(allTiles[idx(c, c + 2)]).not.toHaveClass('bg-gray-900');
+
+    // d=5 → (c+3, c+4) should be tier-2 (mid opacity)
+    expect(allTiles[idx(c + 3, c + 4)]).toHaveClass('fov-tier-2');
+
+    // d=6 → (c+6, c) should be tier-1 (low opacity)
+    expect(allTiles[idx(c + 6, c)]).toHaveClass('fov-tier-1');
+
+    // d=7 → (c+7, c) should be invisible (tier-0 / black)
+    expect(allTiles[idx(c + 7, c)]).toHaveClass('bg-gray-900');
+  });
+
   it('should be centered on the page', () => {
     // Arrange
     const mockTilemap = createMockTilemap(25, 25);

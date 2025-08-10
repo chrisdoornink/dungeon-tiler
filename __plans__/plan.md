@@ -79,4 +79,9 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] The lightswitch should only work for 3 seconds and then flicker back off.
 - [ ] Add subtype 7 for exitKey - it must be used to open the exit door
 
+### Visual Polish
+
+- [x] Render circular field-of-view (FOV) using Euclidean distance instead of Manhattan
+- [x] Add fading tiers near FOV boundary (full/mid/low/invisible)
+
 ## Current Goal

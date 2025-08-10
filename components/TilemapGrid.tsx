@@ -130,7 +130,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         data-testid="tilemap-grid-wrapper"
       >
         <div
-          className="border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-0"
+          className="relative border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-0"
           data-testid="tilemap-grid-container"
           style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
           tabIndex={0} // Make div focusable for keyboard events
@@ -168,39 +168,47 @@ function calculateVisibility(
   grid: number[][],
   playerPosition: [number, number] | null,
   showFullMap: boolean = false
-): boolean[][] {
+): number[][] {
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
 
   // If showFullMap is true or no player, everything is visible
   if (showFullMap || !playerPosition) {
     return Array(gridHeight)
-      .fill(true)
-      .map(() => Array(gridWidth).fill(true));
+      .fill(0)
+      .map(() => Array(gridWidth).fill(3));
   }
 
   // Create a grid of false values (not visible)
-  const visibility: boolean[][] = Array(gridHeight)
-    .fill(false)
-    .map(() => Array(gridWidth).fill(false));
+  const visibility: number[][] = Array(gridHeight)
+    .fill(0)
+    .map(() => Array(gridWidth).fill(0));
 
   const [playerY, playerX] = playerPosition;
 
-  // Use a uniform visibility radius of 4 tiles in all directions
-  const visibilityRadius = 4;
+  // Full-visibility radius
+  const fullRadius = 4;
 
   // Set visibility for all tiles in range
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
-      // Calculate Manhattan distance from player (sum of x and y distances)
-      const dy = Math.abs(y - playerY);
-      const dx = Math.abs(x - playerX);
+      // Use Euclidean distance for circular FOV
+      const dy = y - playerY;
+      const dx = x - playerX;
+      const d = Math.sqrt(dx * dx + dy * dy);
 
-      // A tile is visible if the Manhattan distance is less than or equal to the visibility radius
-      // This creates a diamond-shaped visibility area around the player
-      const isVisible = dy + dx <= visibilityRadius;
+      // Tiered visibility:
+      // 3: d <= 4 (full)
+      // 2: 4 < d <= 5 (mid)
+      // 1: 5 < d <= 6 (low)
+      // 0: d > 6 (invisible)
+      let tier = 0;
+      if (d <= fullRadius) tier = 3;
+      else if (d <= fullRadius + 1) tier = 2;
+      else if (d <= fullRadius + 2) tier = 1;
+      else tier = 0;
 
-      visibility[y][x] = isVisible;
+      visibility[y][x] = tier;
     }
   }
 
@@ -240,12 +248,13 @@ function renderTileGrid(
     return grid[row][col];
   };
 
-  return grid.flatMap((row, rowIndex) =>
+  const tiles = grid.flatMap((row, rowIndex) =>
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
       const subtype =
         subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : [];
-      const isVisible = visibility[rowIndex][colIndex];
+      const tier = visibility[rowIndex][colIndex];
+      const isVisible = tier > 0;
 
       // Get neighboring tiles
       const neighbors = {
@@ -256,18 +265,43 @@ function renderTileGrid(
       };
 
       return (
-        <div key={`${rowIndex}-${colIndex}`}>
+        <div key={`${rowIndex}-${colIndex}`} className="relative">
           <Tile
             tileId={tileId}
             tileType={tileType}
             subtype={subtype}
             isVisible={isVisible}
+            visibilityTier={tier}
             neighbors={neighbors}
           />
         </div>
       );
     })
   );
+
+  // Add a smooth radial gradient overlay centered on the player for continuous fade
+  if (playerPosition && !showFullMap) {
+    const [py, px] = playerPosition; // grid coords
+    const tileSize = 40; // px (w-10/h-10)
+    const centerX = (px + 0.5) * tileSize;
+    const centerY = (py + 0.5) * tileSize;
+    const r1 = 4 * tileSize; // full
+    const r2 = 5 * tileSize; // mid
+    const r3 = 6 * tileSize; // low
+    const r4 = 7 * tileSize; // nearly dark
+
+    const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px, rgba(0,0,0,0) ${r1}px, rgba(0,0,0,0.35) ${r2}px, rgba(0,0,0,0.65) ${r3}px, rgba(0,0,0,0.92) ${r4}px)`;
+
+    tiles.push(
+      <div
+        key="fov-radial-overlay"
+        className="pointer-events-none absolute inset-0 mix-blend-multiply"
+        style={{ backgroundImage: gradient, zIndex: 10000 }}
+      />
+    );
+  }
+
+  return tiles;
 }
 
 // Function removed since we're now using GameState
