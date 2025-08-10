@@ -122,18 +122,75 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
   );
 };
 
+// Calculate visibility based on player position
+function calculateVisibility(grid: number[][], playerPosition: [number, number] | null): boolean[][] {
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+  
+  // Create a grid of false values (not visible)
+  const visibility: boolean[][] = Array(gridHeight).fill(false).map(() => Array(gridWidth).fill(false));
+  
+  // If no player, everything is visible (fallback for testing)
+  if (!playerPosition) {
+    return Array(gridHeight).fill(true).map(() => Array(gridWidth).fill(true));
+  }
+  
+  const [playerY, playerX] = playerPosition;
+  
+  // Use a uniform visibility radius of 4 tiles in all directions
+  const visibilityRadius = 4;
+  
+  // Set visibility for all tiles in range
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      // Calculate Manhattan distance from player (sum of x and y distances)
+      const dy = Math.abs(y - playerY);
+      const dx = Math.abs(x - playerX);
+      
+      // A tile is visible if the Manhattan distance is less than or equal to the visibility radius
+      // This creates a diamond-shaped visibility area around the player
+      const isVisible = (dy + dx) <= visibilityRadius;
+      
+      visibility[y][x] = isVisible;
+    }
+  }
+  
+  return visibility;
+}
+
 // Render the grid of tiles
 function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][] | undefined) {
+  // Find player position in the grid
+  let playerPosition: [number, number] | null = null;
+  
+  if (subtypes) {
+    for (let y = 0; y < subtypes.length; y++) {
+      for (let x = 0; x < subtypes[y].length; x++) {
+        if (subtypes[y][x] === TileSubtype.PLAYER) {
+          playerPosition = [y, x];
+          break;
+        }
+      }
+      if (playerPosition) break;
+    }
+  }
+  
+  // Calculate visibility for each tile
+  const visibility = calculateVisibility(grid, playerPosition);
+  
   return grid.flatMap((row, rowIndex) => 
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
       const subtype = subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : 0;
+      const isVisible = visibility[rowIndex][colIndex];
+      
       return (
         <div key={`${rowIndex}-${colIndex}`}>
           <Tile 
             tileId={tileId}
             tileType={tileType}
             subtype={subtype}
+            isVisible={isVisible}
           />
         </div>
       );

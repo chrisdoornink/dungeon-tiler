@@ -66,13 +66,14 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Make the wall tile text visible, light text over the dark tile please
 - [x] There should always be a single wall tile in the grid with the type 2 which will be "door" AND the type 1 which will be "exit". The exit tile should be placed next to a floor tile.
 - [x] There may be a wall or tile with the type 3 which will be 'key'. A key will correspond to a lock which will be type 4. Type 3 and 4 always need to be used together and need to reference each other so that the key can unlock the lock.
-- [ ] Ensure that subtypes can change based on user actions and are not static after generation of map
-- [ ] A User is represented by a tile with the type 5 which will be "player". The player tile should be placed on a floor tile.
-- [ ] When the user clicks the right arrow key the player should move one tile to the right if the tile is a floor tile.
-- [ ] When the user clicks the left arrow key the player should move one tile to the left if the tile is a floor tile.
-- [ ] When the user clicks the up arrow key the player should move one tile up if the tile is a floor tile.
-- [ ] When the user clicks the down arrow key the player should move one tile down if the tile is a floor tile.
-- [ ] When the player moves to a tile with a subtype the subtype should be removed from the tile.
-- [ ] When the player moves to a tile with a subtype the subtype should be added to an inventory array.
+- [x] A User is represented by a tile with the type 5 which will be "player". The player tile should be placed on a floor tile.
+- [x] When the user clicks the right arrow key the player should move one tile to the right if the tile is a floor tile.
+- [x] When the user clicks the left arrow key the player should move one tile to the left if the tile is a floor tile.
+- [x] When the user clicks the up arrow key the player should move one tile up if the tile is a floor tile.
+- [x] When the user clicks the down arrow key the player should move one tile down if the tile is a floor tile.
+- [x] When the player moves to a tile with a subtype the subtype should be removed from the tile.
+- [x] When the player moves to a tile with a subtype the subtype should be added to an inventory array.
+- [x] Only part of the map is visible at any given time. The player should be able to move the visible area of the map around the player. A player can see 4 tiles in all directions. The tiles that are invisible are displayed as black, the unexplored but remembered wall tiles are displayed as dark gray, the floor tiles as lighter gray, and the player tile is displayed in blue.
+- [ ] use a free emoji or font library that has pixel art emojis and use them to display the tiles.
 
 ## Current Goal
