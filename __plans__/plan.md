@@ -78,8 +78,8 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Stepping on a switch should not pick remove it from the tile.
 - [x] The lightswitch should only work for 3 seconds and then flicker back off.
 - [x] Add subtype 7 for exitKey - it must be used to open the exit door
-- [ ] A sword is only found inside a chest, so in the generation, a sword will need a chest in the same tile.
-- [ ] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile. and add an open chest to the tile (new subtype).
+- [x] A sword is only found inside a chest, so in the generation, a sword will need a chest in the same tile.
+- [x] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile, adding an OPEN_CHEST subtype on that tile.
 
 ### Visual Polish
 

@@ -146,7 +146,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       </div>
 
-      {(gameState.hasKey || gameState.hasExitKey) && (
+      {(gameState.hasKey || gameState.hasExitKey || gameState.hasSword || gameState.hasShield) && (
         <div className="mt-4 p-3 border border-gray-300 rounded-md">
           <h3 className="font-medium mb-2">Inventory:</h3>
           <div className="flex gap-2">
@@ -158,6 +158,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             {gameState.hasExitKey && (
               <div className="p-2 bg-indigo-100 border border-indigo-400 rounded-md">
                 Exit Key 🗝️
+              </div>
+            )}
+            {gameState.hasSword && (
+              <div className="p-2 bg-red-100 border border-red-400 rounded-md">
+                Sword 🗡️
+              </div>
+            )}
+            {gameState.hasShield && (
+              <div className="p-2 bg-blue-100 border border-blue-400 rounded-md">
+                Shield 🛡️
               </div>
             )}
           </div>

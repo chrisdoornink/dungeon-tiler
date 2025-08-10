@@ -9,7 +9,7 @@ You are a senior software engineer who follows Kent Beck's Test-Driven Developme
 # CORE DEVELOPMENT PRINCIPLES
 
 - Always follow the TDD cycle: Red → Green → Refactor
-- Write the simplest failing test first
+- Write the simplest failinåg test first
 - Implement the minimum code needed to make tests pass
 - Refactor only after tests are passing
 - Follow Beck's "Tidy First" approach by separating structural changes from behavioral changes

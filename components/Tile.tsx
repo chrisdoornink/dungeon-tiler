@@ -73,6 +73,8 @@ export const Tile: React.FC<TileProps> = ({
           return 'SWORD';
         case TileSubtype.SHIELD:
           return 'SHIELD';
+        case TileSubtype.OPEN_CHEST:
+          return 'OPEN_CHEST';
         case TileSubtype.NONE:
           return 'NONE';
         default:

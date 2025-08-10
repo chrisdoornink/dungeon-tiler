@@ -163,6 +163,7 @@ export enum TileSubtype {
   CHEST = 8,
   SWORD = 9,
   SHIELD = 10,
+  OPEN_CHEST = 11,
 }
 
 export interface MapData {
@@ -724,10 +725,13 @@ export function movePlayer(
         newGameState.hasShield = true;
       }
 
-      // Remove chest and its content from the tile
+      // Remove chest and its content from the tile, then leave an OPEN_CHEST marker
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
         (t) => t !== TileSubtype.CHEST && t !== TileSubtype.SWORD && t !== TileSubtype.SHIELD
       );
+      if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
+        newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
+      }
     }
 
     // Move player to the new position
@@ -739,11 +743,14 @@ export function movePlayer(
       newMapData.subtypes[currentY][currentX] = [];
     }
 
-    // Handle special case for lightswitch - player and switch coexist on the same tile
-    if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
-      // Add player to the array if it's not already there
-      if (!newMapData.subtypes[newY][newX].includes(TileSubtype.PLAYER)) {
-        newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+    // Handle special cases where player coexists with a persistent tile subtype
+    const destSubtypes = newMapData.subtypes[newY][newX];
+    if (
+      destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
+      destSubtypes.includes(TileSubtype.OPEN_CHEST)
+    ) {
+      if (!destSubtypes.includes(TileSubtype.PLAYER)) {
+        destSubtypes.push(TileSubtype.PLAYER);
       }
     } else {
       // For other tiles, just set to player

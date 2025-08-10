@@ -5,7 +5,8 @@ import {
   generateMapWithSubtypes,
   TileSubtype,
   generateMapWithDoorAndExit,
-  generateMapWithKeyAndLock
+  generateMapWithKeyAndLock,
+  generateCompleteMap,
 } from "../../lib/map";
 
 describe("Map Generation", () => {
@@ -13,6 +14,18 @@ describe("Map Generation", () => {
     const map = generateMap();
     expect(map.length).toBe(25);
     expect(map[0].length).toBe(25);
+  });
+  
+  it("generation should only place SWORD inside a CHEST", () => {
+    const mapData = generateCompleteMap();
+    for (let y = 0; y < 25; y++) {
+      for (let x = 0; x < 25; x++) {
+        const subs = mapData.subtypes[y][x];
+        if (subs.includes(TileSubtype.SWORD)) {
+          expect(subs.includes(TileSubtype.CHEST)).toBe(true);
+        }
+      }
+    }
   });
 
   it("should generate a random map with floor and wall tiles", () => {

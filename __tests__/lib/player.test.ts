@@ -39,6 +39,41 @@ describe("Player and Dynamic Subtypes", () => {
     }
   });
 
+  it("opening a chest leaves an OPEN_CHEST subtype on the tile", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Player at (8,8); chest+sword at (8,9)
+    mapData.subtypes[8][8] = [TileSubtype.PLAYER];
+    mapData.subtypes[8][9] = [TileSubtype.CHEST, TileSubtype.SWORD];
+
+    const gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    const after = movePlayer(gameState, Direction.RIGHT);
+    expect(after.hasSword).toBe(true);
+    expect(after.mapData.subtypes[8][9].includes(TileSubtype.CHEST)).toBe(
+      false
+    );
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(after.mapData.subtypes[8][9].includes((TileSubtype as any).OPEN_CHEST)).toBe(true);
+  });
+
   it("opens an unlocked chest and grants its content (sword)", () => {
     const mapData: MapData = {
       tiles: Array(25)
