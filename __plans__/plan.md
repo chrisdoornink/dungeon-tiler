@@ -74,5 +74,6 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] When the player moves to a tile with a subtype the subtype should be removed from the tile.
 - [x] When the player moves to a tile with a subtype the subtype should be added to an inventory array.
 - [x] Only part of the map is visible at any given time. The player should be able to move the visible area of the map around the player. A player can see 4 tiles in all directions. The tiles that are invisible are displayed as black, the unexplored but remembered wall tiles are displayed as dark gray, the floor tiles as lighter gray, and the player tile is displayed in blue.
+- [ ] Add subtype 6 for lightswitch - it toggles off the visibility of the map so they can see the whole map.
 
 ## Current Goal

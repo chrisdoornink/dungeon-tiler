@@ -154,7 +154,8 @@ export enum TileSubtype {
   DOOR = 2,
   KEY = 3,
   LOCK = 4,
-  PLAYER = 5
+  PLAYER = 5,
+  LIGHTSWITCH = 6
 }
 
 export interface MapData {
@@ -301,12 +302,51 @@ export function generateMapWithKeyAndLock(): MapData {
 }
 
 /**
- * Generate a complete map with all subtypes (door, exit, key, lock)
+ * Add a lightswitch to the map
+ * @param mapData The map data to add a lightswitch to
+ * @returns The updated map data with a lightswitch added
+ */
+export function addLightswitchToMap(mapData: MapData): MapData {
+  // Create a deep copy of the map data
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+  
+  // Find all eligible floor tiles (that don't already have a subtype)
+  const eligibleTiles: Array<[number, number]> = [];
+  
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (grid[y][x] === FLOOR && newMapData.subtypes[y][x] === TileSubtype.NONE) {
+        eligibleTiles.push([y, x]);
+      }
+    }
+  }
+  
+  // If we have eligible tiles, place a lightswitch on a random one
+  if (eligibleTiles.length > 0) {
+    const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
+    const [lightswitchY, lightswitchX] = eligibleTiles[randomIndex];
+    
+    // Set the lightswitch
+    newMapData.subtypes[lightswitchY][lightswitchX] = TileSubtype.LIGHTSWITCH;
+    console.log(`Placed lightswitch at [${lightswitchY}, ${lightswitchX}]`);
+  } else {
+    console.warn('Could not place lightswitch - no eligible floor tiles available');
+  }
+  
+  return newMapData;
+}
+
+/**
+ * Generate a complete map with all subtypes (door, exit, key, lock, lightswitch)
  * @returns MapData object with all subtypes properly placed
  */
 export function generateCompleteMap(): MapData {
   const mapData = generateMapWithKeyAndLock();
-  return addPlayerToMap(mapData);
+  const mapWithLightswitch = addLightswitchToMap(mapData);
+  return addPlayerToMap(mapWithLightswitch);
 }
 
 /**
@@ -315,32 +355,36 @@ export function generateCompleteMap(): MapData {
  * @returns The updated map data with a player added
  */
 export function addPlayerToMap(mapData: MapData): MapData {
-  // Find all available floor tiles for player placement
-  const floorTiles: Array<[number, number]> = [];
+  // Create a deep copy of the map data
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
   
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      // Only consider floor tiles that don't have any subtype
-      if (mapData.tiles[y][x] === FLOOR && mapData.subtypes[y][x] === TileSubtype.NONE) {
-        floorTiles.push([y, x]);
+  // Find all eligible floor tiles (that don't have a subtype)
+  const eligibleTiles: Array<[number, number]> = [];
+  
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (grid[y][x] === FLOOR && newMapData.subtypes[y][x] === TileSubtype.NONE) {
+        eligibleTiles.push([y, x]);
       }
     }
   }
   
-  // If we don't have any valid positions, return the map without a player
-  if (floorTiles.length === 0) {
-    console.warn('No valid floor tiles for player placement');
-    return mapData;
+  // If we have eligible tiles, place a player on a random one
+  if (eligibleTiles.length > 0) {
+    const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
+    const [playerY, playerX] = eligibleTiles[randomIndex];
+    
+    // Place the player
+    newMapData.subtypes[playerY][playerX] = TileSubtype.PLAYER;
+    console.log(`Placed player at [${playerY}, ${playerX}]`);
+  } else {
+    console.warn('Could not place player - no eligible floor tiles available');
   }
   
-  // Choose a random floor tile for player placement
-  const randomIndex = Math.floor(Math.random() * floorTiles.length);
-  const [playerY, playerX] = floorTiles[randomIndex];
-  
-  // Place the player
-  mapData.subtypes[playerY][playerX] = TileSubtype.PLAYER;
-  
-  return mapData;
+  return newMapData;
 }
 
 /**
@@ -375,6 +419,7 @@ export enum Direction {
 export interface GameState {
   hasKey: boolean;
   mapData: MapData;
+  showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
 }
 
 /**
@@ -384,7 +429,8 @@ export interface GameState {
 export function initializeGameState(): GameState {
   return {
     hasKey: false,
-    mapData: generateCompleteMap()
+    mapData: generateCompleteMap(),
+    showFullMap: false
   };
 }
 
@@ -478,6 +524,16 @@ export function movePlayer(gameState: GameState, direction: Direction): GameStat
       newGameState.hasKey = true;
       newMapData.subtypes[newY][newX] = TileSubtype.NONE;
       console.log('Player picked up a key!');
+    }
+    
+    // If it's a lightswitch, toggle full map visibility
+    if (subtype === TileSubtype.LIGHTSWITCH) {
+      // Toggle the showFullMap flag
+      newGameState.showFullMap = !newGameState.showFullMap;
+      console.log(`Player toggled light switch! Full map visibility: ${newGameState.showFullMap ? 'ON' : 'OFF'}`);
+      
+      // Remove the lightswitch after use
+      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
     }
     
     // Move player to the new position

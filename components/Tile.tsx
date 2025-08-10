@@ -92,8 +92,14 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
-          {/* Only display subtype if it exists */}
-          {subtype > 0 && (
+          {/* Special styling for lightswitch */}
+          {subtype === TileSubtype.LIGHTSWITCH ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-md">
+                <span className="text-white font-bold text-sm">⚡</span>
+              </div>
+            </div>
+          ) : subtype > 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-600 font-bold">
               {subtype}
             </div>

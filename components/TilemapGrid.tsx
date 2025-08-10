@@ -25,7 +25,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
         mapData: {
           tiles: tilemap,
           subtypes: subtypes || Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0))
-        }
+        },
+        showFullMap: false
       };
     } else {
       // If no tilemap provided, generate a new game state
@@ -99,7 +100,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
           style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
           tabIndex={0} // Make div focusable for keyboard events
         >
-          {renderTileGrid(gameState.mapData.tiles, tileTypes, gameState.mapData.subtypes)}
+          {renderTileGrid(gameState.mapData.tiles, tileTypes, gameState.mapData.subtypes, gameState.showFullMap)}
         </div>
       </div>
       
@@ -123,17 +124,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
 };
 
 // Calculate visibility based on player position
-function calculateVisibility(grid: number[][], playerPosition: [number, number] | null): boolean[][] {
+function calculateVisibility(grid: number[][], playerPosition: [number, number] | null, showFullMap: boolean = false): boolean[][] {
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
   
-  // Create a grid of false values (not visible)
-  const visibility: boolean[][] = Array(gridHeight).fill(false).map(() => Array(gridWidth).fill(false));
-  
-  // If no player, everything is visible (fallback for testing)
-  if (!playerPosition) {
+  // If showFullMap is true or no player, everything is visible
+  if (showFullMap || !playerPosition) {
     return Array(gridHeight).fill(true).map(() => Array(gridWidth).fill(true));
   }
+  
+  // Create a grid of false values (not visible)
+  const visibility: boolean[][] = Array(gridHeight).fill(false).map(() => Array(gridWidth).fill(false));
   
   const [playerY, playerX] = playerPosition;
   
@@ -159,7 +160,7 @@ function calculateVisibility(grid: number[][], playerPosition: [number, number] 
 }
 
 // Render the grid of tiles
-function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][] | undefined) {
+function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][] | undefined, showFullMap: boolean = false) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
   
@@ -176,7 +177,7 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
   }
   
   // Calculate visibility for each tile
-  const visibility = calculateVisibility(grid, playerPosition);
+  const visibility = calculateVisibility(grid, playerPosition, showFullMap);
   
   // Function to safely get a tile ID at specific coordinates
   const getTileAt = (row: number, col: number): number | null => {
