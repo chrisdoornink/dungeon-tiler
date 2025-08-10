@@ -1,6 +1,7 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
 import { TilemapGrid } from '../../components/TilemapGrid';
+import { TileSubtype, GameState } from '../../lib/map';
 import '@testing-library/jest-dom';
 
 describe('TilemapGrid component', () => {
@@ -69,5 +70,42 @@ describe('TilemapGrid component', () => {
     // Assert - Check for responsive classes and overflow handling
     const gridContainer = screen.getByTestId('tilemap-grid-container');
     expect(gridContainer).toHaveClass('max-w-full overflow-auto');
+  });
+
+  it('should auto-disable full map visibility after 3 seconds', () => {
+    jest.useFakeTimers();
+
+    // Arrange: create a 25x25 all-floor map with player at center
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    const center = Math.floor(size / 2);
+    subtypes[center][center] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+    };
+
+    // Act: render with showFullMap = true
+    render(<TilemapGrid tilemap={tiles} tileTypes={mockTileTypes} subtypes={subtypes} initialGameState={initialGameState} />);
+
+    // The first tile corresponds to position (0,0) which should be visible initially (full map)
+    const tilesEls = screen.getAllByTestId(/^tile-/);
+    const firstTile = tilesEls[0];
+    expect(firstTile).not.toHaveClass('bg-gray-900');
+
+    // Advance timers by 3 seconds to expire the lightswitch effect
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+
+    // After timer, far tiles should become invisible (outside player radius)
+    const tilesAfter = screen.getAllByTestId(/^tile-/);
+    const firstTileAfter = tilesAfter[0];
+    expect(firstTileAfter).toHaveClass('bg-gray-900');
+
+    jest.useRealTimers();
   });
 });

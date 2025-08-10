@@ -76,7 +76,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Only part of the map is visible at any given time. The player should be able to move the visible area of the map around the player. A player can see 4 tiles in all directions. The tiles that are invisible are displayed as black, the unexplored but remembered wall tiles are displayed as dark gray, the floor tiles as lighter gray, and the player tile is displayed in blue.
 - [x] Add subtype 6 for lightswitch - it toggles off the visibility of the map so they can see the whole map.
 - [x] Stepping on a switch should not pick remove it from the tile.
-- [ ] The lightswitch should only work for 3 seconds and then flicker back off.
+- [x] The lightswitch should only work for 3 seconds and then flicker back off.
 - [ ] Add subtype 7 for exitKey - it must be used to open the exit door
 
 ## Current Goal

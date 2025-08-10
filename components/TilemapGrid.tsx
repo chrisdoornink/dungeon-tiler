@@ -58,6 +58,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Track inventory
   const [inventory, setInventory] = useState<number[]>([]);
 
+  // Auto-disable full map visibility after 3 seconds
+  useEffect(() => {
+    if (!gameState.showFullMap) return;
+    const timer: ReturnType<typeof setTimeout> = setTimeout(() => {
+      setGameState((prev) => ({ ...prev, showFullMap: false }));
+      // Note: keep behavior minimal per TDD; no extra side-effects
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [gameState.showFullMap]);
+
   // Add keyboard event listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
