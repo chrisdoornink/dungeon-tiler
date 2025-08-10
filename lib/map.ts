@@ -8,10 +8,10 @@ export type TileType = {
 
 // Map of tile types by ID
 export const tileTypes: Record<number, TileType> = {
-  0: { id: 0, name: 'floor', color: '#ccc', walkable: true },
-  1: { id: 1, name: 'wall', color: '#333', walkable: false },
-  2: { id: 2, name: 'door', color: '#aa7', walkable: false },
-  3: { id: 3, name: 'key', color: '#ff0', walkable: true },
+  0: { id: 0, name: "floor", color: "#ccc", walkable: true },
+  1: { id: 1, name: "wall", color: "#333", walkable: false },
+  2: { id: 2, name: "door", color: "#aa7", walkable: false },
+  3: { id: 3, name: "key", color: "#ff0", walkable: true },
 };
 
 // Define tile types as constants for clarity
@@ -51,7 +51,7 @@ type Room = {
 export function generateMap(): number[][] {
   // Initialize grid with walls
   const grid: number[][] = [];
-  
+
   for (let y = 0; y < GRID_SIZE; y++) {
     const row: number[] = [];
     for (let x = 0; x < GRID_SIZE; x++) {
@@ -59,27 +59,31 @@ export function generateMap(): number[][] {
     }
     grid.push(row);
   }
-  
+
   // Create 2-4 rooms
   const numRooms = 2 + Math.floor(Math.random() * 3); // 2-4 rooms
   const rooms: Room[] = [];
-  
+
   for (let i = 0; i < numRooms; i++) {
     // Try to place a room that doesn't overlap with existing rooms
     let attempts = 0;
     let roomPlaced = false;
-    
+
     while (!roomPlaced && attempts < 20) {
       // Random room size
-      const width = MIN_ROOM_SIZE + Math.floor(Math.random() * (MAX_ROOM_SIZE - MIN_ROOM_SIZE + 1));
-      const height = MIN_ROOM_SIZE + Math.floor(Math.random() * (MAX_ROOM_SIZE - MIN_ROOM_SIZE + 1));
-      
+      const width =
+        MIN_ROOM_SIZE +
+        Math.floor(Math.random() * (MAX_ROOM_SIZE - MIN_ROOM_SIZE + 1));
+      const height =
+        MIN_ROOM_SIZE +
+        Math.floor(Math.random() * (MAX_ROOM_SIZE - MIN_ROOM_SIZE + 1));
+
       // Random room position (ensure room is fully within grid)
       const x = 1 + Math.floor(Math.random() * (GRID_SIZE - width - 2));
       const y = 1 + Math.floor(Math.random() * (GRID_SIZE - height - 2));
-      
+
       const newRoom: Room = { x, y, width, height };
-      
+
       // Check if this room overlaps with existing rooms
       let overlaps = false;
       for (const room of rooms) {
@@ -88,33 +92,33 @@ export function generateMap(): number[][] {
           break;
         }
       }
-      
+
       if (!overlaps) {
         rooms.push(newRoom);
         carveRoom(grid, newRoom);
         roomPlaced = true;
       }
-      
+
       attempts++;
     }
   }
-  
+
   // Connect rooms with corridors
   for (let i = 0; i < rooms.length - 1; i++) {
     const roomA = rooms[i];
     const roomB = rooms[i + 1];
     createCorridor(grid, roomA, roomB);
   }
-  
+
   // Ensure perimeter has at least 50% walls
   enforcePerimeterWalls(grid);
-  
+
   // Adjust floor percentage to be between 50% and 75%
   adjustFloorPercentage(grid);
-  
+
   // Ensure all floor tiles are connected
   ensureFloorsConnected(grid);
-  
+
   return grid;
 }
 
@@ -155,7 +159,7 @@ export enum TileSubtype {
   KEY = 3,
   LOCK = 4,
   PLAYER = 5,
-  LIGHTSWITCH = 6
+  LIGHTSWITCH = 6,
 }
 
 export interface MapData {
@@ -170,13 +174,17 @@ export interface MapData {
 export function generateMapWithSubtypes(): MapData {
   const tiles = generateMap();
   // Initialize as a 3D array of empty arrays
-  const subtypes = Array(GRID_SIZE).fill(0).map(() => 
-    Array(GRID_SIZE).fill(0).map(() => [] as number[])
-  );
-  
+  const subtypes = Array(GRID_SIZE)
+    .fill(0)
+    .map(() =>
+      Array(GRID_SIZE)
+        .fill(0)
+        .map(() => [] as number[])
+    );
+
   return {
     tiles,
-    subtypes
+    subtypes,
   };
 }
 
@@ -188,49 +196,53 @@ export function generateMapWithSubtypes(): MapData {
 export function generateMapWithDoorAndExit(): MapData {
   // Start with a basic map with subtypes
   const mapData = generateMapWithSubtypes();
-  
+
   // Find all wall tiles that are adjacent to at least one floor tile
   const wallsNextToFloor: Array<[number, number]> = [];
-  
+
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       // Check if this is a wall tile
       if (mapData.tiles[y][x] === WALL) {
         // Check if it's adjacent to at least one floor tile
-        const hasAdjacentFloor = (
-          (y > 0 && mapData.tiles[y-1][x] === FLOOR) ||              // North
-          (y < GRID_SIZE-1 && mapData.tiles[y+1][x] === FLOOR) ||    // South
-          (x > 0 && mapData.tiles[y][x-1] === FLOOR) ||              // West
-          (x < GRID_SIZE-1 && mapData.tiles[y][x+1] === FLOOR)       // East
-        );
-        
+        const hasAdjacentFloor =
+          (y > 0 && mapData.tiles[y - 1][x] === FLOOR) || // North
+          (y < GRID_SIZE - 1 && mapData.tiles[y + 1][x] === FLOOR) || // South
+          (x > 0 && mapData.tiles[y][x - 1] === FLOOR) || // West
+          (x < GRID_SIZE - 1 && mapData.tiles[y][x + 1] === FLOOR); // East
+
         if (hasAdjacentFloor) {
           wallsNextToFloor.push([y, x]);
         }
       }
     }
   }
-  
+
   // If we don't have at least two valid positions, return the basic map
   if (wallsNextToFloor.length < 2) {
-    console.warn('Not enough walls next to floor tiles for door and exit placement');
+    console.warn(
+      "Not enough walls next to floor tiles for door and exit placement"
+    );
     return mapData;
   }
-  
+
   // Shuffle the array of valid wall positions
   for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [wallsNextToFloor[i], wallsNextToFloor[j]] = [wallsNextToFloor[j], wallsNextToFloor[i]];
+    [wallsNextToFloor[i], wallsNextToFloor[j]] = [
+      wallsNextToFloor[j],
+      wallsNextToFloor[i],
+    ];
   }
-  
+
   // Place the door (first wall)
   const [doorY, doorX] = wallsNextToFloor[0];
   mapData.subtypes[doorY][doorX] = [TileSubtype.DOOR];
-  
+
   // Place the exit (second wall)
   const [exitY, exitX] = wallsNextToFloor[1];
   mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
-  
+
   return mapData;
 }
 
@@ -242,65 +254,70 @@ export function generateMapWithDoorAndExit(): MapData {
 export function generateMapWithKeyAndLock(): MapData {
   // Start with a map that already has door and exit
   const mapData = generateMapWithDoorAndExit();
-  
+
   // Find all available floor tiles for key placement
   const floorTiles: Array<[number, number]> = [];
-  
+
   // Find all available wall tiles next to floor for lock placement
   const wallsNextToFloor: Array<[number, number]> = [];
-  
+
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       // Skip tiles that already have subtypes
-      if (mapData.subtypes[y][x].length > 0 && !mapData.subtypes[y][x].includes(TileSubtype.NONE)) {
+      if (
+        mapData.subtypes[y][x].length > 0 &&
+        !mapData.subtypes[y][x].includes(TileSubtype.NONE)
+      ) {
         continue;
       }
-      
+
       // Check for floor tiles for key placement
       if (mapData.tiles[y][x] === FLOOR) {
         floorTiles.push([y, x]);
       }
       // Check for wall tiles next to floor for lock placement
       else if (mapData.tiles[y][x] === WALL) {
-        const hasAdjacentFloor = (
-          (y > 0 && mapData.tiles[y-1][x] === FLOOR) ||              // North
-          (y < GRID_SIZE-1 && mapData.tiles[y+1][x] === FLOOR) ||    // South
-          (x > 0 && mapData.tiles[y][x-1] === FLOOR) ||              // West
-          (x < GRID_SIZE-1 && mapData.tiles[y][x+1] === FLOOR)       // East
-        );
-        
+        const hasAdjacentFloor =
+          (y > 0 && mapData.tiles[y - 1][x] === FLOOR) || // North
+          (y < GRID_SIZE - 1 && mapData.tiles[y + 1][x] === FLOOR) || // South
+          (x > 0 && mapData.tiles[y][x - 1] === FLOOR) || // West
+          (x < GRID_SIZE - 1 && mapData.tiles[y][x + 1] === FLOOR); // East
+
         if (hasAdjacentFloor) {
           wallsNextToFloor.push([y, x]);
         }
       }
     }
   }
-  
+
   // If we don't have enough valid positions, return the map without key/lock
   if (floorTiles.length < 1 || wallsNextToFloor.length < 1) {
-    console.warn('Not enough valid tiles for key and lock placement');
+    console.warn("Not enough valid tiles for key and lock placement");
     return mapData;
   }
-  
+
   // Shuffle the arrays for random placement
   for (let i = floorTiles.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [floorTiles[i], floorTiles[j]] = [floorTiles[j], floorTiles[i]];
   }
-  
+
   for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [wallsNextToFloor[i], wallsNextToFloor[j]] = [wallsNextToFloor[j], wallsNextToFloor[i]];
+    [wallsNextToFloor[i], wallsNextToFloor[j]] = [
+      wallsNextToFloor[j],
+      wallsNextToFloor[i],
+    ];
   }
-  
+
   // Place the key on a floor tile
   const [keyY, keyX] = floorTiles[0];
   mapData.subtypes[keyY][keyX] = [TileSubtype.KEY];
-  
+
   // Place the lock on a wall next to floor
   const [lockY, lockX] = wallsNextToFloor[0];
   mapData.subtypes[lockY][lockX] = [TileSubtype.LOCK];
-  
+
   return mapData;
 }
 
@@ -315,30 +332,36 @@ export function addLightswitchToMap(mapData: MapData): MapData {
   const grid = newMapData.tiles;
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
-  
+
   // Find all eligible floor tiles (that don't already have a subtype)
   const eligibleTiles: Array<[number, number]> = [];
-  
+
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
-      if (grid[y][x] === FLOOR && (newMapData.subtypes[y][x].length === 0 || newMapData.subtypes[y][x].includes(TileSubtype.NONE))) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
         eligibleTiles.push([y, x]);
       }
     }
   }
-  
+
   // If we have eligible tiles, place a lightswitch on a random one
   if (eligibleTiles.length > 0) {
     const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
     const [lightswitchY, lightswitchX] = eligibleTiles[randomIndex];
-    
+
     // Set the lightswitch
     newMapData.subtypes[lightswitchY][lightswitchX] = [TileSubtype.LIGHTSWITCH];
     console.log(`Placed lightswitch at [${lightswitchY}, ${lightswitchX}]`);
   } else {
-    console.warn('Could not place lightswitch - no eligible floor tiles available');
+    console.warn(
+      "Could not place lightswitch - no eligible floor tiles available"
+    );
   }
-  
+
   return newMapData;
 }
 
@@ -363,30 +386,34 @@ export function addPlayerToMap(mapData: MapData): MapData {
   const grid = newMapData.tiles;
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
-  
+
   // Find all eligible floor tiles (that don't have a subtype)
   const eligibleTiles: Array<[number, number]> = [];
-  
+
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
-      if (grid[y][x] === FLOOR && (newMapData.subtypes[y][x].length === 0 || newMapData.subtypes[y][x].includes(TileSubtype.NONE))) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
         eligibleTiles.push([y, x]);
       }
     }
   }
-  
+
   // If we have eligible tiles, place a player on a random one
   if (eligibleTiles.length > 0) {
     const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
     const [playerY, playerX] = eligibleTiles[randomIndex];
-    
+
     // Place the player
     newMapData.subtypes[playerY][playerX] = [TileSubtype.PLAYER];
     console.log(`Placed player at [${playerY}, ${playerX}]`);
   } else {
-    console.warn('Could not place player - no eligible floor tiles available');
+    console.warn("Could not place player - no eligible floor tiles available");
   }
-  
+
   return newMapData;
 }
 
@@ -414,7 +441,7 @@ export enum Direction {
   UP,
   RIGHT,
   DOWN,
-  LEFT
+  LEFT,
 }
 
 /**
@@ -434,7 +461,7 @@ export function initializeGameState(): GameState {
   return {
     hasKey: false,
     mapData: generateCompleteMap(),
-    showFullMap: false
+    showFullMap: false,
   };
 }
 
@@ -444,14 +471,17 @@ export function initializeGameState(): GameState {
  * @param direction Direction to move
  * @returns Updated game state after movement attempt
  */
-export function movePlayer(gameState: GameState, direction: Direction): GameState {
+export function movePlayer(
+  gameState: GameState,
+  direction: Direction
+): GameState {
   const position = findPlayerPosition(gameState.mapData);
   if (!position) return gameState; // No player found
-  
+
   const [currentY, currentX] = position;
   let newY = currentY;
   let newX = currentX;
-  
+
   // Calculate new position based on direction
   switch (direction) {
     case Direction.UP:
@@ -467,88 +497,104 @@ export function movePlayer(gameState: GameState, direction: Direction): GameStat
       newX = Math.max(0, currentX - 1);
       break;
   }
-  
+
   // If position didn't change, return unchanged state
   if (newY === currentY && newX === currentX) return gameState;
-  
+
   // Deep clone the map data to avoid modifying the original
   const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
   const newGameState = { ...gameState, mapData: newMapData };
-  
+
   // Check if the new position is a wall
   if (newMapData.tiles[newY][newX] === WALL) {
     // Check if it's a door or lock
     const subtype = newMapData.subtypes[newY][newX];
-    
+
     // If it's a door, player can pass through
     if (subtype.includes(TileSubtype.DOOR)) {
       // Convert the door to floor when player passes through
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.DOOR);
-      
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+        (type) => type !== TileSubtype.DOOR
+      );
+
       // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+        currentX
+      ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
-    } 
+    }
     // If it's a lock and player has key, unlock it
     else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
       // Convert the lock to floor when unlocked
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.LOCK);
-      
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+        (type) => type !== TileSubtype.LOCK
+      );
+
       // Move player to the new position and consume the key
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+        currentX
+      ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       newGameState.hasKey = false;
-    } 
+    }
     // If it's an exit, player wins (for now just pass through)
     else if (subtype.includes(TileSubtype.EXIT)) {
       // Convert the exit to floor when player passes through
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.EXIT);
-      
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+        (type) => type !== TileSubtype.EXIT
+      );
+
       // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+        currentX
+      ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
-      
+
       // Here you would typically trigger a win condition
-      console.log('Player found the exit!');
+      console.log("Player found the exit!");
     }
-    
+
     // For regular walls, do nothing - player cannot move there
     return newGameState;
   }
-  
+
   // If the new position is a floor tile
   if (newMapData.tiles[newY][newX] === FLOOR) {
     const subtype = newMapData.subtypes[newY][newX];
-    
+
     // If it's a key, pick it up
     if (subtype.includes(TileSubtype.KEY)) {
       newGameState.hasKey = true;
       newMapData.subtypes[newY][newX] = [];
-      console.log('Player picked up a key!');
+      console.log("Player picked up a key!");
     }
-    
+
     // If it's a lightswitch, toggle full map visibility
     if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
       // Toggle the showFullMap flag
       newGameState.showFullMap = !newGameState.showFullMap;
-      console.log(`Player toggled light switch! Full map visibility: ${newGameState.showFullMap ? 'ON' : 'OFF'}`);
-      
+      console.log(
+        `Player toggled light switch! Full map visibility: ${
+          newGameState.showFullMap ? "ON" : "OFF"
+        }`
+      );
+
       // Keep the lightswitch on the tile (don't remove it)
       // Player and lightswitch will coexist on the same tile
     }
-    
+
     // Move player to the new position
-    newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(
-      type => type !== TileSubtype.PLAYER
-    );
+    newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+      currentX
+    ].filter((type) => type !== TileSubtype.PLAYER);
     // If current position array is empty after filtering, make it an empty array
     if (newMapData.subtypes[currentY][currentX].length === 0) {
       newMapData.subtypes[currentY][currentX] = [];
     }
-    
+
     // Handle special case for lightswitch - player and switch coexist on the same tile
     if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
       // Add player to the array if it's not already there
@@ -560,7 +606,7 @@ export function movePlayer(gameState: GameState, direction: Direction): GameStat
       newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
     }
   }
-  
+
   return newGameState;
 }
 
@@ -596,7 +642,7 @@ function createCorridor(grid: number[][], roomA: Room, roomB: Room): void {
   const y1 = Math.floor(roomA.y + roomA.height / 2);
   const x2 = Math.floor(roomB.x + roomB.width / 2);
   const y2 = Math.floor(roomB.y + roomB.height / 2);
-  
+
   // Create an L-shaped corridor
   if (Math.random() < 0.5) {
     // Horizontal then vertical
@@ -623,15 +669,17 @@ function createCorridor(grid: number[][], roomA: Room, roomB: Room): void {
 function enforcePerimeterWalls(grid: number[][]): void {
   // Top and bottom rows
   for (let x = 0; x < GRID_SIZE; x++) {
-    if (Math.random() < 0.7) { // 70% chance of being a wall
+    if (Math.random() < 0.7) {
+      // 70% chance of being a wall
       grid[0][x] = WALL;
       grid[GRID_SIZE - 1][x] = WALL;
     }
   }
-  
+
   // Left and right columns
   for (let y = 0; y < GRID_SIZE; y++) {
-    if (Math.random() < 0.7) { // 70% chance of being a wall
+    if (Math.random() < 0.7) {
+      // 70% chance of being a wall
       grid[y][0] = WALL;
       grid[y][GRID_SIZE - 1] = WALL;
     }
@@ -645,10 +693,10 @@ function enforcePerimeterWalls(grid: number[][]): void {
 function ensureFloorsConnected(grid: number[][]): void {
   // Step 1: Find all separate floor regions using flood fill
   const regions = findFloorRegions(grid);
-  
+
   // If there's only one region, all floors are already connected
   if (regions.length <= 1) return;
-  
+
   // Step 2: Connect all regions to the first region
   for (let i = 1; i < regions.length; i++) {
     connectRegions(grid, regions[0], regions[i]);
@@ -662,9 +710,11 @@ function ensureFloorsConnected(grid: number[][]): void {
 function findFloorRegions(grid: number[][]): Array<Array<[number, number]>> {
   const height = grid.length;
   const width = grid[0].length;
-  const visited = Array(height).fill(0).map(() => Array(width).fill(false));
+  const visited = Array(height)
+    .fill(0)
+    .map(() => Array(width).fill(false));
   const regions: Array<Array<[number, number]>> = [];
-  
+
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       if (grid[y][x] === FLOOR && !visited[y][x]) {
@@ -672,59 +722,72 @@ function findFloorRegions(grid: number[][]): Array<Array<[number, number]>> {
         const region: Array<[number, number]> = [];
         const queue: Array<[number, number]> = [[y, x]];
         visited[y][x] = true;
-        
+
         while (queue.length > 0) {
           const [cy, cx] = queue.shift()!;
           region.push([cy, cx]);
-          
+
           // Check all four adjacent cells (up, right, down, left)
           for (let dir = 0; dir < 4; dir++) {
             const ny = cy + dy[dir];
             const nx = cx + dx[dir];
-            
-            if (ny >= 0 && ny < height && nx >= 0 && nx < width && 
-                grid[ny][nx] === FLOOR && !visited[ny][nx]) {
+
+            if (
+              ny >= 0 &&
+              ny < height &&
+              nx >= 0 &&
+              nx < width &&
+              grid[ny][nx] === FLOOR &&
+              !visited[ny][nx]
+            ) {
               queue.push([ny, nx]);
               visited[ny][nx] = true;
             }
           }
         }
-        
+
         regions.push(region);
       }
     }
   }
-  
+
   return regions;
 }
 
 /**
  * Connect two separate floor regions by creating a path between them
  */
-function connectRegions(grid: number[][], regionA: Array<[number, number]>, regionB: Array<[number, number]>): void {
+function connectRegions(
+  grid: number[][],
+  regionA: Array<[number, number]>,
+  regionB: Array<[number, number]>
+): void {
   // Find the closest pair of tiles between the two regions
   let minDist = Infinity;
   let bestPair: [[number, number], [number, number]] | null = null;
-  
+
   for (const [y1, x1] of regionA) {
     for (const [y2, x2] of regionB) {
       const dist = Math.abs(y2 - y1) + Math.abs(x2 - x1);
       if (dist < minDist) {
         minDist = dist;
-        bestPair = [[y1, x1], [y2, x2]];
+        bestPair = [
+          [y1, x1],
+          [y2, x2],
+        ];
       }
     }
   }
-  
+
   if (bestPair) {
     const [[y1, x1], [y2, x2]] = bestPair;
-    
+
     // Create a path between the two points
     // First horizontally, then vertically (L-shaped path)
     for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x++) {
       grid[y1][x] = FLOOR;
     }
-    
+
     for (let y = Math.min(y1, y2); y <= Math.max(y1, y2); y++) {
       grid[y][x2] = FLOOR;
     }
@@ -737,23 +800,23 @@ function connectRegions(grid: number[][], regionA: Array<[number, number]>, regi
 function adjustFloorPercentage(grid: number[][]): void {
   let floorCount = 0;
   const totalTiles = GRID_SIZE * GRID_SIZE;
-  
+
   // Count current floor tiles
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       if (grid[y][x] === FLOOR) floorCount++;
     }
   }
-  
+
   const minFloor = Math.ceil(totalTiles * 0.5);
   const maxFloor = Math.floor(totalTiles * 0.75);
-  
+
   if (floorCount < minFloor) {
     // Add more floor tiles if below minimum
     while (floorCount < minFloor) {
       const x = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
       const y = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
-      
+
       if (grid[y][x] === WALL) {
         grid[y][x] = FLOOR;
         floorCount++;
@@ -764,7 +827,7 @@ function adjustFloorPercentage(grid: number[][]): void {
     while (floorCount > maxFloor) {
       const x = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
       const y = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
-      
+
       if (grid[y][x] === FLOOR) {
         grid[y][x] = WALL;
         floorCount--;

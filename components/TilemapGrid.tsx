@@ -1,6 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { TileType, GameState, Direction, movePlayer, initializeGameState, findPlayerPosition, TileSubtype } from '../lib/map';
-import { Tile } from './Tile';
+import React, { useState, useEffect } from "react";
+import {
+  TileType,
+  GameState,
+  Direction,
+  movePlayer,
+  initializeGameState,
+  findPlayerPosition,
+  TileSubtype,
+} from "../lib/map";
+import { Tile } from "./Tile";
 
 // Grid configuration constants
 const GRID_WIDTH = 25;
@@ -13,7 +21,12 @@ interface TilemapGridProps {
   initialGameState?: GameState;
 }
 
-export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, subtypes, initialGameState }) => {
+export const TilemapGrid: React.FC<TilemapGridProps> = ({
+  tilemap,
+  tileTypes,
+  subtypes,
+  initialGameState,
+}) => {
   // Initialize game state
   const [gameState, setGameState] = useState<GameState>(() => {
     if (initialGameState) {
@@ -24,9 +37,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
         hasKey: false,
         mapData: {
           tiles: tilemap,
-          subtypes: subtypes || Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0).map(() => []))
+          subtypes:
+            subtypes ||
+            Array(GRID_HEIGHT)
+              .fill(0)
+              .map(() =>
+                Array(GRID_WIDTH)
+                  .fill(0)
+                  .map(() => [])
+              ),
         },
-        showFullMap: false
+        showFullMap: false,
       };
     } else {
       // If no tilemap provided, generate a new game state
@@ -41,79 +62,88 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       let direction: Direction | null = null;
-      
+
       switch (event.key) {
-        case 'ArrowUp':
+        case "ArrowUp":
           direction = Direction.UP;
           break;
-        case 'ArrowRight':
+        case "ArrowRight":
           direction = Direction.RIGHT;
           break;
-        case 'ArrowDown':
+        case "ArrowDown":
           direction = Direction.DOWN;
           break;
-        case 'ArrowLeft':
+        case "ArrowLeft":
           direction = Direction.LEFT;
           break;
       }
-      
+
       if (direction !== null) {
         // Get current subtype at player position before moving
         const playerPosition = findPlayerPosition(gameState.mapData);
         const newGameState = movePlayer(gameState, direction);
-        
+
         // Check if player picked up a key or other item
         if (playerPosition) {
           const [oldY, oldX] = playerPosition;
           const newPosition = findPlayerPosition(newGameState.mapData);
-          
+
           if (newPosition) {
             const [newY, newX] = newPosition;
-            
+
             // If position changed and player had a key now, they must have picked it up
-            if ((newY !== oldY || newX !== oldX) && newGameState.hasKey && !gameState.hasKey) {
+            if (
+              (newY !== oldY || newX !== oldX) &&
+              newGameState.hasKey &&
+              !gameState.hasKey
+            ) {
               // Add key to inventory
-              setInventory(prev => [...prev, TileSubtype.KEY]);
+              setInventory((prev) => [...prev, TileSubtype.KEY]);
             }
           }
         }
-        
+
         setGameState(newGameState);
       }
     };
-    
-    window.addEventListener('keydown', handleKeyDown);
+
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
-      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [gameState]);
-  
+
   return (
     <div className="flex flex-col items-center w-full">
-      <div 
+      <div
         className="flex justify-center w-full"
         data-testid="tilemap-grid-wrapper"
       >
-        <div 
+        <div
           className="border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-0"
           data-testid="tilemap-grid-container"
           style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
           tabIndex={0} // Make div focusable for keyboard events
         >
-          {renderTileGrid(gameState.mapData.tiles, tileTypes, gameState.mapData.subtypes, gameState.showFullMap)}
+          {renderTileGrid(
+            gameState.mapData.tiles,
+            tileTypes,
+            gameState.mapData.subtypes,
+            gameState.showFullMap
+          )}
         </div>
       </div>
-      
+
       {inventory.length > 0 && (
         <div className="mt-4 p-3 border border-gray-300 rounded-md">
           <h3 className="font-medium mb-2">Inventory:</h3>
           <div className="flex gap-2">
             {inventory.map((item, index) => (
-              <div 
+              <div
                 key={index}
                 className="p-2 bg-yellow-100 border border-yellow-400 rounded-md"
               >
-                {item === TileSubtype.KEY ? 'Key 🔑' : `Item ${item}`}
+                {item === TileSubtype.KEY ? "Key 🔑" : `Item ${item}`}
               </div>
             ))}
           </div>
@@ -124,46 +154,59 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
 };
 
 // Calculate visibility based on player position
-function calculateVisibility(grid: number[][], playerPosition: [number, number] | null, showFullMap: boolean = false): boolean[][] {
+function calculateVisibility(
+  grid: number[][],
+  playerPosition: [number, number] | null,
+  showFullMap: boolean = false
+): boolean[][] {
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
-  
+
   // If showFullMap is true or no player, everything is visible
   if (showFullMap || !playerPosition) {
-    return Array(gridHeight).fill(true).map(() => Array(gridWidth).fill(true));
+    return Array(gridHeight)
+      .fill(true)
+      .map(() => Array(gridWidth).fill(true));
   }
-  
+
   // Create a grid of false values (not visible)
-  const visibility: boolean[][] = Array(gridHeight).fill(false).map(() => Array(gridWidth).fill(false));
-  
+  const visibility: boolean[][] = Array(gridHeight)
+    .fill(false)
+    .map(() => Array(gridWidth).fill(false));
+
   const [playerY, playerX] = playerPosition;
-  
+
   // Use a uniform visibility radius of 4 tiles in all directions
   const visibilityRadius = 4;
-  
+
   // Set visibility for all tiles in range
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
       // Calculate Manhattan distance from player (sum of x and y distances)
       const dy = Math.abs(y - playerY);
       const dx = Math.abs(x - playerX);
-      
+
       // A tile is visible if the Manhattan distance is less than or equal to the visibility radius
       // This creates a diamond-shaped visibility area around the player
-      const isVisible = (dy + dx) <= visibilityRadius;
-      
+      const isVisible = dy + dx <= visibilityRadius;
+
       visibility[y][x] = isVisible;
     }
   }
-  
+
   return visibility;
 }
 
 // Render the grid of tiles
-function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][][] | undefined, showFullMap: boolean = false) {
+function renderTileGrid(
+  grid: number[][],
+  tileTypes: Record<number, TileType>,
+  subtypes: number[][][] | undefined,
+  showFullMap: boolean = false
+) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
-  
+
   if (subtypes) {
     for (let y = 0; y < subtypes.length; y++) {
       for (let x = 0; x < subtypes[y].length; x++) {
@@ -175,10 +218,10 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
       if (playerPosition) break;
     }
   }
-  
+
   // Calculate visibility for each tile
   const visibility = calculateVisibility(grid, playerPosition, showFullMap);
-  
+
   // Function to safely get a tile ID at specific coordinates
   const getTileAt = (row: number, col: number): number | null => {
     if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) {
@@ -187,23 +230,24 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
     return grid[row][col];
   };
 
-  return grid.flatMap((row, rowIndex) => 
+  return grid.flatMap((row, rowIndex) =>
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
-      const subtype = subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : [];
+      const subtype =
+        subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : [];
       const isVisible = visibility[rowIndex][colIndex];
-      
+
       // Get neighboring tiles
       const neighbors = {
         top: getTileAt(rowIndex - 1, colIndex),
         right: getTileAt(rowIndex, colIndex + 1),
         bottom: getTileAt(rowIndex + 1, colIndex),
-        left: getTileAt(rowIndex, colIndex - 1)
+        left: getTileAt(rowIndex, colIndex - 1),
       };
-      
+
       return (
         <div key={`${rowIndex}-${colIndex}`}>
-          <Tile 
+          <Tile
             tileId={tileId}
             tileType={tileType}
             subtype={subtype}
