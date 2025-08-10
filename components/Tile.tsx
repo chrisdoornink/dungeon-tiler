@@ -49,6 +49,38 @@ export const Tile: React.FC<TileProps> = ({
           : ''
     : '';
 
+  const subtypeNames = (arr: number[] | undefined): string[] => {
+    if (!arr || arr.length === 0) return [];
+    return arr.map((s) => {
+      switch (s) {
+        case TileSubtype.PLAYER:
+          return 'PLAYER';
+        case TileSubtype.LIGHTSWITCH:
+          return 'LIGHTSWITCH';
+        case TileSubtype.EXITKEY:
+          return 'EXITKEY';
+        case TileSubtype.KEY:
+          return 'KEY';
+        case TileSubtype.LOCK:
+          return 'LOCK';
+        case TileSubtype.DOOR:
+          return 'DOOR';
+        case TileSubtype.EXIT:
+          return 'EXIT';
+        case TileSubtype.CHEST:
+          return 'CHEST';
+        case TileSubtype.SWORD:
+          return 'SWORD';
+        case TileSubtype.SHIELD:
+          return 'SHIELD';
+        case TileSubtype.NONE:
+          return 'NONE';
+        default:
+          return String(s);
+      }
+    });
+  };
+
   if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
     return (
       <div 
@@ -113,7 +145,7 @@ export const Tile: React.FC<TileProps> = ({
             </div>
           ) : subtype && subtype.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-600 font-bold">
-              {subtype.join(',')}
+              {subtypeNames(subtype).join(',')}
             </div>
           )}
         </div>
@@ -181,7 +213,7 @@ export const Tile: React.FC<TileProps> = ({
           {/* Only display subtype if it exists */}
           {subtype && subtype.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-bold">
-              {subtype.join(',')}
+              {subtypeNames(subtype).join(',')}
             </div>
           )}
         </div>
@@ -203,7 +235,7 @@ export const Tile: React.FC<TileProps> = ({
       className="w-10 h-10 flex items-center justify-center bg-purple-500 text-white"
       data-testid={`tile-${tileId}`}
     >
-      {subtype && subtype.length > 0 ? subtype.join(',') : tileId}
+      {subtype && subtype.length > 0 ? subtypeNames(subtype).join(',') : tileId}
     </div>
   );
 };

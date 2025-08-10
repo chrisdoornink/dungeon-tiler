@@ -21,12 +21,12 @@ describe('Tile component', () => {
     expect(tile).not.toHaveTextContent(/\d/);
   });
 
-  it('should display subtype value when subtype is provided', () => {
+  it('should display subtype name when subtype is provided', () => {
     const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
     render(<Tile tileId={0} tileType={mockTileType} subtype={[1]} />);
     
     const tile = screen.getByTestId('tile-0');
-    expect(tile).toHaveTextContent('1');
+    expect(tile).toHaveTextContent('EXIT');
   });
 
   it('should not display content when subtype is empty array', () => {

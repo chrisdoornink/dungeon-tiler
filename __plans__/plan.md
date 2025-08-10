@@ -78,7 +78,8 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Stepping on a switch should not pick remove it from the tile.
 - [x] The lightswitch should only work for 3 seconds and then flicker back off.
 - [x] Add subtype 7 for exitKey - it must be used to open the exit door
--
+- [ ] A sword is only found inside a chest, so in the generation, a sword will need a chest in the same tile.
+- [ ] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile. and add an open chest to the tile (new subtype).
 
 ### Visual Polish
 
@@ -93,20 +94,20 @@ We will implement a simple end-game modal that appears when the player opens the
 
 TDD Test Breakdown:
 
-- [ ] lib: Opening exit with exit key and moving onto it sets `gameState.win = true`.
+- [x] lib: Opening exit with exit key and moving onto it sets `gameState.win = true`.
 - [ ] lib: Attempting to move into exit without exit key does NOT set `gameState.win`.
 - [ ] lib: Moving onto a normal floor tile does NOT set `gameState.win`.
-- [ ] components: When `gameState.win` becomes true after a move, `TilemapGrid` renders an end-game modal with the message.
-- [ ] components: No modal is shown when `gameState.win` is false.
-- [ ] components: Modal content text is exactly the expected copy for snapshot/strict assertion.
+- [ ] components: When `gameState.win` becomes true after a move, `TilemapGrid` renders an end-game modal with the message. (superseded by redirect)
+- [ ] components: No modal is shown when `gameState.win` is false. (superseded by redirect)
+- [ ] components: Modal content text is exactly the expected copy for snapshot/strict assertion. (superseded by redirect)
 
 Next: Redirect to End Page and Persist Game Data
 
 TDD Test Breakdown:
 
-- [ ] components: When `win` becomes true, `TilemapGrid` stores the final game payload in `sessionStorage` under a stable key (e.g., `lastGame`) and navigates to `/end` via router push.
-- [ ] components: The storage payload contains map, inventory flags, and optional summary fields.
-- [ ] app/end: End page reads `sessionStorage.lastGame` and renders a summary view. If missing, shows a fallback message.
+- [x] components: When `win` becomes true, `TilemapGrid` stores the final game payload in `sessionStorage` under a stable key (e.g., `lastGame`) and navigates to `/end` via router push.
+- [x] components: The storage payload contains map, inventory flags, and optional summary fields.
+- [x] app/end: End page reads `sessionStorage.lastGame` and renders a summary view. If missing, shows a fallback message.
 - [ ] components: No redirect occurs when `win` is false.
 
 Implementation Notes:
@@ -120,3 +121,35 @@ Implementation Notes:
 - Add `win: boolean` to `GameState` (default `false`).
 - In `movePlayer()`, when the exit is opened using `hasExitKey` and the player moves onto it, set `win = true`.
 - In `TilemapGrid.tsx`, render a simple modal overlay when `gameState.win` is true. Keep it minimal for now.
+  - Superseded by redirect to `/end` with persisted `lastGame`.
+
+---
+
+### New Feature: Chests, Sword, Shield (and lockable containers)
+
+Goal: Introduce a `CHEST` subtype that may be locked or unlocked. Opening a chest yields an item (`SWORD` or `SHIELD`). Eventually, locks can be placed on other items too, but start with chests.
+
+TDD Test Breakdown:
+
+- [ ] lib: Stepping onto an unlocked chest opens it and grants its content (e.g., sword), removing the chest from the tile.
+- [ ] lib: Stepping onto a locked chest without a key does NOT open it (no item granted, chest remains).
+- [ ] lib: Stepping onto a locked chest WITH a key opens it, consumes one key, grants content, removes the chest.
+- [ ] lib: Chest contents support at least `SWORD` and `SHIELD`.
+- [ ] lib: Picking up `SWORD` sets `gameState.hasSword = true`.
+- [ ] lib: Picking up `SHIELD` sets `gameState.hasShield = true`.
+- [ ] lib: Moving onto normal floors does not modify `hasSword`/`hasShield`.
+- [ ] lib: Map generation can place a small number of chests on valid floor tiles, some locked, some unlocked, with randomized content.
+- [ ] components: Inventory UI displays sword/shield when owned.
+- [ ] components: Legend shows CHEST, SWORD, SHIELD entries.
+
+Implementation Notes:
+
+- Extend `TileSubtype` with `CHEST`, `SWORD`, `SHIELD`.
+- Add `hasSword`, `hasShield` to `GameState` and initialize to `false`.
+- Represent locked chests either as `CHEST` plus `LOCK` in subtypes or via a separate metadata map; prefer `CHEST` + `LOCK` for consistency.
+- On move:
+  - If stepping onto `CHEST` + (optional `LOCK`):
+    - If `LOCK` present and `hasKey=false`, block open (player remains on current tile).
+    - If `LOCK` present and `hasKey=true`, consume key and open.
+    - Opening grants item and removes `CHEST` (+`LOCK`) from tile.
+- Update `generateCompleteMap()` to place chests with mixed lock states and contents.

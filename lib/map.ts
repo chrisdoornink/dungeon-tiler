@@ -91,7 +91,7 @@ export function generateMap(): number[][] {
           break;
         }
       }
-
+      
       if (!overlaps) {
         rooms.push(newRoom);
         carveRoom(grid, newRoom);
@@ -160,6 +160,9 @@ export enum TileSubtype {
   PLAYER = 5,
   LIGHTSWITCH = 6,
   EXITKEY = 7,
+  CHEST = 8,
+  SWORD = 9,
+  SHIELD = 10,
 }
 
 export interface MapData {
@@ -405,6 +408,56 @@ export function addExitKeyToMap(mapData: MapData): MapData {
 }
 
 /**
+ * Add chests (with sword/shield contents) to random floor tiles.
+ * Some chests will be locked and require a KEY to open.
+ */
+export function addChestsToMap(
+  mapData: MapData,
+  options: { count?: number; lockedChance?: number } = {}
+): MapData {
+  const { count = 2, lockedChance = 0.5 } = options;
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+
+  // Shuffle
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const placements = Math.min(count, eligible.length);
+  for (let i = 0; i < placements; i++) {
+    const [cy, cx] = eligible[i];
+    const locked = Math.random() < lockedChance;
+    const content = Math.random() < 0.5 ? TileSubtype.SWORD : TileSubtype.SHIELD;
+    const sub: number[] = [TileSubtype.CHEST, content];
+    if (locked) sub.push(TileSubtype.LOCK);
+    newMapData.subtypes[cy][cx] = sub;
+    const contentName = content === TileSubtype.SWORD ? "SWORD" : "SHIELD";
+    console.log(
+      `Placed chest at [${cy}, ${cx}] content:${contentName} locked:${locked ? "YES" : "NO"}`
+    );
+  }
+
+  return newMapData;
+}
+
+/**
  * Generate a complete map with all subtypes (door, exit, key, lock, lightswitch)
  * @returns MapData object with all subtypes properly placed
  */
@@ -412,7 +465,8 @@ export function generateCompleteMap(): MapData {
   const mapData = generateMapWithKeyAndLock();
   const withExitKey = addExitKeyToMap(mapData);
   const mapWithLightswitch = addLightswitchToMap(withExitKey);
-  return addPlayerToMap(mapWithLightswitch);
+  const withChests = addChestsToMap(mapWithLightswitch);
+  return addPlayerToMap(withChests);
 }
 
 /**
@@ -490,6 +544,8 @@ export enum Direction {
 export interface GameState {
   hasKey: boolean;
   hasExitKey: boolean;
+  hasSword?: boolean;
+  hasShield?: boolean;
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
@@ -503,6 +559,8 @@ export function initializeGameState(): GameState {
   return {
     hasKey: false,
     hasExitKey: false,
+    hasSword: false,
+    hasShield: false,
     mapData: generateCompleteMap(),
     showFullMap: false,
     win: false,
@@ -640,6 +698,36 @@ export function movePlayer(
 
       // Keep the lightswitch on the tile (don't remove it)
       // Player and lightswitch will coexist on the same tile
+    }
+
+    // If it's a chest, handle opening logic (supports optional lock)
+    if (subtype.includes(TileSubtype.CHEST)) {
+      const isLocked = subtype.includes(TileSubtype.LOCK);
+      if (isLocked && !newGameState.hasKey) {
+        // Block opening and movement if locked and no key
+        return newGameState;
+      }
+      // If locked and we have a key, consume it
+      if (isLocked && newGameState.hasKey) {
+        newGameState.hasKey = false;
+        // Remove LOCK from the tile
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+          (t) => t !== TileSubtype.LOCK
+        );
+      }
+
+      // Grant item contained in chest
+      if (subtype.includes(TileSubtype.SWORD)) {
+        newGameState.hasSword = true;
+      }
+      if (subtype.includes(TileSubtype.SHIELD)) {
+        newGameState.hasShield = true;
+      }
+
+      // Remove chest and its content from the tile
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+        (t) => t !== TileSubtype.CHEST && t !== TileSubtype.SWORD && t !== TileSubtype.SHIELD
+      );
     }
 
     // Move player to the new position

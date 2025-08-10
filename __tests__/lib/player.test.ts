@@ -39,6 +39,130 @@ describe("Player and Dynamic Subtypes", () => {
     }
   });
 
+  it("opens an unlocked chest and grants its content (sword)", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Layout: Player at (10,10) -> CHEST+SWORD at (10,11) floor
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    mapData.subtypes[10][11] = [TileSubtype.CHEST, TileSubtype.SWORD];
+
+    let gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    // Move right to open chest and collect sword
+    gameState = movePlayer(gameState, Direction.RIGHT);
+
+    expect(gameState.hasSword).toBe(true);
+    expect(gameState.hasShield).not.toBe(true);
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
+      false
+    );
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.SWORD)
+    ).toBe(false);
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
+  });
+
+  it("does not open a locked chest without a key", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Layout: Player at (10,10) -> CHEST+LOCK+SHIELD at (10,11)
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    mapData.subtypes[10][11] = [
+      TileSubtype.CHEST,
+      TileSubtype.LOCK,
+      TileSubtype.SHIELD,
+    ];
+
+    let gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    // Attempt to open locked chest without a key
+    const after = movePlayer(gameState, Direction.RIGHT);
+    // Should not move
+    expect(findPlayerPosition(after.mapData)).toEqual([10, 10]);
+    // Chest remains
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
+      true
+    );
+    expect(after.hasShield).not.toBe(true);
+  });
+
+  it("opens a locked chest with a key, consumes key, and grants shield", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Layout: Player at (10,10) -> CHEST+LOCK+SHIELD at (10,11)
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    mapData.subtypes[10][11] = [
+      TileSubtype.CHEST,
+      TileSubtype.LOCK,
+      TileSubtype.SHIELD,
+    ];
+
+    let gameState: GameState = {
+      hasKey: true,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    // Move right to unlock and open chest
+    const after = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(after.mapData)).toEqual([10, 11]);
+    expect(after.hasKey).toBe(false);
+    expect(after.hasShield).toBe(true);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
+      false
+    );
+    expect(
+      after.mapData.subtypes[10][11].includes(TileSubtype.SHIELD)
+    ).toBe(false);
+  });
+
   it("should NOT open exit without exit key", () => {
     const mapData: MapData = {
       tiles: Array(25)
@@ -334,6 +458,7 @@ describe("Player and Dynamic Subtypes", () => {
       hasExitKey: false,
       mapData: mapData,
       showFullMap: false,
+      win: false,
     };
 
     // Move right onto the lightswitch
