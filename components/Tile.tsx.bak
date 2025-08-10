@@ -1,0 +1,184 @@
+import React from 'react';
+import { TileType, TileSubtype } from '../lib/map';
+
+type NeighborInfo = {
+  top: number | null;
+  right: number | null;
+  bottom: number | null;
+  left: number | null;
+};
+
+interface TileProps {
+  tileId: number;
+  tileType: TileType;
+  subtype?: number;
+  isVisible?: boolean; // Whether this tile is in the player's field of view
+  neighbors?: NeighborInfo; // Information about neighboring tiles
+}
+
+export const Tile: React.FC<TileProps> = ({ tileId, tileType, subtype = 0, isVisible = true, neighbors = { top: null, right: null, bottom: null, left: null } }) => {
+  // For future use - uncomment if needed for debugging
+  // const displayText = subtype > 0 ? `${tileId}:${subtype}` : `${tileId}`;
+  
+  // Generate a shorthand code for autotiling
+  const topNeighbor = neighbors.top === tileId ? 'T' : '';
+  const rightNeighbor = neighbors.right === tileId ? 'R' : '';
+  const bottomNeighbor = neighbors.bottom === tileId ? 'B' : '';
+  const leftNeighbor = neighbors.left === tileId ? 'L' : '';
+  const neighborCode = `${topNeighbor}${rightNeighbor}${bottomNeighbor}${leftNeighbor}`;
+  
+  // Determine colors based on visibility and tile type
+  let backgroundColor = '#000'; // Default black for invisible tiles
+  let textColor = '#fff';
+  
+  // Pixel art colors
+  const wallDarkColor = '#3d3d3d';     // Dark gray for walls
+  const wallBaseColor = '#686868';     // Medium gray for walls
+  const wallLightColor = '#8e8e8e';    // Light gray for walls
+  const floorDarkColor = '#b8b8b8';    // Dark color for floors
+  const floorBaseColor = '#d6d6d6';    // Medium color for floors
+  const floorLightColor = '#f0f0f0';   // Light color for floors
+  
+  // Pixel art border sizes
+  const pixelSize = 'border-[2px]';     // Size of each "pixel" in the pixel art
+  const cornerSize = 'w-[4px] h-[4px]'; // Size of corner pieces
+  
+  if (isVisible) {
+    if (subtype === TileSubtype.PLAYER) {
+      backgroundColor = '#3b82f6'; // Blue for player
+    } else {
+      // Apply pixel art styling based on tile type
+      if (tileId === 0) { // Floor tile
+        backgroundColor = floorBaseColor;
+        
+        // Define classes based on neighboring tiles (for floors)
+        let tileClasses = 'relative';
+        
+        // Basic floor texture
+        const floorTextureClasses = 'before:content-[""] before:absolute before:inset-0 ' +
+                                    'before:bg-[url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEklEQVQImWP49OnTP0bG//8ZADTcBHl0T8ZtAAAAAElFTkSuQmCC")] ' +
+                                    'before:bg-repeat before:opacity-10';
+        
+        tileClasses += ' ' + floorTextureClasses;
+        
+        // Add borders where floor meets non-floor
+        if (neighbors.top !== null && neighbors.top !== tileId) {
+          tileClasses += ' border-t ' + pixelSize + ' border-t-[' + floorDarkColor + ']';
+        }
+        if (neighbors.right !== null && neighbors.right !== tileId) {
+          tileClasses += ' border-r ' + pixelSize + ' border-r-[' + floorDarkColor + ']';
+        }
+        if (neighbors.bottom !== null && neighbors.bottom !== tileId) {
+          tileClasses += ' border-b ' + pixelSize + ' border-b-[' + floorDarkColor + ']';
+        }
+        if (neighbors.left !== null && neighbors.left !== tileId) {
+          tileClasses += ' border-l ' + pixelSize + ' border-l-[' + floorDarkColor + ']';
+        }
+        
+        return (
+          <div 
+            className={`w-10 h-10 flex items-center justify-center ${tileClasses}`}
+            style={{ backgroundColor }}
+            data-testid={`tile-${tileId}`}
+            data-neighbor-code={neighborCode}
+          />
+        );
+      } 
+      else if (tileId === 1) { // Wall tile
+        backgroundColor = wallBaseColor;
+        
+        // For walls, we'll use a more sophisticated approach with pixel art corners and edges
+        // based on the neighbors configuration
+        
+        // Generate CSS classes for wall autotiling based on neighbors
+        let cornerClasses = '';
+        let edgeClasses = '';
+        let insetClasses = '';
+        
+        // Determine which corners and edges to show based on neighbors
+        // This creates the "pixel art" effect for walls
+      }
+    }
+  } else {
+    // Not visible - determine if it's a wall or floor for basic structure
+    if (tileId === 0) { // Floor
+      backgroundColor = '#222'; // Dark gray for floors
+    } else if (tileId === 1) { // Wall
+      backgroundColor = '#444'; // Light gray for walls
+    }
+    textColor = 'transparent'; // Hide text for non-visible tiles
+  }
+  
+        // Setup for wall corners based on neighbor pattern
+        if (!topNeighbor && !leftNeighbor) {
+          cornerClasses += ' after:content-[""] after:absolute after:top-0 after:left-0 ' + 
+                         'after:border-t-[4px] after:border-l-[4px] after:border-[' + wallDarkColor + '] ' +
+                         'after:w-[6px] after:h-[6px]';
+        }
+        if (!topNeighbor && !rightNeighbor) {
+          cornerClasses += ' before:content-[""] before:absolute before:top-0 before:right-0 ' + 
+                         'before:border-t-[4px] before:border-r-[4px] before:border-[' + wallDarkColor + '] ' +
+                         'before:w-[6px] before:h-[6px]';
+        }
+        
+        // Create the edge highlights for the wall
+        if (!topNeighbor) {
+          edgeClasses += ' after:content-[""] after:absolute after:top-0 after:left-[6px] after:right-[6px] ' +
+                       'after:h-[2px] after:bg-[' + wallLightColor + ']';
+        }
+        if (!rightNeighbor) {
+          edgeClasses += ' before:content-[""] before:absolute before:right-0 before:top-[6px] before:bottom-[6px] ' +
+                       'before:w-[2px] before:bg-[' + wallLightColor + ']';
+        }
+        
+        // Inner shadow effect for walls
+        if (topNeighbor && leftNeighbor) {
+          insetClasses += ' shadow-[inset_2px_2px_0_' + wallDarkColor + ']';
+        } else if (topNeighbor) {
+          insetClasses += ' shadow-[inset_0_2px_0_' + wallDarkColor + ']';
+        } else if (leftNeighbor) {
+          insetClasses += ' shadow-[inset_2px_0_0_' + wallDarkColor + ']';
+        }
+        
+        return (
+          <div 
+            className={`w-10 h-10 relative ${cornerClasses} ${edgeClasses} ${insetClasses}`}
+            style={{ backgroundColor }}
+            data-testid={`tile-${tileId}`}
+            data-neighbor-code={neighborCode}
+          >
+            {/* Optional: Add inner content for the wall */}
+            <div className="absolute inset-[3px] bg-[${wallBaseColor}] border border-[${wallDarkColor}] opacity-30"></div>
+          </div>
+        );
+      }
+    }
+  } else {
+    // Not visible - determine if it's a wall or floor for basic structure
+    if (tileId === 0) { // Floor
+      backgroundColor = '#222'; // Dark gray for floors
+    } else if (tileId === 1) { // Wall
+      backgroundColor = '#444'; // Light gray for walls
+    }
+    textColor = 'transparent'; // Hide text for non-visible tiles
+    
+    return (
+      <div 
+        className="w-10 h-10 flex items-center justify-center"
+        style={{ backgroundColor }}
+        data-testid={`tile-${tileId}`}
+        data-neighbor-code={neighborCode}
+      />
+    );
+  }
+  
+  // Fallback rendering - should not typically be reached
+  return (
+    <div 
+      className="w-10 h-10 flex items-center justify-center"
+      style={{ backgroundColor }}
+      data-testid={`tile-${tileId}`}
+    />
+  );
+  );
+};
