@@ -52,6 +52,7 @@ describe('TilemapGrid component', () => {
 
     const initialGameState: GameState = {
       hasKey: false,
+      hasExitKey: false,
       mapData: { tiles, subtypes },
       showFullMap: false,
     };
@@ -126,6 +127,7 @@ describe('TilemapGrid component', () => {
 
     const initialGameState: GameState = {
       hasKey: false,
+      hasExitKey: false,
       mapData: { tiles, subtypes },
       showFullMap: true,
     };

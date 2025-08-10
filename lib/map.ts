@@ -59,7 +59,6 @@ export function generateMap(): number[][] {
     }
     grid.push(row);
   }
-
   // Create 2-4 rooms
   const numRooms = 2 + Math.floor(Math.random() * 3); // 2-4 rooms
   const rooms: Room[] = [];
@@ -160,6 +159,7 @@ export enum TileSubtype {
   LOCK = 4,
   PLAYER = 5,
   LIGHTSWITCH = 6,
+  EXITKEY = 7,
 }
 
 export interface MapData {
@@ -366,12 +366,52 @@ export function addLightswitchToMap(mapData: MapData): MapData {
 }
 
 /**
+ * Add an exit key to the map on a random floor tile without other subtypes
+ * @param mapData The map data to add an exit key to
+ * @returns The updated map data with an exit key added
+ */
+export function addExitKeyToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligibleTiles: Array<[number, number]> = [];
+
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligibleTiles.push([y, x]);
+      }
+    }
+  }
+
+  if (eligibleTiles.length > 0) {
+    const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
+    const [ey, ex] = eligibleTiles[randomIndex];
+    newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
+    console.log(`Placed exit key at [${ey}, ${ex}]`);
+  } else {
+    console.warn(
+      "Could not place exit key - no eligible floor tiles available"
+    );
+  }
+
+  return newMapData;
+}
+
+/**
  * Generate a complete map with all subtypes (door, exit, key, lock, lightswitch)
  * @returns MapData object with all subtypes properly placed
  */
 export function generateCompleteMap(): MapData {
   const mapData = generateMapWithKeyAndLock();
-  const mapWithLightswitch = addLightswitchToMap(mapData);
+  const withExitKey = addExitKeyToMap(mapData);
+  const mapWithLightswitch = addLightswitchToMap(withExitKey);
   return addPlayerToMap(mapWithLightswitch);
 }
 
@@ -449,6 +489,7 @@ export enum Direction {
  */
 export interface GameState {
   hasKey: boolean;
+  hasExitKey: boolean;
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
 }
@@ -460,6 +501,7 @@ export interface GameState {
 export function initializeGameState(): GameState {
   return {
     hasKey: false,
+    hasExitKey: false,
     mapData: generateCompleteMap(),
     showFullMap: false,
   };
@@ -539,22 +581,26 @@ export function movePlayer(
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       newGameState.hasKey = false;
     }
-    // If it's an exit, player wins (for now just pass through)
+    // If it's an exit, require EXITKEY to open
     else if (subtype.includes(TileSubtype.EXIT)) {
-      // Convert the exit to floor when player passes through
-      newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-        (type) => type !== TileSubtype.EXIT
-      );
+      if (newGameState.hasExitKey) {
+        // Convert the exit to floor when player opens it
+        newMapData.tiles[newY][newX] = FLOOR;
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
+          newX
+        ].filter((type) => type !== TileSubtype.EXIT);
 
-      // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
-        currentX
-      ].filter((type) => type !== TileSubtype.PLAYER);
-      newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+        // Move player to the new position and consume the exit key
+        newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+          currentX
+        ].filter((type) => type !== TileSubtype.PLAYER);
+        newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+        newGameState.hasExitKey = false;
 
-      // Here you would typically trigger a win condition
-      console.log("Player found the exit!");
+        // Here you would typically trigger a win condition
+        console.log("Player opened the exit!");
+      }
+      // If no exit key, blocked by exit wall
     }
 
     // For regular walls, do nothing - player cannot move there
@@ -570,6 +616,13 @@ export function movePlayer(
       newGameState.hasKey = true;
       newMapData.subtypes[newY][newX] = [];
       console.log("Player picked up a key!");
+    }
+
+    // If it's an exit key, pick it up
+    if (subtype.includes(TileSubtype.EXITKEY)) {
+      newGameState.hasExitKey = true;
+      newMapData.subtypes[newY][newX] = [];
+      console.log("Player picked up the exit key!");
     }
 
     // If it's a lightswitch, toggle full map visibility

@@ -39,6 +39,82 @@ describe("Player and Dynamic Subtypes", () => {
     }
   });
 
+  it("should NOT open exit without exit key", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Player at (10, 11), Exit at (10, 12) as wall with EXIT subtype
+    mapData.subtypes[10][11] = [TileSubtype.PLAYER];
+    mapData.tiles[10][12] = 1; // wall
+    mapData.subtypes[10][12] = [TileSubtype.EXIT];
+
+    let gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+    };
+
+    // Attempt to move into exit without exit key
+    gameState = movePlayer(gameState, Direction.RIGHT);
+
+    // Player should NOT have moved; exit remains a wall with EXIT subtype
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
+    expect(gameState.mapData.tiles[10][12]).toBe(1);
+    expect(gameState.mapData.subtypes[10][12].includes(TileSubtype.EXIT)).toBe(
+      true
+    );
+  });
+
+  it("should open exit only after picking up exit key (and consume it)", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Layout: P (10,10) -> EXITKEY (10,11) floor -> EXIT (10,12) wall
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    mapData.subtypes[10][11] = [TileSubtype.EXITKEY];
+    mapData.tiles[10][12] = 1; // wall
+    mapData.subtypes[10][12] = [TileSubtype.EXIT];
+
+    let gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+    };
+
+    // Step 1: move right to pick up exit key
+    gameState = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
+    expect(gameState.hasExitKey).toBe(true);
+
+    // Step 2: move right into exit; should open and consume exit key
+    gameState = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 12]);
+    expect(gameState.mapData.tiles[10][12]).toBe(0);
+    expect(gameState.hasExitKey).toBe(false);
+  });
+
   it("should find player position correctly", () => {
     const mapData = generateMapWithSubtypes();
     // Place player at a known position
@@ -145,7 +221,9 @@ describe("Player and Dynamic Subtypes", () => {
     // Initialize game state with this custom map
     let gameState: GameState = {
       hasKey: false,
+      hasExitKey: false,
       mapData: mapData,
+      showFullMap: false,
     };
 
     // Step 1: Move right to pick up the key
@@ -171,7 +249,7 @@ describe("Player and Dynamic Subtypes", () => {
     ).toBe(true); // Player moved there
   });
 
-  it("should pass through doors and exit", () => {
+  it("should pass through doors but be blocked by exit without exit key", () => {
     // Create a custom map for this test
     const mapData: MapData = {
       tiles: Array(25)
@@ -201,7 +279,9 @@ describe("Player and Dynamic Subtypes", () => {
     // Initialize game state with this custom map
     let gameState: GameState = {
       hasKey: false,
+      hasExitKey: false,
       mapData: mapData,
+      showFullMap: false,
     };
 
     // Step 1: Move right through the door
@@ -213,14 +293,12 @@ describe("Player and Dynamic Subtypes", () => {
       gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)
     ).toBe(true);
 
-    // Step 2: Move right again through the exit
+    // Step 2: Attempt to move right into the exit without exit key (should be blocked)
     gameState = movePlayer(gameState, Direction.RIGHT);
 
-    // Verify exit became floor and player moved there
-    expect(gameState.mapData.tiles[10][12]).toBe(0); // Now floor
-    expect(
-      gameState.mapData.subtypes[10][12].includes(TileSubtype.PLAYER)
-    ).toBe(true);
+    // Verify exit is still a wall and player did not move
+    expect(gameState.mapData.tiles[10][12]).toBe(1); // Still wall
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
   });
 
   it("should not remove lightswitch when stepping on it", () => {
@@ -248,6 +326,7 @@ describe("Player and Dynamic Subtypes", () => {
     // Initialize game state with this custom map
     let gameState: GameState = {
       hasKey: false,
+      hasExitKey: false,
       mapData: mapData,
       showFullMap: false,
     };

@@ -5,7 +5,6 @@ import {
   Direction,
   movePlayer,
   initializeGameState,
-  findPlayerPosition,
   TileSubtype,
 } from "../lib/map";
 import { Tile } from "./Tile";
@@ -35,6 +34,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Create a new game state with the provided tilemap and subtypes
       return {
         hasKey: false,
+        hasExitKey: false,
         mapData: {
           tiles: tilemap,
           subtypes:
@@ -55,8 +55,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   });
 
-  // Track inventory
-  const [inventory, setInventory] = useState<number[]>([]);
+  // Inventory is derived from gameState flags (hasKey, hasExitKey)
 
   // Auto-disable full map visibility after 3 seconds
   useEffect(() => {
@@ -89,29 +88,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       if (direction !== null) {
-        // Get current subtype at player position before moving
-        const playerPosition = findPlayerPosition(gameState.mapData);
         const newGameState = movePlayer(gameState, direction);
-
-        // Check if player picked up a key or other item
-        if (playerPosition) {
-          const [oldY, oldX] = playerPosition;
-          const newPosition = findPlayerPosition(newGameState.mapData);
-
-          if (newPosition) {
-            const [newY, newX] = newPosition;
-
-            // If position changed and player had a key now, they must have picked it up
-            if (
-              (newY !== oldY || newX !== oldX) &&
-              newGameState.hasKey &&
-              !gameState.hasKey
-            ) {
-              // Add key to inventory
-              setInventory((prev) => [...prev, TileSubtype.KEY]);
-            }
-          }
-        }
 
         setGameState(newGameState);
       }
@@ -144,18 +121,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       </div>
 
-      {inventory.length > 0 && (
+      {(gameState.hasKey || gameState.hasExitKey) && (
         <div className="mt-4 p-3 border border-gray-300 rounded-md">
           <h3 className="font-medium mb-2">Inventory:</h3>
           <div className="flex gap-2">
-            {inventory.map((item, index) => (
-              <div
-                key={index}
-                className="p-2 bg-yellow-100 border border-yellow-400 rounded-md"
-              >
-                {item === TileSubtype.KEY ? "Key 🔑" : `Item ${item}`}
+            {gameState.hasKey && (
+              <div className="p-2 bg-yellow-100 border border-yellow-400 rounded-md">
+                Key 🔑
               </div>
-            ))}
+            )}
+            {gameState.hasExitKey && (
+              <div className="p-2 bg-indigo-100 border border-indigo-400 rounded-md">
+                Exit Key 🗝️
+              </div>
+            )}
           </div>
         </div>
       )}
