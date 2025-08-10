@@ -21,7 +21,7 @@ describe("Player and Dynamic Subtypes", () => {
     
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        if (mapWithPlayer.subtypes[y][x] === TileSubtype.PLAYER) {
+        if (mapWithPlayer.subtypes[y][x].includes(TileSubtype.PLAYER)) {
           playerCount++;
           playerPosition = [y, x];
         }
@@ -47,7 +47,7 @@ describe("Player and Dynamic Subtypes", () => {
     for (let y = 0; y < 25 && !placed; y++) {
       for (let x = 0; x < 25 && !placed; x++) {
         if (mapData.tiles[y][x] === 0) { // Floor tile
-          mapData.subtypes[y][x] = TileSubtype.PLAYER;
+          mapData.subtypes[y][x] = [TileSubtype.PLAYER];
           placed = true;
         }
       }
@@ -57,7 +57,7 @@ describe("Player and Dynamic Subtypes", () => {
     expect(position).not.toBeNull();
     if (position) {
       const [y, x] = position;
-      expect(mapData.subtypes[y][x]).toBe(TileSubtype.PLAYER);
+      expect(mapData.subtypes[y][x].includes(TileSubtype.PLAYER)).toBe(true);
     }
   });
   
@@ -92,7 +92,7 @@ describe("Player and Dynamic Subtypes", () => {
         expect(newGameState.mapData.tiles[newPosition[0]][newPosition[1]]).toBe(0);
         
         // Verify old position is now empty
-        expect(newGameState.mapData.subtypes[initialY][initialX]).toBe(TileSubtype.NONE);
+        expect(newGameState.mapData.subtypes[initialY][initialX]).toEqual([]);
         break;
       }
     }
@@ -107,19 +107,19 @@ describe("Player and Dynamic Subtypes", () => {
     // Create a custom map for this test
     const mapData: MapData = {
       tiles: Array(25).fill(0).map(() => Array(25).fill(0)),
-      subtypes: Array(25).fill(0).map(() => Array(25).fill(0))
+      subtypes: Array(25).fill(0).map(() => Array(25).fill(0).map(() => []))
     };
     
     // Place player, key, and lock in known positions
     // Player at (10, 10)
-    mapData.subtypes[10][10] = TileSubtype.PLAYER;
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
     
     // Key at (10, 11) - right of player
-    mapData.subtypes[10][11] = TileSubtype.KEY;
+    mapData.subtypes[10][11] = [TileSubtype.KEY];
     
     // Lock at (10, 12) - two spots right of player
     mapData.tiles[10][12] = 1; // Wall
-    mapData.subtypes[10][12] = TileSubtype.LOCK;
+    mapData.subtypes[10][12] = [TileSubtype.LOCK];
     
     // Initialize game state with this custom map
     let gameState: GameState = {
@@ -145,27 +145,27 @@ describe("Player and Dynamic Subtypes", () => {
     
     // Verify lock tile is now a floor
     expect(gameState.mapData.tiles[10][12]).toBe(0); // Now floor
-    expect(gameState.mapData.subtypes[10][12]).toBe(TileSubtype.PLAYER); // Player moved there
+    expect(gameState.mapData.subtypes[10][12].includes(TileSubtype.PLAYER)).toBe(true); // Player moved there
   });
   
   it("should pass through doors and exit", () => {
     // Create a custom map for this test
     const mapData: MapData = {
       tiles: Array(25).fill(0).map(() => Array(25).fill(0)),
-      subtypes: Array(25).fill(0).map(() => Array(25).fill(0))
+      subtypes: Array(25).fill(0).map(() => Array(25).fill(0).map(() => []))
     };
     
     // Place player, door, and exit in known positions
     // Player at (10, 10)
-    mapData.subtypes[10][10] = TileSubtype.PLAYER;
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
     
     // Door at (10, 11) - right of player
     mapData.tiles[10][11] = 1; // Wall
-    mapData.subtypes[10][11] = TileSubtype.DOOR;
+    mapData.subtypes[10][11] = [TileSubtype.DOOR];
     
     // Exit at (10, 12) - two spots right of player
     mapData.tiles[10][12] = 1; // Wall
-    mapData.subtypes[10][12] = TileSubtype.EXIT;
+    mapData.subtypes[10][12] = [TileSubtype.EXIT];
     
     // Initialize game state with this custom map
     let gameState: GameState = {
@@ -178,13 +178,48 @@ describe("Player and Dynamic Subtypes", () => {
     
     // Verify door became floor and player moved there
     expect(gameState.mapData.tiles[10][11]).toBe(0); // Now floor
-    expect(gameState.mapData.subtypes[10][11]).toBe(TileSubtype.PLAYER);
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)).toBe(true);
     
     // Step 2: Move right again through the exit
     gameState = movePlayer(gameState, Direction.RIGHT);
     
     // Verify exit became floor and player moved there
     expect(gameState.mapData.tiles[10][12]).toBe(0); // Now floor
-    expect(gameState.mapData.subtypes[10][12]).toBe(TileSubtype.PLAYER);
+    expect(gameState.mapData.subtypes[10][12].includes(TileSubtype.PLAYER)).toBe(true);
+  });
+  
+  it("should not remove lightswitch when stepping on it", () => {
+    // Create a custom map for this test
+    const mapData: MapData = {
+      tiles: Array(25).fill(0).map(() => Array(25).fill(0)),
+      subtypes: Array(25).fill(0).map(() => Array(25).fill(0).map(() => []))
+    };
+    
+    // Place player at (10, 10)
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    
+    // Place lightswitch at (10, 11) - right of player
+    mapData.tiles[10][11] = 0; // Floor tile
+    mapData.subtypes[10][11] = [TileSubtype.LIGHTSWITCH];
+    
+    // Initialize game state with this custom map
+    let gameState: GameState = {
+      hasKey: false,
+      mapData: mapData,
+      showFullMap: false
+    };
+    
+    // Move right onto the lightswitch
+    gameState = movePlayer(gameState, Direction.RIGHT);
+    
+    // Verify player is on the tile
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)).toBe(true);
+    
+    // Verify the lightswitch is still present on the same tile as the player
+    // We should have both the lightswitch and player in the array
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.LIGHTSWITCH)).toBe(true);
+    
+    // Verify showFullMap was toggled
+    expect(gameState.showFullMap).toBe(true);
   });
 });

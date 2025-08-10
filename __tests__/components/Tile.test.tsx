@@ -10,30 +10,30 @@ describe('Tile component', () => {
     
     const tile = screen.getByTestId('tile-0');
     expect(tile).toBeInTheDocument();
-    expect(tile).toHaveStyle('background-color: #ccc');
+    expect(tile).toHaveStyle('background-color: #c8c8c8');
   });
 
-  it('should display the tile ID', () => {
+  it('should not display content for tile with no subtype', () => {
     const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
     render(<Tile tileId={1} tileType={mockTileType} />);
     
     const tile = screen.getByTestId('tile-1');
-    expect(tile).toHaveTextContent('1');
+    expect(tile).not.toHaveTextContent(/\d/);
   });
 
-  it('should display tile ID and subtype when subtype is provided', () => {
+  it('should display subtype value when subtype is provided', () => {
     const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
-    render(<Tile tileId={0} tileType={mockTileType} subtype={1} />);
+    render(<Tile tileId={0} tileType={mockTileType} subtype={[1]} />);
     
     const tile = screen.getByTestId('tile-0');
-    expect(tile).toHaveTextContent('0:1');
+    expect(tile).toHaveTextContent('1');
   });
 
-  it('should display only tile ID when subtype is 0', () => {
+  it('should not display content when subtype is empty array', () => {
     const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
-    render(<Tile tileId={1} tileType={mockTileType} subtype={0} />);
+    render(<Tile tileId={1} tileType={mockTileType} subtype={[]} />);
     
     const tile = screen.getByTestId('tile-1');
-    expect(tile).toHaveTextContent('1');
+    expect(tile).not.toHaveTextContent(/\d/);
   });
 });

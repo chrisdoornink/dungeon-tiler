@@ -9,7 +9,7 @@ const GRID_HEIGHT = 25;
 interface TilemapGridProps {
   tilemap?: number[][];
   tileTypes: Record<number, TileType>;
-  subtypes?: number[][];
+  subtypes?: number[][][];
   initialGameState?: GameState;
 }
 
@@ -24,7 +24,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({ tilemap, tileTypes, su
         hasKey: false,
         mapData: {
           tiles: tilemap,
-          subtypes: subtypes || Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0))
+          subtypes: subtypes || Array(GRID_HEIGHT).fill(0).map(() => Array(GRID_WIDTH).fill(0).map(() => []))
         },
         showFullMap: false
       };
@@ -160,14 +160,14 @@ function calculateVisibility(grid: number[][], playerPosition: [number, number] 
 }
 
 // Render the grid of tiles
-function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][] | undefined, showFullMap: boolean = false) {
+function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, subtypes: number[][][] | undefined, showFullMap: boolean = false) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
   
   if (subtypes) {
     for (let y = 0; y < subtypes.length; y++) {
       for (let x = 0; x < subtypes[y].length; x++) {
-        if (subtypes[y][x] === TileSubtype.PLAYER) {
+        if (subtypes[y][x].includes(TileSubtype.PLAYER)) {
           playerPosition = [y, x];
           break;
         }
@@ -190,7 +190,7 @@ function renderTileGrid(grid: number[][], tileTypes: Record<number, TileType>, s
   return grid.flatMap((row, rowIndex) => 
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
-      const subtype = subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : 0;
+      const subtype = subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : [];
       const isVisible = visibility[rowIndex][colIndex];
       
       // Get neighboring tiles

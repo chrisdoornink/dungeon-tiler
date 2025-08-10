@@ -3,6 +3,7 @@ import {
   countRooms,
   areAllFloorsConnected,
   generateMapWithSubtypes,
+  TileSubtype,
   generateMapWithDoorAndExit,
   generateMapWithKeyAndLock
 } from "../../lib/map";
@@ -116,10 +117,11 @@ describe("Tile Subtypes", () => {
     expect(mapData.tiles[0].length).toBe(25);
     expect(mapData.subtypes[0].length).toBe(25);
 
-    // Check that all subtypes are initialized to 0
+    // Check that all subtypes are initialized to empty arrays
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        expect(mapData.subtypes[y][x]).toBe(0);
+        expect(Array.isArray(mapData.subtypes[y][x])).toBe(true);
+        expect(mapData.subtypes[y][x].length).toBe(0);
       }
     }
   });
@@ -138,11 +140,11 @@ describe("Tile Subtypes", () => {
     // Count door and exit tiles
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x] === 2) {
+        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.DOOR)) {
           doorCount++;
           doorPosition = [y, x];
         }
-        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x] === 1) {
+        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.EXIT)) {
           exitCount++;
           exitPosition = [y, x];
         }
@@ -194,11 +196,11 @@ describe("Tile Subtypes", () => {
     // Count key and lock tiles
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        if (mapData.tiles[y][x] === 0 && mapData.subtypes[y][x] === 3) {
+        if (mapData.tiles[y][x] === 0 && mapData.subtypes[y][x].includes(TileSubtype.KEY)) {
           keyCount++;
           keyPosition = [y, x];
         }
-        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x] === 4) {
+        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.LOCK)) {
           lockCount++;
           lockPosition = [y, x];
         }

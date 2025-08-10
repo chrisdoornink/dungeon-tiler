@@ -37,10 +37,12 @@ describe('Home Component', () => {
     
     // Default mock implementation returns a small test grid
     const mockGrid = Array(25).fill(0).map(() => Array(25).fill(0));
-    const mockSubtypes = Array(25).fill(0).map(() => Array(25).fill(0));
+    const mockSubtypes = Array(25).fill(0).map(() => 
+      Array(25).fill(0).map(() => [] as number[])
+    );
     
     // Place a player in the mock data
-    mockSubtypes[12][12] = mapModule.TileSubtype.PLAYER;
+    mockSubtypes[12][12] = [mapModule.TileSubtype.PLAYER];
     
     // Mock return values
     (mapModule.generateMap as jest.Mock).mockReturnValue(mockGrid);

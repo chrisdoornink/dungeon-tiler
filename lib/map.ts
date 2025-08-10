@@ -160,7 +160,7 @@ export enum TileSubtype {
 
 export interface MapData {
   tiles: number[][];
-  subtypes: number[][];
+  subtypes: number[][][];
 }
 
 /**
@@ -169,7 +169,10 @@ export interface MapData {
  */
 export function generateMapWithSubtypes(): MapData {
   const tiles = generateMap();
-  const subtypes = Array(GRID_SIZE).fill(0).map(() => Array(GRID_SIZE).fill(0));
+  // Initialize as a 3D array of empty arrays
+  const subtypes = Array(GRID_SIZE).fill(0).map(() => 
+    Array(GRID_SIZE).fill(0).map(() => [] as number[])
+  );
   
   return {
     tiles,
@@ -222,11 +225,11 @@ export function generateMapWithDoorAndExit(): MapData {
   
   // Place the door (first wall)
   const [doorY, doorX] = wallsNextToFloor[0];
-  mapData.subtypes[doorY][doorX] = TileSubtype.DOOR;
+  mapData.subtypes[doorY][doorX] = [TileSubtype.DOOR];
   
   // Place the exit (second wall)
   const [exitY, exitX] = wallsNextToFloor[1];
-  mapData.subtypes[exitY][exitX] = TileSubtype.EXIT;
+  mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
   
   return mapData;
 }
@@ -249,7 +252,7 @@ export function generateMapWithKeyAndLock(): MapData {
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
       // Skip tiles that already have subtypes
-      if (mapData.subtypes[y][x] !== TileSubtype.NONE) {
+      if (mapData.subtypes[y][x].length > 0 && !mapData.subtypes[y][x].includes(TileSubtype.NONE)) {
         continue;
       }
       
@@ -292,11 +295,11 @@ export function generateMapWithKeyAndLock(): MapData {
   
   // Place the key on a floor tile
   const [keyY, keyX] = floorTiles[0];
-  mapData.subtypes[keyY][keyX] = TileSubtype.KEY;
+  mapData.subtypes[keyY][keyX] = [TileSubtype.KEY];
   
   // Place the lock on a wall next to floor
   const [lockY, lockX] = wallsNextToFloor[0];
-  mapData.subtypes[lockY][lockX] = TileSubtype.LOCK;
+  mapData.subtypes[lockY][lockX] = [TileSubtype.LOCK];
   
   return mapData;
 }
@@ -318,7 +321,7 @@ export function addLightswitchToMap(mapData: MapData): MapData {
   
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
-      if (grid[y][x] === FLOOR && newMapData.subtypes[y][x] === TileSubtype.NONE) {
+      if (grid[y][x] === FLOOR && (newMapData.subtypes[y][x].length === 0 || newMapData.subtypes[y][x].includes(TileSubtype.NONE))) {
         eligibleTiles.push([y, x]);
       }
     }
@@ -330,7 +333,7 @@ export function addLightswitchToMap(mapData: MapData): MapData {
     const [lightswitchY, lightswitchX] = eligibleTiles[randomIndex];
     
     // Set the lightswitch
-    newMapData.subtypes[lightswitchY][lightswitchX] = TileSubtype.LIGHTSWITCH;
+    newMapData.subtypes[lightswitchY][lightswitchX] = [TileSubtype.LIGHTSWITCH];
     console.log(`Placed lightswitch at [${lightswitchY}, ${lightswitchX}]`);
   } else {
     console.warn('Could not place lightswitch - no eligible floor tiles available');
@@ -366,7 +369,7 @@ export function addPlayerToMap(mapData: MapData): MapData {
   
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
-      if (grid[y][x] === FLOOR && newMapData.subtypes[y][x] === TileSubtype.NONE) {
+      if (grid[y][x] === FLOOR && (newMapData.subtypes[y][x].length === 0 || newMapData.subtypes[y][x].includes(TileSubtype.NONE))) {
         eligibleTiles.push([y, x]);
       }
     }
@@ -378,7 +381,7 @@ export function addPlayerToMap(mapData: MapData): MapData {
     const [playerY, playerX] = eligibleTiles[randomIndex];
     
     // Place the player
-    newMapData.subtypes[playerY][playerX] = TileSubtype.PLAYER;
+    newMapData.subtypes[playerY][playerX] = [TileSubtype.PLAYER];
     console.log(`Placed player at [${playerY}, ${playerX}]`);
   } else {
     console.warn('Could not place player - no eligible floor tiles available');
@@ -395,7 +398,8 @@ export function addPlayerToMap(mapData: MapData): MapData {
 export function findPlayerPosition(mapData: MapData): [number, number] | null {
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
-      if (mapData.subtypes[y][x] === TileSubtype.PLAYER) {
+      // Check if the PLAYER subtype is in the array
+      if (mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
         return [y, x];
       }
     }
@@ -477,35 +481,35 @@ export function movePlayer(gameState: GameState, direction: Direction): GameStat
     const subtype = newMapData.subtypes[newY][newX];
     
     // If it's a door, player can pass through
-    if (subtype === TileSubtype.DOOR) {
+    if (subtype.includes(TileSubtype.DOOR)) {
       // Convert the door to floor when player passes through
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.DOOR);
       
       // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
-      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
     } 
     // If it's a lock and player has key, unlock it
-    else if (subtype === TileSubtype.LOCK && newGameState.hasKey) {
+    else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
       // Convert the lock to floor when unlocked
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.LOCK);
       
       // Move player to the new position and consume the key
-      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
-      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       newGameState.hasKey = false;
     } 
     // If it's an exit, player wins (for now just pass through)
-    else if (subtype === TileSubtype.EXIT) {
+    else if (subtype.includes(TileSubtype.EXIT)) {
       // Convert the exit to floor when player passes through
       newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(type => type !== TileSubtype.EXIT);
       
       // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
-      newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(type => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       
       // Here you would typically trigger a win condition
       console.log('Player found the exit!');
@@ -520,25 +524,41 @@ export function movePlayer(gameState: GameState, direction: Direction): GameStat
     const subtype = newMapData.subtypes[newY][newX];
     
     // If it's a key, pick it up
-    if (subtype === TileSubtype.KEY) {
+    if (subtype.includes(TileSubtype.KEY)) {
       newGameState.hasKey = true;
-      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      newMapData.subtypes[newY][newX] = [];
       console.log('Player picked up a key!');
     }
     
     // If it's a lightswitch, toggle full map visibility
-    if (subtype === TileSubtype.LIGHTSWITCH) {
+    if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
       // Toggle the showFullMap flag
       newGameState.showFullMap = !newGameState.showFullMap;
       console.log(`Player toggled light switch! Full map visibility: ${newGameState.showFullMap ? 'ON' : 'OFF'}`);
       
-      // Remove the lightswitch after use
-      newMapData.subtypes[newY][newX] = TileSubtype.NONE;
+      // Keep the lightswitch on the tile (don't remove it)
+      // Player and lightswitch will coexist on the same tile
     }
     
     // Move player to the new position
-    newMapData.subtypes[currentY][currentX] = TileSubtype.NONE;
-    newMapData.subtypes[newY][newX] = TileSubtype.PLAYER;
+    newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][currentX].filter(
+      type => type !== TileSubtype.PLAYER
+    );
+    // If current position array is empty after filtering, make it an empty array
+    if (newMapData.subtypes[currentY][currentX].length === 0) {
+      newMapData.subtypes[currentY][currentX] = [];
+    }
+    
+    // Handle special case for lightswitch - player and switch coexist on the same tile
+    if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
+      // Add player to the array if it's not already there
+      if (!newMapData.subtypes[newY][newX].includes(TileSubtype.PLAYER)) {
+        newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+      }
+    } else {
+      // For other tiles, just set to player
+      newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
+    }
   }
   
   return newGameState;

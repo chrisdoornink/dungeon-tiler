@@ -14,13 +14,21 @@ describe('TilemapGrid component', () => {
   const createMockTilemap = (width: number, height: number): number[][] => {
     return Array(height).fill(0).map(() => Array(width).fill(0));
   };
+  
+  // Create mock subtypes with the required 25x25 dimensions as arrays
+  const createMockSubtypes = (width: number, height: number): number[][][] => {
+    return Array(height).fill(0).map(() => Array(width).fill(0).map(() => []));
+  };
 
   it('should render a 25x25 grid', () => {
     // Arrange - Create a 25x25 tilemap
     const mockTilemap = createMockTilemap(25, 25);
     
+    // Create subtypes
+    const mockSubtypes = createMockSubtypes(25, 25);
+    
     // Act - Render the component
-    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} />);
+    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} subtypes={mockSubtypes} />);
     
     // Assert - Verify the grid has 25x25=625 cells
     const gridContainer = screen.getByTestId('tilemap-grid-container');
@@ -37,8 +45,11 @@ describe('TilemapGrid component', () => {
     // Arrange
     const mockTilemap = createMockTilemap(25, 25);
     
+    // Create subtypes
+    const mockSubtypes = createMockSubtypes(25, 25);
+    
     // Act
-    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} />);
+    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} subtypes={mockSubtypes} />);
     
     // Assert
     const gridWrapper = screen.getByTestId('tilemap-grid-wrapper');
@@ -49,8 +60,11 @@ describe('TilemapGrid component', () => {
     // Arrange
     const mockTilemap = createMockTilemap(25, 25);
     
+    // Create subtypes
+    const mockSubtypes = createMockSubtypes(25, 25);
+    
     // Act
-    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} />);
+    render(<TilemapGrid tilemap={mockTilemap} tileTypes={mockTileTypes} subtypes={mockSubtypes} />);
     
     // Assert - Check for responsive classes and overflow handling
     const gridContainer = screen.getByTestId('tilemap-grid-container');

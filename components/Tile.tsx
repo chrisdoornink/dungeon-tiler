@@ -11,7 +11,7 @@ type NeighborInfo = {
 interface TileProps {
   tileId: number;
   tileType: TileType;
-  subtype?: number;
+  subtype?: number[];
   isVisible?: boolean; // Whether this tile is in the player's field of view
   neighbors?: NeighborInfo; // Information about neighboring tiles
 }
@@ -20,7 +20,7 @@ export const Tile: React.FC<TileProps> = ({
   tileId,
   // tileType not currently used but kept for future extensibility
   tileType,
-  subtype = 0,
+  subtype = [],
   isVisible = true,
   neighbors = { top: null, right: null, bottom: null, left: null }
 }) => {
@@ -37,7 +37,7 @@ export const Tile: React.FC<TileProps> = ({
   // Pixel art colors - directly use these values in the JSX
   
   // If this is a player tile
-  if (isVisible && subtype === TileSubtype.PLAYER) {
+  if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
     return (
       <div 
         className="w-10 h-10 flex items-center justify-center bg-blue-500 text-white font-bold"
@@ -93,15 +93,15 @@ export const Tile: React.FC<TileProps> = ({
           data-neighbor-code={neighborCode}
         >
           {/* Special styling for lightswitch */}
-          {subtype === TileSubtype.LIGHTSWITCH ? (
+          {subtype && subtype.includes(TileSubtype.LIGHTSWITCH) ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-md">
                 <span className="text-white font-bold text-sm">⚡</span>
               </div>
             </div>
-          ) : subtype > 0 && (
+          ) : subtype && subtype.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-600 font-bold">
-              {subtype}
+              {subtype.join(',')}
             </div>
           )}
         </div>
@@ -167,9 +167,9 @@ export const Tile: React.FC<TileProps> = ({
           <div className="absolute inset-[3px] border border-[#4a4a4a] opacity-30"></div>
           
           {/* Only display subtype if it exists */}
-          {subtype > 0 && (
+          {subtype && subtype.length > 0 && (
             <div className="absolute inset-0 flex items-center justify-center text-xs text-white font-bold">
-              {subtype}
+              {subtype.join(',')}
             </div>
           )}
         </div>
@@ -191,7 +191,7 @@ export const Tile: React.FC<TileProps> = ({
       className="w-10 h-10 flex items-center justify-center bg-purple-500 text-white"
       data-testid={`tile-${tileId}`}
     >
-      {subtype > 0 ? subtype : tileId}
+      {subtype && subtype.length > 0 ? subtype.join(',') : tileId}
     </div>
   );
 };
