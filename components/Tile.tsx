@@ -1,5 +1,6 @@
 import React from 'react';
 import { TileType, TileSubtype } from '../lib/map';
+import styles from './Tile.module.css';
 
 type NeighborInfo = {
   top: number | null;
@@ -85,8 +86,8 @@ export const Tile: React.FC<TileProps> = ({
 
   if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
     return (
-      <div 
-        className={`relative w-10 h-10 flex items-center justify-center bg-blue-500 text-white font-bold ${tierClass}`}
+      <div
+        className={`${styles.tileContainer} ${styles.player} ${tierClass}`}
         data-testid={`tile-${tileId}`}
         data-neighbor-code={neighborCode}
       >
@@ -99,46 +100,14 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
-      // Create the autotiled floor style
-      let floorClasses = `w-10 h-10 relative bg-[#c8c8c8] ${tierClass}`;
-      
-      // Add subtle texture to floors
-      floorClasses += ' before:content-[""] before:absolute before:inset-0 before:bg-opacity-10 ' +
-                     'before:bg-[url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVQImWNgYGD4z0AKYBzEAwAmAgMDZnGqswAAAABJRU5ErkJggg==")] ' +
-                     'before:opacity-20';
-      
-      // Apply retro pixel borders based on neighbors
-      // Top edge
-      if (neighbors.top !== null && neighbors.top !== tileId) {
-        floorClasses += ' border-t-2 border-t-[#9a9a9a]';
-      }
-      
-      // Right edge
-      if (neighbors.right !== null && neighbors.right !== tileId) {
-        floorClasses += ' border-r-2 border-r-[#9a9a9a]';
-      }
-      
-      // Bottom edge
-      if (neighbors.bottom !== null && neighbors.bottom !== tileId) {
-        floorClasses += ' border-b-2 border-b-[#9a9a9a]';
-      }
-      
-      // Left edge
-      if (neighbors.left !== null && neighbors.left !== tileId) {
-        floorClasses += ' border-l-2 border-l-[#9a9a9a]';
-      }
-      
-      // Add corner classes for when two perpendicular edges meet
-      // These create the pixel corners effect
-      
+      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
       return (
-        <div 
+        <div
           className={floorClasses}
-          style={{ backgroundColor: '#c8c8c8' }} 
+          style={{ backgroundColor: '#c8c8c8' }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
-          {/* Special styling for lightswitch */}
           {subtype && subtype.includes(TileSubtype.LIGHTSWITCH) ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center shadow-md">
@@ -155,8 +124,8 @@ export const Tile: React.FC<TileProps> = ({
     } else {
       // Invisible floor
       return (
-        <div 
-          className="w-10 h-10 bg-gray-900"
+        <div
+          className={`${styles.tileContainer} ${styles.invisible} bg-gray-900`}
           data-testid={`tile-${tileId}`}
         />
       );
@@ -166,11 +135,8 @@ export const Tile: React.FC<TileProps> = ({
   // If this is a wall tile
   if (tileId === 1) {
     if (isVisible) {
-      // Create the autotiled wall style
-      let wallClasses = `w-10 h-10 relative bg-[#5a5a5a] ${tierClass}`;
-      
-      // Start with base wall style
-      wallClasses += ' border border-[#3a3a3a]';
+      // Create the wall style
+      let wallClasses = `${styles.tileContainer} ${styles.wall} ${tierClass}`;
       
       // Inner shadow for 3D effect - differs based on neighbors
       let shadowClasses = '';
@@ -192,25 +158,38 @@ export const Tile: React.FC<TileProps> = ({
       
       // Top edge highlight
       if (!topNeighbor) {
-        highlightClasses += ' after:content-[""] after:absolute after:top-0 after:left-[2px] after:right-[2px] ' +
-                          'after:h-[1px] after:bg-[#7a7a7a]';
+        highlightClasses += ` ${styles.wallTopHighlight}`;
       }
       
       // Right edge highlight
       if (!rightNeighbor) {
-        highlightClasses += ' before:content-[""] before:absolute before:right-0 before:top-[2px] before:bottom-[2px] ' +
-                          'before:w-[1px] before:bg-[#7a7a7a]';
+        highlightClasses += ` ${styles.wallRightHighlight}`;
+      }
+
+      // Forced perspective: if the tile below is a FLOOR (0), make the bottom border much thicker/darker
+      const isFloorBelow = neighbors.bottom === 0;
+      if (isFloorBelow) {
+        // Keep these utility-like classes for tests and easy tuning via :global
+        wallClasses += ' border-b-8 border-b-[#1f1f1f]';
       }
       
       return (
-        <div 
+        <div
           className={`${wallClasses} ${shadowClasses} ${highlightClasses}`}
           style={{ backgroundColor: '#5a5a5a' }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
           {/* Wall details - inner texture or pattern */}
-          <div className="absolute inset-[3px] border border-[#4a4a4a] opacity-30"></div>
+          <div className={styles.wallInsetTexture}></div>
+
+          {/* Exaggerated base shadow when standing in front of floor */}
+          {isFloorBelow && (
+            <div
+              data-testid="wall-base-shadow"
+              className={styles.wallBaseShadow}
+            />
+          )}
           
           {/* Only display subtype if it exists */}
           {subtype && subtype.length > 0 && (
@@ -223,8 +202,8 @@ export const Tile: React.FC<TileProps> = ({
     } else {
       // Invisible wall - same style as invisible floor
       return (
-        <div 
-          className="w-10 h-10 bg-gray-900"
+        <div
+          className={`${styles.tileContainer} ${styles.invisible} bg-gray-900`}
           data-testid={`tile-${tileId}`}
         />
       );

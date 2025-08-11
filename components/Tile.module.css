@@ -1,0 +1,92 @@
+:root {
+  --tile-size: 40px; /* 10 * 4px (tailwind w-10 h-10 equivalent) */
+  --floor-bg: #c8c8c8;
+  --wall-bg: #5a5a5a;
+  --wall-border: #3a3a3a;
+  --wall-shadow: #4a4a4a;
+  --edge-highlight: #7a7a7a;
+  --perspective-base: #1f1f1f;
+}
+
+.tileContainer {
+  position: relative;
+  width: var(--tile-size);
+  height: var(--tile-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+/* Visibility tiers (kept as global tokens so tests can still see class names if needed) */
+:global(.fov-tier-3) { filter: none; }
+:global(.fov-tier-2) { filter: brightness(0.85); }
+:global(.fov-tier-1) { filter: brightness(0.7); }
+
+/* Keep border-b-8 token globally to satisfy tests and non-Tailwind runtime */
+:global(.border-b-8) { border-bottom-width: 8px !important; border-bottom-style: solid; }
+:global(.border-b-4) { border-bottom-width: 4px !important; border-bottom-style: solid; }
+:global(.border-b-2) { border-bottom-width: 2px !important; border-bottom-style: solid; }
+:global(.border-b-0) { border-bottom-width: 0px !important; border-bottom-style: solid; }
+
+/* Specific color utility token we referenced */
+:global(.border-b-\[\#1f1f1f\]) { border-bottom-color: var(--perspective-base) !important; }
+
+/* Tailwind token used by tests for invisible tiles */
+:global(.bg-gray-900) { background-color: #111827 !important; }
+
+.floor {
+  background-color: var(--floor-bg);
+}
+
+.wall {
+  background-color: var(--wall-bg);
+  border: 1px solid var(--wall-border);
+}
+
+.wallInsetTexture {
+  position: absolute;
+  inset: 3px;
+  border: 1px solid var(--wall-shadow);
+  opacity: 0.3;
+}
+
+/* Edge highlights when no same-type neighbor */
+.wallTopHighlight::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+  background: var(--edge-highlight);
+}
+
+.wallRightHighlight::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 2px;
+  bottom: 2px;
+  width: 1px;
+  background: var(--edge-highlight);
+}
+
+/* Exaggerated base shadow strip */
+.wallBaseShadow {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 8px; /* stronger visual than h-2 */
+  background: rgba(0,0,0,0.5);
+}
+
+.player {
+  background: #3b82f6; /* blue-500 */
+  color: white;
+}
+
+.invisible {
+  background: #111827; /* gray-900 */
+}
