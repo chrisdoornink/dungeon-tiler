@@ -39,6 +39,40 @@ describe("Player and Dynamic Subtypes", () => {
     }
   });
 
+  it("lib: moving onto a normal floor tile does NOT set gameState.win", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Player at (7,7); floor at (7,8)
+    mapData.subtypes[7][7] = [TileSubtype.PLAYER];
+    mapData.tiles[7][8] = 0; // floor
+
+    let gs: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    // Move onto normal floor
+    gs = movePlayer(gs, Direction.RIGHT);
+
+    // Should be on the new floor tile and win should remain false
+    expect(findPlayerPosition(gs.mapData)).toEqual([7, 8]);
+    expect(gs.win).toBe(false);
+  });
+
   it("opening a chest leaves an OPEN_CHEST subtype on the tile", () => {
     const mapData: MapData = {
       tiles: Array(25)

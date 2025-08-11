@@ -97,7 +97,7 @@ TDD Test Breakdown:
 
 - [x] lib: Opening exit with exit key and moving onto it sets `gameState.win = true`.
 - [x] lib: Attempting to move into exit without exit key does NOT set `gameState.win`.
-- [ ] lib: Moving onto a normal floor tile does NOT set `gameState.win`.
+- [x] lib: Moving onto a normal floor tile does NOT set `gameState.win`.
 - [ ] components: When `gameState.win` becomes true after a move, `TilemapGrid` renders an end-game modal with the message. (superseded by redirect)
 - [ ] components: No modal is shown when `gameState.win` is false. (superseded by redirect)
 - [ ] components: Modal content text is exactly the expected copy for snapshot/strict assertion. (superseded by redirect)
@@ -109,7 +109,7 @@ TDD Test Breakdown:
 - [x] components: When `win` becomes true, `TilemapGrid` stores the final game payload in `sessionStorage` under a stable key (e.g., `lastGame`) and navigates to `/end` via router push.
 - [x] components: The storage payload contains map, inventory flags, and optional summary fields.
 - [x] app/end: End page reads `sessionStorage.lastGame` and renders a summary view. If missing, shows a fallback message.
-- [ ] components: No redirect occurs when `win` is false.
+- [x] components: No redirect occurs when `win` is false.
 
 Implementation Notes:
 
@@ -133,6 +133,7 @@ Goal: Introduce a `CHEST` subtype that may be locked or unlocked. Opening a ches
 TDD Test Breakdown:
 
 - [ ] lib: Stepping onto an unlocked chest opens it and grants its content (e.g., sword), removing the chest from the tile.
+- [x] lib: Stepping onto an unlocked chest opens it and grants its content (e.g., sword), removing the chest from the tile.
 - [ ] lib: Stepping onto a locked chest without a key does NOT open it (no item granted, chest remains).
 - [ ] lib: Stepping onto a locked chest WITH a key opens it, consumes one key, grants content, removes the chest.
 - [ ] lib: Chest contents support at least `SWORD` and `SHIELD`.

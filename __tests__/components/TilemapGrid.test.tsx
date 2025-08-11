@@ -91,6 +91,42 @@ describe('TilemapGrid component', () => {
     expect(pushMock).toHaveBeenCalledWith('/end');
   });
 
+  it('does NOT redirect or persist when win remains false after a normal move', () => {
+    // Arrange: 25x25 floor map with PLAYER at (10,10); no EXIT interaction
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    subtypes[10][10] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+      win: false,
+    };
+
+    // Clear prior mocks/payloads
+    pushMock.mockClear();
+    window.sessionStorage.removeItem('lastGame');
+
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    // Act: move right onto a normal floor tile (no win condition)
+    fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+    // Assert: no redirect and no persisted payload
+    expect(pushMock).not.toHaveBeenCalled();
+    expect(window.sessionStorage.getItem('lastGame')).toBeNull();
+  });
+
   it('should render circular FOV with fading tiers', () => {
     // Arrange: 25x25 floor map with PLAYER at center
     const size = 25;

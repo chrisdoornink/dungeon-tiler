@@ -23,3 +23,13 @@ All tests passing (27/27).
 - No structural changes.
 
 All tests passing (44/44) at 2025-08-11T14:37:36-07:00.
+
+### Behavioral (continued)
+- Added test: `lib: moving onto a normal floor tile does NOT set gameState.win` in `__tests__/lib/player.test.ts`.
+- Added component test: `does NOT redirect or persist when win remains false after a normal move` in `__tests__/components/TilemapGrid.test.tsx`.
+
+### Plan Updates
+- Marked plan items complete for the above tests in `__plans__/plan.md`.
+- Also marked chest-unlocked behavior item as covered by existing tests.
+
+All tests passing (46/46) at 2025-08-11T15:09:45-07:00.
