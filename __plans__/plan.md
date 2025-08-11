@@ -80,6 +80,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Add subtype 7 for exitKey - it must be used to open the exit door
 - [x] A sword is only found inside a chest, so in the generation, a sword will need a chest in the same tile.
 - [x] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile, adding an OPEN_CHEST subtype on that tile.
+- [ ] Building off the visual design implemented currently, try to give some forced perspective to the walls by making the bottom border if the wall tile has a floor tile below it taller than the other borders.
 
 ### Visual Polish
 
@@ -95,7 +96,7 @@ We will implement a simple end-game modal that appears when the player opens the
 TDD Test Breakdown:
 
 - [x] lib: Opening exit with exit key and moving onto it sets `gameState.win = true`.
-- [ ] lib: Attempting to move into exit without exit key does NOT set `gameState.win`.
+- [x] lib: Attempting to move into exit without exit key does NOT set `gameState.win`.
 - [ ] lib: Moving onto a normal floor tile does NOT set `gameState.win`.
 - [ ] components: When `gameState.win` becomes true after a move, `TilemapGrid` renders an end-game modal with the message. (superseded by redirect)
 - [ ] components: No modal is shown when `gameState.win` is false. (superseded by redirect)

@@ -13,3 +13,13 @@
 - Replaced CommonJS `require` with ES import for `generateCompleteMap` in `__tests__/lib/map.test.ts`.
 
 All tests passing (27/27).
+
+## 2025-08-11
+
+### Behavioral
+- Added failing test then verified passing: `lib: attempting to move into exit without exit key does NOT set gameState.win` in `__tests__/lib/player.test.ts`. Existing logic in `movePlayer()` already satisfied this; test confirms behavior.
+
+### Structural
+- No structural changes.
+
+All tests passing (44/44) at 2025-08-11T14:37:36-07:00.

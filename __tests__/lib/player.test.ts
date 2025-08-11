@@ -236,6 +236,45 @@ describe("Player and Dynamic Subtypes", () => {
     );
   });
 
+  it("lib: attempting to move into exit without exit key does NOT set win", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    // Player at (5,5); EXIT at (5,6) as wall
+    mapData.subtypes[5][5] = [TileSubtype.PLAYER];
+    mapData.tiles[5][6] = 1; // wall
+    mapData.subtypes[5][6] = [TileSubtype.EXIT];
+
+    let gs: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+    } as GameState;
+
+    // Attempt to move into EXIT without exit key
+    gs = movePlayer(gs, Direction.RIGHT);
+
+    // Should not set win
+    expect(gs.win).toBe(false);
+    // Player should not have moved
+    expect(findPlayerPosition(gs.mapData)).toEqual([5, 5]);
+    // EXIT remains
+    expect(gs.mapData.tiles[5][6]).toBe(1);
+    expect(gs.mapData.subtypes[5][6].includes(TileSubtype.EXIT)).toBe(true);
+  });
+
   it("should open exit only after picking up exit key (and consume it)", () => {
     const mapData: MapData = {
       tiles: Array(25)
