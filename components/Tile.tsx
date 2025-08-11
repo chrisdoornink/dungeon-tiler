@@ -27,6 +27,28 @@ export const Tile: React.FC<TileProps> = ({
   visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null }
 }) => {
+  // Fast bitmask-based wall variant resolver for perspective.
+  // We IGNORE the North (behind) bit and only key off E, S, W.
+  const getWallVariantName = (n: NeighborInfo): string => {
+    // Treat value 1 as wall; anything else is not wall
+    const eBit = n.right === 1 ? 4 : 0; // E
+    const sBit = n.bottom === 1 ? 2 : 0; // S
+    const wBit = n.left === 1 ? 1 : 0;  // W
+    const maskESW = eBit | sBit | wBit; // 0..7
+
+    // 8-entry lookup for ESW; any N combinations collapse to these
+    const tableESW: Record<number, string> = {
+      0b000: 'wall_pillar',     // isolated or N-only
+      0b001: 'wall_end_e',      // W only
+      0b010: 'wall_end_n',      // S only (bottom face visible)
+      0b011: 'wall_corner_ne',  // S + W -> open NE
+      0b100: 'wall_end_w',      // E only
+      0b101: 'wall_horiz',      // E + W (straight)
+      0b110: 'wall_corner_nw',  // E + S -> open NW
+      0b111: 'wall_t_n',        // E + S + W -> open N (behind)
+    };
+    return tableESW[maskESW] ?? 'wall_pillar';
+  };
   // Generate shorthand code for autotiling
   const topNeighbor = neighbors.top === tileId ? 'T' : '';
   const rightNeighbor = neighbors.right === tileId ? 'R' : '';
@@ -166,12 +188,14 @@ export const Tile: React.FC<TileProps> = ({
         highlightClasses += ` ${styles.wallRightHighlight}`;
       }
 
-      // Forced perspective: if the tile below is a FLOOR (0), make the bottom border much thicker/darker
+      // Forced perspective: if the tile below is a FLOOR (0), make the bottom border thicker/darker
       const isFloorBelow = neighbors.bottom === 0;
       if (isFloorBelow) {
         // Keep these utility-like classes for tests and easy tuning via :global
         wallClasses += ' border-b-8 border-b-[#1f1f1f]';
       }
+
+      const variantName = getWallVariantName(neighbors);
       
       return (
         <div
@@ -179,6 +203,8 @@ export const Tile: React.FC<TileProps> = ({
           style={{ backgroundColor: '#5a5a5a' }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
+          data-wall-variant={variantName}
+          title={variantName}
         >
           {/* Wall details - inner texture or pattern */}
           <div className={styles.wallInsetTexture}></div>
