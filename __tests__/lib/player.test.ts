@@ -188,7 +188,7 @@ describe("Player and Dynamic Subtypes", () => {
     // Move right to unlock and open chest
     const after = movePlayer(gameState, Direction.RIGHT);
     expect(findPlayerPosition(after.mapData)).toEqual([10, 11]);
-    expect(after.hasKey).toBe(false);
+    expect(after.hasKey).toBe(true);
     expect(after.hasShield).toBe(true);
     expect(after.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
       false
@@ -402,8 +402,8 @@ describe("Player and Dynamic Subtypes", () => {
     // Step 2: Move right again to unlock the lock
     gameState = movePlayer(gameState, Direction.RIGHT);
 
-    // Verify key was used
-    expect(gameState.hasKey).toBe(false);
+    // Universal key is not consumed
+    expect(gameState.hasKey).toBe(true);
 
     // Verify lock tile is now a floor
     expect(gameState.mapData.tiles[10][12]).toBe(0); // Now floor

@@ -91,7 +91,7 @@ export function generateMap(): number[][] {
           break;
         }
       }
-      
+
       if (!overlaps) {
         rooms.push(newRoom);
         carveRoom(grid, newRoom);
@@ -197,40 +197,50 @@ export function generateMapWithSubtypes(): MapData {
  * Places exactly one door and one exit on wall tiles adjacent to floor tiles
  * @returns MapData object with door and exit subtypes placed
  */
-export function generateMapWithDoorAndExit(): MapData {
-  // Start with a basic map with subtypes
-  const mapData = generateMapWithSubtypes();
+export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
+  // Start with provided map (deep copy) or generate a new one with subtypes
+  const mapData = baseMapData
+    ? (JSON.parse(JSON.stringify(baseMapData)) as MapData)
+    : generateMapWithSubtypes();
 
-  // Find all wall tiles that are adjacent to at least one floor tile
+  const h = mapData.tiles.length;
+  const w = mapData.tiles[0].length;
+
+  // First, try to place the door at a strategic choke if one exists
+  const strategic = findStrategicDoorWall(mapData);
+  let doorPlaced: [number, number] | null = null;
+  if (strategic) {
+    const [dy, dx] = strategic;
+    mapData.subtypes[dy][dx] = [TileSubtype.DOOR];
+    doorPlaced = [dy, dx];
+  }
+
+  // Collect all wall tiles adjacent to at least one floor for remaining placements
   const wallsNextToFloor: Array<[number, number]> = [];
-
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      // Check if this is a wall tile
-      if (mapData.tiles[y][x] === WALL) {
-        // Check if it's adjacent to at least one floor tile
-        const hasAdjacentFloor =
-          (y > 0 && mapData.tiles[y - 1][x] === FLOOR) || // North
-          (y < GRID_SIZE - 1 && mapData.tiles[y + 1][x] === FLOOR) || // South
-          (x > 0 && mapData.tiles[y][x - 1] === FLOOR) || // West
-          (x < GRID_SIZE - 1 && mapData.tiles[y][x + 1] === FLOOR); // East
-
-        if (hasAdjacentFloor) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (mapData.tiles[y][x] !== WALL) continue;
+      const hasAdjacentFloor =
+        (y > 0 && mapData.tiles[y - 1][x] === FLOOR) ||
+        (y < h - 1 && mapData.tiles[y + 1][x] === FLOOR) ||
+        (x > 0 && mapData.tiles[y][x - 1] === FLOOR) ||
+        (x < w - 1 && mapData.tiles[y][x + 1] === FLOOR);
+      if (hasAdjacentFloor) {
+        // avoid reusing the same tile used for the door
+        if (!doorPlaced || !(doorPlaced[0] === y && doorPlaced[1] === x)) {
           wallsNextToFloor.push([y, x]);
         }
       }
     }
   }
 
-  // If we don't have at least two valid positions, return the basic map
-  if (wallsNextToFloor.length < 2) {
-    console.warn(
-      "Not enough walls next to floor tiles for door and exit placement"
-    );
+  // Need at least one wall for the exit
+  if (wallsNextToFloor.length < 1) {
+    console.warn("Not enough walls next to floor tiles for exit placement");
     return mapData;
   }
 
-  // Shuffle the array of valid wall positions
+  // Shuffle candidates
   for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [wallsNextToFloor[i], wallsNextToFloor[j]] = [
@@ -239,13 +249,19 @@ export function generateMapWithDoorAndExit(): MapData {
     ];
   }
 
-  // Place the door (first wall)
-  const [doorY, doorX] = wallsNextToFloor[0];
-  mapData.subtypes[doorY][doorX] = [TileSubtype.DOOR];
+  // If door not placed yet (no strategic choke), place it now as the first candidate
+  if (!doorPlaced) {
+    const [doorY, doorX] = wallsNextToFloor.shift()!;
+    mapData.subtypes[doorY][doorX] = [TileSubtype.DOOR];
+  }
 
-  // Place the exit (second wall)
-  const [exitY, exitX] = wallsNextToFloor[1];
-  mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
+  // Place the exit as the next candidate, if available
+  if (wallsNextToFloor.length > 0) {
+    const [exitY, exitX] = wallsNextToFloor[0];
+    mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
+  } else {
+    console.warn("Could not place exit after placing door");
+  }
 
   return mapData;
 }
@@ -370,6 +386,32 @@ export function addLightswitchToMap(mapData: MapData): MapData {
 }
 
 /**
+ * Place a single generic KEY on a random empty floor tile
+ */
+export function addSingleKeyToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const h = newMapData.tiles.length;
+  const w = newMapData.tiles[0].length;
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (
+        newMapData.tiles[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+  if (eligible.length === 0) return newMapData;
+  const idx = Math.floor(Math.random() * eligible.length);
+  const [ky, kx] = eligible[idx];
+  newMapData.subtypes[ky][kx] = [TileSubtype.KEY];
+  return newMapData;
+}
+
+/**
  * Add an exit key to the map on a random floor tile without other subtypes
  * @param mapData The map data to add an exit key to
  * @returns The updated map data with an exit key added
@@ -414,9 +456,9 @@ export function addExitKeyToMap(mapData: MapData): MapData {
  */
 export function addChestsToMap(
   mapData: MapData,
-  options: { count?: number; lockedChance?: number } = {}
+  _options: { count?: number; lockedChance?: number } = {}
 ): MapData {
-  const { count = 2, lockedChance = 0.5 } = options;
+  // Always place exactly 2 chests: one SWORD and one SHIELD
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
   const grid = newMapData.tiles;
   const gridHeight = grid.length;
@@ -441,11 +483,24 @@ export function addChestsToMap(
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
-  const placements = Math.min(count, eligible.length);
-  for (let i = 0; i < placements; i++) {
-    const [cy, cx] = eligible[i];
-    const locked = Math.random() < lockedChance;
-    const content = Math.random() < 0.5 ? TileSubtype.SWORD : TileSubtype.SHIELD;
+  if (eligible.length < 2) return newMapData;
+
+  // Choose two positions
+  const [p1, p2] = [eligible[0], eligible[1]];
+  // Randomize which content goes to which
+  const contents = [TileSubtype.SWORD, TileSubtype.SHIELD];
+  if (Math.random() < 0.5) contents.reverse();
+
+  // Randomly decide how many locked chests: 0,1,2
+  const lockedCount = Math.floor(Math.random() * 3);
+  const lockIndices = [0, 1].sort(() => Math.random() - 0.5).slice(0, lockedCount);
+
+  const placements: Array<[[number, number], number, boolean]> = [
+    [p1, contents[0], lockIndices.includes(0)],
+    [p2, contents[1], lockIndices.includes(1)],
+  ];
+
+  for (const [[cy, cx], content, locked] of placements) {
     const sub: number[] = [TileSubtype.CHEST, content];
     if (locked) sub.push(TileSubtype.LOCK);
     newMapData.subtypes[cy][cx] = sub;
@@ -463,11 +518,55 @@ export function addChestsToMap(
  * @returns MapData object with all subtypes properly placed
  */
 export function generateCompleteMap(): MapData {
-  const mapData = generateMapWithKeyAndLock();
-  const withExitKey = addExitKeyToMap(mapData);
-  const mapWithLightswitch = addLightswitchToMap(withExitKey);
-  const withChests = addChestsToMap(mapWithLightswitch);
-  return addPlayerToMap(withChests);
+  // Base tiles
+  const base = generateMapWithSubtypes();
+  // Place door/exit
+  const withDoorExit = generateMapWithDoorAndExit(base);
+  // Place exit key and lightswitch
+  const withExitKey = addExitKeyToMap(withDoorExit);
+  const withLights = addLightswitchToMap(withExitKey);
+  // Place exactly two chests (sword + shield), some locked
+  const withChests = addChestsToMap(withLights);
+  // Place exactly one generic key for all generic locks
+  const withKeys = addSingleKeyToMap(withChests);
+  // Finally place player
+  return addPlayerToMap(withKeys);
+}
+
+/**
+ * Find a strategic wall tile suitable for placing a DOOR: a single-tile choke between
+ * two opposite floor tiles (left-right or up-down), with the other two neighbors being walls.
+ * Returns [y, x] or null if none found.
+ */
+export function findStrategicDoorWall(
+  mapData: MapData
+): [number, number] | null {
+  const h = mapData.tiles.length;
+  const w = mapData.tiles[0].length;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (mapData.tiles[y][x] !== WALL) continue;
+
+      const up = y > 0 ? mapData.tiles[y - 1][x] : WALL;
+      const down = y < h - 1 ? mapData.tiles[y + 1][x] : WALL;
+      const left = x > 0 ? mapData.tiles[y][x - 1] : WALL;
+      const right = x < w - 1 ? mapData.tiles[y][x + 1] : WALL;
+
+      const upIsFloor = up === FLOOR;
+      const downIsFloor = down === FLOOR;
+      const leftIsFloor = left === FLOOR;
+      const rightIsFloor = right === FLOOR;
+
+      // Opposite-side floor neighbors form a corridor; other two sides should be walls
+      const lrChoke = leftIsFloor && rightIsFloor && !upIsFloor && !downIsFloor;
+      const udChoke = upIsFloor && downIsFloor && !leftIsFloor && !rightIsFloor;
+
+      if (lrChoke || udChoke) {
+        return [y, x];
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -543,7 +642,7 @@ export enum Direction {
  * Game state interface for tracking player inventory and game progress
  */
 export interface GameState {
-  hasKey: boolean;
+  hasKey: boolean; // Player has the universal generic key
   hasExitKey: boolean;
   hasSword?: boolean;
   hasShield?: boolean;
@@ -629,18 +728,17 @@ export function movePlayer(
     }
     // If it's a lock and player has key, unlock it
     else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
-      // Convert the lock to floor when unlocked
+      // Convert the lock to floor when unlocked; universal key is not consumed
       newMapData.tiles[newY][newX] = FLOOR;
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
         (type) => type !== TileSubtype.LOCK
       );
-
-      // Move player to the new position and consume the key
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+      // Move the player onto the unlocked floor tile
+      newMapData.subtypes[currentY][
         currentX
       ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
-      newGameState.hasKey = false;
+      // Keep hasKey true (universal key is not consumed)
     }
     // If it's an exit, require EXITKEY to open
     else if (subtype.includes(TileSubtype.EXIT)) {
@@ -675,6 +773,7 @@ export function movePlayer(
 
     // If it's a key, pick it up
     if (subtype.includes(TileSubtype.KEY)) {
+      // Universal generic key: once picked up, always available for generic locks
       newGameState.hasKey = true;
       newMapData.subtypes[newY][newX] = [];
       console.log("Player picked up a key!");
@@ -704,30 +803,36 @@ export function movePlayer(
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
+      // If locked and no key, block movement and do not open
       if (isLocked && !newGameState.hasKey) {
-        // Block opening and movement if locked and no key
+        console.log("Chest is locked. Need a key.");
         return newGameState;
       }
-      // If locked and we have a key, consume it
+
+      // If locked and we have a key, consume it and remove the lock
       if (isLocked && newGameState.hasKey) {
-        newGameState.hasKey = false;
-        // Remove LOCK from the tile
-        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-          (t) => t !== TileSubtype.LOCK
-        );
+        // Universal key: do not consume
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
+          newX
+        ].filter((t) => t !== TileSubtype.LOCK);
       }
 
-      // Grant item contained in chest
+      // Grant item contained in chest (unlocked or no lock)
       if (subtype.includes(TileSubtype.SWORD)) {
         newGameState.hasSword = true;
+        console.log("Player obtained a SWORD!");
       }
       if (subtype.includes(TileSubtype.SHIELD)) {
         newGameState.hasShield = true;
+        console.log("Player obtained a SHIELD!");
       }
 
       // Remove chest and its content from the tile, then leave an OPEN_CHEST marker
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-        (t) => t !== TileSubtype.CHEST && t !== TileSubtype.SWORD && t !== TileSubtype.SHIELD
+        (t) =>
+          t !== TileSubtype.CHEST &&
+          t !== TileSubtype.SWORD &&
+          t !== TileSubtype.SHIELD
       );
       if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
         newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
@@ -747,7 +852,8 @@ export function movePlayer(
     const destSubtypes = newMapData.subtypes[newY][newX];
     if (
       destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
-      destSubtypes.includes(TileSubtype.OPEN_CHEST)
+      destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
+      destSubtypes.includes(TileSubtype.CHEST)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
