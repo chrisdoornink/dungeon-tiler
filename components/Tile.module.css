@@ -141,6 +141,15 @@
   background-image: url('/images/items/exit-key.png');
 }
 
+.doorIcon {
+  background-image: url('/images/items/door-closed.png');
+  /* Custom styling for door to make it larger and span top to bottom */
+  width: 32px; /* Wider than standard icons */
+  height: 36px; /* Taller to reach from top to bottom */
+  background-size: contain;
+  margin-top: 2px; /* Adjust vertical position */
+}
+
 /* Variant: wall_pillar (front perspective) */
 .wallPillar {
   /* 70% bottom base for strong perspective: 28px on 40px tile */

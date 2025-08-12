@@ -99,7 +99,8 @@ describe('Tile component', () => {
       TileSubtype.LIGHTSWITCH, 
       TileSubtype.OPEN_CHEST,
       TileSubtype.KEY,
-      TileSubtype.EXITKEY
+      TileSubtype.EXITKEY,
+      TileSubtype.DOOR
     ]} />);
     
     // Should have all special icons
@@ -107,17 +108,20 @@ describe('Tile component', () => {
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.OPEN_CHEST}`)).toBeInTheDocument();
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.KEY}`)).toBeInTheDocument();
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.EXITKEY}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.DOOR}`)).toBeInTheDocument();
     
     // Icons should use the asset classes
     const switchIcon = screen.getByTestId(`subtype-icon-${TileSubtype.LIGHTSWITCH}`);
     const openChestIcon = screen.getByTestId(`subtype-icon-${TileSubtype.OPEN_CHEST}`);
     const keyIcon = screen.getByTestId(`subtype-icon-${TileSubtype.KEY}`);
     const exitKeyIcon = screen.getByTestId(`subtype-icon-${TileSubtype.EXITKEY}`);
+    const doorIcon = screen.getByTestId(`subtype-icon-${TileSubtype.DOOR}`);
     
     expect(switchIcon.className).toContain('switchIcon');
     expect(openChestIcon.className).toContain('openedChestIcon');
     expect(keyIcon.className).toContain('keyIcon');
     expect(exitKeyIcon.className).toContain('exitKeyIcon');
+    expect(doorIcon.className).toContain('doorIcon');
   });
 
   it('should not display content when subtype is empty array', () => {
