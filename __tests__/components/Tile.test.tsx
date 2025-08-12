@@ -60,7 +60,9 @@ describe('Tile component', () => {
     
     const subtypeIcon = screen.getByTestId(`subtype-icon-${TileSubtype.EXIT}`);
     expect(subtypeIcon).toBeInTheDocument();
-    expect(subtypeIcon).toHaveTextContent('E');
+    // Check for the correct CSS classes instead of text content
+    expect(subtypeIcon.className).toContain('exitIcon');
+    expect(subtypeIcon.className).toContain('fullHeightAssetIcon');
   });
 
   it('should display multiple subtypes as separate icons', () => {
@@ -100,7 +102,8 @@ describe('Tile component', () => {
       TileSubtype.OPEN_CHEST,
       TileSubtype.KEY,
       TileSubtype.EXITKEY,
-      TileSubtype.DOOR
+      TileSubtype.DOOR,
+      TileSubtype.EXIT
     ]} />);
     
     // Should have all special icons
@@ -109,6 +112,7 @@ describe('Tile component', () => {
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.KEY}`)).toBeInTheDocument();
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.EXITKEY}`)).toBeInTheDocument();
     expect(screen.getByTestId(`subtype-icon-${TileSubtype.DOOR}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.EXIT}`)).toBeInTheDocument();
     
     // Icons should use the asset classes
     const switchIcon = screen.getByTestId(`subtype-icon-${TileSubtype.LIGHTSWITCH}`);
@@ -116,12 +120,16 @@ describe('Tile component', () => {
     const keyIcon = screen.getByTestId(`subtype-icon-${TileSubtype.KEY}`);
     const exitKeyIcon = screen.getByTestId(`subtype-icon-${TileSubtype.EXITKEY}`);
     const doorIcon = screen.getByTestId(`subtype-icon-${TileSubtype.DOOR}`);
+    const exitIcon = screen.getByTestId(`subtype-icon-${TileSubtype.EXIT}`);
     
     expect(switchIcon.className).toContain('switchIcon');
     expect(openChestIcon.className).toContain('openedChestIcon');
     expect(keyIcon.className).toContain('keyIcon');
     expect(exitKeyIcon.className).toContain('exitKeyIcon');
     expect(doorIcon.className).toContain('doorIcon');
+    expect(doorIcon.className).toContain('fullHeightAssetIcon');
+    expect(exitIcon.className).toContain('exitIcon');
+    expect(exitIcon.className).toContain('fullHeightAssetIcon');
   });
 
   it('should not display content when subtype is empty array', () => {

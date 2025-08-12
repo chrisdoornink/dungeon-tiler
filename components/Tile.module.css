@@ -121,6 +121,17 @@
   background-repeat: no-repeat;
 }
 
+/* Special full-height asset icon for doors */
+.fullHeightAssetIcon {
+  width: 28px;
+  height: 40px; /* Full tile height */
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  z-index: 2; /* Ensure door appears above the floor */
+}
+
 .closedChestIcon {
   background-image: url('/images/items/closed-chest.png');
 }
@@ -143,11 +154,10 @@
 
 .doorIcon {
   background-image: url('/images/items/door-closed.png');
-  /* Custom styling for door to make it larger and span top to bottom */
-  width: 32px; /* Wider than standard icons */
-  height: 36px; /* Taller to reach from top to bottom */
-  background-size: contain;
-  margin-top: 2px; /* Adjust vertical position */
+}
+
+.exitIcon {
+  background-image: url('/images/items/exit-door-closed.png');
 }
 
 /* Variant: wall_pillar (front perspective) */

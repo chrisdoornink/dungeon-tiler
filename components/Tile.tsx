@@ -195,6 +195,11 @@ export const Tile: React.FC<TileProps> = ({
   const hasDoor = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.DOOR) || false;
   };
+  
+  // Check if a tile has an exit subtype
+  const hasExit = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.EXIT) || false;
+  };
 
   // Get subtypes excluding special cases that have custom rendering
   const getFilteredSubtypes = (subtypes: number[] | undefined): number[] => {
@@ -211,7 +216,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.LIGHTSWITCH &&
         subtype !== TileSubtype.KEY &&
         subtype !== TileSubtype.EXITKEY &&
-        subtype !== TileSubtype.DOOR
+        subtype !== TileSubtype.DOOR &&
+        subtype !== TileSubtype.EXIT
     );
   };
 
@@ -268,12 +274,21 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render door with asset if present */}
+        {/* Render door with asset if present - using full height icon */}
         {hasDoor(subtypes) && (
           <div
             key="door"
             data-testid={`subtype-icon-${TileSubtype.DOOR}`}
-            className={`${styles.assetIcon} ${styles.doorIcon}`}
+            className={`${styles.fullHeightAssetIcon} ${styles.doorIcon}`}
+          />
+        )}
+        
+        {/* Render exit with asset if present - using full height icon */}
+        {hasExit(subtypes) && (
+          <div
+            key="exit"
+            data-testid={`subtype-icon-${TileSubtype.EXIT}`}
+            className={`${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
           />
         )}
 
