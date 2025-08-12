@@ -124,15 +124,30 @@ export const Tile: React.FC<TileProps> = ({
       const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
       
       // Map floor variant to NESW asset filename based on neighbors
+      // In the naming convention, 1 = wall, 0 = floor
       let floorAsset = '/images/floor/floor-try-1.png'; // Default floor
       
       // Check for specific floor patterns based on NESW neighbors
-      if (topNeighbor && !rightNeighbor && !bottomNeighbor && !leftNeighbor) {
-        floorAsset = '/images/floor/floor-1000.png'; // Only north neighbor
-      } else if (topNeighbor && !rightNeighbor && !bottomNeighbor && leftNeighbor) {
-        floorAsset = '/images/floor/floor-1001.png'; // North and west neighbors
-      } else if (!topNeighbor && !rightNeighbor && !bottomNeighbor && leftNeighbor) {
-        floorAsset = '/images/floor/floor-0001.png'; // Only west neighbor
+      // For floor tiles, we check if neighbors are walls (tileId === 1)
+      const hasNorthWall = neighbors.top === 1;
+      const hasEastWall = neighbors.right === 1;
+      const hasSouthWall = neighbors.bottom === 1;
+      const hasWestWall = neighbors.left === 1;
+      
+      // Construct the NESW code where 1 = wall
+      const northBit = hasNorthWall ? '1' : '0';
+      const eastBit = hasEastWall ? '1' : '0';
+      const southBit = hasSouthWall ? '1' : '0';
+      const westBit = hasWestWall ? '1' : '0';
+      const neswCode = `${northBit}${eastBit}${southBit}${westBit}`;
+      
+      // Map the NESW code to available assets
+      if (neswCode === '1000') { // Wall to the north only
+        floorAsset = '/images/floor/floor-1000.png';
+      } else if (neswCode === '1001') { // Walls to north and west
+        floorAsset = '/images/floor/floor-1001.png';
+      } else if (neswCode === '0001') { // Wall to the west only
+        floorAsset = '/images/floor/floor-0001.png';
       }
       
       return (

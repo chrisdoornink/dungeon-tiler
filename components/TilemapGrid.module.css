@@ -1,17 +1,19 @@
 :root {
   /* Less yellow, more transparent torch colors */
-  --torch-core: rgba(190, 170, 140, 0.40);  /* Reduced yellow, more transparent */
-  --torch-mid: rgba(190, 170, 140, 0.30);   /* Same color with reduced opacity */
-  --torch-falloff: rgba(190, 170, 140, 0.15); /* Same color with further reduced opacity */
-  --torch-outer: rgba(190, 170, 140, 0.05);  /* Very subtle outer glow */
-  
+
+  /* Almost completely clear torch colors */
+  --torch-core: rgba(190, 170, 140, 0.04); /* Barely visible */
+  --torch-mid: rgba(190, 170, 140, 0.03); /* Almost clear */
+  --torch-falloff: rgba(190, 170, 140, 0.02); /* Nearly invisible */
+  --torch-outer: rgba(190, 170, 140, 0.01); /* Practically invisible */
+
   /* Shadow overlay from style guide */
   --shadow-overlay: rgba(26, 26, 26, 0.75); /* #1a1a1a with opacity */
-  
-  /* Second glow layer with slightly warmer tint - also less yellow */
-  --torch2-core: rgba(180, 160, 130, 0.35);   /* Less yellow, more transparent */
-  --torch2-mid: rgba(180, 160, 130, 0.25);    /* Reduced opacity */
-  --torch2-falloff: rgba(180, 160, 130, 0.10); /* Further reduced opacity */
+
+  /* Second glow layer with slightly warmer tint - also almost clear */
+  --torch2-core: rgba(180, 160, 130, 0.03); /* Barely visible */
+  --torch2-mid: rgba(180, 160, 130, 0.02); /* Almost clear */
+  --torch2-falloff: rgba(180, 160, 130, 0.01); /* Practically invisible */
 }
 
 .torchGlow {
@@ -24,26 +26,31 @@
   filter: blur(2px); /* Add slight blur for more realistic light diffusion */
 }
 
-/* Slow, gentle torch glow variation */
+/* Slow, gentle torch glow variation with color shift */
 @keyframes torchFlicker {
   0% {
-    opacity: 0.80;
+    opacity: 0.8;
     transform: scale(1);
+    filter: sepia(0.2) hue-rotate(10deg);
   }
   25% {
     opacity: 0.85;
     transform: scale(1.005);
+    filter: sepia(0.25) hue-rotate(15deg);
   }
   50% {
     opacity: 0.82;
     transform: scale(0.998);
+    filter: sepia(0.18) hue-rotate(8deg);
   }
   75% {
     opacity: 0.87;
     transform: scale(1.003);
+    filter: sepia(0.22) hue-rotate(12deg);
   }
   100% {
-    opacity: 0.80;
+    opacity: 0.8;
     transform: scale(1);
+    filter: sepia(0.2) hue-rotate(10deg);
   }
 }
