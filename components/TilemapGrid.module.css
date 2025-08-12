@@ -1,17 +1,17 @@
 :root {
-  /* Style guide torch colors */
-  --torch-core: rgba(210, 180, 122, 0.65);  /* #d2b47a - Warm, dim golden tone */
-  --torch-mid: rgba(210, 180, 122, 0.45);   /* Same color with reduced opacity */
-  --torch-falloff: rgba(210, 180, 122, 0.25); /* Same color with further reduced opacity */
-  --torch-outer: rgba(210, 180, 122, 0.10);  /* Subtle outer glow */
+  /* Less yellow, more transparent torch colors */
+  --torch-core: rgba(190, 170, 140, 0.40);  /* Reduced yellow, more transparent */
+  --torch-mid: rgba(190, 170, 140, 0.30);   /* Same color with reduced opacity */
+  --torch-falloff: rgba(190, 170, 140, 0.15); /* Same color with further reduced opacity */
+  --torch-outer: rgba(190, 170, 140, 0.05);  /* Very subtle outer glow */
   
   /* Shadow overlay from style guide */
   --shadow-overlay: rgba(26, 26, 26, 0.75); /* #1a1a1a with opacity */
   
-  /* Second glow layer with slightly warmer tint */
-  --torch2-core: rgba(220, 170, 100, 0.50);   /* Slightly warmer variation */
-  --torch2-mid: rgba(220, 170, 100, 0.35);    /* Reduced opacity */
-  --torch2-falloff: rgba(220, 170, 100, 0.20); /* Further reduced opacity */
+  /* Second glow layer with slightly warmer tint - also less yellow */
+  --torch2-core: rgba(180, 160, 130, 0.35);   /* Less yellow, more transparent */
+  --torch2-mid: rgba(180, 160, 130, 0.25);    /* Reduced opacity */
+  --torch2-falloff: rgba(180, 160, 130, 0.10); /* Further reduced opacity */
 }
 
 .torchGlow {
@@ -19,43 +19,31 @@
   inset: 0;
   pointer-events: none;
   mix-blend-mode: screen;
-  animation: torchFlicker 1800ms ease-in-out infinite;
+  animation: torchFlicker 8000ms ease-in-out infinite; /* Much slower animation */
   will-change: opacity, transform;
   filter: blur(2px); /* Add slight blur for more realistic light diffusion */
 }
 
-/* More dramatic flicker with wider range */
+/* Slow, gentle torch glow variation */
 @keyframes torchFlicker {
   0% {
-    opacity: 0.75;
+    opacity: 0.80;
     transform: scale(1);
   }
-  10% {
-    opacity: 0.95;
-    transform: scale(1.01);
-  }
-  20% {
-    opacity: 0.8;
-    transform: scale(0.995);
-  }
-  35% {
-    opacity: 1;
-    transform: scale(1.015);
+  25% {
+    opacity: 0.85;
+    transform: scale(1.005);
   }
   50% {
-    opacity: 0.78;
+    opacity: 0.82;
     transform: scale(0.998);
   }
-  65% {
-    opacity: 0.98;
-    transform: scale(1.02);
-  }
-  80% {
-    opacity: 0.82;
-    transform: scale(0.99);
+  75% {
+    opacity: 0.87;
+    transform: scale(1.003);
   }
   100% {
-    opacity: 0.75;
+    opacity: 0.80;
     transform: scale(1);
   }
 }
