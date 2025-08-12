@@ -166,21 +166,90 @@ export const Tile: React.FC<TileProps> = ({
     }
   };
 
+  // Check if a tile has a chest subtype
+  const hasChest = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.CHEST) || false;
+  };
+
+  // Check if a tile has an open chest subtype
+  const hasOpenChest = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.OPEN_CHEST) || false;
+  };
+
+  // Check if a tile has a lightswitch subtype
+  const hasLightswitch = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
+  };
+
+  // Get subtypes excluding special cases that have custom rendering
+  const getFilteredSubtypes = (subtypes: number[] | undefined): number[] => {
+    if (!subtypes || subtypes.length === 0) return [];
+    
+    // If there's a closed chest, filter out any sword/shield subtypes as they're "inside" the chest
+    // Also filter out the LOCK subtype as it's represented by the chest being closed
+    if (hasChest(subtypes)) {
+      return subtypes.filter(subtype => 
+        subtype !== TileSubtype.SWORD && 
+        subtype !== TileSubtype.SHIELD &&
+        subtype !== TileSubtype.LOCK
+      );
+    }
+    
+    return subtypes;
+  };
+
   // Render subtype icons
   const renderSubtypeIcons = (subtypes: number[] | undefined) => {
     if (!subtypes || subtypes.length === 0) return null;
-
+    
+    const filteredSubtypes = getFilteredSubtypes(subtypes);
+    
     return (
       <div className={styles.subtypeContainer}>
-        {subtypes.map((subtype) => (
-          <div
-            key={subtype}
-            data-testid={`subtype-icon-${subtype}`}
-            className={`${styles.subtypeIcon} ${getSubtypeColor(subtype)}`}
-          >
-            {getSubtypeSymbol(subtype)}
-          </div>
-        ))}
+        {/* Render chest with asset if present */}
+        {hasChest(subtypes) && (
+          <div 
+            key="chest"
+            data-testid={`subtype-icon-${TileSubtype.CHEST}`}
+            className={`${styles.assetIcon} ${styles.closedChestIcon}`}
+          />
+        )}
+        
+        {/* Render open chest with asset if present */}
+        {hasOpenChest(subtypes) && (
+          <div 
+            key="open-chest"
+            data-testid={`subtype-icon-${TileSubtype.OPEN_CHEST}`}
+            className={`${styles.assetIcon} ${styles.openedChestIcon}`}
+          />
+        )}
+        
+        {/* Render lightswitch with asset if present */}
+        {hasLightswitch(subtypes) && (
+          <div 
+            key="lightswitch"
+            data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
+            className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+        
+        {/* Render remaining subtypes with standard icons */}
+        {filteredSubtypes
+          .filter(subtype => 
+            subtype !== TileSubtype.CHEST && 
+            subtype !== TileSubtype.OPEN_CHEST && 
+            subtype !== TileSubtype.LIGHTSWITCH
+          )
+          .map((subtype) => (
+            <div 
+              key={subtype}
+              data-testid={`subtype-icon-${subtype}`}
+              className={`${styles.subtypeIcon} ${getSubtypeColor(subtype)}`}
+            >
+              {getSubtypeSymbol(subtype)}
+            </div>
+          ))
+        }
       </div>
     );
   };

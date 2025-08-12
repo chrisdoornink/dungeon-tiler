@@ -112,6 +112,27 @@
   text-shadow: 0px 0px 2px rgba(0,0,0,0.8);
 }
 
+/* Asset-based subtype icons */
+.assetIcon {
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.closedChestIcon {
+  background-image: url('/images/items/closed-chest.png');
+}
+
+.openedChestIcon {
+  background-image: url('/images/items/opened-chest.png');
+}
+
+.switchIcon {
+  background-image: url('/images/items/switch.png');
+}
+
 /* Variant: wall_pillar (front perspective) */
 .wallPillar {
   /* 70% bottom base for strong perspective: 28px on 40px tile */

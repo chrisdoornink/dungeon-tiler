@@ -78,6 +78,35 @@ describe('Tile component', () => {
     // Background should still be present (not replaced by subtypes)
     expect(tile).toHaveStyle('background-image: url(/images/floor/floor-try-1.png)');
   });
+  
+  it('should hide sword/shield subtypes when a closed chest is present', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(<Tile tileId={0} tileType={mockTileType} subtype={[TileSubtype.CHEST, TileSubtype.SWORD]} />);
+    
+    // Should have chest icon but not sword icon
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.CHEST}`)).toBeInTheDocument();
+    expect(screen.queryByTestId(`subtype-icon-${TileSubtype.SWORD}`)).not.toBeInTheDocument();
+    
+    // Chest should use the asset icon class
+    const chestIcon = screen.getByTestId(`subtype-icon-${TileSubtype.CHEST}`);
+    expect(chestIcon.className).toContain('closedChestIcon');
+  });
+  
+  it('should render asset-based icons for special subtypes', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(<Tile tileId={0} tileType={mockTileType} subtype={[TileSubtype.LIGHTSWITCH, TileSubtype.OPEN_CHEST]} />);
+    
+    // Should have both special icons
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.LIGHTSWITCH}`)).toBeInTheDocument();
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.OPEN_CHEST}`)).toBeInTheDocument();
+    
+    // Icons should use the asset classes
+    const switchIcon = screen.getByTestId(`subtype-icon-${TileSubtype.LIGHTSWITCH}`);
+    const openChestIcon = screen.getByTestId(`subtype-icon-${TileSubtype.OPEN_CHEST}`);
+    
+    expect(switchIcon.className).toContain('switchIcon');
+    expect(openChestIcon.className).toContain('openedChestIcon');
+  });
 
   it('should not display content when subtype is empty array', () => {
     const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
