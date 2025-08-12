@@ -20,8 +20,7 @@ interface TileProps {
 
 export const Tile: React.FC<TileProps> = ({
   tileId,
-  // tileType not currently used but kept for future extensibility
-  tileType,
+  // We don't need tileType for now, but it's in the props interface for future use
   subtype = [],
   isVisible = true,
   visibilityTier = 3,

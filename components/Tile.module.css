@@ -1,16 +1,16 @@
 :root {
   --tile-size: 40px; /* 10 * 4px (tailwind w-10 h-10 equivalent) */
-  --floor-bg: #c8c8c8;
-  --wall-bg: #5a5a5a;
-  --wall-border: #3a3a3a;
-  --wall-shadow: #4a4a4a;
-  --edge-highlight: #7a7a7a;
-  --perspective-base: #1f1f1f;
-  /* New derived wall colors from a light gray top */
-  /* Use floor as the material; darken for vertical faces */
-  --wall-top: color-mix(in srgb, var(--floor-bg) 90%, #000 10%); /* top face */
-  --wall-side: color-mix(in srgb, var(--wall-top) 68%, #000 32%); /* side faces */
-  --wall-bottom: color-mix(in srgb, var(--wall-top) 40%, #000 60%); /* bottom base */
+  /* Dark forest theme colors */
+  --floor-bg: #2a3328; /* Deep forest floor green-brown */
+  --wall-top: #3a4a3e; /* Mossy stone top */
+  --wall-side: #2c3a30; /* Darker moss-covered stone sides */
+  --wall-bottom: #1a2a20; /* Deep shadow with forest tint */
+  --edge-highlight: #4c5a4e; /* Subtle forest-tinted highlight */
+  --perspective-base: #162018; /* Deep forest shadow */
+  --overgrown-grass: #3f5a46; /* Desaturated mossy green */
+  --dirt-path: #3d3426; /* Dark earthy forest path */
+  --forest-accent: #4d6356; /* Forest accent for details */
+  --forest-dark: #1e2a22; /* Deep forest shadow */
 }
 
 .tileContainer {
@@ -42,6 +42,25 @@
 
 .floor {
   background-color: var(--floor-bg);
+  background-image: url('/images/floor-try-1.png');
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  position: relative;
+  /* Add a subtle blend to integrate with the forest theme */
+  box-shadow: inset 0 0 10px rgba(26, 42, 32, 0.4);
+}
+
+/* Add subtle moss overlay to floor tiles */
+.floor::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(circle at 30% 70%, rgba(63,90,70,0.15) 0%, rgba(63,90,70,0) 30%),
+    radial-gradient(circle at 80% 20%, rgba(63,90,70,0.1) 0%, rgba(63,90,70,0) 25%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
 }
 
 .wall {
@@ -52,11 +71,12 @@
 .wallInsetTexture {
   position: absolute;
   inset: 4px;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.05);
   border-radius: 2px;
-  /* subtle inner bevel to emulate Zelda-like tile cap */
+  /* Forest-themed texture with subtle moss effect */
   background: 
-    linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(0,0,0,0.06));
+    linear-gradient(to bottom, rgba(63,90,70,0.08), rgba(26,42,32,0.12)),
+    repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(77,99,86,0.03) 4px, rgba(77,99,86,0.03) 5px);
 }
 
 /* Variant: wall_pillar (front perspective) */
@@ -86,7 +106,7 @@
   border-right: 2px solid var(--wall-side);
 }
 
-/* Edge highlights when no same-type neighbor */
+/* Edge highlights when no same-type neighbor - forest style */
 .wallTopHighlight::after {
   content: "";
   position: absolute;
@@ -94,17 +114,45 @@
   left: 2px;
   right: 2px;
   height: 1px;
-  background: var(--edge-highlight);
+  background: linear-gradient(to right, 
+    transparent, 
+    var(--edge-highlight), 
+    var(--forest-accent), 
+    var(--edge-highlight), 
+    transparent
+  );
 }
 
 .wallRightHighlight::before {
   content: "";
   position: absolute;
-  right: 0;
   top: 2px;
   bottom: 2px;
+  right: 0;
   width: 1px;
-  background: var(--edge-highlight);
+  background: linear-gradient(to bottom, 
+    transparent, 
+    var(--edge-highlight), 
+    var(--forest-accent), 
+    var(--edge-highlight), 
+    transparent
+  );
+}
+
+.wallLeftHighlight::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  width: 1px;
+  background: linear-gradient(to bottom, 
+    transparent, 
+    var(--edge-highlight), 
+    var(--forest-accent), 
+    var(--edge-highlight), 
+    transparent
+  );
 }
 
 /* Exaggerated base shadow strip */

@@ -91,7 +91,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       router.push("/end");
     }
-  }, [gameState.win, gameState.hasKey, gameState.hasExitKey, gameState.mapData, router]);
+  }, [
+    gameState.win,
+    gameState.hasKey,
+    gameState.hasExitKey,
+    gameState.mapData,
+    router,
+  ]);
 
   // Add keyboard event listener
   useEffect(() => {
@@ -147,7 +153,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       </div>
 
-      {(gameState.hasKey || gameState.hasExitKey || gameState.hasSword || gameState.hasShield) && (
+      {(gameState.hasKey ||
+        gameState.hasExitKey ||
+        gameState.hasSword ||
+        gameState.hasShield) && (
         <div className="mt-4 p-3 border border-gray-300 rounded-md">
           <h3 className="font-medium mb-2">Inventory:</h3>
           <div className="flex gap-2">
@@ -308,12 +317,12 @@ function renderTileGrid(
     const r4 = 6.2 * tileSize; // near dark
     const r5 = 7.0 * tileSize; // full dark
 
-    // Warm torch glow radii (moderate effect)
-    const t0 = 2.3 * tileSize; // bright core (moderate)
-    const t1 = 3.5 * tileSize; // warm mid (moderate)
-    const t2 = 4.7 * tileSize; // outer falloff (moderate)
-    const t3 = 5.8 * tileSize; // outer glow (moderate)
-    const t4 = 6.5 * tileSize; // transparent edge (moderate)
+    // Warm torch glow radii (expanded for more dramatic effect)
+    const t0 = 2.5 * tileSize; // bright core (larger)
+    const t1 = 3.8 * tileSize; // warm mid (expanded)
+    const t2 = 5.2 * tileSize; // outer falloff (expanded)
+    const t3 = 6.5 * tileSize; // outer glow
+    const t4 = 7.5 * tileSize; // transparent edge (much larger)
 
     const torchGradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
       var(--torch-core) ${t0}px,
@@ -324,33 +333,15 @@ function renderTileGrid(
     )`;
 
     const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
-      rgba(0,0,0,0) ${r0}px,
-      rgba(0,0,0,0.18) ${r1}px,
-      rgba(0,0,0,0.45) ${r2}px,
-      rgba(0,0,0,0.72) ${r3}px,
-      rgba(0,0,0,0.90) ${r4}px,
-      rgba(0,0,0,0.98) ${r5}px
+      rgba(26,26,26,0) ${r0}px,
+      rgba(26,26,26,0.25) ${r1}px,
+      rgba(26,26,26,0.50) ${r2}px,
+      rgba(26,26,26,0.75) ${r3}px,
+      rgba(26,26,26,0.90) ${r4}px,
+      rgba(26,26,26,1) ${r5}px
     )`;
 
-    // Create a second torch gradient with slightly different position and colors for more dynamic effect
-    const torch2Gradient = `radial-gradient(circle at ${centerX + 5}px ${centerY - 5}px,
-      var(--torch2-core) ${t0 * 0.9}px,
-      var(--torch2-mid) ${t1 * 0.95}px,
-      var(--torch2-falloff) ${t2 * 0.92}px,
-      rgba(0,0,0,0) ${t3 * 0.97}px
-    )`;
-    
-    // Push both torch glow layers first (lower z), then the dark vignette (higher z)
-    // Secondary glow with different animation phase
-    tiles.push(
-      <div
-        key="torch-glow-secondary"
-        className={`${styles.torchGlowSecondary}`}
-        style={{ backgroundImage: torch2Gradient, zIndex: 8900 }}
-      />
-    );
-    
-    // Primary glow layer
+    // Push the warm torch glow first (lower z), then the dark vignette (higher z)
     tiles.push(
       <div
         key="torch-glow"
