@@ -4,7 +4,7 @@ import {
   areAllFloorsConnected,
   generateMapWithSubtypes,
   TileSubtype,
-  generateMapWithDoorAndExit,
+  generateMapWithExit,
   generateMapWithKeyAndLock,
   generateCompleteMap,
 } from "../../lib/map";
@@ -139,24 +139,16 @@ describe("Tile Subtypes", () => {
     }
   });
   
-  it("should place exactly one door (subtype 2) and one exit (subtype 1) on wall tiles next to floor tiles", () => {
-    const mapData = generateMapWithDoorAndExit();
-    
-    // Check for exactly one door (subtype 2)
-    let doorCount = 0;
-    let doorPosition: [number, number] | null = null;
+  it("should place exactly one exit (subtype 1) on a wall tile next to floor tiles", () => {
+    const mapData = generateMapWithExit();
     
     // Check for exactly one exit (subtype 1)
     let exitCount = 0;
     let exitPosition: [number, number] | null = null;
     
-    // Count door and exit tiles
+    // Count exit tiles
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.DOOR)) {
-          doorCount++;
-          doorPosition = [y, x];
-        }
         if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.EXIT)) {
           exitCount++;
           exitPosition = [y, x];
@@ -164,22 +156,8 @@ describe("Tile Subtypes", () => {
       }
     }
     
-    // Should have exactly one door and one exit
-    expect(doorCount).toBe(1);
+    // Should have exactly one exit
     expect(exitCount).toBe(1);
-    
-    // Door should be next to at least one floor tile
-    expect(doorPosition).not.toBeNull();
-    if (doorPosition) {
-      const [y, x] = doorPosition;
-      const hasAdjacentFloor = (
-        (y > 0 && mapData.tiles[y-1][x] === 0) ||                 // North
-        (y < 24 && mapData.tiles[y+1][x] === 0) ||                // South
-        (x > 0 && mapData.tiles[y][x-1] === 0) ||                 // West
-        (x < 24 && mapData.tiles[y][x+1] === 0)                   // East
-      );
-      expect(hasAdjacentFloor).toBe(true);
-    }
     
     // Exit should be next to at least one floor tile
     expect(exitPosition).not.toBeNull();

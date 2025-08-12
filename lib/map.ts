@@ -193,11 +193,11 @@ export function generateMapWithSubtypes(): MapData {
 }
 
 /**
- * Generate a map with door and exit subtypes
- * Places exactly one door and one exit on wall tiles adjacent to floor tiles
- * @returns MapData object with door and exit subtypes placed
+ * Generate a map with exit subtype
+ * Places exactly one exit on a wall tile adjacent to floor tiles
+ * @returns MapData object with exit subtype placed
  */
-export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
+export function generateMapWithExit(baseMapData?: MapData): MapData {
   // Start with provided map (deep copy) or generate a new one with subtypes
   const mapData = baseMapData
     ? (JSON.parse(JSON.stringify(baseMapData)) as MapData)
@@ -206,16 +206,7 @@ export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
   const h = mapData.tiles.length;
   const w = mapData.tiles[0].length;
 
-  // First, try to place the door at a strategic choke if one exists
-  const strategic = findStrategicDoorWall(mapData);
-  let doorPlaced: [number, number] | null = null;
-  if (strategic) {
-    const [dy, dx] = strategic;
-    mapData.subtypes[dy][dx] = [TileSubtype.DOOR];
-    doorPlaced = [dy, dx];
-  }
-
-  // Collect all wall tiles adjacent to at least one floor for remaining placements
+  // Collect all wall tiles adjacent to at least one floor for exit placement
   const wallsNextToFloor: Array<[number, number]> = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -226,10 +217,7 @@ export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
         (x > 0 && mapData.tiles[y][x - 1] === FLOOR) ||
         (x < w - 1 && mapData.tiles[y][x + 1] === FLOOR);
       if (hasAdjacentFloor) {
-        // avoid reusing the same tile used for the door
-        if (!doorPlaced || !(doorPlaced[0] === y && doorPlaced[1] === x)) {
-          wallsNextToFloor.push([y, x]);
-        }
+        wallsNextToFloor.push([y, x]);
       }
     }
   }
@@ -249,19 +237,10 @@ export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
     ];
   }
 
-  // If door not placed yet (no strategic choke), place it now as the first candidate
-  if (!doorPlaced) {
-    const [doorY, doorX] = wallsNextToFloor.shift()!;
-    mapData.subtypes[doorY][doorX] = [TileSubtype.DOOR];
-  }
+  // Place the exit on the first candidate
+  const [exitY, exitX] = wallsNextToFloor[0];
+  mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
 
-  // Place the exit as the next candidate, if available
-  if (wallsNextToFloor.length > 0) {
-    const [exitY, exitX] = wallsNextToFloor[0];
-    mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
-  } else {
-    console.warn("Could not place exit after placing door");
-  }
 
   return mapData;
 }
@@ -273,7 +252,7 @@ export function generateMapWithDoorAndExit(baseMapData?: MapData): MapData {
  */
 export function generateMapWithKeyAndLock(): MapData {
   // Start with a map that already has door and exit
-  const mapData = generateMapWithDoorAndExit();
+  const mapData = generateMapWithExit();
 
   // Find all available floor tiles for key placement
   const floorTiles: Array<[number, number]> = [];
@@ -518,10 +497,10 @@ export function addChestsToMap(
 export function generateCompleteMap(): MapData {
   // Base tiles
   const base = generateMapWithSubtypes();
-  // Place door/exit
-  const withDoorExit = generateMapWithDoorAndExit(base);
+  // Place exit
+  const withExit = generateMapWithExit(base);
   // Place exit key and lightswitch
-  const withExitKey = addExitKeyToMap(withDoorExit);
+  const withExitKey = addExitKeyToMap(withExit);
   const withLights = addLightswitchToMap(withExitKey);
   // Place exactly two chests (sword + shield), some locked
   const withChests = addChestsToMap(withLights);

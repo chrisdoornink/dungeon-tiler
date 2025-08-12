@@ -1,5 +1,4 @@
 import { MapData, findStrategicDoorWall } from "../../lib/map";
-import { generateMapWithDoorAndExit, TileSubtype } from "../../lib/map";
 
 // Build a 9x9 map with a single-entrance room on the right side.
 // Layout (F=floor, W=wall, X=candidate door wall):
@@ -68,12 +67,10 @@ describe("Strategic door placement", () => {
     expect([y, x]).toEqual([3, 5]);
   });
 
-  it("generateMapWithDoorAndExit places DOOR at strategic choke when provided a map", () => {
+  // Test removed since regular doors are no longer generated
+  it("findStrategicDoorWall still identifies potential door locations", () => {
     const base = makeMap();
-    const door = findStrategicDoorWall(base);
-    expect(door).toEqual([3, 5]);
-
-    const withDoor = generateMapWithDoorAndExit(base);
-    expect(withDoor.subtypes[3][5].includes(TileSubtype.DOOR)).toBe(true);
+    const doorLocation = findStrategicDoorWall(base);
+    expect(doorLocation).toEqual([3, 5]);
   });
 });
