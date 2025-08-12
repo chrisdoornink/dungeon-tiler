@@ -196,11 +196,37 @@ export const Tile: React.FC<TileProps> = ({
       }
 
       const variantName = getWallVariantName(neighbors);
+      if (variantName === 'wall_pillar') {
+        wallClasses += ` ${styles.wallPillar}`;
+      }
+      // Apply helper classes for other variants
+      if (variantName === 'wall_end_e') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        wallClasses += ` ${styles.wallEdgeR}`;
+      } else if (variantName === 'wall_end_w') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        wallClasses += ` ${styles.wallEdgeL}`;
+      } else if (variantName === 'wall_end_n') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+      } else if (variantName === 'wall_corner_ne') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        // Corner NE shows left face in our simplified CSS
+        wallClasses += ` ${styles.wallEdgeL}`;
+      } else if (variantName === 'wall_corner_nw') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        // Corner NW shows right face
+        wallClasses += ` ${styles.wallEdgeR}`;
+      } else if (variantName === 'wall_horiz') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
+      } else if (variantName === 'wall_t_n') {
+        if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
+      }
       
       return (
         <div
           className={`${wallClasses} ${shadowClasses} ${highlightClasses}`}
-          style={{ backgroundColor: '#5a5a5a' }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
           data-wall-variant={variantName}

@@ -6,6 +6,11 @@
   --wall-shadow: #4a4a4a;
   --edge-highlight: #7a7a7a;
   --perspective-base: #1f1f1f;
+  /* New derived wall colors from a light gray top */
+  /* Use floor as the material; darken for vertical faces */
+  --wall-top: color-mix(in srgb, var(--floor-bg) 90%, #000 10%); /* top face */
+  --wall-side: color-mix(in srgb, var(--wall-top) 68%, #000 32%); /* side faces */
+  --wall-bottom: color-mix(in srgb, var(--wall-top) 40%, #000 60%); /* bottom base */
 }
 
 .tileContainer {
@@ -40,15 +45,45 @@
 }
 
 .wall {
-  background-color: var(--wall-bg);
-  border: 1px solid var(--wall-border);
+  background-color: var(--wall-top);
+  border: 1px solid var(--wall-side);
 }
 
 .wallInsetTexture {
   position: absolute;
-  inset: 3px;
-  border: 1px solid var(--wall-shadow);
-  opacity: 0.3;
+  inset: 4px;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 2px;
+  /* subtle inner bevel to emulate Zelda-like tile cap */
+  background: 
+    linear-gradient(to bottom, rgba(255,255,255,0.08), rgba(0,0,0,0.06));
+}
+
+/* Variant: wall_pillar (front perspective) */
+.wallPillar {
+  /* 70% bottom base for strong perspective: 28px on 40px tile */
+  border-bottom-width: calc(var(--tile-size) * 0.7);
+  border-bottom-style: solid;
+  border-bottom-color: var(--wall-bottom); /* bottom face derived from top */
+
+  /* Thin side faces (front view) */
+  border-left: 2px solid var(--wall-side);
+  border-right: 2px solid var(--wall-side);
+}
+
+/* Helpers for other variants */
+.wallBase70 {
+  border-bottom-width: calc(var(--tile-size) * 0.7);
+  border-bottom-style: solid;
+  border-bottom-color: var(--wall-bottom);
+}
+
+.wallEdgeL {
+  border-left: 2px solid var(--wall-side);
+}
+
+.wallEdgeR {
+  border-right: 2px solid var(--wall-side);
 }
 
 /* Edge highlights when no same-type neighbor */
@@ -79,7 +114,11 @@
   right: 0;
   bottom: 0;
   height: 8px; /* stronger visual than h-2 */
-  background: rgba(0,0,0,0.5);
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--wall-bottom) 20%, #000 0%) 0%,
+    color-mix(in srgb, var(--wall-bottom) 75%, #000 25%) 100%
+  );
 }
 
 .player {

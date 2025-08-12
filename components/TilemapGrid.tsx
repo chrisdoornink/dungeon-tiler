@@ -9,6 +9,7 @@ import {
   TileSubtype,
 } from "../lib/map";
 import { Tile } from "./Tile";
+import styles from "./TilemapGrid.module.css";
 
 // Grid configuration constants
 const GRID_WIDTH = 25;
@@ -307,14 +308,56 @@ function renderTileGrid(
     const r4 = 6.2 * tileSize; // near dark
     const r5 = 7.0 * tileSize; // full dark
 
+    // Warm torch glow radii (moderate effect)
+    const t0 = 2.3 * tileSize; // bright core (moderate)
+    const t1 = 3.5 * tileSize; // warm mid (moderate)
+    const t2 = 4.7 * tileSize; // outer falloff (moderate)
+    const t3 = 5.8 * tileSize; // outer glow (moderate)
+    const t4 = 6.5 * tileSize; // transparent edge (moderate)
+
+    const torchGradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
+      var(--torch-core) ${t0}px,
+      var(--torch-mid) ${t1}px,
+      var(--torch-falloff) ${t2}px,
+      var(--torch-outer) ${t3}px,
+      rgba(0,0,0,0) ${t4}px
+    )`;
+
     const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
       rgba(0,0,0,0) ${r0}px,
-      rgba(0,0,0,0.20) ${r1}px,
-      rgba(0,0,0,0.50) ${r2}px,
-      rgba(0,0,0,0.80) ${r3}px,
-      rgba(0,0,0,0.95) ${r4}px,
-      rgba(0,0,0,1) ${r5}px
+      rgba(0,0,0,0.18) ${r1}px,
+      rgba(0,0,0,0.45) ${r2}px,
+      rgba(0,0,0,0.72) ${r3}px,
+      rgba(0,0,0,0.90) ${r4}px,
+      rgba(0,0,0,0.98) ${r5}px
     )`;
+
+    // Create a second torch gradient with slightly different position and colors for more dynamic effect
+    const torch2Gradient = `radial-gradient(circle at ${centerX + 5}px ${centerY - 5}px,
+      var(--torch2-core) ${t0 * 0.9}px,
+      var(--torch2-mid) ${t1 * 0.95}px,
+      var(--torch2-falloff) ${t2 * 0.92}px,
+      rgba(0,0,0,0) ${t3 * 0.97}px
+    )`;
+    
+    // Push both torch glow layers first (lower z), then the dark vignette (higher z)
+    // Secondary glow with different animation phase
+    tiles.push(
+      <div
+        key="torch-glow-secondary"
+        className={`${styles.torchGlowSecondary}`}
+        style={{ backgroundImage: torch2Gradient, zIndex: 8900 }}
+      />
+    );
+    
+    // Primary glow layer
+    tiles.push(
+      <div
+        key="torch-glow"
+        className={`${styles.torchGlow}`}
+        style={{ backgroundImage: torchGradient, zIndex: 9000 }}
+      />
+    );
 
     tiles.push(
       <div
