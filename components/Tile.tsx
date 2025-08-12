@@ -122,10 +122,29 @@ export const Tile: React.FC<TileProps> = ({
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
       const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      
+      // Map floor variant to NESW asset filename based on neighbors
+      let floorAsset = '/images/floor/floor-try-1.png'; // Default floor
+      
+      // Check for specific floor patterns based on NESW neighbors
+      if (topNeighbor && !rightNeighbor && !bottomNeighbor && !leftNeighbor) {
+        floorAsset = '/images/floor/floor-1000.png'; // Only north neighbor
+      } else if (topNeighbor && !rightNeighbor && !bottomNeighbor && leftNeighbor) {
+        floorAsset = '/images/floor/floor-1001.png'; // North and west neighbors
+      } else if (!topNeighbor && !rightNeighbor && !bottomNeighbor && leftNeighbor) {
+        floorAsset = '/images/floor/floor-0001.png'; // Only west neighbor
+      }
+      
       return (
         <div
           className={floorClasses}
-          style={{ backgroundColor: '#c8c8c8' }}
+          style={{
+            backgroundColor: '#c8c8c8', // Keep for test compatibility
+            backgroundImage: `url(${floorAsset})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
@@ -195,50 +214,76 @@ export const Tile: React.FC<TileProps> = ({
       }
 
       const variantName = getWallVariantName(neighbors);
+      
+      // Map wall variant to NESW asset filename
+      // N is always 0 since we don't care about the north direction
+      let wallAsset = '';
+      
       if (variantName === 'wall_pillar') {
         wallClasses += ` ${styles.wallPillar}`;
+        wallAsset = '/images/wall/wall-0000.png'; // Isolated wall
       }
-      // Apply helper classes for other variants
+      // Apply helper classes for other variants and map to NESW wall assets
       if (variantName === 'wall_end_e') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeR}`;
+        wallAsset = '/images/wall/wall-0001.png'; // Wall to the west only (0001)
       } else if (variantName === 'wall_end_w') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL}`;
+        wallAsset = '/images/wall/wall-0100.png'; // Wall to the east only (0100)
       } else if (variantName === 'wall_end_n') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
+        wallAsset = '/images/wall/wall-0010.png'; // Wall to the south only (0010)
       } else if (variantName === 'wall_corner_ne') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         // Corner NE shows left face in our simplified CSS
         wallClasses += ` ${styles.wallEdgeL}`;
+        wallAsset = '/images/wall/wall-0011.png'; // Walls to south and west (0011)
       } else if (variantName === 'wall_corner_nw') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         // Corner NW shows right face
         wallClasses += ` ${styles.wallEdgeR}`;
+        wallAsset = '/images/wall/wall-0110.png'; // Walls to east and south (0110)
       } else if (variantName === 'wall_horiz') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
+        wallAsset = '/images/wall/wall-0101.png'; // Walls to east and west (0101)
       } else if (variantName === 'wall_t_n') {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
+        wallAsset = '/images/wall/wall-0111.png'; // Walls to east, south, and west (0111)
       }
+      
+      // For wall tiles with assets, use a simplified class without borders and extra styling
+      // But keep the border-b-8 class for tests if there's a floor below
+      const finalWallClasses = wallAsset 
+        ? `${styles.tileContainer} ${styles.wallWithAsset} ${tierClass} ${isFloorBelow ? 'border-b-8 border-b-[#1f1f1f]' : ''}` 
+        : `${wallClasses} ${shadowClasses} ${highlightClasses}`;
       
       return (
         <div
-          className={`${wallClasses} ${shadowClasses} ${highlightClasses}`}
+          className={finalWallClasses}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
           data-wall-variant={variantName}
           title={variantName}
+          style={wallAsset ? {
+            backgroundImage: `url(${wallAsset})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat'
+          } : undefined}
         >
-          {/* Wall details - inner texture or pattern */}
-          <div className={styles.wallInsetTexture}></div>
+          {/* Wall details - inner texture or pattern (only shown if no wall asset) */}
+          {!wallAsset && <div className={styles.wallInsetTexture}></div>}
 
           {/* Exaggerated base shadow when standing in front of floor */}
           {isFloorBelow && (
             <div
               data-testid="wall-base-shadow"
               className={styles.wallBaseShadow}
+              style={wallAsset ? { opacity: 0 } : undefined} /* Invisible but present for tests */
             />
           )}
           

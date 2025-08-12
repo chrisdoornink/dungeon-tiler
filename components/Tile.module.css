@@ -68,6 +68,12 @@
   border: 1px solid var(--wall-side);
 }
 
+/* Wall with asset image - no borders or additional styling */
+.wallWithAsset {
+  background-color: transparent;
+  border: none;
+}
+
 .wallInsetTexture {
   position: absolute;
   inset: 4px;
