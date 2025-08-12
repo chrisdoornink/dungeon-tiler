@@ -180,12 +180,12 @@ export const Tile: React.FC<TileProps> = ({
   const hasLightswitch = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
   };
-  
+
   // Check if a tile has a key subtype
   const hasKey = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.KEY) || false;
   };
-  
+
   // Check if a tile has an exit key subtype
   const hasExitKey = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.EXITKEY) || false;
@@ -194,76 +194,77 @@ export const Tile: React.FC<TileProps> = ({
   // Get subtypes excluding special cases that have custom rendering
   const getFilteredSubtypes = (subtypes: number[] | undefined): number[] => {
     if (!subtypes || subtypes.length === 0) return [];
-    
+
     // Filter out subtypes that have custom asset-based rendering
-    return subtypes.filter(subtype => 
-      subtype !== TileSubtype.SWORD && 
-      subtype !== TileSubtype.SHIELD &&
-      subtype !== TileSubtype.LOCK &&
-      subtype !== TileSubtype.CHEST &&
-      subtype !== TileSubtype.OPEN_CHEST &&
-      subtype !== TileSubtype.LIGHTSWITCH &&
-      subtype !== TileSubtype.KEY &&
-      subtype !== TileSubtype.EXITKEY
+    return subtypes.filter(
+      (subtype) =>
+        subtype !== TileSubtype.SWORD &&
+        subtype !== TileSubtype.SHIELD &&
+        subtype !== TileSubtype.LOCK &&
+        subtype !== TileSubtype.CHEST &&
+        subtype !== TileSubtype.OPEN_CHEST &&
+        subtype !== TileSubtype.LIGHTSWITCH &&
+        subtype !== TileSubtype.KEY &&
+        subtype !== TileSubtype.EXITKEY
     );
   };
 
   // Render subtype icons
   const renderSubtypeIcons = (subtypes: number[] | undefined) => {
     if (!subtypes || subtypes.length === 0) return null;
-    
+
     const filteredSubtypes = getFilteredSubtypes(subtypes);
-    
+
     return (
       <div className={styles.subtypeContainer}>
         {/* Render chest with asset if present */}
         {hasChest(subtypes) && (
-          <div 
+          <div
             key="chest"
             data-testid={`subtype-icon-${TileSubtype.CHEST}`}
             className={`${styles.assetIcon} ${styles.closedChestIcon}`}
           />
         )}
-        
+
         {/* Render open chest with asset if present */}
         {hasOpenChest(subtypes) && (
-          <div 
+          <div
             key="open-chest"
             data-testid={`subtype-icon-${TileSubtype.OPEN_CHEST}`}
             className={`${styles.assetIcon} ${styles.openedChestIcon}`}
           />
         )}
-        
+
         {/* Render lightswitch with asset if present */}
         {hasLightswitch(subtypes) && (
-          <div 
+          <div
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
           />
         )}
-        
+
         {/* Render key with asset if present */}
         {hasKey(subtypes) && (
-          <div 
+          <div
             key="key"
             data-testid={`subtype-icon-${TileSubtype.KEY}`}
             className={`${styles.assetIcon} ${styles.keyIcon}`}
           />
         )}
-        
+
         {/* Render exit key with asset if present */}
         {hasExitKey(subtypes) && (
-          <div 
+          <div
             key="exit-key"
             data-testid={`subtype-icon-${TileSubtype.EXITKEY}`}
             className={`${styles.assetIcon} ${styles.exitKeyIcon}`}
           />
         )}
-        
+
         {/* Render remaining subtypes with standard icons */}
         {filteredSubtypes.map((subtype) => (
-          <div 
+          <div
             key={subtype}
             data-testid={`subtype-icon-${subtype}`}
             className={`${styles.subtypeIcon} ${getSubtypeColor(subtype)}`}
@@ -297,22 +298,51 @@ export const Tile: React.FC<TileProps> = ({
       let floorAsset = "/images/floor/floor-try-1.png"; // Default floor
 
       // Check for specific floor patterns based on NESW neighbors
-      if (topNeighbor && !rightNeighbor && !bottomNeighbor && !leftNeighbor) {
-        floorAsset = "/images/floor/floor-1000.png"; // Only north neighbor
-      } else if (
-        topNeighbor &&
-        !rightNeighbor &&
-        !bottomNeighbor &&
-        leftNeighbor
-      ) {
-        floorAsset = "/images/floor/floor-1001.png"; // North and west neighbors
-      } else if (
-        !topNeighbor &&
-        !rightNeighbor &&
-        !bottomNeighbor &&
-        leftNeighbor
-      ) {
-        floorAsset = "/images/floor/floor-0001.png"; // Only west neighbor
+      // The pattern is: North (1st digit), East (2nd), South (3rd), West (4th)
+      // 1 means there's a connection, 0 means no connection
+
+      // Build the NESW pattern string based on neighbors
+      const n = topNeighbor ? "0" : "1";
+      const e = rightNeighbor ? "0" : "1";
+      const s = bottomNeighbor ? "0" : "1";
+      const w = leftNeighbor ? "0" : "1";
+      const neswPattern = `${n}${e}${s}${w}`;
+
+      // Map the pattern to the available floor assets
+      switch (neswPattern) {
+        case "1000":
+          floorAsset = "/images/floor/floor-1000.png"; // Only north neighbor
+          break;
+        case "1001":
+          floorAsset = "/images/floor/floor-1001.png"; // North and west neighbors
+          break;
+        case "0001":
+          floorAsset = "/images/floor/floor-0001.png"; // Only west neighbor
+          break;
+        // TODO - need tile images for these first
+        // case "0010":
+        //   floorAsset = "/images/floor/floor-0010.png"; // Only south neighbor
+        //   break;
+        // case "0100":
+        //   floorAsset = "/images/floor/floor-0100.png"; // Only east neighbor
+        //   break;
+        // case "1010":
+        //   floorAsset = "/images/floor/floor-1010.png"; // North and south neighbors
+        //   break;
+        // case "1100":
+        //   floorAsset = "/images/floor/floor-1100.png"; // North and east neighbors
+        //   break;
+        // case "1011":
+        //   floorAsset = "/images/floor/floor-1011.png"; // North, east, and west neighbors
+        //   break;
+        // case "1110":
+        //   floorAsset = "/images/floor/floor-1110.png"; // North, east, and south neighbors
+        //   break;
+        // case "1111":
+        //   floorAsset = "/images/floor/floor-1111.png"; // All neighbors
+        //   break;
+        default:
+          floorAsset = "/images/floor/floor-try-1.png"; // Default floor
       }
 
       return (

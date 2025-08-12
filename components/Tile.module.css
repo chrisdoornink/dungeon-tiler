@@ -42,7 +42,7 @@
 
 .floor {
   background-color: var(--floor-bg);
-  background-image: url('/images/floor-try-1.png');
+  background-image: url('/images/floor/floor-try-1.png');
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;
