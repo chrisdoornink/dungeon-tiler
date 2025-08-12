@@ -54,12 +54,29 @@ describe('Tile component', () => {
     expect(tile).not.toHaveTextContent(/\d/);
   });
 
-  it('should display subtype name when subtype is provided', () => {
+  it('should display subtype icon when subtype is provided', () => {
     const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
-    render(<Tile tileId={0} tileType={mockTileType} subtype={[1]} />);
+    render(<Tile tileId={0} tileType={mockTileType} subtype={[TileSubtype.EXIT]} />);
+    
+    const subtypeIcon = screen.getByTestId(`subtype-icon-${TileSubtype.EXIT}`);
+    expect(subtypeIcon).toBeInTheDocument();
+    expect(subtypeIcon).toHaveTextContent('E');
+  });
+
+  it('should display multiple subtypes as separate icons', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(<Tile tileId={0} tileType={mockTileType} subtype={[TileSubtype.KEY, TileSubtype.DOOR]} />);
     
     const tile = screen.getByTestId('tile-0');
-    expect(tile).toHaveTextContent('EXIT');
+    const subtypeIcons = screen.getAllByTestId(/subtype-icon-/);
+    
+    // Should have two separate subtype icons
+    expect(subtypeIcons).toHaveLength(2);
+    expect(screen.getByTestId('subtype-icon-' + TileSubtype.KEY)).toBeInTheDocument();
+    expect(screen.getByTestId('subtype-icon-' + TileSubtype.DOOR)).toBeInTheDocument();
+    
+    // Background should still be present (not replaced by subtypes)
+    expect(tile).toHaveStyle('background-image: url(/images/floor/floor-try-1.png)');
   });
 
   it('should not display content when subtype is empty array', () => {

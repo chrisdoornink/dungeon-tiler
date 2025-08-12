@@ -155,3 +155,22 @@ Implementation Notes:
     - If `LOCK` present and `hasKey=true`, consume key and open.
     - Opening grants item and removes `CHEST` (+`LOCK`) from tile.
 - Update `generateCompleteMap()` to place chests with mixed lock states and contents.
+
+### Standardized Tile Subtype Rendering
+
+Goal: Implement a standardized, extensible method to render multiple subtypes on dungeon tiles without replacing the background tile pattern.
+
+TDD Test Breakdown:
+
+- [x] components: Multiple subtypes can be displayed on a single tile as separate icons.
+- [x] components: Subtype icons are rendered on top of the base tile without replacing the background pattern.
+- [x] components: Each subtype has a unique visual representation (color and symbol).
+- [x] components: Subtype icons are positioned properly on both floor and wall tiles.
+
+Implementation Notes:
+
+- Created a reusable `renderSubtypeIcons()` function in the Tile component.
+- Added CSS classes for subtype container and individual icons.
+- Implemented helper functions for subtype colors and symbols.
+- Updated both floor and wall tile rendering to use the standardized approach.
+- Ensured all tests pass with the new implementation.
