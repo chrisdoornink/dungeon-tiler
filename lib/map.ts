@@ -452,11 +452,10 @@ export function addExitKeyToMap(mapData: MapData): MapData {
 
 /**
  * Add chests (with sword/shield contents) to random floor tiles.
- * Some chests will be locked and require a KEY to open.
+ * All chests are locked and require a KEY to open.
  */
 export function addChestsToMap(
-  mapData: MapData,
-  _options: { count?: number; lockedChance?: number } = {}
+  mapData: MapData
 ): MapData {
   // Always place exactly 2 chests: one SWORD and one SHIELD
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -491,9 +490,8 @@ export function addChestsToMap(
   const contents = [TileSubtype.SWORD, TileSubtype.SHIELD];
   if (Math.random() < 0.5) contents.reverse();
 
-  // Randomly decide how many locked chests: 0,1,2
-  const lockedCount = Math.floor(Math.random() * 3);
-  const lockIndices = [0, 1].sort(() => Math.random() - 0.5).slice(0, lockedCount);
+  // Make all chests locked
+  const lockIndices = [0, 1]; // Both indices are locked
 
   const placements: Array<[[number, number], number, boolean]> = [
     [p1, contents[0], lockIndices.includes(0)],

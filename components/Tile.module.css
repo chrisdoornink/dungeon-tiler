@@ -133,6 +133,14 @@
   background-image: url('/images/items/switch.png');
 }
 
+.keyIcon {
+  background-image: url('/images/items/key.png');
+}
+
+.exitKeyIcon {
+  background-image: url('/images/items/exit-key.png');
+}
+
 /* Variant: wall_pillar (front perspective) */
 .wallPillar {
   /* 70% bottom base for strong perspective: 28px on 40px tile */

@@ -114,9 +114,9 @@ export const Tile: React.FC<TileProps> = ({
       case TileSubtype.LIGHTSWITCH:
         return "bg-amber-500";
       case TileSubtype.EXITKEY:
-        return "bg-purple-500";
-      case TileSubtype.KEY:
         return "bg-yellow-500";
+      case TileSubtype.KEY:
+        return "bg-purple-500";
       case TileSubtype.LOCK:
         return "bg-gray-500";
       case TileSubtype.DOOR:
@@ -144,9 +144,9 @@ export const Tile: React.FC<TileProps> = ({
       case TileSubtype.LIGHTSWITCH:
         return "";
       case TileSubtype.EXITKEY:
-        return "";
-      case TileSubtype.KEY:
         return "K";
+      case TileSubtype.KEY:
+        return "";
       case TileSubtype.LOCK:
         return "L";
       case TileSubtype.DOOR:
@@ -180,22 +180,32 @@ export const Tile: React.FC<TileProps> = ({
   const hasLightswitch = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
   };
+  
+  // Check if a tile has a key subtype
+  const hasKey = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.KEY) || false;
+  };
+  
+  // Check if a tile has an exit key subtype
+  const hasExitKey = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.EXITKEY) || false;
+  };
 
   // Get subtypes excluding special cases that have custom rendering
   const getFilteredSubtypes = (subtypes: number[] | undefined): number[] => {
     if (!subtypes || subtypes.length === 0) return [];
     
-    // If there's a closed chest, filter out any sword/shield subtypes as they're "inside" the chest
-    // Also filter out the LOCK subtype as it's represented by the chest being closed
-    if (hasChest(subtypes)) {
-      return subtypes.filter(subtype => 
-        subtype !== TileSubtype.SWORD && 
-        subtype !== TileSubtype.SHIELD &&
-        subtype !== TileSubtype.LOCK
-      );
-    }
-    
-    return subtypes;
+    // Filter out subtypes that have custom asset-based rendering
+    return subtypes.filter(subtype => 
+      subtype !== TileSubtype.SWORD && 
+      subtype !== TileSubtype.SHIELD &&
+      subtype !== TileSubtype.LOCK &&
+      subtype !== TileSubtype.CHEST &&
+      subtype !== TileSubtype.OPEN_CHEST &&
+      subtype !== TileSubtype.LIGHTSWITCH &&
+      subtype !== TileSubtype.KEY &&
+      subtype !== TileSubtype.EXITKEY
+    );
   };
 
   // Render subtype icons
@@ -233,23 +243,34 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
         
+        {/* Render key with asset if present */}
+        {hasKey(subtypes) && (
+          <div 
+            key="key"
+            data-testid={`subtype-icon-${TileSubtype.KEY}`}
+            className={`${styles.assetIcon} ${styles.keyIcon}`}
+          />
+        )}
+        
+        {/* Render exit key with asset if present */}
+        {hasExitKey(subtypes) && (
+          <div 
+            key="exit-key"
+            data-testid={`subtype-icon-${TileSubtype.EXITKEY}`}
+            className={`${styles.assetIcon} ${styles.exitKeyIcon}`}
+          />
+        )}
+        
         {/* Render remaining subtypes with standard icons */}
-        {filteredSubtypes
-          .filter(subtype => 
-            subtype !== TileSubtype.CHEST && 
-            subtype !== TileSubtype.OPEN_CHEST && 
-            subtype !== TileSubtype.LIGHTSWITCH
-          )
-          .map((subtype) => (
-            <div 
-              key={subtype}
-              data-testid={`subtype-icon-${subtype}`}
-              className={`${styles.subtypeIcon} ${getSubtypeColor(subtype)}`}
-            >
-              {getSubtypeSymbol(subtype)}
-            </div>
-          ))
-        }
+        {filteredSubtypes.map((subtype) => (
+          <div 
+            key={subtype}
+            data-testid={`subtype-icon-${subtype}`}
+            className={`${styles.subtypeIcon} ${getSubtypeColor(subtype)}`}
+          >
+            {getSubtypeSymbol(subtype)}
+          </div>
+        ))}
       </div>
     );
   };
