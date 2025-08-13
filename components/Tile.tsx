@@ -344,7 +344,8 @@ export const Tile: React.FC<TileProps> = ({
         floorAsset = "/images/floor/floor-try-1.png";
       }
 
-      // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile
+      // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
+      const hasWallBelow = neighbors.bottom === 1;
 
       return (
         <div
@@ -354,6 +355,7 @@ export const Tile: React.FC<TileProps> = ({
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
+            position: "relative", // Ensure relative positioning for absolute children
           }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
@@ -370,6 +372,14 @@ export const Tile: React.FC<TileProps> = ({
           )}
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
+          
+          {/* Render wall top overlay if there's a wall below this floor tile */}
+          {hasWallBelow && (
+            <div 
+              className={styles.wallTopOverlay}
+              data-testid="wall-top-overlay"
+            />
+          )}
         </div>
       );
     } else {
