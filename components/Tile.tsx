@@ -219,7 +219,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.KEY &&
         subtype !== TileSubtype.EXITKEY &&
         subtype !== TileSubtype.DOOR &&
-        subtype !== TileSubtype.EXIT
+        subtype !== TileSubtype.EXIT &&
+        subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
     );
   };
 
@@ -308,43 +309,25 @@ export const Tile: React.FC<TileProps> = ({
     );
   };
 
-  if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
-    // Get the appropriate hero image based on player direction
-    let heroImage = '/images/hero/hero-front-static.png'; // Default
-    
+  // Get the appropriate hero image based on player direction if this is a player tile
+  const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER) ? (() => {
+    // Default to front-facing
     switch (playerDirection) {
       case Direction.UP:
-        heroImage = '/images/hero/hero-back-static.png';
-        break;
+        return '/images/hero/hero-back-static.png';
       case Direction.RIGHT:
-        heroImage = '/images/hero/hero-right-static.png';
-        break;
+        return '/images/hero/hero-right-static.png';
       case Direction.LEFT:
-        // Mirror the right-facing image for left direction
-        heroImage = '/images/hero/hero-right-static.png';
-        break;
+        return '/images/hero/hero-right-static.png';
       case Direction.DOWN:
       default:
-        heroImage = '/images/hero/hero-front-static.png';
-        break;
+        return '/images/hero/hero-front-static.png';
     }
-    
-    return (
-      <div
-        className={`${styles.tileContainer} ${styles.player} ${tierClass}`}
-        data-testid={`tile-${tileId}`}
-        data-neighbor-code={neighborCode}
-      >
-        <div 
-          className={styles.heroImage}
-          style={{
-            backgroundImage: `url(${heroImage})`,
-            transform: playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none',
-          }}
-        />
-      </div>
-    );
-  }
+  })() : '';
+  
+  // Determine if we need to flip the hero image for left-facing direction
+  const isPlayerTile = isVisible && subtype && subtype.includes(TileSubtype.PLAYER);
+  const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
 
   // If this is a floor tile
   if (tileId === 0) {
@@ -375,6 +358,16 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Render hero image on top of floor if this is a player tile */}
+          {isPlayerTile && (
+            <div 
+              className={styles.heroImage}
+              style={{
+                backgroundImage: `url(${heroImage})`,
+                transform: heroTransform,
+              }}
+            />
+          )}
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
         </div>

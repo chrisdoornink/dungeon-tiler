@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { Tile } from '../../components/Tile';
 import '@testing-library/jest-dom';
-import { TileSubtype } from '../../lib/map';
+import { TileSubtype, Direction } from '../../lib/map';
 
 describe('Tile component', () => {
   it('should render the tile with correct background color', () => {
@@ -138,5 +138,96 @@ describe('Tile component', () => {
     
     const tile = screen.getByTestId('tile-1');
     expect(tile).not.toHaveTextContent(/\d/);
+  });
+
+  it('should render hero image with front-facing direction by default', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+      />
+    );
+    
+    // Find the hero image overlay
+    const heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toBeInTheDocument();
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-static.png')");
+    expect(heroImage).toHaveStyle('transform: none');
+  });
+
+  it('should render hero image with correct direction based on playerDirection prop', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    
+    // Test UP direction
+    const { rerender } = render(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        playerDirection={Direction.UP}
+      />
+    );
+    
+    let heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-back-static.png')");
+    
+    // Test RIGHT direction
+    rerender(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        playerDirection={Direction.RIGHT}
+      />
+    );
+    
+    heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-static.png')");
+    expect(heroImage).toHaveStyle('transform: none');
+    
+    // Test LEFT direction (should use right image with horizontal flip)
+    rerender(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        playerDirection={Direction.LEFT}
+      />
+    );
+    
+    heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-static.png')");
+    expect(heroImage).toHaveStyle('transform: scaleX(-1)');
+  });
+
+  it('should overlay hero image on top of floor tile background', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        playerDirection={Direction.DOWN}
+      />
+    );
+    
+    const tile = screen.getByTestId('tile-0');
+    const heroImage = tile.querySelector(`.heroImage`);
+    
+    // Check that the tile has a background image (floor)
+    expect(tile).toHaveStyle('background-image: url("/images/floor/floor-try-1.png")');
+    
+    // Check that the hero image is positioned absolutely to overlay the floor
+    expect(heroImage).toHaveClass('heroImage');
+    
+    // Verify the hero image has transparent background
+    expect(heroImage).toHaveStyle('background-color: transparent');
   });
 });

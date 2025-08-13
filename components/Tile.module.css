@@ -276,8 +276,13 @@
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 2; /* Ensure hero appears above the floor */
+  background-color: transparent; /* Make sure background is transparent */
 }
 
 /* Candle glow effect for player tile */
