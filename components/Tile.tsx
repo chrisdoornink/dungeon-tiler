@@ -327,53 +327,13 @@ export const Tile: React.FC<TileProps> = ({
       // Map floor variant to NESW asset filename based on neighbors
       let floorAsset = "/images/floor/floor-try-1.png"; // Default floor
 
-      // Check for specific floor patterns based on NESW neighbors
-      // The pattern is: North (1st digit), East (2nd), South (3rd), West (4th)
-      // 1 means there's a connection, 0 means no connection
-
-      // Build the NESW pattern string based on neighbors
-      const n = topNeighbor ? "0" : "1";
-      const e = rightNeighbor ? "0" : "1";
-      const s = bottomNeighbor ? "0" : "1";
-      const w = leftNeighbor ? "0" : "1";
-      const neswPattern = `${n}${e}${s}${w}`;
-
-      // Map the pattern to the available floor assets
-      switch (neswPattern) {
-        case "1000":
-          floorAsset = "/images/floor/floor-1000.png"; // Only north neighbor
-          break;
-        case "1001":
-          floorAsset = "/images/floor/floor-1001.png"; // North and west neighbors
-          break;
-        case "0001":
-          floorAsset = "/images/floor/floor-0001.png"; // Only west neighbor
-          break;
-        // TODO - need tile images for these first
-        // case "0010":
-        //   floorAsset = "/images/floor/floor-0010.png"; // Only south neighbor
-        //   break;
-        // case "0100":
-        //   floorAsset = "/images/floor/floor-0100.png"; // Only east neighbor
-        //   break;
-        // case "1010":
-        //   floorAsset = "/images/floor/floor-1010.png"; // North and south neighbors
-        //   break;
-        // case "1100":
-        //   floorAsset = "/images/floor/floor-1100.png"; // North and east neighbors
-        //   break;
-        // case "1011":
-        //   floorAsset = "/images/floor/floor-1011.png"; // North, east, and west neighbors
-        //   break;
-        // case "1110":
-        //   floorAsset = "/images/floor/floor-1110.png"; // North, east, and south neighbors
-        //   break;
-        // case "1111":
-        //   floorAsset = "/images/floor/floor-1111.png"; // All neighbors
-        //   break;
-        default:
-          floorAsset = "/images/floor/floor-try-1.png"; // Default floor
+      if (!topNeighbor) {
+        floorAsset = "/images/floor/floor-1000.png";
+      } else {
+        floorAsset = "/images/floor/floor-try-1.png";
       }
+
+      // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile
 
       return (
         <div

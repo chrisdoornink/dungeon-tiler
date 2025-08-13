@@ -163,6 +163,35 @@
 
 .exitIcon {
   background-image: url('/images/items/exit-door-closed.png');
+  position: relative;
+  /* Lighten the image slightly */
+  filter: brightness(1.2);
+}
+
+/* Add candle glow effect */
+.exitIcon::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+    circle at center,
+    rgba(255, 200, 100, 0.6) 0%,
+    rgba(255, 160, 50, 0.4) 30%,
+    rgba(255, 140, 20, 0.1) 60%,
+    transparent 80%
+  );
+  animation: candleFlicker 3s infinite alternate;
+  z-index: -1;
+  transform: scale(1.4);
+}
+
+@keyframes candleFlicker {
+  0% { opacity: 0.7; }
+  25% { opacity: 0.8; }
+  50% { opacity: 0.6; }
+  75% { opacity: 0.8; }
+  100% { opacity: 0.7; }
 }
 
 /* Variant: wall_pillar (front perspective) */
