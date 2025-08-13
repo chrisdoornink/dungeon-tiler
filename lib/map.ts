@@ -626,6 +626,7 @@ export interface GameState {
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
+  playerDirection: Direction; // Track the player's facing direction
 }
 
 /**
@@ -641,6 +642,7 @@ export function initializeGameState(): GameState {
     mapData: generateCompleteMap(),
     showFullMap: false,
     win: false,
+    playerDirection: Direction.DOWN, // Default facing down/front
   };
 }
 
@@ -676,13 +678,16 @@ export function movePlayer(
       newX = Math.max(0, currentX - 1);
       break;
   }
-
-  // If position didn't change, return unchanged state
-  if (newY === currentY && newX === currentX) return gameState;
+  
+  // If position didn't change, return state with updated direction only
+  if (newY === currentY && newX === currentX) {
+    return { ...gameState, playerDirection: direction };
+  }
 
   // Deep clone the map data to avoid modifying the original
   const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
-  const newGameState = { ...gameState, mapData: newMapData };
+  // Always update the player direction regardless of whether movement succeeds
+  const newGameState = { ...gameState, mapData: newMapData, playerDirection: direction };
 
   // Check if the new position is a wall
   if (newMapData.tiles[newY][newX] === WALL) {

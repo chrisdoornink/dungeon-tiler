@@ -53,6 +53,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         },
         showFullMap: false,
         win: false,
+        playerDirection: Direction.DOWN, // Default to facing down/front
       };
     } else {
       // If no tilemap provided, generate a new game state
@@ -155,7 +156,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             gameState.mapData.tiles,
             tileTypes,
             gameState.mapData.subtypes,
-            gameState.showFullMap
+            gameState.showFullMap,
+            gameState.playerDirection
           )}
         </div>
       </div>
@@ -251,7 +253,8 @@ function renderTileGrid(
   grid: number[][],
   tileTypes: Record<number, TileType>,
   subtypes: number[][][] | undefined,
-  showFullMap: boolean = false
+  showFullMap: boolean = false,
+  playerDirection: Direction = Direction.DOWN
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -295,6 +298,9 @@ function renderTileGrid(
         left: getTileAt(rowIndex, colIndex - 1),
       };
 
+      // Check if this is the player tile to pass the playerDirection prop
+      const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
+      
       return (
         <div key={`${rowIndex}-${colIndex}`} className={`relative ${styles.tileWrapper}`}>
           <Tile
@@ -304,6 +310,7 @@ function renderTileGrid(
             isVisible={isVisible}
             visibilityTier={tier}
             neighbors={neighbors}
+            playerDirection={isPlayerTile ? playerDirection : undefined}
           />
         </div>
       );

@@ -163,35 +163,14 @@
 
 .exitIcon {
   background-image: url('/images/items/exit-door-closed.png');
-  position: relative;
-  /* Lighten the image slightly */
-  filter: brightness(1.2);
+  /* Add subtle glow effect to make exit door more visible */
+  filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.5));
+  animation: exitPulse 2s infinite alternate;
 }
 
-/* Add candle glow effect */
-.exitIcon::before {
-  content: "";
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(
-    circle at center,
-    rgba(255, 200, 100, 0.6) 0%,
-    rgba(255, 160, 50, 0.4) 30%,
-    rgba(255, 140, 20, 0.1) 60%,
-    transparent 80%
-  );
-  animation: candleFlicker 3s infinite alternate;
-  z-index: -1;
-  transform: scale(1.4);
-}
-
-@keyframes candleFlicker {
-  0% { opacity: 0.7; }
-  25% { opacity: 0.8; }
-  50% { opacity: 0.6; }
-  75% { opacity: 0.8; }
-  100% { opacity: 0.7; }
+@keyframes exitPulse {
+  from { filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.4)); }
+  to { filter: drop-shadow(0 0 6px rgba(72, 187, 120, 0.7)); }
 }
 
 /* Variant: wall_pillar (front perspective) */
@@ -285,8 +264,44 @@
 }
 
 .player {
-  background: #3b82f6; /* blue-500 */
+  background: transparent; /* Changed from blue to transparent to show the hero image */
   color: white;
+  position: relative;
+}
+
+/* Hero character image */
+.heroImage {
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+  z-index: 2; /* Ensure hero appears above the floor */
+}
+
+/* Candle glow effect for player tile */
+.player::before {
+  content: "";
+  position: absolute;
+  inset: -15px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(255, 191, 0, 0.4) 0%,
+    rgba(255, 160, 0, 0.2) 40%,
+    rgba(255, 140, 0, 0.1) 60%,
+    transparent 80%
+  );
+  z-index: -1;
+  animation: candleFlicker 3s infinite alternate;
+}
+
+@keyframes candleFlicker {
+  0%, 100% { opacity: 0.7; }
+  25% { opacity: 0.8; }
+  50% { opacity: 0.6; }
+  75% { opacity: 0.9; }
 }
 
 .invisible {

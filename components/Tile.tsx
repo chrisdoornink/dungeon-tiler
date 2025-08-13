@@ -1,5 +1,5 @@
 import React from "react";
-import { TileType, TileSubtype } from "../lib/map";
+import { TileType, TileSubtype, Direction } from "../lib/map";
 import styles from "./Tile.module.css";
 
 type NeighborInfo = {
@@ -16,6 +16,7 @@ interface TileProps {
   isVisible?: boolean; // Whether this tile is in the player's field of view
   visibilityTier?: number; // 0-3 for FOV fade tiers
   neighbors?: NeighborInfo; // Information about neighboring tiles
+  playerDirection?: Direction; // Direction the player is facing
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -25,6 +26,7 @@ export const Tile: React.FC<TileProps> = ({
   isVisible = true,
   visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null },
+  playerDirection = Direction.DOWN, // Default to facing down/front
 }) => {
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
@@ -307,13 +309,39 @@ export const Tile: React.FC<TileProps> = ({
   };
 
   if (isVisible && subtype && subtype.includes(TileSubtype.PLAYER)) {
+    // Get the appropriate hero image based on player direction
+    let heroImage = '/images/hero/hero-front-static.png'; // Default
+    
+    switch (playerDirection) {
+      case Direction.UP:
+        heroImage = '/images/hero/hero-back-static.png';
+        break;
+      case Direction.RIGHT:
+        heroImage = '/images/hero/hero-right-static.png';
+        break;
+      case Direction.LEFT:
+        // Mirror the right-facing image for left direction
+        heroImage = '/images/hero/hero-right-static.png';
+        break;
+      case Direction.DOWN:
+      default:
+        heroImage = '/images/hero/hero-front-static.png';
+        break;
+    }
+    
     return (
       <div
         className={`${styles.tileContainer} ${styles.player} ${tierClass}`}
         data-testid={`tile-${tileId}`}
         data-neighbor-code={neighborCode}
       >
-        @
+        <div 
+          className={styles.heroImage}
+          style={{
+            backgroundImage: `url(${heroImage})`,
+            transform: playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none',
+          }}
+        />
       </div>
     );
   }
