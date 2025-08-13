@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   TileType,
@@ -8,6 +8,7 @@ import {
   TileSubtype,
 } from "../lib/map";
 import { Tile } from "./Tile";
+import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
 
 // Grid configuration constants
@@ -147,6 +148,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     router,
   ]);
 
+  // Handle player movement
+  const handlePlayerMove = useCallback((direction: Direction) => {
+    const newGameState = movePlayer(gameState, direction);
+    setGameState(newGameState);
+  }, [gameState]);
+
+  // Handle mobile control button clicks
+  const handleMobileMove = useCallback((directionStr: string) => {
+    switch (directionStr) {
+      case 'UP':
+        handlePlayerMove(Direction.UP);
+        break;
+      case 'RIGHT':
+        handlePlayerMove(Direction.RIGHT);
+        break;
+      case 'DOWN':
+        handlePlayerMove(Direction.DOWN);
+        break;
+      case 'LEFT':
+        handlePlayerMove(Direction.LEFT);
+        break;
+    }
+  }, [handlePlayerMove]);
+
   // Add keyboard event listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -168,9 +193,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       if (direction !== null) {
-        const newGameState = movePlayer(gameState, direction);
-
-        setGameState(newGameState);
+        handlePlayerMove(direction);
       }
     };
 
@@ -178,10 +201,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [gameState]);
+  }, [gameState, handlePlayerMove]);
 
   return (
-    <div className="relative" data-testid="tilemap-grid-wrapper">
+    <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
       {/* Fixed inventory at top right */}
       {(gameState.hasKey ||
         gameState.hasExitKey ||
@@ -214,11 +237,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       )}
       
+      {/* Mobile controls */}
+      <MobileControls onMove={handleMobileMove} />
+      
       {/* Centered map container */}
       <div className="flex justify-center items-center h-[calc(100vh-100px)]">
         <div 
-          className={styles.viewportContainer}
-          data-testid="tilemap-grid-container" 
+          className={`${styles.viewportContainer} max-w-full overflow-auto`}
+          data-testid="tilemap-grid-container"
           style={{
             gridTemplateColumns: process.env.NODE_ENV === 'test' ? 'repeat(25, 1fr)' : undefined
           }}
