@@ -528,7 +528,7 @@ export const Tile: React.FC<TileProps> = ({
                   backgroundImage: `url(${wallAsset})`,
                   backgroundSize: "cover",
                   backgroundPosition: "center",
-                  backgroundRepeat: "no-repeat",
+                  backgroundRepeat: "no-repeat"
                 }
               : undefined
           }

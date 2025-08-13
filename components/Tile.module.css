@@ -11,6 +11,10 @@
   --dirt-path: #3d3426; /* Dark earthy forest path */
   --forest-accent: #4d6356; /* Forest accent for details */
   --forest-dark: #1e2a22; /* Deep forest shadow */
+  
+  /* Torch flicker colors */
+  --torch-glow-tier1: rgba(255, 200, 120, 0.15); /* Warm yellow glow for tier 1 */
+  --torch-glow-tier2: rgba(255, 200, 120, 0.1); /* Subtle warm glow for tier 2 */
 }
 
 .tileContainer {
@@ -30,8 +34,70 @@
 
 /* Visibility tiers (kept as global tokens so tests can still see class names if needed) */
 :global(.fov-tier-3) { filter: none; }
-:global(.fov-tier-2) { filter: brightness(0.85); }
-:global(.fov-tier-1) { filter: brightness(0.7); }
+
+/* Enhanced torch flickering animations with moderate darker shades */
+@keyframes torchFlickerTier2 {
+  0% { 
+    filter: brightness(0.84);
+    box-shadow: inset 0 0 30px 10px rgba(0, 0, 0, 0.15);
+  }
+  25% { 
+    filter: brightness(0.89);
+    box-shadow: inset 0 0 40px 15px rgba(0, 0, 0, 0.09);
+  }
+  50% { 
+    filter: brightness(0.82);
+    box-shadow: inset 0 0 35px 12px rgba(0, 0, 0, 0.18);
+  }
+  75% { 
+    filter: brightness(0.88);
+    box-shadow: inset 0 0 42px 16px rgba(0, 0, 0, 0.1);
+  }
+  100% { 
+    filter: brightness(0.84);
+    box-shadow: inset 0 0 30px 10px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@keyframes torchFlickerTier1 {
+  0% { 
+    filter: brightness(0.68);
+    box-shadow: inset 0 0 40px 15px rgba(0, 0, 0, 0.28);
+  }
+  20% { 
+    filter: brightness(0.74);
+    box-shadow: inset 0 0 55px 22px rgba(0, 0, 0, 0.2);
+  }
+  40% { 
+    filter: brightness(0.66);
+    box-shadow: inset 0 0 50px 20px rgba(0, 0, 0, 0.3);
+  }
+  60% { 
+    filter: brightness(0.73);
+    box-shadow: inset 0 0 60px 25px rgba(0, 0, 0, 0.21);
+  }
+  80% { 
+    filter: brightness(0.67);
+    box-shadow: inset 0 0 45px 18px rgba(0, 0, 0, 0.29);
+  }
+  100% { 
+    filter: brightness(0.68);
+    box-shadow: inset 0 0 40px 15px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* Apply animations directly to visibility tiers with moderate animation durations */
+:global(.fov-tier-2) { 
+  animation: torchFlickerTier2 2.2s ease-in-out infinite;
+  position: relative;
+  z-index: 0;
+}
+
+:global(.fov-tier-1) { 
+  animation: torchFlickerTier1 2.7s ease-in-out infinite;
+  position: relative;
+  z-index: 0;
+}
 
 /* Keep border-b-8 token globally to satisfy tests and non-Tailwind runtime */
 :global(.border-b-8) { border-bottom-width: 8px !important; border-bottom-style: solid; }
