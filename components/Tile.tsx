@@ -346,6 +346,29 @@ export const Tile: React.FC<TileProps> = ({
 
       // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
       const hasWallBelow = neighbors.bottom === 1;
+      
+      // Determine which wall image to use for the overlay based on neighboring walls
+      let wallTopImage = '/images/wall/wall-0111.png'; // Default wall image
+      
+      if (hasWallBelow) {
+        // Check if there are walls to the left and right
+        const hasWallLeft = neighbors.left === 1;
+        const hasWallRight = neighbors.right === 1;
+        
+        if (!hasWallLeft && !hasWallRight) {
+          // No walls on sides, use wall-0010.png (just top wall)
+          wallTopImage = '/images/wall/wall-0010.png';
+        } else if (hasWallLeft && !hasWallRight) {
+          // Wall on left only
+          wallTopImage = '/images/wall/wall-0110.png';
+        } else if (!hasWallLeft && hasWallRight) {
+          // Wall on right only
+          wallTopImage = '/images/wall/wall-0011.png';
+        } else {
+          // Walls on both sides
+          wallTopImage = '/images/wall/wall-0111.png';
+        }
+      }
 
       return (
         <div
@@ -377,6 +400,9 @@ export const Tile: React.FC<TileProps> = ({
           {hasWallBelow && (
             <div 
               className={styles.wallTopOverlay}
+              style={{
+                backgroundImage: `url(${wallTopImage})`,
+              }}
               data-testid="wall-top-overlay"
             />
           )}

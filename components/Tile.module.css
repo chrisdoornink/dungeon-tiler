@@ -307,7 +307,6 @@
   left: 0;
   right: 0;
   height: 33%; /* Bottom third of the tile */
-  background-image: url('/images/wall/wall-0111.png');
   background-position: center top; /* Show the top portion of the wall image */
   background-size: 100% 300%; /* Make the image 3x taller than the container to show only top third */
   z-index: 3; /* Above the hero image and other content */
