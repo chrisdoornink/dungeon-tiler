@@ -61,21 +61,52 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Find player position in the grid
   const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(null);
+  // Add state to track if player is currently moving
+  const [isMoving, setIsMoving] = useState<boolean>(false);
+  // Store the previous game state for smooth transitions
+  const [prevGameState, setPrevGameState] = useState<GameState | null>(null);
   
   useEffect(() => {
     // Find player position whenever gameState changes
     if (gameState.mapData.subtypes) {
-      for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
-        for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
-          if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
-            setPlayerPosition([y, x]);
-            return;
+      // If we have a previous state and the player has moved
+      if (prevGameState && !isMoving) {
+        // Set moving flag to true
+        setIsMoving(true);
+        
+        // Delay updating the player position to match the grid transition
+        setTimeout(() => {
+          // Find new player position
+          for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
+            for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
+              if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
+                setPlayerPosition([y, x]);
+                // Reset moving flag
+                setIsMoving(false);
+                return;
+              }
+            }
+          }
+          setPlayerPosition(null);
+          setIsMoving(false);
+        }, 150); // Half of the CSS transition time for a smooth effect
+      } else if (!prevGameState) {
+        // Initial load - set position immediately
+        for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
+          for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
+            if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
+              setPlayerPosition([y, x]);
+              return;
+            }
           }
         }
+        setPlayerPosition(null);
       }
-      setPlayerPosition(null);
+      
+      // Update previous game state
+      setPrevGameState(gameState);
     }
-  }, [gameState]);
+  }, [gameState, prevGameState, isMoving]);
 
   // Inventory is derived from gameState flags (hasKey, hasExitKey)
 
@@ -155,7 +186,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         <div
           className={styles.mapContainer}
           style={{
-            transform: playerPosition ? `translate(${calculateMapTransform(playerPosition, gameState.mapData.tiles[0].length, gameState.mapData.tiles.length)})` : 'none',
+            transform: playerPosition ? `translate(${calculateMapTransform(playerPosition)})` : 'none',
           }}
         >
           <div

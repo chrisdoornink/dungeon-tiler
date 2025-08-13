@@ -316,7 +316,6 @@ export const Tile: React.FC<TileProps> = ({
       case Direction.UP:
         return '/images/hero/hero-back-static.png';
       case Direction.RIGHT:
-        return '/images/hero/hero-right-static.png';
       case Direction.LEFT:
         return '/images/hero/hero-right-static.png';
       case Direction.DOWN:
