@@ -21,13 +21,17 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#1B1B1B] text-white">
       <h1 className="text-3xl font-bold mb-6">Dungeon Tilemap</h1>
 
       <TilemapGrid 
         tileTypes={tileTypes}
         initialGameState={algorithm === "complete" ? initializeGameState() : {
           hasKey: false,
+          hasExitKey: false,
+          showFullMap: false,
+          win: false,
+          playerDirection: 0, // Direction.DOWN
           mapData: {
             tiles: tilemap,
             subtypes: mapData?.subtypes || []
@@ -38,7 +42,7 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
       <div className="mt-4 mb-4">
         <button 
           onClick={() => window.location.reload()} 
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+          className="px-4 py-2 bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0"
         >
           Generate New Map
         </button>

@@ -24,6 +24,21 @@
   background-color: var(--forest-dark);
 }
 
+/* Fixed viewport container */
+.viewportContainer {
+  width: 600px;
+  height: 600px;
+  margin: 0 auto;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Map container that will move to center on player */
+.mapContainer {
+  position: absolute;
+  transition: transform 0.2s ease;
+}
+
 .tileWrapper {
   margin: 0;
   padding: 0;

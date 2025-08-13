@@ -5,7 +5,6 @@ import {
   GameState,
   Direction,
   movePlayer,
-  initializeGameState,
   TileSubtype,
 } from "../lib/map";
 import { Tile } from "./Tile";
@@ -56,10 +55,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         playerDirection: Direction.DOWN, // Default to facing down/front
       };
     } else {
-      // If no tilemap provided, generate a new game state
-      return initializeGameState();
+      throw new Error("Either initialGameState or tilemap must be provided");
     }
   });
+
+  // Find player position in the grid
+  const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(null);
+  
+  useEffect(() => {
+    // Find player position whenever gameState changes
+    if (gameState.mapData.subtypes) {
+      for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
+        for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
+          if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
+            setPlayerPosition([y, x]);
+            return;
+          }
+        }
+      }
+      setPlayerPosition(null);
+    }
+  }, [gameState]);
 
   // Inventory is derived from gameState flags (hasKey, hasExitKey)
 
@@ -135,30 +151,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   return (
     <div className="flex flex-col items-center w-full">
-      <div
-        className="flex justify-center w-full"
-        data-testid="tilemap-grid-wrapper"
-      >
+      <div className={styles.viewportContainer}>
         <div
-          className={`relative border border-gray-800 rounded-md p-2 shadow-md max-w-full overflow-auto ${styles.gridContainer}`}
-          data-testid="tilemap-grid-container"
-          style={{ 
-            gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)`,
-            backgroundColor: 'var(--forest-dark)',
-            gap: 0,
-            gridGap: 0,
-            gridRowGap: 0,
-            gridColumnGap: 0
+          className={styles.mapContainer}
+          style={{
+            transform: playerPosition ? `translate(${calculateMapTransform(playerPosition, gameState.mapData.tiles[0].length, gameState.mapData.tiles.length)})` : 'none',
           }}
-          tabIndex={0} // Make div focusable for keyboard events
         >
-          {renderTileGrid(
-            gameState.mapData.tiles,
-            tileTypes,
-            gameState.mapData.subtypes,
-            gameState.showFullMap,
-            gameState.playerDirection
-          )}
+          <div
+            className={styles.gridContainer}
+            style={{
+              gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
+              gridTemplateColumns: `repeat(${gameState.mapData.tiles[0].length}, 40px)`,
+              gridRowGap: 0,
+              gridColumnGap: 0
+            }}
+            tabIndex={0} // Make div focusable for keyboard events
+          >
+            {renderTileGrid(
+              gameState.mapData.tiles,
+              tileTypes,
+              gameState.mapData.subtypes,
+              gameState.showFullMap,
+              gameState.playerDirection
+            )}
+          </div>
         </div>
       </div>
 
@@ -377,3 +394,22 @@ function renderTileGrid(
 }
 
 // Function removed since we're now using GameState
+
+// Calculate the transform to center the map on the player
+function calculateMapTransform(playerPosition: [number, number]): string {
+  if (!playerPosition) return '0px, 0px';
+  
+  const tileSize = 40; // px
+  const viewportWidth = 600; // px (from CSS)
+  const viewportHeight = 600; // px (from CSS)
+  
+  // Calculate the center position of the player in pixels
+  const playerX = (playerPosition[1] + 0.5) * tileSize;
+  const playerY = (playerPosition[0] + 0.5) * tileSize;
+  
+  // Calculate the transform to center the player in the viewport
+  const translateX = (viewportWidth / 2) - playerX;
+  const translateY = (viewportHeight / 2) - playerY;
+  
+  return `${translateX}px, ${translateY}px`;
+}

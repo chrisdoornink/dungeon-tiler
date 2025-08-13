@@ -81,7 +81,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] A sword is only found inside a chest, so in the generation, a sword will need a chest in the same tile.
 - [x] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile, adding an OPEN_CHEST subtype on that tile.
 - [x] Building off the visual design implemented currently, try to give some forced perspective to the walls by making the bottom border if the wall tile has a floor tile below it taller than the other borders.
-- [ ] Implement this // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile - need the asset first
+- [x] Implement this // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile - need the asset first
 
 ### Visual Polish
 

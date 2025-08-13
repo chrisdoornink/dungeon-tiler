@@ -11,10 +11,10 @@ export const LegendItem: React.FC<LegendItemProps> = ({ tile }) => {
   return (
     <div className="flex items-center">
       <div 
-        className="w-6 h-6 mr-2"
+        className="w-6 h-6 mr-2 border-0"
         style={{ backgroundColor: tile.color }}
       ></div>
-      <span>
+      <span className="text-white">
         {tile.id}: {tile.name} {walkabilityLabel}
       </span>
     </div>
