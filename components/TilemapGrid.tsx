@@ -139,9 +139,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         data-testid="tilemap-grid-wrapper"
       >
         <div
-          className="relative border border-gray-300 rounded-md p-2 shadow-md max-w-full overflow-auto grid gap-0"
+          className={`relative border border-gray-800 rounded-md p-2 shadow-md max-w-full overflow-auto ${styles.gridContainer}`}
           data-testid="tilemap-grid-container"
-          style={{ gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)` }}
+          style={{ 
+            gridTemplateColumns: `repeat(${GRID_WIDTH}, 1fr)`,
+            backgroundColor: 'var(--forest-dark)',
+            gap: 0,
+            gridGap: 0,
+            gridRowGap: 0,
+            gridColumnGap: 0
+          }}
           tabIndex={0} // Make div focusable for keyboard events
         >
           {renderTileGrid(
@@ -289,7 +296,7 @@ function renderTileGrid(
       };
 
       return (
-        <div key={`${rowIndex}-${colIndex}`} className="relative">
+        <div key={`${rowIndex}-${colIndex}`} className={`relative ${styles.tileWrapper}`}>
           <Tile
             tileId={tileId}
             tileType={tileType}

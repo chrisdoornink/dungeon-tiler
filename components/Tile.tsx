@@ -190,12 +190,12 @@ export const Tile: React.FC<TileProps> = ({
   const hasExitKey = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.EXITKEY) || false;
   };
-  
+
   // Check if a tile has a door subtype
   const hasDoor = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.DOOR) || false;
   };
-  
+
   // Check if a tile has an exit subtype
   const hasExit = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.EXIT) || false;
@@ -282,7 +282,7 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.fullHeightAssetIcon} ${styles.doorIcon}`}
           />
         )}
-        
+
         {/* Render exit with asset if present - using full height icon */}
         {hasExit(subtypes) && (
           <div
@@ -379,7 +379,6 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            backgroundColor: "#c8c8c8", // Keep for test compatibility
             backgroundImage: `url(${floorAsset})`,
             backgroundSize: "cover",
             backgroundPosition: "center",

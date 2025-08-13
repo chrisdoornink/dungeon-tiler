@@ -24,3 +24,18 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Fix for grid gaps in dungeon tilemap */
+.grid {
+  gap: 0 !important;
+  grid-gap: 0 !important;
+}
+
+/* Ensure no borders or margins on grid items */
+.grid > div {
+  margin: 0 !important;
+  padding: 0 !important;
+  border: none !important;
+  line-height: 0 !important;
+  box-sizing: border-box !important;
+}

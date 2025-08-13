@@ -21,6 +21,11 @@
   align-items: center;
   justify-content: center;
   font-weight: bold;
+  margin: 0;
+  padding: 0;
+  border: none;
+  line-height: 0;
+  box-sizing: border-box;
 }
 
 /* Visibility tiers (kept as global tokens so tests can still see class names if needed) */

@@ -16,6 +16,20 @@
   --torch2-falloff: rgba(180, 160, 130, 0.01); /* Practically invisible */
 }
 
+/* Grid container styles to eliminate white grid lines */
+.gridContainer {
+  display: grid;
+  grid-gap: 0;
+  gap: 0;
+  background-color: var(--forest-dark);
+}
+
+.tileWrapper {
+  margin: 0;
+  padding: 0;
+  line-height: 0;
+}
+
 .torchGlow {
   position: absolute;
   inset: 0;
