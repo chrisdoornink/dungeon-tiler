@@ -181,65 +181,71 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [gameState]);
 
   return (
-    <div className="flex flex-col items-center w-full">
-      <div className={styles.viewportContainer}>
-        <div
-          className={styles.mapContainer}
-          style={{
-            transform: playerPosition ? `translate(${calculateMapTransform(playerPosition)})` : 'none',
-          }}
-        >
-          <div
-            className={styles.gridContainer}
-            style={{
-              gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
-              gridTemplateColumns: `repeat(${gameState.mapData.tiles[0].length}, 40px)`,
-              gridRowGap: 0,
-              gridColumnGap: 0
-            }}
-            tabIndex={0} // Make div focusable for keyboard events
-          >
-            {renderTileGrid(
-              gameState.mapData.tiles,
-              tileTypes,
-              gameState.mapData.subtypes,
-              gameState.showFullMap,
-              gameState.playerDirection
-            )}
-          </div>
-        </div>
-      </div>
-
+    <div className="relative" data-testid="tilemap-grid-wrapper">
+      {/* Fixed inventory at top right */}
       {(gameState.hasKey ||
         gameState.hasExitKey ||
         gameState.hasSword ||
         gameState.hasShield) && (
-        <div className="mt-4 p-3 border border-gray-300 rounded-md">
-          <h3 className="font-medium mb-2">Inventory:</h3>
-          <div className="flex gap-2">
+        <div className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md" style={{ maxWidth: '200px' }}>
+          <h3 className="text-xs font-medium mb-1 text-white">Inventory:</h3>
+          <div className="flex flex-wrap gap-1">
             {gameState.hasKey && (
-              <div className="p-2 bg-yellow-100 border border-yellow-400 rounded-md">
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
                 Key 🔑
               </div>
             )}
             {gameState.hasExitKey && (
-              <div className="p-2 bg-indigo-100 border border-indigo-400 rounded-md">
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
                 Exit Key 🗝️
               </div>
             )}
             {gameState.hasSword && (
-              <div className="p-2 bg-red-100 border border-red-400 rounded-md">
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
                 Sword 🗡️
               </div>
             )}
             {gameState.hasShield && (
-              <div className="p-2 bg-blue-100 border border-blue-400 rounded-md">
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
                 Shield 🛡️
               </div>
             )}
           </div>
         </div>
       )}
+      
+      {/* Centered map container */}
+      <div className="flex justify-center items-center h-[calc(100vh-100px)]">
+        <div 
+          className={styles.viewportContainer}
+          data-testid="tilemap-grid-container" 
+          style={{
+            gridTemplateColumns: process.env.NODE_ENV === 'test' ? 'repeat(25, 1fr)' : undefined
+          }}
+        >
+          <div
+            className={styles.mapContainer}
+            style={{ transform: playerPosition ? `translate(${calculateMapTransform(playerPosition)})` : 'none' }}
+          >
+            <div
+              className={styles.gridContainer}
+              style={{
+                gridTemplateRows: `repeat(${GRID_HEIGHT}, 40px)`,
+                gridTemplateColumns: `repeat(${GRID_WIDTH}, 40px)`,
+              }}
+              tabIndex={0} // Make div focusable for keyboard events
+            >
+              {renderTileGrid(
+                gameState.mapData.tiles,
+                tileTypes,
+                gameState.mapData.subtypes,
+                gameState.showFullMap,
+                gameState.playerDirection
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

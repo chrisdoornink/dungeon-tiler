@@ -2,7 +2,6 @@
 
 import { generateMap, generateCompleteMap, tileTypes, MapData, initializeGameState } from "../lib/map";
 import { TilemapGrid } from "../components/TilemapGrid";
-import { Legend } from "../components/Legend";
 
 interface HomeProps {
   algorithm?: "default" | "complete";
@@ -22,7 +21,6 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#1B1B1B] text-white">
-      <h1 className="text-3xl font-bold mb-6">Dungeon Tilemap</h1>
 
       <TilemapGrid 
         tileTypes={tileTypes}
@@ -47,8 +45,6 @@ export default function Home({ algorithm = "complete" }: HomeProps) {
           Generate New Map
         </button>
       </div>
-
-      <Legend tileTypes={tileTypes} />
     </div>
   );
 }
