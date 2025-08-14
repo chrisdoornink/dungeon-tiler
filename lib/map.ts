@@ -630,6 +630,7 @@ export interface GameState {
   win: boolean; // Win state when player opens exit and steps onto it
   playerDirection: Direction; // Track the player's facing direction
   enemies?: Enemy[]; // Active enemies on the map
+  heroHealth: number; // Player health points for current run
 }
 
 /**
@@ -660,6 +661,7 @@ export function initializeGameState(): GameState {
     win: false,
     playerDirection: Direction.DOWN, // Default facing down/front
     enemies,
+    heroHealth: 5,
   };
 }
 
