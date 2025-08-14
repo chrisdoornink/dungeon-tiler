@@ -1,20 +1,4 @@
-:root {
-  /* Less yellow, more transparent torch colors */
-
-  /* Almost completely clear torch colors */
-  --torch-core: rgba(190, 170, 140, 0.04); /* Barely visible */
-  --torch-mid: rgba(190, 170, 140, 0.03); /* Almost clear */
-  --torch-falloff: rgba(190, 170, 140, 0.02); /* Nearly invisible */
-  --torch-outer: rgba(190, 170, 140, 0.01); /* Practically invisible */
-
-  /* Shadow overlay from style guide */
-  --shadow-overlay: rgba(26, 26, 26, 0.75); /* #1a1a1a with opacity */
-
-  /* Second glow layer with slightly warmer tint - also almost clear */
-  --torch2-core: rgba(180, 160, 130, 0.03); /* Barely visible */
-  --torch2-mid: rgba(180, 160, 130, 0.02); /* Almost clear */
-  --torch2-falloff: rgba(180, 160, 130, 0.01); /* Practically invisible */
-}
+/* Root-level CSS variables moved to app/globals.css :root for Next.js CSS Modules compatibility */
 
 /* Grid container styles to eliminate white grid lines */
 .gridContainer {

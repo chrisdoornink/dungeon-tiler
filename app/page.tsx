@@ -1,41 +1,16 @@
 "use client";
 
-import { generateMap, generateCompleteMap, tileTypes, MapData, initializeGameState } from "../lib/map";
+import { tileTypes, initializeGameState } from "../lib/map";
 import { TilemapGrid } from "../components/TilemapGrid";
 
-interface HomeProps {
-  algorithm?: "default" | "complete";
-}
-
-export default function Home({ algorithm = "complete" }: HomeProps) {
-  // Generate the tilemap based on selected algorithm
-  let mapData: MapData | null = null;
-  let tilemap: number[][];
-  
-  if (algorithm === "complete") {
-    mapData = generateCompleteMap();
-    tilemap = mapData.tiles;
-  } else {
-    tilemap = generateMap();
-  }
+export default function Home() {
+  // Initialize game state (complete map generation handled internally)
+  const initialState = initializeGameState();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#1B1B1B] text-white">
 
-      <TilemapGrid 
-        tileTypes={tileTypes}
-        initialGameState={algorithm === "complete" ? initializeGameState() : {
-          hasKey: false,
-          hasExitKey: false,
-          showFullMap: false,
-          win: false,
-          playerDirection: 0, // Direction.DOWN
-          mapData: {
-            tiles: tilemap,
-            subtypes: mapData?.subtypes || []
-          }
-        }}
-      />
+      <TilemapGrid tileTypes={tileTypes} initialGameState={initialState} />
 
       <div className="mt-4 mb-4">
         <button 

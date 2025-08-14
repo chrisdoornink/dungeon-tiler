@@ -5,6 +5,31 @@
   --foreground: #ededed;
 }
 
+/* Global utility classes moved from CSS Modules (Vercel CSS Modules purity) */
+.fov-tier-3 { filter: none; }
+.fov-tier-2 { 
+  animation: torchFlickerTier2 2.2s ease-in-out infinite;
+  position: relative;
+  z-index: 0;
+}
+.fov-tier-1 { 
+  animation: torchFlickerTier1 2.7s ease-in-out infinite;
+  position: relative;
+  z-index: 0;
+}
+
+/* Border width utilities used in components */
+.border-b-8 { border-bottom-width: 8px !important; border-bottom-style: solid; }
+.border-b-4 { border-bottom-width: 4px !important; border-bottom-style: solid; }
+.border-b-2 { border-bottom-width: 2px !important; border-bottom-style: solid; }
+.border-b-0 { border-bottom-width: 0px !important; border-bottom-style: solid; }
+
+/* Specific bottom border color token */
+.border-b-\[\#1f1f1f\] { border-bottom-color: var(--perspective-base) !important; }
+
+/* Utility for invisible tiles used in tests and fallback */
+.bg-gray-900 { background-color: #111827 !important; }
+
 /* Define theme variables directly */
 :root {
   --color-background: var(--background);
@@ -27,6 +52,42 @@ body {
   margin: 0;
   padding: 0;
   border: none;
+}
+
+/* Global theme tokens moved from CSS Modules to avoid purity errors on Vercel */
+:root {
+  /* Dungeon tiler sizing */
+  --tile-size: 40px;
+
+  /* Dark forest theme colors */
+  --floor-bg: #2a3328;
+  --wall-top: #3a4a3e;
+  --wall-side: #2c3a30;
+  --wall-bottom: #1a2a20;
+  --edge-highlight: #4c5a4e;
+  --perspective-base: #162018;
+  --overgrown-grass: #3f5a46;
+  --dirt-path: #3d3426;
+  --forest-accent: #4d6356;
+  --forest-dark: #1e2a22;
+
+  /* Torch flicker colors (tile flicker usage) */
+  --torch-glow-tier1: rgba(255, 200, 120, 0.15);
+  --torch-glow-tier2: rgba(255, 200, 120, 0.1);
+
+  /* Torch/glow colors for viewport glow layer */
+  --torch-core: rgba(190, 170, 140, 0.04);
+  --torch-mid: rgba(190, 170, 140, 0.03);
+  --torch-falloff: rgba(190, 170, 140, 0.02);
+  --torch-outer: rgba(190, 170, 140, 0.01);
+
+  /* Shadow overlay */
+  --shadow-overlay: rgba(26, 26, 26, 0.75);
+
+  /* Secondary glow layer */
+  --torch2-core: rgba(180, 160, 130, 0.03);
+  --torch2-mid: rgba(180, 160, 130, 0.02);
+  --torch2-falloff: rgba(180, 160, 130, 0.01);
 }
 
 /* Fix for grid gaps in dungeon tilemap */

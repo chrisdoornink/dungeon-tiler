@@ -1,21 +1,4 @@
-:root {
-  --tile-size: 40px; /* 10 * 4px (tailwind w-10 h-10 equivalent) */
-  /* Dark forest theme colors */
-  --floor-bg: #2a3328; /* Deep forest floor green-brown */
-  --wall-top: #3a4a3e; /* Mossy stone top */
-  --wall-side: #2c3a30; /* Darker moss-covered stone sides */
-  --wall-bottom: #1a2a20; /* Deep shadow with forest tint */
-  --edge-highlight: #4c5a4e; /* Subtle forest-tinted highlight */
-  --perspective-base: #162018; /* Deep forest shadow */
-  --overgrown-grass: #3f5a46; /* Desaturated mossy green */
-  --dirt-path: #3d3426; /* Dark earthy forest path */
-  --forest-accent: #4d6356; /* Forest accent for details */
-  --forest-dark: #1e2a22; /* Deep forest shadow */
-  
-  /* Torch flicker colors */
-  --torch-glow-tier1: rgba(255, 200, 120, 0.15); /* Warm yellow glow for tier 1 */
-  --torch-glow-tier2: rgba(255, 200, 120, 0.1); /* Subtle warm glow for tier 2 */
-}
+/* Root-level CSS variables moved to app/globals.css :root for Next.js CSS Modules compatibility */
 
 .tileContainer {
   position: relative;
@@ -32,8 +15,7 @@
   box-sizing: border-box;
 }
 
-/* Visibility tiers (kept as global tokens so tests can still see class names if needed) */
-:global(.fov-tier-3) { filter: none; }
+/* Visibility tier globals moved to app/globals.css */
 
 /* Enhanced torch flickering animations with moderate darker shades */
 @keyframes torchFlickerTier2 {
@@ -86,30 +68,9 @@
   }
 }
 
-/* Apply animations directly to visibility tiers with moderate animation durations */
-:global(.fov-tier-2) { 
-  animation: torchFlickerTier2 2.2s ease-in-out infinite;
-  position: relative;
-  z-index: 0;
-}
+/* FOV tier class rules moved to app/globals.css */
 
-:global(.fov-tier-1) { 
-  animation: torchFlickerTier1 2.7s ease-in-out infinite;
-  position: relative;
-  z-index: 0;
-}
-
-/* Keep border-b-8 token globally to satisfy tests and non-Tailwind runtime */
-:global(.border-b-8) { border-bottom-width: 8px !important; border-bottom-style: solid; }
-:global(.border-b-4) { border-bottom-width: 4px !important; border-bottom-style: solid; }
-:global(.border-b-2) { border-bottom-width: 2px !important; border-bottom-style: solid; }
-:global(.border-b-0) { border-bottom-width: 0px !important; border-bottom-style: solid; }
-
-/* Specific color utility token we referenced */
-:global(.border-b-\[\#1f1f1f\]) { border-bottom-color: var(--perspective-base) !important; }
-
-/* Tailwind token used by tests for invisible tiles */
-:global(.bg-gray-900) { background-color: #111827 !important; }
+/* Border and color utility tokens moved to app/globals.css */
 
 .floor {
   background-color: var(--floor-bg);
