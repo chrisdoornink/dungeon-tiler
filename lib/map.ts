@@ -6,6 +6,9 @@ export type TileType = {
   walkable: boolean;
 };
 
+// Enemy integration
+import { Enemy, placeEnemies, updateEnemies } from "./enemy";
+
 // Map of tile types by ID
 export const tileTypes: Record<number, TileType> = {
   0: { id: 0, name: "floor", color: "#ccc", walkable: true },
@@ -241,7 +244,6 @@ export function generateMapWithExit(baseMapData?: MapData): MapData {
   const [exitY, exitX] = wallsNextToFloor[0];
   mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
 
-
   return mapData;
 }
 
@@ -433,9 +435,7 @@ export function addExitKeyToMap(mapData: MapData): MapData {
  * Add chests (with sword/shield contents) to random floor tiles.
  * All chests are locked and require a KEY to open.
  */
-export function addChestsToMap(
-  mapData: MapData
-): MapData {
+export function addChestsToMap(mapData: MapData): MapData {
   // Always place exactly 2 chests: one SWORD and one SHIELD
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
   const grid = newMapData.tiles;
@@ -483,7 +483,9 @@ export function addChestsToMap(
     newMapData.subtypes[cy][cx] = sub;
     const contentName = content === TileSubtype.SWORD ? "SWORD" : "SHIELD";
     console.log(
-      `Placed chest at [${cy}, ${cx}] content:${contentName} locked:${locked ? "YES" : "NO"}`
+      `Placed chest at [${cy}, ${cx}] content:${contentName} locked:${
+        locked ? "YES" : "NO"
+      }`
     );
   }
 
@@ -627,6 +629,7 @@ export interface GameState {
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
   playerDirection: Direction; // Track the player's facing direction
+  enemies?: Enemy[]; // Active enemies on the map
 }
 
 /**
@@ -634,15 +637,29 @@ export interface GameState {
  * @returns A new GameState object
  */
 export function initializeGameState(): GameState {
+  const mapData = generateCompleteMap();
+  // Find player position to place enemies at a safe distance
+  const playerPos = findPlayerPosition(mapData);
+  const enemies = playerPos
+    ? placeEnemies({ grid: mapData.tiles, player: { y: playerPos[0], x: playerPos[1] }, count: 3, minDistanceFromPlayer: 8 })
+    : [];
+
+  if (enemies.length > 0) {
+    console.log(`Placed ${enemies.length} enemies:`, enemies.map(e => `[${e.y}, ${e.x}]`).join(", "));
+  } else {
+    console.log("No enemies placed.");
+  }
+
   return {
     hasKey: false,
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
-    mapData: generateCompleteMap(),
+    mapData,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN, // Default facing down/front
+    enemies,
   };
 }
 
@@ -678,7 +695,7 @@ export function movePlayer(
       newX = Math.max(0, currentX - 1);
       break;
   }
-  
+
   // If position didn't change, return state with updated direction only
   if (newY === currentY && newX === currentX) {
     return { ...gameState, playerDirection: direction };
@@ -687,7 +704,11 @@ export function movePlayer(
   // Deep clone the map data to avoid modifying the original
   const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
   // Always update the player direction regardless of whether movement succeeds
-  const newGameState = { ...gameState, mapData: newMapData, playerDirection: direction };
+  const newGameState = {
+    ...gameState,
+    mapData: newMapData,
+    playerDirection: direction,
+  };
 
   // Check if the new position is a wall
   if (newMapData.tiles[newY][newX] === WALL) {
@@ -716,9 +737,9 @@ export function movePlayer(
         (type) => type !== TileSubtype.LOCK
       );
       // Move the player onto the unlocked floor tile
-      newMapData.subtypes[currentY][
-        currentX
-      ].filter((type) => type !== TileSubtype.PLAYER);
+      newMapData.subtypes[currentY][currentX].filter(
+        (type) => type !== TileSubtype.PLAYER
+      );
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       // Keep hasKey true (universal key is not consumed)
     }
@@ -844,6 +865,14 @@ export function movePlayer(
       // For other tiles, just set to player
       newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
     }
+  }
+
+  // After resolving movement (or blocked), update enemies based on final player position
+  const finalPlayerPos = findPlayerPosition(newMapData) || [currentY, currentX];
+  if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+    updateEnemies(newMapData.tiles, newGameState.enemies, { y: finalPlayerPos[0], x: finalPlayerPos[1] });
+    // Debug: log updated positions
+    console.log("Enemies updated:", newGameState.enemies.map(e => `[${e.y}, ${e.x}]`).join(", "));
   }
 
   return newGameState;

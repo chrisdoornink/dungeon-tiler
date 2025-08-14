@@ -266,7 +266,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 tileTypes,
                 gameState.mapData.subtypes,
                 gameState.showFullMap,
-                gameState.playerDirection
+                gameState.playerDirection,
+                gameState.enemies
               )}
             </div>
           </div>
@@ -334,7 +335,8 @@ function renderTileGrid(
   tileTypes: Record<number, TileType>,
   subtypes: number[][][] | undefined,
   showFullMap: boolean = false,
-  playerDirection: Direction = Direction.DOWN
+  playerDirection: Direction = Direction.DOWN,
+  enemies?: Array<{ y: number; x: number }>
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -362,6 +364,11 @@ function renderTileGrid(
     return grid[row][col];
   };
 
+  const enemySet = new Set<string>();
+  if (enemies) {
+    for (const e of enemies) enemySet.add(`${e.y},${e.x}`);
+  }
+
   const tiles = grid.flatMap((row, rowIndex) =>
     row.map((tileId, colIndex) => {
       const tileType = tileTypes[tileId];
@@ -381,6 +388,8 @@ function renderTileGrid(
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
       
+      const hasEnemy = enemySet.has(`${rowIndex},${colIndex}`);
+
       return (
         <div key={`${rowIndex}-${colIndex}`} className={`relative ${styles.tileWrapper}`}>
           <Tile
@@ -392,6 +401,63 @@ function renderTileGrid(
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
           />
+          {hasEnemy && (
+            <>
+              {isVisible ? (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                    zIndex: 3,
+                  }}
+                  data-testid="enemy-sprite"
+                />
+              ) : (
+                // Invisible tile: render subtle glowing eyes
+                <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 11000 }}>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: '22px',
+                      height: '10px',
+                      display: 'flex',
+                      gap: '8px',
+                      opacity: 0.28,
+                      animation: 'enemy-eye-flicker 2s infinite ease-in-out',
+                      filter: 'drop-shadow(0 0 6px rgba(255,140,0,0.55))',
+                    }}
+                  >
+                    <span
+                      style={{
+                        display: 'block',
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 50% 50%, #ffd27a 0%, #ff9900 60%, rgba(255,153,0,0.6) 100%)',
+                      }}
+                    />
+                    <span
+                      style={{
+                        display: 'block',
+                        width: '7px',
+                        height: '7px',
+                        borderRadius: '50%',
+                        background: 'radial-gradient(circle at 50% 50%, #ffd27a 0%, #ff9900 60%, rgba(255,153,0,0.6) 100%)',
+                      }}
+                    />
+                  </div>
+                  {/* Keyframes injected inline for portability */}
+                  <style>{`@keyframes enemy-eye-flicker { 0%{opacity:.22} 10%{opacity:.3} 20%{opacity:.2} 30%{opacity:.32} 40%{opacity:.24} 50%{opacity:.34} 60%{opacity:.22} 70%{opacity:.3} 80%{opacity:.2} 90%{opacity:.28} 100%{opacity:.25} }`}</style>
+                </div>
+              )}
+            </>
+          )}
         </div>
       );
     })
