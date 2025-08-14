@@ -7,6 +7,7 @@ import {
   movePlayer,
   TileSubtype,
 } from "../lib/map";
+import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
@@ -56,6 +57,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         playerDirection: Direction.DOWN, // Default to facing down/front
         heroHealth: 5,
         heroAttack: 1,
+        stats: {
+          damageDealt: 0,
+          damageTaken: 0,
+          enemiesDefeated: 0,
+        },
       };
     } else {
       throw new Error("Either initialGameState or tilemap must be provided");
@@ -207,6 +213,39 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   return (
     <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
+      {/* HUD: Hero health and visible enemy healths (top-left) */}
+      <div className="absolute top-2 left-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md text-white min-w-[120px]">
+        <div className="text-xs font-medium mb-1">Status</div>
+        <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
+        {playerPosition && gameState.enemies && gameState.enemies.length > 0 && (
+          (() => {
+            const [py, px] = playerPosition;
+            const los = gameState.enemies
+              .filter((e) => canSee(gameState.mapData.tiles, [py, px], [e.y, e.x]))
+              .map((e) => ({
+                e,
+                d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
+              }))
+              .sort((a, b) => a.d - b.d);
+            if (los.length === 0) return null;
+            return (
+              <div className="mt-2">
+                <div className="text-xs font-medium mb-1">Enemies in sight</div>
+                <ul className="space-y-1">
+                  {los.map(({ e, d }, idx) => (
+                    <li key={`${e.y},${e.x},${idx}`} className="text-sm flex items-center gap-2">
+                      <span>👁️</span>
+                      <span>
+                        ({e.y},{e.x}) · dist {d} · HP {e.health}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })()
+        )}
+      </div>
       {/* Fixed inventory at top right */}
       {(gameState.hasKey ||
         gameState.hasExitKey ||

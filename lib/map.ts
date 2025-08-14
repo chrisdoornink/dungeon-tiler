@@ -632,6 +632,11 @@ export interface GameState {
   enemies?: Enemy[]; // Active enemies on the map
   heroHealth: number; // Player health points for current run
   heroAttack: number; // Player base attack for current run
+  stats: {
+    damageDealt: number;
+    damageTaken: number;
+    enemiesDefeated: number;
+  };
 }
 
 /**
@@ -664,6 +669,11 @@ export function initializeGameState(): GameState {
     enemies,
     heroHealth: 5,
     heroAttack: 1,
+    stats: {
+      damageDealt: 0,
+      damageTaken: 0,
+      enemiesDefeated: 0,
+    },
   };
 }
 
@@ -713,6 +723,23 @@ export function movePlayer(
     mapData: newMapData,
     playerDirection: direction,
   };
+
+  // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
+  const playerPosNow = [currentY, currentX] as [number, number];
+  if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+    const damage = updateEnemies(newMapData.tiles, newGameState.enemies, {
+      y: playerPosNow[0],
+      x: playerPosNow[1],
+    });
+    if (damage > 0) {
+      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
+      newGameState.stats.damageTaken += damage;
+    }
+    console.log(
+      "Enemies updated:",
+      newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
+    );
+  }
 
   // Check if the new position is a wall
   if (newMapData.tiles[newY][newX] === WALL) {
@@ -777,6 +804,77 @@ export function movePlayer(
   // If the new position is a floor tile
   if (newMapData.tiles[newY][newX] === FLOOR) {
     const subtype = newMapData.subtypes[newY][newX];
+
+    // Combat: if an enemy occupies the destination, resolve attack
+    if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+      const idx = newGameState.enemies.findIndex((e) => e.y === newY && e.x === newX);
+      if (idx !== -1) {
+        // Apply hero damage to enemy
+        const enemy = newGameState.enemies[idx];
+        enemy.health -= newGameState.heroAttack;
+        newGameState.stats.damageDealt += newGameState.heroAttack;
+
+        if (enemy.health <= 0) {
+          // Remove enemy and move player into the tile
+          newGameState.enemies.splice(idx, 1);
+          newGameState.stats.enemiesDefeated += 1;
+
+          // Move player to the new position
+          newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+            currentX
+          ].filter((type) => type !== TileSubtype.PLAYER);
+          if (newMapData.subtypes[currentY][currentX].length === 0) {
+            newMapData.subtypes[currentY][currentX] = [];
+          }
+
+          const destSubtypes = newMapData.subtypes[newY][newX];
+          if (
+            destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
+            destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
+            destSubtypes.includes(TileSubtype.CHEST)
+          ) {
+            if (!destSubtypes.includes(TileSubtype.PLAYER)) {
+              destSubtypes.push(TileSubtype.PLAYER);
+            }
+          } else {
+            // For other tiles, just set to player
+            newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
+          }
+
+          // After combat/movement, update enemies and return
+          const finalPlayerPos = findPlayerPosition(newMapData) || [newY, newX];
+          if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+            const damage = updateEnemies(
+              newMapData.tiles,
+              newGameState.enemies,
+              { y: finalPlayerPos[0], x: finalPlayerPos[1] }
+            );
+            if (damage > 0) {
+              newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
+              newGameState.stats.damageTaken += damage;
+            }
+            console.log(
+              "Enemies updated:",
+              newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
+            );
+          }
+          return newGameState;
+        } else {
+          // Enemy survived: player stays put; update enemies and return
+          const finalPlayerPos = [currentY, currentX] as [number, number];
+          const damage = updateEnemies(newMapData.tiles, newGameState.enemies, { y: finalPlayerPos[0], x: finalPlayerPos[1] });
+          if (damage > 0) {
+            newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
+            newGameState.stats.damageTaken += damage;
+          }
+          console.log(
+            "Enemies updated:",
+            newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
+          );
+          return newGameState;
+        }
+      }
+    }
 
     // If it's a key, pick it up
     if (subtype.includes(TileSubtype.KEY)) {
@@ -871,13 +969,7 @@ export function movePlayer(
     }
   }
 
-  // After resolving movement (or blocked), update enemies based on final player position
-  const finalPlayerPos = findPlayerPosition(newMapData) || [currentY, currentX];
-  if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
-    updateEnemies(newMapData.tiles, newGameState.enemies, { y: finalPlayerPos[0], x: finalPlayerPos[1] });
-    // Debug: log updated positions
-    console.log("Enemies updated:", newGameState.enemies.map(e => `[${e.y}, ${e.x}]`).join(", "));
-  }
+  // Enemies have already been updated at the start of this turn
 
   return newGameState;
 }

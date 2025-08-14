@@ -22,7 +22,7 @@ export class Enemy {
     this.x = pos.x;
   }
 
-  update(ctx: EnemyUpdateContext) {
+  update(ctx: EnemyUpdateContext): number {
     const { grid, player } = ctx;
     const sees = canSee(grid, [this.y, this.x], [player.y, player.x]);
     if (sees) {
@@ -43,6 +43,10 @@ export class Enemy {
         const nx = this.x + dx;
         // Do not move onto the player's tile; skip if would collide
         const wouldCollideWithPlayer = ny === player.y && nx === player.x;
+        if (wouldCollideWithPlayer) {
+          // Attack the player instead of moving
+          return this.attack;
+        }
         if (isFloor(grid, ny, nx) && !wouldCollideWithPlayer) {
           this.y = ny;
           this.x = nx;
@@ -53,6 +57,7 @@ export class Enemy {
       // Keep IDLE for now; we'll expand later (e.g., patrol)
       this.state = EnemyState.IDLE;
     }
+    return 0;
   }
 }
 
@@ -114,8 +119,10 @@ export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
   player: { y: number; x: number }
-): void {
+): number {
+  let totalDamage = 0;
   for (const e of enemies) {
-    e.update({ grid, player });
+    totalDamage += e.update({ grid, player });
   }
+  return totalDamage;
 }
