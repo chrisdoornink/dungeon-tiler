@@ -220,24 +220,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         {playerPosition && gameState.enemies && gameState.enemies.length > 0 && (
           (() => {
             const [py, px] = playerPosition;
-            const los = gameState.enemies
+            const visibleNearby = gameState.enemies
               .filter((e) => canSee(gameState.mapData.tiles, [py, px], [e.y, e.x]))
-              .map((e) => ({
-                e,
-                d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
-              }))
+              .map((e) => ({ e, d: calculateDistance([py, px], [e.y, e.x], "manhattan") }))
+              .filter(({ d }) => d <= 8)
               .sort((a, b) => a.d - b.d);
-            if (los.length === 0) return null;
+            if (visibleNearby.length === 0) return null;
             return (
               <div className="mt-2">
                 <div className="text-xs font-medium mb-1">Enemies in sight</div>
                 <ul className="space-y-1">
-                  {los.map(({ e, d }, idx) => (
+                  {visibleNearby.map(({ e }, idx) => (
                     <li key={`${e.y},${e.x},${idx}`} className="text-sm flex items-center gap-2">
-                      <span>👁️</span>
-                      <span>
-                        ({e.y},{e.x}) · dist {d} · HP {e.health}
-                      </span>
+                      <span
+                        className="inline-block"
+                        style={{
+                          width: 18,
+                          height: 18,
+                          backgroundImage: 'url(/images/enemies/fire-goblin/fire-goblin-front.png)',
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                        }}
+                        aria-hidden="true"
+                      />
+                      <span>HP {e.health}</span>
                     </li>
                   ))}
                 </ul>
