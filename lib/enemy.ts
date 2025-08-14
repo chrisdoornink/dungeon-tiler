@@ -39,7 +39,9 @@ export class Enemy {
       for (const [dy, dx] of tryMoves) {
         const ny = this.y + dy;
         const nx = this.x + dx;
-        if (isFloor(grid, ny, nx)) {
+        // Do not move onto the player's tile; skip if would collide
+        const wouldCollideWithPlayer = ny === player.y && nx === player.x;
+        if (isFloor(grid, ny, nx) && !wouldCollideWithPlayer) {
           this.y = ny;
           this.x = nx;
           break;

@@ -22,6 +22,20 @@ describe("Enemy basic behaviors (TDD)", () => {
     expect(enemy.state).toBe(EnemyState.HUNTING);
   });
 
+  test("enemy does not move onto the player's tile (no overlap policy)", () => {
+    const grid = makeMap();
+    // Place enemy adjacent to player with LOS; movement would normally step onto player
+    const player = { y: 5, x: 5 };
+    const enemy = new Enemy({ y: 5, x: 6 }); // to the right of player
+
+    // Direct LOS and one step would collide; ensure it doesn't move onto player
+    expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(true);
+    enemy.update({ grid, player });
+    // Should not enter player's cell
+    expect(enemy.y).toBe(5);
+    expect(enemy.x).toBe(6);
+  });
+
   test("enemy in HUNTING moves one step toward player on clear floor", () => {
     const grid = makeMap();
     const player = { y: 5, x: 2 };
