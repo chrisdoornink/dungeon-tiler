@@ -375,7 +375,7 @@
   height: 33%; /* Bottom third of the tile */
   background-position: center top; /* Show the top portion of the wall image */
   background-size: 100% 300%; /* Make the image 3x taller than the container to show only top third */
-  z-index: 3; /* Above the hero image and other content */
+  z-index: 12000; /* Above fog (10000) and eyes (11000) to occlude enemies properly */
   pointer-events: none; /* Allow clicks to pass through */
 }
 

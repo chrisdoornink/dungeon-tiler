@@ -17,6 +17,8 @@ interface TileProps {
   visibilityTier?: number; // 0-3 for FOV fade tiers
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
+  hasEnemy?: boolean; // Whether this tile contains an enemy
+  enemyVisible?: boolean; // Whether enemy is in player's FOV
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -27,6 +29,8 @@ export const Tile: React.FC<TileProps> = ({
   visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
+  hasEnemy = false,
+  enemyVisible = undefined,
 }) => {
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
@@ -397,6 +401,62 @@ export const Tile: React.FC<TileProps> = ({
                 backgroundColor: 'transparent'
               }}
             />
+          )}
+
+          {/* Enemy rendering: sprite (when visible) and eyes (always) */}
+          {hasEnemy && (
+            <>
+              {((enemyVisible ?? isVisible) === true) && (
+                <div
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                    zIndex: 10, // below wall top overlay (100)
+                  }}
+                  data-testid="enemy-sprite"
+                />
+              )}
+              <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 9 }}>
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '16px',
+                    height: '7px',
+                    display: 'flex',
+                    gap: '6px',
+                    opacity: (enemyVisible ?? isVisible) ? 0.18 : 0.24,
+                    animation: 'enemy-eye-flicker 2s infinite ease-in-out',
+                    filter: 'drop-shadow(0 0 5px rgba(255,140,0,0.5))',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'block',
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 50% 50%, #ffd27a 0%, #ff9900 60%, rgba(255,153,0,0.6) 100%)',
+                    }}
+                  />
+                  <span
+                    style={{
+                      display: 'block',
+                      width: '5px',
+                      height: '5px',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 50% 50%, #ffd27a 0%, #ff9900 60%, rgba(255,153,0,0.6) 100%)',
+                    }}
+                  />
+                </div>
+                <style>{`@keyframes enemy-eye-flicker { 0%{opacity:.22} 10%{opacity:.3} 20%{opacity:.2} 30%{opacity:.32} 40%{opacity:.24} 50%{opacity:.34} 60%{opacity:.22} 70%{opacity:.3} 80%{opacity:.2} 90%{opacity:.28} 100%{opacity:.25} }`}</style>
+              </div>
+            </>
           )}
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
