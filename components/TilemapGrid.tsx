@@ -55,6 +55,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         win: false,
         playerDirection: Direction.DOWN, // Default to facing down/front
         heroHealth: 5,
+        heroAttack: 1,
       };
     } else {
       throw new Error("Either initialGameState or tilemap must be provided");

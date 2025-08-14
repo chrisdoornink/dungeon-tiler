@@ -631,6 +631,7 @@ export interface GameState {
   playerDirection: Direction; // Track the player's facing direction
   enemies?: Enemy[]; // Active enemies on the map
   heroHealth: number; // Player health points for current run
+  heroAttack: number; // Player base attack for current run
 }
 
 /**
@@ -662,6 +663,7 @@ export function initializeGameState(): GameState {
     playerDirection: Direction.DOWN, // Default facing down/front
     enemies,
     heroHealth: 5,
+    heroAttack: 1,
   };
 }
 

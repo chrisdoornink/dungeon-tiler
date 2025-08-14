@@ -15,6 +15,7 @@ export class Enemy {
   x: number;
   state: EnemyState = EnemyState.IDLE;
   health: number = 3; // Goblin base health
+  attack: number = 1; // Goblin base attack
 
   constructor(pos: { y: number; x: number }) {
     this.y = pos.y;
