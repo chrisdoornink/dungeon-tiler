@@ -7,6 +7,7 @@ import {
   movePlayer,
   TileSubtype,
 } from "../lib/map";
+import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import MobileControls from "./MobileControls";
@@ -384,7 +385,7 @@ function renderTileGrid(
   subtypes: number[][][] | undefined,
   showFullMap: boolean = false,
   playerDirection: Direction = Direction.DOWN,
-  enemies?: Array<{ y: number; x: number }>
+  enemies?: Enemy[]
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -412,9 +413,10 @@ function renderTileGrid(
     return grid[row][col];
   };
 
-  const enemySet = new Set<string>();
+  // Map enemies by position for sprite/facing lookup
+  const enemyMap = new Map<string, Enemy>();
   if (enemies) {
-    for (const e of enemies) enemySet.add(`${e.y},${e.x}`);
+    for (const e of enemies) enemyMap.set(`${e.y},${e.x}`, e);
   }
 
   const tiles = grid.flatMap((row, rowIndex) =>
@@ -436,7 +438,8 @@ function renderTileGrid(
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
       
-      const hasEnemy = enemySet.has(`${rowIndex},${colIndex}`);
+      const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
+      const hasEnemy = !!enemyAtTile;
 
       return (
         <div key={`${rowIndex}-${colIndex}`} className={`relative ${styles.tileWrapper}`}>
@@ -450,6 +453,7 @@ function renderTileGrid(
             playerDirection={isPlayerTile ? playerDirection : undefined}
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
+            enemyFacing={enemyAtTile?.facing}
           />
         </div>
       );

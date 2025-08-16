@@ -632,6 +632,8 @@ export interface GameState {
   enemies?: Enemy[]; // Active enemies on the map
   heroHealth: number; // Player health points for current run
   heroAttack: number; // Player base attack for current run
+  // Optional RNG for combat variance injection in tests; falls back to Math.random
+  combatRng?: () => number;
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -727,10 +729,12 @@ export function movePlayer(
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
-    const damage = updateEnemies(newMapData.tiles, newGameState.enemies, {
-      y: playerPosNow[0],
-      x: playerPosNow[1],
-    });
+    const damage = updateEnemies(
+      newMapData.tiles,
+      newGameState.enemies,
+      { y: playerPosNow[0], x: playerPosNow[1] },
+      { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
+    );
     if (damage > 0) {
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
       newGameState.stats.damageTaken += damage;
@@ -809,10 +813,14 @@ export function movePlayer(
     if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
       const idx = newGameState.enemies.findIndex((e) => e.y === newY && e.x === newX);
       if (idx !== -1) {
-        // Apply hero damage to enemy
+        // Apply hero damage to enemy with variance and sword bonus
         const enemy = newGameState.enemies[idx];
-        enemy.health -= newGameState.heroAttack;
-        newGameState.stats.damageDealt += newGameState.heroAttack;
+        const rng = newGameState.combatRng; // undefined => no variance
+        const variance = rng ? ((r => (r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng())) : 0;
+        const swordBonus = newGameState.hasSword ? 2 : 0;
+        const heroDamage = Math.max(0, newGameState.heroAttack + swordBonus + variance);
+        enemy.health -= heroDamage;
+        newGameState.stats.damageDealt += heroDamage;
 
         if (enemy.health <= 0) {
           // Remove enemy and move player into the tile
@@ -847,7 +855,8 @@ export function movePlayer(
             const damage = updateEnemies(
               newMapData.tiles,
               newGameState.enemies,
-              { y: finalPlayerPos[0], x: finalPlayerPos[1] }
+              { y: finalPlayerPos[0], x: finalPlayerPos[1] },
+              { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
             );
             if (damage > 0) {
               newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
@@ -862,7 +871,12 @@ export function movePlayer(
         } else {
           // Enemy survived: player stays put; update enemies and return
           const finalPlayerPos = [currentY, currentX] as [number, number];
-          const damage = updateEnemies(newMapData.tiles, newGameState.enemies, { y: finalPlayerPos[0], x: finalPlayerPos[1] });
+          const damage = updateEnemies(
+            newMapData.tiles,
+            newGameState.enemies,
+            { y: finalPlayerPos[0], x: finalPlayerPos[1] },
+            { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
+          );
           if (damage > 0) {
             newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
             newGameState.stats.damageTaken += damage;

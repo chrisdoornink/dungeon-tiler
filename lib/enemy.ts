@@ -16,6 +16,9 @@ export class Enemy {
   state: EnemyState = EnemyState.IDLE;
   health: number = 3; // Goblin base health
   attack: number = 1; // Goblin base attack
+  // Simple facing state without importing Direction to avoid circular deps
+  // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
+  facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
 
   constructor(pos: { y: number; x: number }) {
     this.y = pos.y;
@@ -45,9 +48,18 @@ export class Enemy {
         const wouldCollideWithPlayer = ny === player.y && nx === player.x;
         if (wouldCollideWithPlayer) {
           // Attack the player instead of moving
+          // Face toward the player even if not moving
+          if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
+            this.facing = dxRaw > 0 ? 'RIGHT' : 'LEFT';
+          } else {
+            this.facing = dyRaw > 0 ? 'DOWN' : 'UP';
+          }
           return this.attack;
         }
         if (isFloor(grid, ny, nx) && !wouldCollideWithPlayer) {
+          // Update facing based on chosen step
+          if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
+          else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
           this.y = ny;
           this.x = nx;
           break;
@@ -118,11 +130,19 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
-  player: { y: number; x: number }
+  player: { y: number; x: number },
+  opts?: { rng?: () => number; defense?: number }
 ): number {
+  const rng = opts?.rng; // undefined means no variance
+  const defense = opts?.defense ?? 0;
   let totalDamage = 0;
   for (const e of enemies) {
-    totalDamage += e.update({ grid, player });
+    const base = e.update({ grid, player });
+    if (base > 0) {
+      const variance = rng ? ((r => (r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng())) : 0;
+      const effective = Math.max(0, base + variance - defense);
+      totalDamage += effective;
+    }
   }
   return totalDamage;
 }

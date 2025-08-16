@@ -19,6 +19,7 @@ interface TileProps {
   playerDirection?: Direction; // Direction the player is facing
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
+  enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -31,6 +32,7 @@ export const Tile: React.FC<TileProps> = ({
   playerDirection = Direction.DOWN, // Default to facing down/front
   hasEnemy = false,
   enemyVisible = undefined,
+  enemyFacing,
 }) => {
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
@@ -410,16 +412,28 @@ export const Tile: React.FC<TileProps> = ({
                 <div
                   className="absolute inset-0 pointer-events-none"
                   style={{
-                    backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                    backgroundImage: `url(${(() => {
+                      switch (enemyFacing) {
+                        case 'UP':
+                          return '/images/enemies/fire-goblin/fire-goblin-back.png';
+                        case 'RIGHT':
+                        case 'LEFT':
+                          return '/images/enemies/fire-goblin/fire-goblin-right.png';
+                        case 'DOWN':
+                        default:
+                          return '/images/enemies/fire-goblin/fire-goblin-front.png';
+                      }
+                    })()})`,
                     backgroundSize: "contain",
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
-                    zIndex: 10, // below wall top overlay (100)
+                    zIndex: 10500, // above fog (10000), below wall tops (12000)
+                    transform: enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none',
                   }}
                   data-testid="enemy-sprite"
                 />
               )}
-              <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 9 }}>
+              <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 11000 }}>
                 <div
                   style={{
                     position: 'absolute',
@@ -432,7 +446,7 @@ export const Tile: React.FC<TileProps> = ({
                     gap: '6px',
                     opacity: (enemyVisible ?? isVisible) ? 0.18 : 0.24,
                     animation: 'enemy-eye-flicker 2s infinite ease-in-out',
-                    filter: 'drop-shadow(0 0 5px rgba(255,140,0,0.5))',
+                    filter: 'drop-shadow(0 0 5px rgba(255,140,0,0.6))',
                   }}
                 >
                   <span

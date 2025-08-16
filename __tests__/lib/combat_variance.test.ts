@@ -1,0 +1,81 @@
+import { Direction, TileSubtype, type GameState, movePlayer } from "../../lib/map";
+import { Enemy } from "../../lib/enemy";
+
+function makeState(y: number, x: number, opts?: Partial<GameState>): GameState {
+  const size = 25;
+  const tiles = Array.from({ length: size }, () => Array(size).fill(0)); // FLOOR
+  const subtypes = Array.from({ length: size }, () => Array.from({ length: size }, () => [] as number[]));
+  subtypes[y][x].push(TileSubtype.PLAYER);
+  const base: GameState = {
+    hasKey: false,
+    hasExitKey: false,
+    hasSword: false,
+    hasShield: false,
+    mapData: { tiles, subtypes },
+    showFullMap: false,
+    win: false,
+    playerDirection: Direction.DOWN,
+    enemies: [] as Enemy[],
+    heroHealth: 5,
+    heroAttack: 1,
+    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    combatRng: () => 0.5, // default neutral: 0 variance
+  } as unknown as GameState;
+  return { ...base, ...(opts || {}) } as GameState;
+}
+
+describe("Combat variance and equipment", () => {
+  test("enemy attack uses ±1 variance around strength (no shield)", () => {
+    const gs = makeState(2, 2, {
+      combatRng: () => 0.99, // force +1 variance
+    });
+    const e = new Enemy({ y: 2, x: 1 }); // left of player, will attempt to move into player when we tick
+    e.attack = 1;
+    gs.enemies!.push(e);
+
+    const before = gs.heroHealth;
+    const after = movePlayer(gs, Direction.UP);
+    // damage = 1 base + 1 variance = 2
+    expect(after.heroHealth).toBe(before - 2);
+    expect(after.stats.damageTaken).toBe(2);
+  });
+
+  test("shield gives +2 damage reduction (protection)", () => {
+    const gs = makeState(2, 2, {
+      hasShield: true,
+      combatRng: () => 0.99, // +1 variance
+    });
+    const e = new Enemy({ y: 2, x: 1 });
+    e.attack = 1;
+    gs.enemies!.push(e);
+
+    const before = gs.heroHealth;
+    const after = movePlayer(gs, Direction.UP);
+    // incoming = 1 + 1 = 2; defense = 2; net = 0
+    expect(after.heroHealth).toBe(before);
+    expect(after.stats.damageTaken).toBe(0);
+  });
+
+  test("sword adds +2 to hero attack; variance applies; enemy can be one-shot", () => {
+    const gs = makeState(2, 2, {
+      hasSword: true,
+      combatRng: () => 0.99, // +1 variance
+    });
+    const e = new Enemy({ y: 2, x: 3 });
+    e.health = 3;
+    gs.enemies!.push(e);
+
+    const after = movePlayer(gs, Direction.RIGHT);
+
+    // Hero effective damage = base 1 + sword 2 + variance 1 = 4
+    expect(after.enemies!.length).toBe(0);
+    expect(after.stats.enemiesDefeated).toBe(1);
+    expect(after.stats.damageDealt).toBeGreaterThanOrEqual(3); // at least enemy health
+
+    // Player moved into enemy tile
+    const pos = after.mapData.subtypes.flatMap((row, yy) =>
+      row.flatMap((cell, xx) => (cell.includes(TileSubtype.PLAYER) ? [[yy, xx] as [number, number]] : []))
+    )[0];
+    expect(pos).toEqual([2, 3]);
+  });
+});
