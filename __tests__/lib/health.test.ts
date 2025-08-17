@@ -8,6 +8,25 @@ describe("Health system - initial hero health", () => {
     expect(gs.heroHealth).toBe(5);
   });
 
+describe("Combat - running away behavior", () => {
+  test("when adjacent and the player increases distance in same tick, hero takes no damage", () => {
+    const gs = makeEmptyStateWithPlayer(2, 2);
+    // Enemy to the right (adjacent)
+    const e = new Enemy({ y: 2, x: 3 });
+    e.health = 3;
+    e.attack = 1;
+    gs.enemies!.push(e);
+
+    const before = { health: gs.heroHealth, taken: gs.stats.damageTaken };
+
+    // Run away: move LEFT to increase distance from 1 to 2
+    const after = movePlayer(gs, Direction.LEFT);
+
+    expect(after.heroHealth).toBe(before.health);
+    expect(after.stats.damageTaken).toBe(before.taken);
+  });
+});
+
 describe("Combat - enemy attacks when attempting to step onto player", () => {
   test("adjacent enemy attempts to move into player; heroHealth decreases; damageTaken increments; enemy stays put", () => {
     const gs = makeEmptyStateWithPlayer(2, 2);

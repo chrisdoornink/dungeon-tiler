@@ -733,7 +733,26 @@ export function movePlayer(
       newMapData.tiles,
       newGameState.enemies,
       { y: playerPosNow[0], x: playerPosNow[1] },
-      { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
+      {
+        rng: newGameState.combatRng,
+        defense: newGameState.hasShield ? 2 : 0,
+        // Suppress only when the player moves directly away from an adjacent enemy along the same axis
+        suppress: (e) => {
+          const dy = newY - currentY;
+          const dx = newX - currentX;
+          const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
+          if (!adj) return false;
+          // Enemy is to the right, player moved left
+          if (e.y === currentY && e.x === currentX + 1 && dx === -1) return true;
+          // Enemy is to the left, player moved right
+          if (e.y === currentY && e.x === currentX - 1 && dx === 1) return true;
+          // Enemy is below, player moved up
+          if (e.x === currentX && e.y === currentY + 1 && dy === -1) return true;
+          // Enemy is above, player moved down
+          if (e.x === currentX && e.y === currentY - 1 && dy === 1) return true;
+          return false;
+        },
+      }
     );
     if (damage > 0) {
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);

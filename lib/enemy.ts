@@ -131,14 +131,16 @@ export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
   player: { y: number; x: number },
-  opts?: { rng?: () => number; defense?: number }
+  opts?: { rng?: () => number; defense?: number; suppress?: (e: Enemy) => boolean }
 ): number {
   const rng = opts?.rng; // undefined means no variance
   const defense = opts?.defense ?? 0;
+  const suppress = opts?.suppress;
   let totalDamage = 0;
   for (const e of enemies) {
     const base = e.update({ grid, player });
-    if (base > 0) {
+    // Optionally suppress this enemy's attack for this tick
+    if (base > 0 && !suppress?.(e)) {
       const variance = rng ? ((r => (r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng())) : 0;
       const effective = Math.max(0, base + variance - defense);
       totalDamage += effective;
