@@ -171,6 +171,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     router,
   ]);
 
+  // Redirect to end page and persist snapshot on death (heroHealth <= 0)
+  useEffect(() => {
+    if (gameState.heroHealth <= 0) {
+      try {
+        const payload = {
+          completedAt: new Date().toISOString(),
+          hasKey: gameState.hasKey,
+          hasExitKey: gameState.hasExitKey,
+          mapData: gameState.mapData,
+          outcome: "dead",
+        } as const;
+        if (typeof window !== "undefined") {
+          window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+        }
+      } catch {
+        // ignore storage errors
+      }
+      router.push("/end");
+    }
+  }, [gameState.heroHealth, gameState.hasKey, gameState.hasExitKey, gameState.mapData, router]);
+
   // Handle player movement
   const handlePlayerMove = useCallback(
     (direction: Direction) => {
