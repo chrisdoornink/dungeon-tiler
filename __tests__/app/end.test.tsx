@@ -67,7 +67,7 @@ describe('End Page', () => {
         subtypes: Array(3).fill(0).map(() => Array(3).fill(0).map(() => [] as number[])),
       },
       outcome: 'win' as const,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
     window.sessionStorage.setItem('lastGame', JSON.stringify(payload));
 

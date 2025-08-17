@@ -146,7 +146,7 @@ describe("Player Movement Behaviors", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Test movement in all directions
@@ -206,7 +206,7 @@ describe("Player Movement Behaviors", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Try to move in each direction

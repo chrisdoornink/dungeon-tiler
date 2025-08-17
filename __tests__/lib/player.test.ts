@@ -66,7 +66,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Move onto normal floor
@@ -104,7 +104,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     const after = movePlayer(gameState, Direction.RIGHT);
@@ -143,7 +143,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Move right to open chest and collect sword
@@ -191,7 +191,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Attempt to open locked chest without a key
@@ -227,7 +227,7 @@ describe("Player and Dynamic Subtypes", () => {
       TileSubtype.SHIELD,
     ];
 
-    let gameState: GameState = {
+    const gameState: GameState = {
       hasKey: true,
       hasExitKey: false,
       mapData,
@@ -236,7 +236,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Move right to unlock and open chest
@@ -280,7 +280,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Attempt to move into exit without exit key
@@ -362,7 +362,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Step 1: move right to pick up exit key
@@ -491,7 +491,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Step 1: Move right to pick up the key
@@ -554,7 +554,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Step 1: Move right through the door
@@ -606,7 +606,7 @@ describe("Player and Dynamic Subtypes", () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Move right onto the lightswitch

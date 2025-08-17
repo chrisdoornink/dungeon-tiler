@@ -18,7 +18,7 @@ function makeState(y: number, x: number, opts?: Partial<GameState>): GameState {
     enemies: [] as Enemy[],
     heroHealth: 5,
     heroAttack: 1,
-    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     combatRng: () => 0.5, // default neutral: 0 variance
   } as unknown as GameState;
   return { ...base, ...(opts || {}) } as GameState;

@@ -64,7 +64,7 @@ function makeEmptyStateWithPlayer(y: number, x: number): GameState {
     enemies: [] as Enemy[],
     heroHealth: 5,
     heroAttack: 1,
-    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
   } as GameState;
 }
 

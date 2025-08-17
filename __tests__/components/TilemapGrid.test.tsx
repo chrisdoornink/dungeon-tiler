@@ -69,7 +69,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Act
@@ -111,7 +111,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 0, // triggers death effect immediately
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Act
@@ -154,7 +154,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     render(
@@ -199,7 +199,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Clear prior mocks/payloads
@@ -240,7 +240,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     render(
@@ -320,7 +320,7 @@ describe('TilemapGrid component', () => {
       playerDirection: Direction.DOWN,
       heroHealth: 5,
       heroAttack: 1,
-      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
     // Act: render with showFullMap = true

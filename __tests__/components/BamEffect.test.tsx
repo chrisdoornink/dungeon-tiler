@@ -23,7 +23,7 @@ function makeState(y: number, x: number, enemyY: number, enemyX: number): GameSt
     enemies,
     heroHealth: 5,
     heroAttack: 1,
-    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
   };
 }
 
