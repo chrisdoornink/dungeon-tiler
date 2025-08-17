@@ -77,7 +77,7 @@ describe("Player and Dynamic Subtypes", () => {
     expect(gs.win).toBe(false);
   });
 
-  it("opening a chest leaves an OPEN_CHEST subtype on the tile", () => {
+  it("opening a chest (bump) leaves OPEN_CHEST and item visible without granting it", () => {
     const mapData: MapData = {
       tiles: Array(25)
         .fill(0)
@@ -108,15 +108,16 @@ describe("Player and Dynamic Subtypes", () => {
     };
 
     const after = movePlayer(gameState, Direction.RIGHT);
-    expect(after.hasSword).toBe(true);
-    expect(after.mapData.subtypes[8][9].includes(TileSubtype.CHEST)).toBe(
-      false
-    );
+    // Bump-open: no movement, no item grant yet
+    expect(findPlayerPosition(after.mapData)).toEqual([8, 8]);
+    expect(after.hasSword).not.toBe(true);
+    expect(after.mapData.subtypes[8][9].includes(TileSubtype.CHEST)).toBe(false);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(after.mapData.subtypes[8][9].includes((TileSubtype as any).OPEN_CHEST)).toBe(true);
+    expect(after.mapData.subtypes[8][9].includes(TileSubtype.SWORD)).toBe(true);
   });
 
-  it("opens an unlocked chest and grants its content (sword)", () => {
+  it("unlocked chest: bump opens without moving; next step picks up sword", () => {
     const mapData: MapData = {
       tiles: Array(25)
         .fill(0)
@@ -146,21 +147,24 @@ describe("Player and Dynamic Subtypes", () => {
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
-    // Move right to open chest and collect sword
+    // Step 1: bump to open (no movement, no pickup)
     gameState = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 10]);
+    expect(gameState.hasSword).not.toBe(true);
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(gameState.mapData.subtypes[10][11].includes((TileSubtype as any).OPEN_CHEST)).toBe(true);
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.SWORD)).toBe(true);
 
+    // Step 2: move onto tile and pick up item
+    gameState = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
     expect(gameState.hasSword).toBe(true);
     expect(gameState.hasShield).not.toBe(true);
-    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
-      false
-    );
-    expect(
-      gameState.mapData.subtypes[10][11].includes(TileSubtype.SWORD)
-    ).toBe(false);
-    expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
+    expect(gameState.mapData.subtypes[10][11].includes(TileSubtype.SWORD)).toBe(false);
   });
 
-  it("does not open a locked chest without a key", () => {
+  it("does not open a locked chest without a key (no bump-open)", () => {
     const mapData: MapData = {
       tiles: Array(25)
         .fill(0)
@@ -203,9 +207,13 @@ describe("Player and Dynamic Subtypes", () => {
       true
     );
     expect(after.hasShield).not.toBe(true);
+    // Ensure chest remains closed and locked
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(after.mapData.subtypes[10][11].includes((TileSubtype as any).OPEN_CHEST)).toBe(false);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.LOCK)).toBe(true);
   });
 
-  it("opens a locked chest with a key, consumes key, and grants shield", () => {
+  it("locked chest with key: bump unlocks and opens; next step picks up shield (universal key retained)", () => {
     const mapData: MapData = {
       tiles: Array(25)
         .fill(0)
@@ -239,17 +247,23 @@ describe("Player and Dynamic Subtypes", () => {
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
 
-    // Move right to unlock and open chest
-    const after = movePlayer(gameState, Direction.RIGHT);
+    // Step 1: bump to unlock and open in place; do not move or grant yet
+    let after = movePlayer(gameState, Direction.RIGHT);
+    expect(findPlayerPosition(after.mapData)).toEqual([10, 10]);
+    expect(after.hasKey).toBe(true); // universal key retained
+    expect(after.hasShield).not.toBe(true);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(after.mapData.subtypes[10][11].includes((TileSubtype as any).OPEN_CHEST)).toBe(true);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.LOCK)).toBe(false);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.SHIELD)).toBe(true);
+
+    // Step 2: move onto tile and pick up shield
+    after = movePlayer(after, Direction.RIGHT);
     expect(findPlayerPosition(after.mapData)).toEqual([10, 11]);
-    expect(after.hasKey).toBe(true);
+    expect(after.hasKey).toBe(true); // still universal
     expect(after.hasShield).toBe(true);
-    expect(after.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(
-      false
-    );
-    expect(
-      after.mapData.subtypes[10][11].includes(TileSubtype.SHIELD)
-    ).toBe(false);
+    expect(after.mapData.subtypes[10][11].includes(TileSubtype.SHIELD)).toBe(false);
   });
 
   it("should NOT open exit without exit key", () => {

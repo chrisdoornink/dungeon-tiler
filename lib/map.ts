@@ -944,6 +944,23 @@ export function movePlayer(
       // Movement/clearing of the item happens below in the generic move logic
     }
 
+    // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry
+    // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened)
+    if (
+      (subtype.includes(TileSubtype.SWORD) || subtype.includes(TileSubtype.SHIELD)) &&
+      !subtype.includes(TileSubtype.CHEST)
+    ) {
+      if (subtype.includes(TileSubtype.SWORD)) {
+        newGameState.hasSword = true;
+        console.log("Player obtained a SWORD!");
+      }
+      if (subtype.includes(TileSubtype.SHIELD)) {
+        newGameState.hasShield = true;
+        console.log("Player obtained a SHIELD!");
+      }
+      // Clearing of item happens below when we set dest tile subtypes
+    }
+
     // If it's a ROCK, pick it up (increment inventory) and clear the tile
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
@@ -1051,34 +1068,24 @@ export function movePlayer(
         return newGameState;
       }
 
-      // If locked and we have a key, consume it and remove the lock
+      // Remove LOCK if present (universal key is not consumed)
       if (isLocked && newGameState.hasKey) {
-        // Universal key: do not consume
         newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
           newX
         ].filter((t) => t !== TileSubtype.LOCK);
       }
 
-      // Grant item contained in chest (unlocked or no lock)
-      if (subtype.includes(TileSubtype.SWORD)) {
-        newGameState.hasSword = true;
-        console.log("Player obtained a SWORD!");
-      }
-      if (subtype.includes(TileSubtype.SHIELD)) {
-        newGameState.hasShield = true;
-        console.log("Player obtained a SHIELD!");
-      }
-
-      // Remove chest and its content from the tile, then leave an OPEN_CHEST marker
+      // Open the chest in place, but DO NOT grant item yet and DO NOT move the player
+      // Keep the item (SWORD/SHIELD) visible on top of the opened chest
+      // Remove only the CHEST marker, leave item subtype as-is
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-        (t) =>
-          t !== TileSubtype.CHEST &&
-          t !== TileSubtype.SWORD &&
-          t !== TileSubtype.SHIELD
+        (t) => t !== TileSubtype.CHEST
       );
       if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
         newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
       }
+      // Return without moving
+      return newGameState;
     }
 
     // Move player to the new position
@@ -1104,6 +1111,10 @@ export function movePlayer(
       // For other tiles, just set to player
       newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
     }
+    // If we picked up FOOD/MED/SWORD/SHIELD, remove those subtypes from dest
+    newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+      (t) => t !== TileSubtype.FOOD && t !== TileSubtype.MED && t !== TileSubtype.SWORD && t !== TileSubtype.SHIELD
+    );
     moved = true;
   }
 

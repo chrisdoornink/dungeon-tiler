@@ -54,6 +54,58 @@ describe('Chests and Keys invariants', () => {
     expect(hasShield).toBe(true);
   });
 
+  test('bump-opening a locked chest with a key reveals item without moving; second step picks it up', () => {
+    // Build a minimal custom map
+    const size = 25;
+    const subtypes = Array.from({ length: size }, () => Array.from({ length: size }, () => [] as number[]));
+    const tiles = Array.from({ length: size }, () => Array(size).fill(0));
+
+    // Place player at (10,10)
+    subtypes[10][10] = [TileSubtype.PLAYER];
+    // Place locked chest with SWORD at (10,11)
+    subtypes[10][11] = [TileSubtype.CHEST, TileSubtype.LOCK, TileSubtype.SWORD];
+
+    // Assemble GameState
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gs: any = {
+      hasKey: true,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      showFullMap: false,
+      win: false,
+      playerDirection: 2,
+      heroHealth: 5,
+      heroAttack: 1,
+      enemies: [],
+      mapData: { tiles, subtypes },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    // Attempt to move RIGHT into the locked chest with a key
+    const afterOpen = movePlayer(gs, Direction.RIGHT);
+
+    // Player should NOT have moved
+    const p1 = findAll(afterOpen.mapData, (s) => s.includes(TileSubtype.PLAYER));
+    expect(p1).toEqual([[10, 10]]);
+
+    // Chest should be open and item visible on the same tile
+    expect(afterOpen.mapData.subtypes[10][11].includes(TileSubtype.OPEN_CHEST)).toBe(true);
+    expect(afterOpen.mapData.subtypes[10][11].includes(TileSubtype.SWORD)).toBe(true);
+    // Universal key is not consumed
+    expect(afterOpen.hasKey).toBe(true);
+
+    // Now step RIGHT again to pick up the item
+    const afterPickup = movePlayer(afterOpen, Direction.RIGHT);
+    const p2 = findAll(afterPickup.mapData, (s) => s.includes(TileSubtype.PLAYER));
+    expect(p2).toEqual([[10, 11]]);
+    // Sword picked up
+    expect(afterPickup.hasSword).toBe(true);
+    // Item removed, chest remains open
+    expect(afterPickup.mapData.subtypes[10][11].includes(TileSubtype.SWORD)).toBe(false);
+    expect(afterPickup.mapData.subtypes[10][11].includes(TileSubtype.OPEN_CHEST)).toBe(true);
+  });
+
   test('one generic key is placed per level (universal)', () => {
     const gs = initializeGameState();
     const keys = findAll(gs.mapData, (s) => s.length === 1 && s[0] === TileSubtype.KEY);

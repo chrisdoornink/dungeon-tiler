@@ -226,6 +226,12 @@ export const Tile: React.FC<TileProps> = ({
   const hasMed = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.MED) || false;
   };
+  const hasSwordItem = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SWORD) || false;
+  };
+  const hasShieldItem = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SHIELD) || false;
+  };
 
   // Deterministic variant picker based on coordinates
   const pickVariant = (choices: string[]): string => {
@@ -287,6 +293,34 @@ export const Tile: React.FC<TileProps> = ({
             key="open-chest"
             data-testid={`subtype-icon-${TileSubtype.OPEN_CHEST}`}
             className={`${styles.assetIcon} ${styles.openedChestIcon}`}
+          />
+        )}
+
+        {/* If chest is open, render revealed SWORD/SHIELD overlays */}
+        {hasOpenChest(subtypes) && hasSwordItem(subtypes) && (
+          <div
+            key="sword-revealed"
+            data-testid={`subtype-icon-${TileSubtype.SWORD}`}
+            className={`${styles.assetIcon}`}
+            style={{
+              backgroundImage: `url(${pickVariant([
+                '/images/items/food-1.png',
+                '/images/items/food-2.png',
+                '/images/items/food-3.png',
+              ])})`,
+              zIndex: 3,
+            }}
+          />
+        )}
+        {hasOpenChest(subtypes) && hasShieldItem(subtypes) && (
+          <div
+            key="shield-revealed"
+            data-testid={`subtype-icon-${TileSubtype.SHIELD}`}
+            className={`${styles.assetIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/meds-1.png')`,
+              zIndex: 3,
+            }}
           />
         )}
 
