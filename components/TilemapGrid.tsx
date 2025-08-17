@@ -149,6 +149,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   useEffect(() => {
     if (gameState.win) {
       try {
+        // Compute streak: increment from previous lastGame.streak if available
+        let nextStreak = 1;
+        try {
+          if (typeof window !== "undefined") {
+            const prevRaw = window.sessionStorage.getItem("lastGame");
+            if (prevRaw) {
+              const prev = JSON.parse(prevRaw);
+              const prevStreak = typeof prev?.streak === 'number' ? prev.streak : 0;
+              nextStreak = prevStreak + 1;
+            }
+          }
+        } catch {}
         const payload = {
           completedAt: new Date().toISOString(),
           hasKey: gameState.hasKey,
@@ -159,6 +171,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           mapData: gameState.mapData,
           stats: gameState.stats,
           outcome: "win" as const,
+          streak: nextStreak,
         };
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
@@ -194,6 +207,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           mapData: gameState.mapData,
           stats: gameState.stats,
           outcome: "dead",
+          streak: 0,
         } as const;
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("lastGame", JSON.stringify(payload));

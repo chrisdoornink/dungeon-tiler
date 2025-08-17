@@ -9,6 +9,7 @@ type LastGame = {
   hasSword?: boolean;
   hasShield?: boolean;
   showFullMap?: boolean;
+  streak?: number;
   mapData: {
     tiles: number[][];
     subtypes: number[][][];
@@ -105,6 +106,12 @@ export default function EndPage() {
         </div>
 
         <div className="text-left text-sm space-y-2">
+          {typeof last.streak === 'number' && (
+            <div className="flex items-baseline justify-between">
+              <div className="font-medium">Streak</div>
+              <div>{last.streak}</div>
+            </div>
+          )}
           {last.stats && (
             <>
               <div className="flex items-baseline justify-between">
@@ -141,7 +148,18 @@ export default function EndPage() {
           )}
         </div>
 
-        <div className="my-4">
+        <div className="my-4 flex items-center justify-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                window.location.assign('/');
+              }
+            }}
+            className="px-4 py-2 rounded-md bg-[#0D47A1] text-white hover:bg-[#0b3a82] transition-colors border-0"
+          >
+            play again
+          </button>
           <button
             type="button"
             onClick={onShare}

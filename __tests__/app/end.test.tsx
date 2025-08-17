@@ -28,6 +28,7 @@ describe('End Page', () => {
       hasExitKey: false,
       hasSword: false,
       hasShield: false,
+      streak: 3,
       mapData: {
         tiles: Array(5).fill(0).map(() => Array(7).fill(0)),
         subtypes: Array(5).fill(0).map(() => Array(7).fill(0).map(() => [] as number[])),
@@ -44,5 +45,10 @@ describe('End Page', () => {
     expect(screen.queryByText('🗝️')).not.toBeInTheDocument();
     // No map size rows anymore
     expect(screen.queryByText('Map Size')).not.toBeInTheDocument();
+    // Streak shown
+    expect(screen.getByText('Streak')).toBeInTheDocument();
+    expect(screen.getByText('3')).toBeInTheDocument();
+    // Play again button present
+    expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
   });
 });
