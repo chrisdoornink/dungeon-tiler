@@ -62,6 +62,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageDealt: 0,
           damageTaken: 0,
           enemiesDefeated: 0,
+          steps: 0,
         },
       };
     } else {

@@ -638,6 +638,7 @@ export interface GameState {
     damageDealt: number;
     damageTaken: number;
     enemiesDefeated: number;
+    steps: number;
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
@@ -677,6 +678,7 @@ export function initializeGameState(): GameState {
       damageDealt: 0,
       damageTaken: 0,
       enemiesDefeated: 0,
+      steps: 0,
     },
     recentDeaths: [],
   };
@@ -730,6 +732,8 @@ export function movePlayer(
   };
   // Reset transient deaths for this tick
   newGameState.recentDeaths = [];
+  // Track if player actually changed tiles this turn
+  let moved = false;
 
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
@@ -787,6 +791,7 @@ export function movePlayer(
         currentX
       ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+      moved = true;
     }
     // If it's a lock and player has key, unlock it
     else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
@@ -801,6 +806,7 @@ export function movePlayer(
       );
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       // Keep hasKey true (universal key is not consumed)
+      moved = true;
     }
     // If it's an exit, require EXITKEY to open
     else if (subtype.includes(TileSubtype.EXIT)) {
@@ -818,6 +824,7 @@ export function movePlayer(
         newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
         newGameState.hasExitKey = false;
         newGameState.win = true;
+        moved = true;
 
         // Here you would typically trigger a win condition
         console.log("Player opened the exit!");
@@ -986,9 +993,14 @@ export function movePlayer(
       // For other tiles, just set to player
       newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
     }
+    moved = true;
   }
 
   // Enemies have already been updated at the start of this turn
+  // Increment steps if a move occurred
+  if (moved) {
+    newGameState.stats.steps += 1;
+  }
 
   return newGameState;
 }

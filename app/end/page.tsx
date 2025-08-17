@@ -20,6 +20,7 @@ type LastGame = {
     damageDealt: number;
     damageTaken: number;
     enemiesDefeated: number;
+    steps?: number;
   };
 };
 
@@ -62,7 +63,9 @@ export default function EndPage() {
   shareLines.push(`#Dungeon ${dateStr}`);
   shareLines.push(last.outcome === 'dead' ? '☠️ You died' : '🚪 Escaped!');
   if (last.stats) {
-    shareLines.push(`🗡️ dmg: ${last.stats.damageDealt}  🛡️ taken: ${last.stats.damageTaken}  👹 x${last.stats.enemiesDefeated}`);
+    const base = `🗡️ dmg: ${last.stats.damageDealt}  🛡️ taken: ${last.stats.damageTaken}  👹 x${last.stats.enemiesDefeated}`;
+    const steps = typeof last.stats.steps === 'number' ? `  👣 ${last.stats.steps} steps` : '';
+    shareLines.push(base + steps);
   }
   // intentionally omit map size from share text
   const shareText = shareLines.join('\n');
@@ -123,6 +126,12 @@ export default function EndPage() {
                 <div className="font-medium">Damage Taken</div>
                 <div>{last.stats.damageTaken}</div>
               </div>
+              {typeof last.stats.steps === 'number' && (
+                <div className="flex items-baseline justify-between">
+                  <div className="font-medium">Steps</div>
+                  <div>{last.stats.steps}</div>
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <div className="font-medium">Enemies Defeated</div>
                 <div className="flex items-center gap-1">
