@@ -70,14 +70,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   });
 
   // Find player position in the grid
-  const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(null);
+  const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(
+    null
+  );
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
   const [prevGameState, setPrevGameState] = useState<GameState | null>(null);
   // Transient BAM effect state
-  const [bamEffect, setBamEffect] = useState<null | { y: number; x: number; src: string }>(null);
-  
+  const [bamEffect, setBamEffect] = useState<null | {
+    y: number;
+    x: number;
+    src: string;
+  }>(null);
+
   useEffect(() => {
     // Find player position whenever gameState changes
     if (gameState.mapData.subtypes) {
@@ -85,13 +91,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (prevGameState && !isMoving) {
         // Set moving flag to true
         setIsMoving(true);
-        
+
         // Delay updating the player position to match the grid transition
         setTimeout(() => {
           // Find new player position
           for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
             for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
-              if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
+              if (
+                gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)
+              ) {
                 setPlayerPosition([y, x]);
                 // Reset moving flag
                 setIsMoving(false);
@@ -114,7 +122,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
         setPlayerPosition(null);
       }
-      
+
       // Update previous game state
       setPrevGameState(gameState);
     }
@@ -160,56 +168,70 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   ]);
 
   // Handle player movement
-  const handlePlayerMove = useCallback((direction: Direction) => {
-    // Detect potential combat: moving into an adjacent enemy tile
-    if (playerPosition && gameState.enemies && gameState.enemies.length > 0) {
-      const [py, px] = playerPosition;
-      let ty = py;
-      let tx = px;
-      switch (direction) {
-        case Direction.UP: ty = py - 1; break;
-        case Direction.RIGHT: tx = px + 1; break;
-        case Direction.DOWN: ty = py + 1; break;
-        case Direction.LEFT: tx = px - 1; break;
+  const handlePlayerMove = useCallback(
+    (direction: Direction) => {
+      // Detect potential combat: moving into an adjacent enemy tile
+      if (playerPosition && gameState.enemies && gameState.enemies.length > 0) {
+        const [py, px] = playerPosition;
+        let ty = py;
+        let tx = px;
+        switch (direction) {
+          case Direction.UP:
+            ty = py - 1;
+            break;
+          case Direction.RIGHT:
+            tx = px + 1;
+            break;
+          case Direction.DOWN:
+            ty = py + 1;
+            break;
+          case Direction.LEFT:
+            tx = px - 1;
+            break;
+        }
+        const enemy = gameState.enemies.find((e) => e.y === ty && e.x === tx);
+        if (enemy) {
+          // Show BAM at midpoint between player and enemy
+          const yMid = (py + enemy.y) / 2;
+          const xMid = (px + enemy.x) / 2;
+          const choices = [
+            "/images/items/bam1.png",
+            "/images/items/bam2.png",
+            "/images/items/bam3.png",
+          ];
+          const src = choices[Math.floor(Math.random() * choices.length)];
+          setBamEffect({ y: yMid, x: xMid, src });
+          // Clear after ~600ms
+          setTimeout(() => setBamEffect(null), 200);
+        }
       }
-      const enemy = gameState.enemies.find(e => e.y === ty && e.x === tx);
-      if (enemy) {
-        // Show BAM at midpoint between player and enemy
-        const yMid = (py + enemy.y) / 2;
-        const xMid = (px + enemy.x) / 2;
-        const choices = [
-          '/images/items/bam1.png',
-          '/images/items/bam2.png',
-          '/images/items/bam3.png',
-        ];
-        const src = choices[Math.floor(Math.random() * choices.length)];
-        setBamEffect({ y: yMid, x: xMid, src });
-        // Clear after ~600ms
-        setTimeout(() => setBamEffect(null), 600);
-      }
-    }
 
-    const newGameState = movePlayer(gameState, direction);
-    setGameState(newGameState);
-  }, [gameState, playerPosition]);
+      const newGameState = movePlayer(gameState, direction);
+      setGameState(newGameState);
+    },
+    [gameState, playerPosition]
+  );
 
   // Handle mobile control button clicks
-  const handleMobileMove = useCallback((directionStr: string) => {
-    switch (directionStr) {
-      case 'UP':
-        handlePlayerMove(Direction.UP);
-        break;
-      case 'RIGHT':
-        handlePlayerMove(Direction.RIGHT);
-        break;
-      case 'DOWN':
-        handlePlayerMove(Direction.DOWN);
-        break;
-      case 'LEFT':
-        handlePlayerMove(Direction.LEFT);
-        break;
-    }
-  }, [handlePlayerMove]);
+  const handleMobileMove = useCallback(
+    (directionStr: string) => {
+      switch (directionStr) {
+        case "UP":
+          handlePlayerMove(Direction.UP);
+          break;
+        case "RIGHT":
+          handlePlayerMove(Direction.RIGHT);
+          break;
+        case "DOWN":
+          handlePlayerMove(Direction.DOWN);
+          break;
+        case "LEFT":
+          handlePlayerMove(Direction.LEFT);
+          break;
+      }
+    },
+    [handlePlayerMove]
+  );
 
   // Add keyboard event listener
   useEffect(() => {
@@ -243,17 +265,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [gameState, handlePlayerMove]);
 
   return (
-    <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
+    <div
+      className="relative flex justify-center"
+      data-testid="tilemap-grid-wrapper"
+    >
       {/* HUD: Hero health and visible enemy healths (top-left) */}
       <div className="absolute top-2 left-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md text-white min-w-[120px]">
         <div className="text-xs font-medium mb-1">Status</div>
         <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
-        {playerPosition && gameState.enemies && gameState.enemies.length > 0 && (
+        {playerPosition &&
+          gameState.enemies &&
+          gameState.enemies.length > 0 &&
           (() => {
             const [py, px] = playerPosition;
             const visibleNearby = gameState.enemies
-              .filter((e) => canSee(gameState.mapData.tiles, [py, px], [e.y, e.x]))
-              .map((e) => ({ e, d: calculateDistance([py, px], [e.y, e.x], "manhattan") }))
+              .filter((e) =>
+                canSee(gameState.mapData.tiles, [py, px], [e.y, e.x])
+              )
+              .map((e) => ({
+                e,
+                d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
+              }))
               .filter(({ d }) => d <= 8)
               .sort((a, b) => a.d - b.d);
             if (visibleNearby.length === 0) return null;
@@ -262,16 +294,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 <div className="text-xs font-medium mb-1">Enemies in sight</div>
                 <ul className="space-y-1">
                   {visibleNearby.map(({ e }, idx) => (
-                    <li key={`${e.y},${e.x},${idx}`} className="text-sm flex items-center gap-2">
+                    <li
+                      key={`${e.y},${e.x},${idx}`}
+                      className="text-sm flex items-center gap-2"
+                    >
                       <span
                         className="inline-block"
                         style={{
                           width: 18,
                           height: 18,
-                          backgroundImage: 'url(/images/enemies/fire-goblin/fire-goblin-front.png)',
-                          backgroundSize: 'contain',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'center',
+                          backgroundImage:
+                            "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                          backgroundSize: "contain",
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "center",
                         }}
                         aria-hidden="true"
                       />
@@ -281,15 +317,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 </ul>
               </div>
             );
-          })()
-        )}
+          })()}
       </div>
       {/* Fixed inventory at top right */}
       {(gameState.hasKey ||
         gameState.hasExitKey ||
         gameState.hasSword ||
         gameState.hasShield) && (
-        <div className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md" style={{ maxWidth: '200px' }}>
+        <div
+          className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md"
+          style={{ maxWidth: "200px" }}
+        >
           <h3 className="text-xs font-medium mb-1 text-white">Inventory:</h3>
           <div className="flex flex-wrap gap-1">
             {gameState.hasKey && (
@@ -315,24 +353,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* Mobile controls */}
       <MobileControls onMove={handleMobileMove} />
-      
+
       {/* Centered map container */}
       <div className="flex justify-center items-center h-[calc(100vh-100px)]">
-        <div 
+        <div
           className={`${styles.viewportContainer} max-w-full overflow-auto`}
           data-testid="tilemap-grid-container"
           style={{
-            gridTemplateColumns: process.env.NODE_ENV === 'test' ? 'repeat(25, 1fr)' : undefined
+            gridTemplateColumns:
+              process.env.NODE_ENV === "test" ? "repeat(25, 1fr)" : undefined,
           }}
         >
           <div
             className={styles.mapContainer}
-            style={{ transform: playerPosition ? `translate(${calculateMapTransform(playerPosition)})` : 'none' }}
+            style={{
+              transform: playerPosition
+                ? `translate(${calculateMapTransform(playerPosition)})`
+                : "none",
+            }}
           >
-            {bamEffect && (
+            {bamEffect &&
               (() => {
                 const tileSize = 40; // px
                 // Use tile centers: add 0.5 to grid coords before converting to pixels
@@ -352,16 +395,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       width: `${size}px`,
                       height: `${size}px`,
                       backgroundImage: `url(${bamEffect.src})`,
-                      backgroundSize: 'contain',
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'center',
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
                       zIndex: 12000,
-                      animation: 'popFade 300ms ease-out',
+                      animation: "popFade 300ms ease-out",
                     }}
                   />
                 );
-              })()
-            )}
+              })()}
             <div
               className={styles.gridContainer}
               style={{
@@ -497,12 +539,15 @@ function renderTileGrid(
 
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
-      
+
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
 
       return (
-        <div key={`${rowIndex}-${colIndex}`} className={`relative ${styles.tileWrapper}`}>
+        <div
+          key={`${rowIndex}-${colIndex}`}
+          className={`relative ${styles.tileWrapper}`}
+        >
           <Tile
             tileId={tileId}
             tileType={tileType}
@@ -583,19 +628,19 @@ function renderTileGrid(
 
 // Calculate the transform to center the map on the player
 function calculateMapTransform(playerPosition: [number, number]): string {
-  if (!playerPosition) return '0px, 0px';
-  
+  if (!playerPosition) return "0px, 0px";
+
   const tileSize = 40; // px
   const viewportWidth = 600; // px (from CSS)
   const viewportHeight = 600; // px (from CSS)
-  
+
   // Calculate the center position of the player in pixels
   const playerX = (playerPosition[1] + 0.5) * tileSize;
   const playerY = (playerPosition[0] + 0.5) * tileSize;
-  
+
   // Calculate the transform to center the player in the viewport
-  const translateX = (viewportWidth / 2) - playerX;
-  const translateY = (viewportHeight / 2) - playerY;
-  
+  const translateX = viewportWidth / 2 - playerX;
+  const translateY = viewportHeight / 2 - playerY;
+
   return `${translateX}px, ${translateY}px`;
 }
