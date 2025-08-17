@@ -104,3 +104,33 @@ body {
   line-height: 0 !important;
   box-sizing: border-box !important;
 }
+
+/* Spirit effect animations */
+@keyframes spiritRiseFade {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+}
+
+@keyframes spiritFlip {
+  0%, 100% {
+    transform: scaleX(1);
+  }
+  50% {
+    transform: scaleX(-1);
+  }
+}
+
+/* Optional utility classes for spirit effect */
+.spirit-rise-fade {
+  animation: spiritRiseFade 1800ms ease-out forwards;
+}
+.spirit-flip {
+  /* Full cycle 1400ms -> flips state every 700ms with 2 steps */
+  animation: spiritFlip 1400ms steps(2, end) infinite;
+}

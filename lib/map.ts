@@ -639,6 +639,8 @@ export interface GameState {
     damageTaken: number;
     enemiesDefeated: number;
   };
+  // Transient: positions where enemies died this tick
+  recentDeaths?: Array<[number, number]>;
 }
 
 /**
@@ -676,6 +678,7 @@ export function initializeGameState(): GameState {
       damageTaken: 0,
       enemiesDefeated: 0,
     },
+    recentDeaths: [],
   };
 }
 
@@ -725,6 +728,8 @@ export function movePlayer(
     mapData: newMapData,
     playerDirection: direction,
   };
+  // Reset transient deaths for this tick
+  newGameState.recentDeaths = [];
 
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
@@ -845,6 +850,9 @@ export function movePlayer(
           // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;
+          // Record death at the enemy's tile (newY, newX)
+          if (!newGameState.recentDeaths) newGameState.recentDeaths = [];
+          newGameState.recentDeaths.push([newY, newX]);
 
           // After combat (no movement), update enemies relative to current player position
           const finalPlayerPos = [currentY, currentX] as [number, number];

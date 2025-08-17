@@ -83,6 +83,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     x: number;
     src: string;
   }>(null);
+  // Transient Spirit effects (spawn on enemy death)
+  const [spirits, setSpirits] = useState<
+    Array<{ id: string; y: number; x: number; createdAt: number }>
+  >([]);
 
   useEffect(() => {
     // Find player position whenever gameState changes
@@ -207,6 +211,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       const newGameState = movePlayer(gameState, direction);
+      // Spawn spirits only for actual deaths reported by the engine this tick
+      const died = newGameState.recentDeaths || [];
+      if (died.length > 0) {
+        const now = Date.now();
+        setSpirits((prev) => {
+          const next = [...prev];
+          for (const [y, x] of died) {
+            const key = `${y},${x}`;
+            const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+            next.push({ id, y, x, createdAt: now });
+            // Auto-remove after animation completes (~1800ms + pad)
+            setTimeout(() => {
+              setSpirits((curr) => curr.filter((s) => s.id !== id));
+            }, 2000);
+          }
+          return next;
+        });
+      }
       setGameState(newGameState);
     },
     [gameState, playerPosition]
@@ -403,6 +425,41 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     }}
                   />
                 );
+              })()}
+            {spirits.length > 0 &&
+              (() => {
+                const tileSize = 40; // px
+                return spirits.map((s) => {
+                  const pxLeft = (s.x + 0.5) * tileSize;
+                  const pxTop = (s.y + 0.5) * tileSize;
+                  const size = 40; // spirit size
+                  return (
+                    <div
+                      key={s.id}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none spirit-rise-fade"
+                      style={{
+                        left: `${pxLeft - size / 2}px`,
+                        top: `${pxTop - size / 2}px`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        zIndex: 11000,
+                      }}
+                    >
+                      <div
+                        className="w-full h-full spirit-flip"
+                        style={{
+                          backgroundImage: 'url(/images/items/spirit.png)',
+                          backgroundSize: 'contain',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundPosition: 'center',
+                          width: '100%',
+                          height: '100%',
+                        }}
+                      />
+                    </div>
+                  );
+                });
               })()}
             <div
               className={styles.gridContainer}

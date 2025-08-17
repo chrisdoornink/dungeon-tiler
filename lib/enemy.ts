@@ -141,7 +141,9 @@ export function updateEnemies(
     const base = e.update({ grid, player });
     // Optionally suppress this enemy's attack for this tick
     if (base > 0 && !suppress?.(e)) {
-      const variance = rng ? ((r => (r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng())) : 0;
+      const variance = rng
+        ? ((r => (r >= 0.75 ? 2 : r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng()))
+        : 0;
       const effective = Math.max(0, base + variance - defense);
       totalDamage += effective;
     }

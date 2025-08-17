@@ -27,7 +27,7 @@ function makeState(y: number, x: number, opts?: Partial<GameState>): GameState {
 describe("Combat variance and equipment", () => {
   test("enemy attack uses ±1 variance around strength (no shield)", () => {
     const gs = makeState(2, 2, {
-      combatRng: () => 0.99, // force +1 variance
+      combatRng: () => 0.7, // +1 variance, below crit threshold (0.75)
     });
     const e = new Enemy({ y: 2, x: 1 }); // left of player, will attempt to move into player when we tick
     e.attack = 1;
@@ -40,10 +40,42 @@ describe("Combat variance and equipment", () => {
     expect(after.stats.damageTaken).toBe(2);
   });
 
+  test("crit (+2 variance) can deal 3 damage without shield (base 1)", () => {
+    const gs = makeState(2, 2, {
+      // Force crit band (tuned to be reasonably common)
+      combatRng: () => 0.95,
+    });
+    const e = new Enemy({ y: 2, x: 1 });
+    e.attack = 1; // goblin base
+    gs.enemies!.push(e);
+
+    const before = gs.heroHealth;
+    const after = movePlayer(gs, Direction.UP);
+    // damage = 1 base + 2 crit = 3
+    expect(after.heroHealth).toBe(before - 3);
+    expect(after.stats.damageTaken).toBe(3);
+  });
+
+  test("with shield, crit can still hurt (net 1) when base 1 and +2 variance", () => {
+    const gs = makeState(2, 2, {
+      hasShield: true,
+      combatRng: () => 0.95, // crit band
+    });
+    const e = new Enemy({ y: 2, x: 1 });
+    e.attack = 1; // goblin base
+    gs.enemies!.push(e);
+
+    const before = gs.heroHealth;
+    const after = movePlayer(gs, Direction.UP);
+    // incoming = 1 + 2 = 3; defense = 2 -> net = 1
+    expect(after.heroHealth).toBe(before - 1);
+    expect(after.stats.damageTaken).toBe(1);
+  });
+
   test("shield gives +2 damage reduction (protection)", () => {
     const gs = makeState(2, 2, {
       hasShield: true,
-      combatRng: () => 0.99, // +1 variance
+      combatRng: () => 0.7, // +1 variance (no crit)
     });
     const e = new Enemy({ y: 2, x: 1 });
     e.attack = 1;

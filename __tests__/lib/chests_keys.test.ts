@@ -62,6 +62,8 @@ describe('Chests and Keys invariants', () => {
 
   test('universal key opens any number of generic locks', () => {
     let gs = initializeGameState();
+    // Make this test deterministic by removing enemies so combat/movement can't interfere
+    gs.enemies = [];
     let locked = findAll(gs.mapData, (s) => s.includes(TileSubtype.CHEST) && s.includes(TileSubtype.LOCK));
     const allChests = findAll(gs.mapData, (s) => s.includes(TileSubtype.CHEST));
 
@@ -98,6 +100,8 @@ describe('Chests and Keys invariants', () => {
     const [ny, nx, dir] = nbs[0];
     setPlayer(gs.mapData, ny, nx);
     const after = movePlayer(gs, dir);
+    // Ensure enemies don't interfere with subsequent actions either
+    after.enemies = [];
     // Universal key is not consumed
     expect(after.hasKey).toBe(true);
     // Chest opened
