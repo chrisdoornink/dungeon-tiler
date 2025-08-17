@@ -36,6 +36,9 @@ describe("Player Movement Behaviors", () => {
       showFullMap: false,
       win: false,
       playerDirection: Direction.DOWN, // Initial direction
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Test each direction
@@ -87,6 +90,9 @@ describe("Player Movement Behaviors", () => {
       showFullMap: false,
       win: false,
       playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Try to move up (outside the map)
@@ -138,6 +144,9 @@ describe("Player Movement Behaviors", () => {
       showFullMap: false,
       win: false,
       playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Test movement in all directions
@@ -195,6 +204,9 @@ describe("Player Movement Behaviors", () => {
       showFullMap: false,
       win: false,
       playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Try to move in each direction

@@ -13,8 +13,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points on opposite sides of the grid
-      const from = [0, 0]; // Top-left
-      const to = [4, 4]; // Bottom-right
+      const from: [number, number] = [0, 0]; // Top-left
+      const to: [number, number] = [4, 4]; // Bottom-right
       
       expect(canSee(grid, from, to)).toBe(true);
     });
@@ -30,8 +30,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points on opposite sides of the wall
-      const from = [0, 0]; // Top-left
-      const to = [4, 4]; // Bottom-right
+      const from: [number, number] = [0, 0]; // Top-left
+      const to: [number, number] = [4, 4]; // Bottom-right
       
       expect(canSee(grid, from, to)).toBe(false);
     });
@@ -44,8 +44,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Adjacent points
-      const from = [0, 0];
-      const to = [0, 1];
+      const from: [number, number] = [0, 0];
+      const to: [number, number] = [0, 1];
       
       expect(canSee(grid, from, to)).toBe(true);
     });
@@ -57,7 +57,7 @@ describe("Line of Sight Utilities", () => {
         [0, 0, 0],
       ];
       
-      const position = [1, 1];
+      const position: [number, number] = [1, 1];
       
       expect(canSee(grid, position, position)).toBe(true);
     });
@@ -72,8 +72,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points on opposite sides of the wall
-      const from = [1, 2]; // Above wall
-      const to = [3, 2]; // Below wall
+      const from: [number, number] = [1, 2]; // Above wall
+      const to: [number, number] = [3, 2]; // Below wall
       
       expect(canSee(grid, from, to)).toBe(false);
     });
@@ -88,8 +88,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points on opposite sides of the wall
-      const from = [2, 1]; // Left of wall
-      const to = [2, 3]; // Right of wall
+      const from: [number, number] = [2, 1]; // Left of wall
+      const to: [number, number] = [2, 3]; // Right of wall
       
       expect(canSee(grid, from, to)).toBe(false);
     });
@@ -104,8 +104,8 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points on opposite sides of the diagonal wall
-      const from = [0, 0]; // Top-left
-      const to = [4, 4]; // Bottom-right
+      const from: [number, number] = [0, 0]; // Top-left
+      const to: [number, number] = [4, 4]; // Bottom-right
       
       expect(canSee(grid, from, to)).toBe(false);
     });
@@ -123,15 +123,15 @@ describe("Line of Sight Utilities", () => {
       ];
       
       // Points that should not have line of sight (diagonal through walls)
-      const from = [0, 0]; // Top-left
-      const to = [6, 6]; // Bottom-right
+      const from: [number, number] = [0, 0]; // Top-left
+      const to: [number, number] = [6, 6]; // Bottom-right
       
       expect(canSee(grid, from, to)).toBe(false);
       
       // Points that should have line of sight through the hole
       // This is a straight horizontal line through the hole at [3,3]
-      const from2 = [3, 0]; // Left middle
-      const to2 = [3, 6]; // Right middle
+      const from2: [number, number] = [3, 0]; // Left middle
+      const to2: [number, number] = [3, 6]; // Right middle
       
       // Verify the grid has the expected layout
       expect(grid[3][0]).toBe(0); // Start point is floor
@@ -148,38 +148,38 @@ describe("Line of Sight Utilities", () => {
   
   describe("calculateDistance function", () => {
     it("should calculate Manhattan distance correctly", () => {
-      const from = [0, 0];
-      const to = [3, 4];
+      const from: [number, number] = [0, 0];
+      const to: [number, number] = [3, 4];
       
       // Manhattan distance = |x2 - x1| + |y2 - y1| = |3 - 0| + |4 - 0| = 3 + 4 = 7
       expect(calculateDistance(from, to, "manhattan")).toBe(7);
     });
     
     it("should calculate Euclidean distance correctly", () => {
-      const from = [0, 0];
-      const to = [3, 4];
+      const from: [number, number] = [0, 0];
+      const to: [number, number] = [3, 4];
       
       // Euclidean distance = sqrt((x2 - x1)² + (y2 - y1)²) = sqrt(3² + 4²) = sqrt(9 + 16) = sqrt(25) = 5
       expect(calculateDistance(from, to, "euclidean")).toBe(5);
     });
     
     it("should calculate Chebyshev distance correctly", () => {
-      const from = [0, 0];
-      const to = [3, 4];
+      const from: [number, number] = [0, 0];
+      const to: [number, number] = [3, 4];
       
       // Chebyshev distance = max(|x2 - x1|, |y2 - y1|) = max(|3 - 0|, |4 - 0|) = max(3, 4) = 4
       expect(calculateDistance(from, to, "chebyshev")).toBe(4);
     });
     
     it("should default to Manhattan distance when no method is specified", () => {
-      const from = [0, 0];
-      const to = [3, 4];
+      const from: [number, number] = [0, 0];
+      const to: [number, number] = [3, 4];
       
       expect(calculateDistance(from, to)).toBe(7); // Manhattan distance
     });
     
     it("should return 0 for the same point", () => {
-      const point = [5, 5];
+      const point: [number, number] = [5, 5];
       
       expect(calculateDistance(point, point, "manhattan")).toBe(0);
       expect(calculateDistance(point, point, "euclidean")).toBe(0);
@@ -187,8 +187,8 @@ describe("Line of Sight Utilities", () => {
     });
     
     it("should handle negative coordinates", () => {
-      const from = [-2, -3];
-      const to = [1, 2];
+      const from: [number, number] = [-2, -3];
+      const to: [number, number] = [1, 2];
       
       // Manhattan: |-2 - 1| + |-3 - 2| = 3 + 5 = 8
       expect(calculateDistance(from, to, "manhattan")).toBe(8);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { go } from "../../lib/navigation";
 
 type LastGame = {
   completedAt: string;
@@ -151,11 +152,7 @@ export default function EndPage() {
         <div className="my-4 flex items-center justify-center gap-2">
           <button
             type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined') {
-                window.location.assign('/');
-              }
-            }}
+            onClick={() => go('/')}
             className="px-4 py-2 rounded-md bg-[#0D47A1] text-white hover:bg-[#0b3a82] transition-colors border-0"
           >
             play again

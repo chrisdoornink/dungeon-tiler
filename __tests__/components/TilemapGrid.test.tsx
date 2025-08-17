@@ -5,7 +5,7 @@ jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 import { TilemapGrid } from '../../components/TilemapGrid';
-import { TileSubtype, GameState } from '../../lib/map';
+import { TileSubtype, GameState, Direction } from '../../lib/map';
 import '@testing-library/jest-dom';
 
 describe('TilemapGrid component', () => {
@@ -46,6 +46,94 @@ describe('TilemapGrid component', () => {
     expect(tiles).toHaveLength(25 * 25);
   });
 
+  it('increments streak on consecutive wins', () => {
+    // Arrange: simulate prior lastGame with streak: 2
+    window.sessionStorage.setItem('lastGame', JSON.stringify({ streak: 2 }));
+
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    const r = 10, c = 10;
+    // Player -> ExitKey -> Exit
+    subtypes[r][c] = [TileSubtype.PLAYER];
+    subtypes[r][c+1] = [TileSubtype.EXITKEY];
+    tiles[r][c+2] = 1; // wall for EXIT
+    subtypes[r][c+2] = [TileSubtype.EXIT];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    };
+
+    // Act
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: 'ArrowRight' }); // pick up exit key
+    fireEvent.keyDown(window, { key: 'ArrowRight' }); // open and exit -> win
+
+    // Assert new streak increased by at least 1 (StrictMode may double-invoke effects)
+    const raw = window.sessionStorage.getItem('lastGame');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.outcome).toBe('win');
+    expect(parsed.streak).toBeGreaterThanOrEqual(3);
+  });
+
+  it('resets streak to 0 on death', () => {
+    // Arrange: prior streak exists
+    window.sessionStorage.setItem('lastGame', JSON.stringify({ streak: 5 }));
+
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    subtypes[12][12] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 0, // triggers death effect immediately
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
+    };
+
+    // Act
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    // Assert sessionStorage has streak reset
+    const raw = window.sessionStorage.getItem('lastGame');
+    expect(raw).toBeTruthy();
+    const parsed = JSON.parse(raw as string);
+    expect(parsed.outcome).toBe('dead');
+    expect(parsed.streak).toBe(0);
+  });
+
+    // moved tiles length assertion above
+
   it('persists lastGame and redirects to /end when win becomes true after opening exit', () => {
     const size = 25;
     const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -63,6 +151,10 @@ describe('TilemapGrid component', () => {
       mapData: { tiles, subtypes },
       showFullMap: false,
       win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     render(
@@ -104,6 +196,10 @@ describe('TilemapGrid component', () => {
       mapData: { tiles, subtypes },
       showFullMap: false,
       win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Clear prior mocks/payloads
@@ -141,6 +237,10 @@ describe('TilemapGrid component', () => {
       mapData: { tiles, subtypes },
       showFullMap: false,
       win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     render(
@@ -217,6 +317,10 @@ describe('TilemapGrid component', () => {
       mapData: { tiles, subtypes },
       showFullMap: true,
       win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     };
 
     // Act: render with showFullMap = true

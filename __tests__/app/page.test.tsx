@@ -1,8 +1,10 @@
 import React from 'react';
 import { render } from '@testing-library/react';
 import Home from '../../app/page';
+const useSearchParamsMock = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: jest.fn() }),
+  useSearchParams: () => useSearchParamsMock(),
 }));
 import * as mapModule from '../../lib/map';
 
@@ -37,6 +39,8 @@ jest.mock('../../lib/map', () => ({
 describe('Home Component', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // default: no algorithm query param
+    useSearchParamsMock.mockReturnValue({ get: () => null });
     
     // Default mock implementation returns a small test grid
     const mockGrid = Array(25).fill(0).map(() => Array(25).fill(0));
@@ -64,6 +68,10 @@ describe('Home Component', () => {
       },
       showFullMap: false,
       win: false,
+      playerDirection: 2,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0 },
     });
     
     // Mock player position finding
@@ -82,7 +90,8 @@ describe('Home Component', () => {
   });
 
   it('should use generateMap when algorithm is set to default', () => {
-    render(<Home algorithm="default" />);
+    useSearchParamsMock.mockReturnValue({ get: (k: string) => (k === 'algorithm' ? 'default' : null) });
+    render(<Home />);
     expect(mapModule.generateMap).toHaveBeenCalled();
     expect(mapModule.generateCompleteMap).not.toHaveBeenCalled();
   });

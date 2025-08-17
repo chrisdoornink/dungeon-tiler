@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "typecheck": "tsc --noEmit",
+    "prebuild": "npm run typecheck && npm run lint"
   },
   "dependencies": {
     "next": "15.4.4",
