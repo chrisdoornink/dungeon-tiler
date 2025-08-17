@@ -115,9 +115,27 @@ export default function EndPage() {
                 <div className="font-medium">Damage Taken</div>
                 <div>{last.stats.damageTaken}</div>
               </div>
-              <div className="flex items-baseline justify-between">
+              <div className="flex items-center justify-between">
                 <div className="font-medium">Enemies Defeated</div>
-                <div>{last.stats.enemiesDefeated}</div>
+                <div className="flex items-center gap-1">
+                  {Array.from({ length: Math.min(12, last.stats.enemiesDefeated) }).map((_, i) => (
+                    <div
+                      key={i}
+                      aria-label="enemy"
+                      title="enemy"
+                      className="w-5 h-5"
+                      style={{
+                        backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                      }}
+                    />
+                  ))}
+                  {last.stats.enemiesDefeated > 12 && (
+                    <span className="text-xs text-gray-600">+{last.stats.enemiesDefeated - 12}</span>
+                  )}
+                </div>
               </div>
             </>
           )}
