@@ -720,6 +720,8 @@ export interface GameState {
   heroAttack: number; // Player base attack for current run
   // Optional RNG for combat variance injection in tests; falls back to Math.random
   combatRng?: () => number;
+  // Inventory
+  rockCount?: number; // Count of collected rocks
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -760,6 +762,7 @@ export function initializeGameState(): GameState {
     enemies,
     heroHealth: 5,
     heroAttack: 1,
+    rockCount: 0,
     stats: {
       damageDealt: 0,
       damageTaken: 0,
@@ -939,6 +942,13 @@ export function movePlayer(
       const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
       newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
       // Movement/clearing of the item happens below in the generic move logic
+    }
+
+    // If it's a ROCK, pick it up (increment inventory) and clear the tile
+    if (subtype.includes(TileSubtype.ROCK)) {
+      newGameState.rockCount = (newGameState.rockCount || 0) + 1;
+      newMapData.subtypes[newY][newX] = [];
+      console.log("Player picked up a rock! Total rocks:", newGameState.rockCount);
     }
 
     // Combat: if an enemy occupies the destination, resolve attack
