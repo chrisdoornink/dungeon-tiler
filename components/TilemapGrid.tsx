@@ -75,6 +75,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
   const [prevGameState, setPrevGameState] = useState<GameState | null>(null);
+  // Transient BAM effect state
+  const [bamEffect, setBamEffect] = useState<null | { y: number; x: number; src: string }>(null);
   
   useEffect(() => {
     // Find player position whenever gameState changes
@@ -159,9 +161,37 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle player movement
   const handlePlayerMove = useCallback((direction: Direction) => {
+    // Detect potential combat: moving into an adjacent enemy tile
+    if (playerPosition && gameState.enemies && gameState.enemies.length > 0) {
+      const [py, px] = playerPosition;
+      let ty = py;
+      let tx = px;
+      switch (direction) {
+        case Direction.UP: ty = py - 1; break;
+        case Direction.RIGHT: tx = px + 1; break;
+        case Direction.DOWN: ty = py + 1; break;
+        case Direction.LEFT: tx = px - 1; break;
+      }
+      const enemy = gameState.enemies.find(e => e.y === ty && e.x === tx);
+      if (enemy) {
+        // Show BAM at midpoint between player and enemy
+        const yMid = (py + enemy.y) / 2;
+        const xMid = (px + enemy.x) / 2;
+        const choices = [
+          '/images/items/bam1.png',
+          '/images/items/bam2.png',
+          '/images/items/bam3.png',
+        ];
+        const src = choices[Math.floor(Math.random() * choices.length)];
+        setBamEffect({ y: yMid, x: xMid, src });
+        // Clear after ~600ms
+        setTimeout(() => setBamEffect(null), 600);
+      }
+    }
+
     const newGameState = movePlayer(gameState, direction);
     setGameState(newGameState);
-  }, [gameState]);
+  }, [gameState, playerPosition]);
 
   // Handle mobile control button clicks
   const handleMobileMove = useCallback((directionStr: string) => {
@@ -302,6 +332,36 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             className={styles.mapContainer}
             style={{ transform: playerPosition ? `translate(${calculateMapTransform(playerPosition)})` : 'none' }}
           >
+            {bamEffect && (
+              (() => {
+                const tileSize = 40; // px
+                // Use tile centers: add 0.5 to grid coords before converting to pixels
+                const pxLeft = (bamEffect.x + 0.5) * tileSize;
+                const pxTop = (bamEffect.y + 0.5) * tileSize;
+                const size = 48; // effect image size in px
+                return (
+                  <div
+                    data-testid="bam-effect"
+                    data-bam-y={String(bamEffect.y)}
+                    data-bam-x={String(bamEffect.x)}
+                    aria-hidden="true"
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${pxLeft - size / 2}px`,
+                      top: `${pxTop - size / 2}px`,
+                      width: `${size}px`,
+                      height: `${size}px`,
+                      backgroundImage: `url(${bamEffect.src})`,
+                      backgroundSize: 'contain',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'center',
+                      zIndex: 12000,
+                      animation: 'popFade 300ms ease-out',
+                    }}
+                  />
+                );
+              })()
+            )}
             <div
               className={styles.gridContainer}
               style={{

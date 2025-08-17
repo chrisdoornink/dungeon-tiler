@@ -71,7 +71,7 @@ describe("Combat - player attacks when moving into enemy", () => {
     expect(playerPos).toEqual([2, 2]);
   });
 
-  test("on kill (enemy health <= 0), enemy is removed, player moves into tile, enemiesDefeated increments", () => {
+  test("on kill (enemy health <= 0), enemy is removed, player stays in place, enemiesDefeated increments", () => {
     const gs = makeEmptyStateWithPlayer(2, 2);
     const e = new Enemy({ y: 2, x: 3 });
     e.health = 1; // one hit to kill
@@ -84,11 +84,11 @@ describe("Combat - player attacks when moving into enemy", () => {
     expect(after.stats.enemiesDefeated).toBe(1);
     expect(after.stats.damageDealt).toBe(1);
 
-    // Player moved into the tile
+    // Player should remain in original position (no stepping into enemy tile)
     const playerPos = after.mapData.subtypes.flatMap((row, yy) =>
       row.flatMap((cell, xx) => (cell.includes(TileSubtype.PLAYER) ? [[yy, xx] as [number, number]] : []))
     )[0];
-    expect(playerPos).toEqual([2, 3]);
+    expect(playerPos).toEqual([2, 2]);
   });
 });
 

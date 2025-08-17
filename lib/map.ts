@@ -823,34 +823,12 @@ export function movePlayer(
         newGameState.stats.damageDealt += heroDamage;
 
         if (enemy.health <= 0) {
-          // Remove enemy and move player into the tile
+          // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;
 
-          // Move player to the new position
-          newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
-            currentX
-          ].filter((type) => type !== TileSubtype.PLAYER);
-          if (newMapData.subtypes[currentY][currentX].length === 0) {
-            newMapData.subtypes[currentY][currentX] = [];
-          }
-
-          const destSubtypes = newMapData.subtypes[newY][newX];
-          if (
-            destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
-            destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
-            destSubtypes.includes(TileSubtype.CHEST)
-          ) {
-            if (!destSubtypes.includes(TileSubtype.PLAYER)) {
-              destSubtypes.push(TileSubtype.PLAYER);
-            }
-          } else {
-            // For other tiles, just set to player
-            newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
-          }
-
-          // After combat/movement, update enemies and return
-          const finalPlayerPos = findPlayerPosition(newMapData) || [newY, newX];
+          // After combat (no movement), update enemies relative to current player position
+          const finalPlayerPos = [currentY, currentX] as [number, number];
           if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
             const damage = updateEnemies(
               newMapData.tiles,

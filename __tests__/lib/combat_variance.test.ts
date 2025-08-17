@@ -72,10 +72,32 @@ describe("Combat variance and equipment", () => {
     expect(after.stats.enemiesDefeated).toBe(1);
     expect(after.stats.damageDealt).toBeGreaterThanOrEqual(3); // at least enemy health
 
-    // Player moved into enemy tile
+    // Player stays in place (no stepping into enemy tile)
     const pos = after.mapData.subtypes.flatMap((row, yy) =>
       row.flatMap((cell, xx) => (cell.includes(TileSubtype.PLAYER) ? [[yy, xx] as [number, number]] : []))
     )[0];
-    expect(pos).toEqual([2, 3]);
+    expect(pos).toEqual([2, 2]);
+  });
+
+  test("on killing an adjacent enemy, the player stays in place and enemy disappears", () => {
+    const gs = makeState(5, 5, {
+      hasSword: true,
+      combatRng: () => 0.99, // +1 variance
+    });
+    const e = new Enemy({ y: 5, x: 6 }); // enemy to the right
+    e.health = 3; // ensure one-shot with sword and +1 variance (1+2+1=4)
+    gs.enemies!.push(e);
+
+    const after = movePlayer(gs, Direction.RIGHT);
+
+    // Enemy should be gone and stats updated
+    expect(after.enemies!.length).toBe(0);
+    expect(after.stats.enemiesDefeated).toBeGreaterThanOrEqual(1);
+
+    // Player should remain at original position (5,5), not step into (5,6)
+    const pos = after.mapData.subtypes.flatMap((row, yy) =>
+      row.flatMap((cell, xx) => (cell.includes(TileSubtype.PLAYER) ? [[yy, xx] as [number, number]] : []))
+    )[0];
+    expect(pos).toEqual([5, 5]);
   });
 });

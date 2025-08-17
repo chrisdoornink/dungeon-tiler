@@ -85,9 +85,10 @@ describe('Chests and Keys invariants', () => {
     const keyPos = findAll(gs.mapData, (s) => s.length === 1 && s[0] === TileSubtype.KEY)[0];
     expect(keyPos).toBeDefined();
     const [ky, kx] = keyPos;
-    // Move player adjacent then onto key (pick direction accordingly)
-    setPlayer(gs.mapData, ky, kx - 1);
-    gs = movePlayer(gs, Direction.RIGHT);
+    // Move player adjacent then onto key (pick a neighbor direction)
+    const [nky, nkx,ndir] = neighbors(ky, kx)[0];
+    setPlayer(gs.mapData, nky, nkx);
+    gs = movePlayer(gs, ndir);
     expect(gs.hasKey).toBe(true);
 
     // Open one locked chest
