@@ -90,14 +90,14 @@ body {
   --torch2-falloff: rgba(180, 160, 130, 0.01);
 }
 
-/* Fix for grid gaps in dungeon tilemap */
-.grid {
+/* Fix for grid gaps in dungeon tilemap (scoped) */
+.tilemap-grid {
   gap: 0 !important;
   grid-gap: 0 !important;
 }
 
-/* Ensure no borders or margins on grid items */
-.grid > div {
+/* Ensure no borders or margins on tilemap grid items (scoped) */
+.tilemap-grid > div {
   margin: 0 !important;
   padding: 0 !important;
   border: none !important;

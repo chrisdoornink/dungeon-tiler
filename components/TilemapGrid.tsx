@@ -153,7 +153,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           completedAt: new Date().toISOString(),
           hasKey: gameState.hasKey,
           hasExitKey: gameState.hasExitKey,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          showFullMap: !!gameState.showFullMap,
           mapData: gameState.mapData,
+          stats: gameState.stats,
+          outcome: "win" as const,
         };
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
@@ -167,7 +172,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.win,
     gameState.hasKey,
     gameState.hasExitKey,
+    gameState.hasSword,
+    gameState.hasShield,
+    gameState.showFullMap,
     gameState.mapData,
+    gameState.stats,
     router,
   ]);
 
@@ -179,7 +188,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           completedAt: new Date().toISOString(),
           hasKey: gameState.hasKey,
           hasExitKey: gameState.hasExitKey,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          showFullMap: !!gameState.showFullMap,
           mapData: gameState.mapData,
+          stats: gameState.stats,
           outcome: "dead",
         } as const;
         if (typeof window !== "undefined") {
@@ -190,7 +203,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       router.push("/end");
     }
-  }, [gameState.heroHealth, gameState.hasKey, gameState.hasExitKey, gameState.mapData, router]);
+  }, [
+    gameState.heroHealth,
+    gameState.hasKey,
+    gameState.hasExitKey,
+    gameState.hasSword,
+    gameState.hasShield,
+    gameState.showFullMap,
+    gameState.mapData,
+    gameState.stats,
+    router,
+  ]);
 
   // Handle player movement
   const handlePlayerMove = useCallback(

@@ -26,6 +26,8 @@ describe('End Page', () => {
       completedAt: new Date().toISOString(),
       hasKey: true,
       hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
       mapData: {
         tiles: Array(5).fill(0).map(() => Array(7).fill(0)),
         subtypes: Array(5).fill(0).map(() => Array(7).fill(0).map(() => [] as number[])),
@@ -37,12 +39,10 @@ describe('End Page', () => {
 
     expect(screen.getByText('You escaped the dungeon!')).toBeInTheDocument();
     expect(screen.getByText('Completed at MOCK_DATE')).toBeInTheDocument();
-    expect(screen.getByText('Had Key')).toBeInTheDocument();
-    expect(screen.getByText('Yes')).toBeInTheDocument();
-    expect(screen.getByText('Had Exit Key')).toBeInTheDocument();
-    // One of the "No" entries should be present for exit key
-    expect(screen.getAllByText('No').length).toBeGreaterThan(0);
-    expect(screen.getByText('Map Size')).toBeInTheDocument();
-    expect(screen.getByText('7 x 5')).toBeInTheDocument();
+    // Icons-only pickups: 🔑 should be present, 🗝️ absent
+    expect(screen.getByText('🔑')).toBeInTheDocument();
+    expect(screen.queryByText('🗝️')).not.toBeInTheDocument();
+    // No map size rows anymore
+    expect(screen.queryByText('Map Size')).not.toBeInTheDocument();
   });
 });
