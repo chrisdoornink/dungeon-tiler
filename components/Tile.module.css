@@ -195,6 +195,23 @@
   animation: exitPulse 2s infinite alternate;
 }
 
+/* Pots, Rocks, Food, Meds */
+.potIcon {
+  background-image: url('/images/items/pot-1.png');
+}
+
+.rockIcon {
+  background-image: url('/images/items/rock-1.png');
+}
+
+.foodIcon {
+  background-image: url('/images/items/food-1.png');
+}
+
+.medIcon {
+  background-image: url('/images/items/meds-1.png');
+}
+
 @keyframes exitPulse {
   from { filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.4)); }
   to { filter: drop-shadow(0 0 6px rgba(72, 187, 120, 0.7)); }

@@ -668,6 +668,8 @@ function renderTileGrid(
             tileId={tileId}
             tileType={tileType}
             subtype={subtype}
+            row={rowIndex}
+            col={colIndex}
             isVisible={isVisible}
             visibilityTier={tier}
             neighbors={neighbors}

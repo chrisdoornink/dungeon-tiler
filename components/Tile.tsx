@@ -13,6 +13,8 @@ interface TileProps {
   tileId: number;
   tileType: TileType;
   subtype?: number[];
+  row?: number; // grid row (y)
+  col?: number; // grid col (x)
   isVisible?: boolean; // Whether this tile is in the player's field of view
   visibilityTier?: number; // 0-3 for FOV fade tiers
   neighbors?: NeighborInfo; // Information about neighboring tiles
@@ -26,6 +28,8 @@ export const Tile: React.FC<TileProps> = ({
   tileId,
   // We don't need tileType for now, but it's in the props interface for future use
   subtype = [],
+  row,
+  col,
   isVisible = true,
   visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null },
@@ -209,6 +213,31 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.EXIT) || false;
   };
 
+  // Pots and Rocks + revealed items
+  const hasPot = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.POT) || false;
+  };
+  const hasRock = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.ROCK) || false;
+  };
+  const hasFood = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.FOOD) || false;
+  };
+  const hasMed = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.MED) || false;
+  };
+
+  // Deterministic variant picker based on coordinates
+  const pickVariant = (choices: string[]): string => {
+    if (!choices || choices.length === 0) return '';
+    // Use row/col if available; otherwise default index 0
+    const y = typeof row === 'number' ? row : 0;
+    const x = typeof col === 'number' ? col : 0;
+    // Simple hash
+    const idx = Math.abs((y * 37 + x * 101) % choices.length);
+    return choices[idx];
+  };
+
   // Get subtypes excluding special cases that have custom rendering
   const getFilteredSubtypes = (subtypes: number[] | undefined): number[] => {
     if (!subtypes || subtypes.length === 0) return [];
@@ -226,6 +255,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.EXITKEY &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.EXIT &&
+        // Exclude pots/rocks and revealed items from generic rendering
+        subtype !== TileSubtype.POT &&
+        subtype !== TileSubtype.ROCK &&
+        subtype !== TileSubtype.FOOD &&
+        subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
     );
   };
@@ -298,6 +332,59 @@ export const Tile: React.FC<TileProps> = ({
             key="exit"
             data-testid={`subtype-icon-${TileSubtype.EXIT}`}
             className={`${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+          />
+        )}
+
+        {/* Render POT/ROCK/FOOD/MED with assets if present */}
+        {hasPot(subtypes) && (
+          <div
+            key="pot"
+            data-testid={`subtype-icon-${TileSubtype.POT}`}
+            className={`${styles.assetIcon} ${styles.potIcon}`}
+            style={{
+              backgroundImage: `url(${pickVariant([
+                '/images/items/pot-1.png',
+                '/images/items/pot-2.png',
+                '/images/items/pot-3.png',
+              ])})`,
+            }}
+          />
+        )}
+        {hasRock(subtypes) && (
+          <div
+            key="rock"
+            data-testid={`subtype-icon-${TileSubtype.ROCK}`}
+            className={`${styles.assetIcon} ${styles.rockIcon}`}
+            style={{
+              backgroundImage: `url(${pickVariant([
+                '/images/items/rock-1.png',
+                '/images/items/rock-2.png',
+              ])})`,
+            }}
+          />
+        )}
+        {hasFood(subtypes) && (
+          <div
+            key="food"
+            data-testid={`subtype-icon-${TileSubtype.FOOD}`}
+            className={`${styles.assetIcon} ${styles.foodIcon}`}
+            style={{
+              backgroundImage: `url(${pickVariant([
+                '/images/items/food-1.png',
+                '/images/items/food-2.png',
+                '/images/items/food-3.png',
+              ])})`,
+            }}
+          />
+        )}
+        {hasMed(subtypes) && (
+          <div
+            key="med"
+            data-testid={`subtype-icon-${TileSubtype.MED}`}
+            className={`${styles.assetIcon} ${styles.medIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/meds-1.png')`,
+            }}
           />
         )}
 

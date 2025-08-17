@@ -167,6 +167,10 @@ export enum TileSubtype {
   SWORD = 9,
   SHIELD = 10,
   OPEN_CHEST = 11,
+  POT = 12,
+  ROCK = 13,
+  FOOD = 14,
+  MED = 15,
 }
 
 export interface MapData {
@@ -367,6 +371,84 @@ export function addLightswitchToMap(mapData: MapData): MapData {
 }
 
 /**
+ * Add a small number of rocks to random empty floor tiles.
+ * Minimal implementation to satisfy count tests: always place exactly 3 ROCKs
+ * (or fewer if there aren't enough eligible tiles).
+ */
+export function addRocksToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+
+  // Shuffle
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const toPlace = Math.min(3, eligible.length);
+  for (let i = 0; i < toPlace; i++) {
+    const [ry, rx] = eligible[i];
+    newMapData.subtypes[ry][rx] = [TileSubtype.ROCK];
+  }
+
+  return newMapData;
+}
+
+/**
+ * Add a small number of pots to random empty floor tiles.
+ * Minimal implementation to satisfy count tests: always place exactly 3 POTs
+ * (or fewer if there aren't enough eligible tiles).
+ */
+export function addPotsToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+
+  // Shuffle
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const toPlace = Math.min(3, eligible.length);
+  for (let i = 0; i < toPlace; i++) {
+    const [py, px] = eligible[i];
+    newMapData.subtypes[py][px] = [TileSubtype.POT];
+  }
+
+  return newMapData;
+}
+
+/**
  * Place a single generic KEY on a random empty floor tile
  */
 export function addSingleKeyToMap(mapData: MapData): MapData {
@@ -508,8 +590,12 @@ export function generateCompleteMap(): MapData {
   const withChests = addChestsToMap(withLights);
   // Place exactly one generic key for all generic locks
   const withKeys = addSingleKeyToMap(withChests);
+  // Place a small number of pots on empty floor tiles
+  const withPots = addPotsToMap(withKeys);
+  // Place a small number of rocks on empty floor tiles
+  const withRocks = addRocksToMap(withPots);
   // Finally place player
-  return addPlayerToMap(withKeys);
+  return addPlayerToMap(withRocks);
 }
 
 /**
@@ -839,6 +925,21 @@ export function movePlayer(
   // If the new position is a floor tile
   if (newMapData.tiles[newY][newX] === FLOOR) {
     const subtype = newMapData.subtypes[newY][newX];
+
+    // If it's a POT, reveal content without moving
+    if (subtype.includes(TileSubtype.POT)) {
+      // Reveal FOOD or MED with a simple 50/50
+      const reveal = Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
+      newMapData.subtypes[newY][newX] = [reveal];
+      return newGameState;
+    }
+
+    // If it's FOOD or MED, apply healing (capped at 5) and proceed to move
+    if (subtype.includes(TileSubtype.FOOD) || subtype.includes(TileSubtype.MED)) {
+      const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
+      newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
+      // Movement/clearing of the item happens below in the generic move logic
+    }
 
     // Combat: if an enemy occupies the destination, resolve attack
     if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
