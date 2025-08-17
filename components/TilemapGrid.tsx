@@ -58,6 +58,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         playerDirection: Direction.DOWN, // Default to facing down/front
         heroHealth: 5,
         heroAttack: 1,
+        rockCount: 0,
         stats: {
           damageDealt: 0,
           damageTaken: 0,
@@ -74,6 +75,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(
     null
   );
+
+  // Handle throwing a rock (consumes one rock). For now, just decrement and show a small effect in front of player.
+  const handleThrowRock = useCallback(() => {
+    setGameState((prev) => {
+      const count = prev.rockCount ?? 0;
+      if (count <= 0) return prev;
+      // Simple visual feedback near player
+      const pos = playerPosition;
+      if (pos) {
+        const [py, px] = pos;
+        setBamEffect({ y: py, x: px, src: "/images/items/bam1.png" });
+        setTimeout(() => setBamEffect(null), 200);
+      }
+      return { ...prev, rockCount: count - 1 };
+    });
+  }, [playerPosition]);
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
@@ -404,7 +421,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       {(gameState.hasKey ||
         gameState.hasExitKey ||
         gameState.hasSword ||
-        gameState.hasShield) && (
+        gameState.hasShield ||
+        (gameState.rockCount ?? 0) > 0) && (
         <div
           className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md"
           style={{ maxWidth: "200px" }}
@@ -431,12 +449,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 Shield 🛡️
               </div>
             )}
+            {(gameState.rockCount ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={handleThrowRock}
+                className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                title={`Throw rock (${gameState.rockCount})`}
+              >
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: 'inline-block',
+                    width: 16,
+                    height: 16,
+                    backgroundImage: 'url(/images/items/rock-1.png)',
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }}
+                />
+                <span>Rock x{gameState.rockCount}</span>
+              </button>
+            )}
           </div>
         </div>
       )}
 
       {/* Mobile controls */}
-      <MobileControls onMove={handleMobileMove} />
+      <MobileControls onMove={handleMobileMove} onThrowRock={handleThrowRock} rockCount={gameState.rockCount ?? 0} />
 
       {/* Centered map container */}
       <div className="flex justify-center items-center h-[calc(100vh-100px)]">

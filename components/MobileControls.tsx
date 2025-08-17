@@ -2,9 +2,11 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 interface MobileControlsProps {
   onMove: (direction: string) => void;
+  onThrowRock?: () => void;
+  rockCount?: number;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onMove }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, rockCount }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
     UP: false,
@@ -111,8 +113,31 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove }) => {
       >
         ◄
       </button>
-      {/* Empty space for center */}
-      <div></div>
+      {/* Center action: Throw rock */}
+      <button
+        data-testid="mobile-control-throw"
+        className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
+          (rockCount ?? 0) > 0 ? (isMobile ? 'bg-[#333333] hover:bg-[#444444] text-white' : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]') : 'bg-[#222222] text-[#666666] cursor-not-allowed'
+        }`}
+        onClick={() => (rockCount ?? 0) > 0 && onThrowRock && onThrowRock()}
+        aria-label="Throw Rock"
+        disabled={(rockCount ?? 0) <= 0}
+        title={(rockCount ?? 0) > 0 ? `Throw rock (${rockCount})` : 'No rocks'}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-block',
+            width: isMobile ? 22 : 18,
+            height: isMobile ? 22 : 18,
+            backgroundImage: "url(/images/items/rock-1.png)",
+            backgroundSize: 'contain',
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'center',
+            verticalAlign: 'middle'
+          }}
+        />
+      </button>
       {/* Right button */}
       <button 
         data-testid="mobile-control-right"
