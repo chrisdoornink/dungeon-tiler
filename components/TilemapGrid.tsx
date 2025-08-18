@@ -978,9 +978,14 @@ function renderTileGrid(
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
+            enemyKind={enemyAtTile?.kind as 'goblin' | 'ghost' | undefined}
             hasSword={hasSword}
             hasShield={hasShield}
-            invisibleClassName={!heroTorchLit && process.env.NODE_ENV !== 'test' ? 'bg-black' : undefined}
+            invisibleClassName={
+              process.env.NODE_ENV === 'test'
+                ? 'bg-gray-900'
+                : (!heroTorchLit ? 'bg-black' : undefined)
+            }
           />
         </div>
       );

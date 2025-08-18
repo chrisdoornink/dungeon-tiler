@@ -22,6 +22,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+  enemyKind?: 'goblin' | 'ghost';
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
   invisibleClassName?: string; // Optional class override for invisible tiles
@@ -40,6 +41,7 @@ export const Tile: React.FC<TileProps> = ({
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
+  enemyKind,
   hasSword,
   hasShield,
   invisibleClassName,
@@ -580,9 +582,12 @@ export const Tile: React.FC<TileProps> = ({
             <>
               {((enemyVisible ?? isVisible) === true) && (
                 <div
-                  className="absolute inset-0 pointer-events-none"
+                  className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
                   style={{
                     backgroundImage: `url(${(() => {
+                      if (enemyKind === 'ghost') {
+                        return '/images/enemies/lantern-wisp.png';
+                      }
                       switch (enemyFacing) {
                         case 'UP':
                           return '/images/enemies/fire-goblin/fire-goblin-back.png';
@@ -598,7 +603,7 @@ export const Tile: React.FC<TileProps> = ({
                     backgroundRepeat: "no-repeat",
                     backgroundPosition: "center",
                     zIndex: 10500, // above fog (10000), below wall tops (12000)
-                    transform: enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none',
+                    transform: enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none'),
                   }}
                   data-testid="enemy-sprite"
                 />
@@ -624,7 +629,7 @@ export const Tile: React.FC<TileProps> = ({
       // Invisible floor
       return (
         <div
-          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? 'bg-gray-900'}`}
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
           data-testid={`tile-${tileId}`}
         />
       );
@@ -762,7 +767,7 @@ export const Tile: React.FC<TileProps> = ({
       // Invisible wall - same style as invisible floor
       return (
         <div
-          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? 'bg-gray-900'}`}
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
           data-testid={`tile-${tileId}`}
         />
       );

@@ -901,6 +901,8 @@ export function movePlayer(
           const dy = newY - currentY;
           const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
+          // Ghosts adjacent this tick should not deal damage
+          if (e.kind === 'ghost' && adj) return true;
           if (!adj) return false;
           // Enemy is to the right, player moved left
           if (e.y === currentY && e.x === currentX + 1 && dx === -1)
@@ -925,14 +927,22 @@ export function movePlayer(
       newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
     );
 
-    // Ghost effect: if any ghost ends adjacent to the player, extinguish hero torch
-    const anyGhostAdjacent = newGameState.enemies.some((e) => {
-      const isGhost = e.kind === "ghost";
-      if (!isGhost) return false;
-      return Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
-    });
-    if (anyGhostAdjacent) {
+    // Ghost effect: any ghost ending adjacent snuffs torch and vanishes with death effect
+    const adjacentGhosts = newGameState.enemies.filter(
+      (e) => e.kind === 'ghost' && Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
+    );
+    if (adjacentGhosts.length > 0) {
       newGameState.heroTorchLit = false;
+      // Record death VFX positions
+      for (const g of adjacentGhosts) {
+        newGameState.recentDeaths?.push([g.y, g.x]);
+      }
+      // Count them as defeated
+      newGameState.stats.enemiesDefeated += adjacentGhosts.length;
+      // Remove adjacent ghosts from active enemies
+      newGameState.enemies = newGameState.enemies.filter(
+        (e) => !(e.kind === 'ghost' && Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1)
+      );
     }
   }
 
