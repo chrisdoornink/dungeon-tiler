@@ -22,6 +22,8 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+  hasSword?: boolean; // Whether player holds a sword (for sprite)
+  hasShield?: boolean; // Whether player holds a shield (for sprite)
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -37,6 +39,8 @@ export const Tile: React.FC<TileProps> = ({
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
+  hasSword,
+  hasShield,
 }) => {
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
@@ -424,20 +428,34 @@ export const Tile: React.FC<TileProps> = ({
     );
   };
 
-  // Get the appropriate hero image based on player direction if this is a player tile
-  const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER) ? (() => {
-    // Default to front-facing
-    switch (playerDirection) {
-      case Direction.UP:
-        return '/images/hero/hero-back-static.png';
-      case Direction.RIGHT:
-      case Direction.LEFT:
-        return '/images/hero/hero-right-static.png';
-      case Direction.DOWN:
-      default:
-        return '/images/hero/hero-front-static.png';
-    }
-  })() : '';
+  // Get the appropriate hero image based on player direction and equipment if this is a player tile
+  const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER)
+    ? (() => {
+        const equip = () => {
+          const s = hasSword ? '-sword' : '';
+          const h = hasShield ? '-shield' : '';
+          // Order: shield then sword when both are present
+          if (s && h) return '-shield-sword';
+          if (h) return '-shield';
+          if (s) return '-sword';
+          return '';
+        };
+        let dir = 'front';
+        switch (playerDirection) {
+          case Direction.UP:
+            dir = 'back';
+            break;
+          case Direction.RIGHT:
+          case Direction.LEFT:
+            dir = 'right';
+            break;
+          case Direction.DOWN:
+          default:
+            dir = 'front';
+        }
+        return `/images/hero/hero-${dir}${equip()}-static.png`;
+      })()
+    : '';
   
   // Determine if we need to flip the hero image for left-facing direction
   const isPlayerTile = isVisible && subtype && subtype.includes(TileSubtype.PLAYER);

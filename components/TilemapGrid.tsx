@@ -574,7 +574,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 gameState.mapData.subtypes,
                 gameState.showFullMap,
                 gameState.playerDirection,
-                gameState.enemies
+                gameState.enemies,
+                gameState.hasSword,
+                gameState.hasShield
               )}
             </div>
           </div>
@@ -643,7 +645,9 @@ function renderTileGrid(
   subtypes: number[][][] | undefined,
   showFullMap: boolean = false,
   playerDirection: Direction = Direction.DOWN,
-  enemies?: Enemy[]
+  enemies?: Enemy[],
+  hasSword?: boolean,
+  hasShield?: boolean
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -717,6 +721,8 @@ function renderTileGrid(
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
+            hasSword={hasSword}
+            hasShield={hasShield}
           />
         </div>
       );
