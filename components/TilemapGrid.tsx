@@ -115,6 +115,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       amount: number;
       color: 'red' | 'green';
       target: 'enemy' | 'hero';
+      sign: '+' | '-';
       createdAt: number;
     }>
   >([]);
@@ -343,6 +344,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 amount: dmg,
                 color: 'red' as const,
                 target: 'enemy' as const,
+                sign: '-' as const,
                 createdAt: now,
               },
             ];
@@ -375,6 +377,39 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 amount: heroDmg,
                 color: 'green' as const,
                 target: 'hero' as const,
+                sign: '-' as const,
+                createdAt: now,
+              },
+            ];
+            setTimeout(() => {
+              setFloating((curr) => curr.filter((f) => f.id !== id));
+            }, 1200);
+            return next;
+          });
+        }
+      }
+      // 3) Hero healing gained this tick (from food/medicine pickup)
+      if (
+        typeof prePlayerY === 'number' &&
+        typeof prePlayerX === 'number'
+      ) {
+        const heroHeal = Math.max(0, newGameState.heroHealth - gameState.heroHealth);
+        if (heroHeal > 0) {
+          const now = Date.now();
+          const id = `fh-hero-${prePlayerY},${prePlayerX}-${now}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}`;
+          setFloating((prev) => {
+            const next = [
+              ...prev,
+              {
+                id,
+                y: prePlayerY as number,
+                x: prePlayerX as number,
+                amount: heroHeal,
+                color: 'green' as const,
+                target: 'hero' as const,
+                sign: '+' as const,
                 createdAt: now,
               },
             ];
@@ -652,7 +687,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         animation: 'spiritRiseFade 1800ms ease-out forwards',
                       }}
                     >
-                      -{f.amount}
+                      {f.sign}{f.amount}
                     </div>
                   );
                 });
