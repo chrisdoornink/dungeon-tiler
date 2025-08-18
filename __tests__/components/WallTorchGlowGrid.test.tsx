@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { TilemapGrid } from '../../components/TilemapGrid';
 import { tileTypes, TileSubtype, Direction, type GameState } from '../../lib/map';
@@ -17,19 +17,22 @@ function emptySubtypes(h: number, w: number): number[][][] {
 }
 
 describe('Wall torch glow integration', () => {
-  it('applies adjacent and diagonal glow classes around a wall torch', () => {
-    const h = 5, w = 5;
+  it('applies visibility tiers around a wall torch (adjacent vs diagonal)', () => {
+    // Use a larger grid and place the player far so torch area is outside normal FOV
+    const h = 11, w = 11;
     const tiles = makeGrid(h, w, 0);
-    // make center a wall so we can place a torch on it
-    tiles[2][2] = 1;
+    // Place a wall at center and mount a torch on it
+    tiles[5][5] = 1;
     const sub = emptySubtypes(h, w);
-    sub[2][2] = [TileSubtype.WALL_TORCH];
+    sub[5][5] = [TileSubtype.WALL_TORCH];
+    // Place player at top-left corner to keep torch area outside FOV
+    sub[0][0] = [TileSubtype.PLAYER];
 
     const initialGameState: GameState = {
       hasKey: false,
       hasExitKey: false,
       mapData: { tiles, subtypes: sub },
-      showFullMap: true,
+      showFullMap: false,
       win: false,
       playerDirection: Direction.DOWN,
       heroHealth: 5,
@@ -47,16 +50,20 @@ describe('Wall torch glow integration', () => {
     const getTile = (y: number, x: number) =>
       document.querySelector(`[data-row="${y}"][data-col="${x}"]`);
 
-    // Adjacent tiles
-    expect(getTile(1,2)).toHaveClass('torchGlowAdj');
-    expect(getTile(3,2)).toHaveClass('torchGlowAdj');
-    expect(getTile(2,1)).toHaveClass('torchGlowAdj');
-    expect(getTile(2,3)).toHaveClass('torchGlowAdj');
+    // Helper to assert inner tile has given class
+    const hasInnerClass = (y: number, x: number, cls: string) =>
+      (getTile(y, x) as Element | null)?.querySelector(`.${cls}`);
 
-    // Diagonals
-    expect(getTile(1,1)).toHaveClass('torchGlowDiag');
-    expect(getTile(1,3)).toHaveClass('torchGlowDiag');
-    expect(getTile(3,1)).toHaveClass('torchGlowDiag');
-    expect(getTile(3,3)).toHaveClass('torchGlowDiag');
+    // Adjacent tiles (around 5,5) should be tier-2 (inner div gets class)
+    expect(hasInnerClass(4,5,'fov-tier-2')).toBeInTheDocument();
+    expect(hasInnerClass(6,5,'fov-tier-2')).toBeInTheDocument();
+    expect(hasInnerClass(5,4,'fov-tier-2')).toBeInTheDocument();
+    expect(hasInnerClass(5,6,'fov-tier-2')).toBeInTheDocument();
+
+    // Diagonals (around 5,5) should be tier-1
+    expect(hasInnerClass(4,4,'fov-tier-1')).toBeInTheDocument();
+    expect(hasInnerClass(4,6,'fov-tier-1')).toBeInTheDocument();
+    expect(hasInnerClass(6,4,'fov-tier-1')).toBeInTheDocument();
+    expect(hasInnerClass(6,6,'fov-tier-1')).toBeInTheDocument();
   });
 });

@@ -14,9 +14,10 @@
   position: relative;
   z-index: 0;
 }
-/* Diagonal to torch: about half as bright as tier-2 */
+/* Diagonal to torch: dimmer than tier-2 but not too dark */
 .fov-tier-1 {
-  filter: brightness(0.40) saturate(0.90);
+  /* bumped from 0.40 -> 0.55 to improve corner visibility */
+  filter: brightness(0.55) saturate(0.95);
   animation: torchFlickerTier1 2.7s ease-in-out infinite;
   position: relative;
   z-index: 0;
