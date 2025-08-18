@@ -6,6 +6,7 @@ import {
   Direction,
   movePlayer,
   TileSubtype,
+  performThrowRock,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
@@ -82,19 +83,159 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     null
   );
 
-  // Handle throwing a rock (consumes one rock). For now, just decrement and show a small effect in front of player.
+  // Transient moving rock effect
+  const [rockEffect, setRockEffect] = useState<null | { y: number; x: number; id: string }>(null);
+
+  // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
     setGameState((prev) => {
       const count = prev.rockCount ?? 0;
       if (count <= 0) return prev;
-      // Simple visual feedback near player
       const pos = playerPosition;
-      if (pos) {
-        const [py, px] = pos;
-        setBamEffect({ y: py, x: px, src: "/images/items/bam1.png" });
-        setTimeout(() => setBamEffect(null), 200);
+      if (!pos) return prev;
+      const [py, px] = pos;
+      // Determine direction vector
+      let vx = 0, vy = 0;
+      switch (prev.playerDirection) {
+        case Direction.UP: vy = -1; break;
+        case Direction.RIGHT: vx = 1; break;
+        case Direction.DOWN: vy = 1; break;
+        case Direction.LEFT: vx = -1; break;
       }
-      return { ...prev, rockCount: count - 1 };
+
+      // Compute animation path (up to 4 steps)
+      const path: Array<[number, number]> = [];
+      let ty = py, tx = px;
+      let impact: { y: number; x: number } | null = null;
+      // Track pre-hit enemy (if any) at the impact tile to compute floating damage later
+      let preEnemyAtImpact: Enemy | undefined;
+      let preEnemyHealth = 0;
+      for (let step = 1; step <= 4; step++) {
+        ty += vy; tx += vx;
+        // Out of bounds: stop before leaving grid
+        if (ty < 0 || ty >= prev.mapData.tiles.length || tx < 0 || tx >= prev.mapData.tiles[0].length) {
+          // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
+          const last = path[path.length - 1];
+          if (last) impact = { y: last[0], x: last[1] };
+          break;
+        }
+        // If wall, stop before entering wall
+        if (prev.mapData.tiles[ty][tx] !== 0) {
+          // Impact on the wall tile
+          impact = { y: ty, x: tx };
+          break;
+        }
+        path.push([ty, tx]);
+        // If enemy at tile, include and stop
+        const enemies = prev.enemies ?? [];
+        const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
+        const hitEnemy = !!enemyAt;
+        if (hitEnemy) {
+          impact = { y: ty, x: tx };
+          preEnemyAtImpact = enemyAt;
+          preEnemyHealth = enemyAt!.health;
+          break;
+        }
+        // If pot at tile, include and stop (already included above)
+        const subs = prev.mapData.subtypes[ty][tx] || [];
+        if (subs.includes(TileSubtype.POT)) {
+          impact = { y: ty, x: tx };
+          break;
+        }
+      }
+
+      // Run the animation
+      if (path.length > 0) {
+        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        let idx = 0;
+        setRockEffect({ y: path[0][0], x: path[0][1], id });
+        const stepMs = 50; // faster animation per tile
+        const interval = setInterval(() => {
+          idx += 1;
+          if (idx >= path.length || !path[idx]) {
+            clearInterval(interval);
+            setRockEffect((cur) => (cur && cur.id === id ? null : cur));
+            return;
+          }
+          const [ny, nx] = path[idx];
+          setRockEffect((cur) => (cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur));
+        }, stepMs);
+        // Safety: clear after 1s
+        setTimeout(() => {
+          setRockEffect((cur) => (cur && cur.id === id ? null : cur));
+        }, 1000);
+
+        // Schedule BAM effect at impact position timed with animation arrival
+        if (impact) {
+          const bamDelay = Math.max(0, path.length) * stepMs + 10;
+          setTimeout(() => {
+            const bamIdx = 1 + Math.floor(Math.random() * 3);
+            setBamEffect({ y: impact.y, x: impact.x, src: `/images/items/bam${bamIdx}.png` });
+            setTimeout(() => setBamEffect(null), 300);
+          }, bamDelay);
+        }
+
+        // If clear path (no impact and path reached 4), delay applying game logic until animation completes
+        if (!impact && path.length === 4) {
+          setTimeout(() => {
+            setGameState((p2) => performThrowRock(p2));
+          }, path.length * stepMs + 10);
+          // Return previous state for now so the rock doesn't appear early
+          return prev;
+        }
+      }
+      // If there was an immediate impact with no path advanced (e.g., wall adjacent), still show BAM
+      else if (impact) {
+        const bamIdx = 1 + Math.floor(Math.random() * 3);
+        setBamEffect({ y: impact.y, x: impact.x, src: `/images/items/bam${bamIdx}.png` });
+        setTimeout(() => setBamEffect(null), 300);
+      }
+
+      // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
+      const next = performThrowRock(prev);
+      // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
+      if (preEnemyAtImpact && impact) {
+        const postEnemy = (next.enemies || []).find((e) => e.y === impact.y && e.x === impact.x);
+        let dmg = 0;
+        if (postEnemy) {
+          dmg = Math.max(0, preEnemyHealth - postEnemy.health);
+        } else {
+          // Enemy died; damage equals its remaining health before the hit
+          dmg = preEnemyHealth;
+        }
+        if (dmg > 0) {
+          const spawn = () => {
+            const now = Date.now();
+            const id = `fd-enemy-${impact!.y},${impact!.x}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+            setFloating((prevF) => {
+              const nextF = [
+                ...prevF,
+                {
+                  id,
+                  y: impact!.y,
+                  x: impact!.x,
+                  amount: dmg,
+                  color: "red" as const,
+                  target: "enemy" as const,
+                  sign: "-" as const,
+                  createdAt: now,
+                },
+              ];
+              setTimeout(() => {
+                setFloating((curr) => curr.filter((f) => f.id !== id));
+              }, 1200);
+              return nextF;
+            });
+          };
+          if (process.env.NODE_ENV === "test") {
+            spawn();
+          } else {
+            // Align roughly with BAM flash timing
+            setTimeout(spawn, 100);
+          }
+        }
+      }
+      return next;
     });
   }, [playerPosition]);
   // Add state to track if player is currently moving
@@ -497,6 +638,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         case "ArrowLeft":
           direction = Direction.LEFT;
           break;
+        case "r":
+        case "R":
+          // Throw a rock
+          handleThrowRock();
+          return; // do not also move
       }
 
       if (direction !== null) {
@@ -508,7 +654,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [gameState, handlePlayerMove]);
+  }, [gameState, handlePlayerMove, handleThrowRock]);
 
   return (
     <div
@@ -648,6 +794,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 : "none",
             }}
           >
+            {rockEffect && (() => {
+              const tileSize = 40;
+              const pxLeft = (rockEffect.x + 0.5) * tileSize;
+              const pxTop = (rockEffect.y + 0.5) * tileSize;
+              const size = 28;
+              return (
+                <div
+                  aria-hidden="true"
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${pxLeft - size / 2}px`,
+                    top: `${pxTop - size / 2}px`,
+                    width: `${size}px`,
+                    height: `${size}px`,
+                    zIndex: 11900,
+                    backgroundImage: "url(/images/items/rock-1.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                    filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
+                    transition: `left 50ms linear, top 50ms linear`,
+                  }}
+                />
+              );
+            })()}
             {bamEffect &&
               (() => {
                 const tileSize = 40; // px

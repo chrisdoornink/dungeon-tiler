@@ -741,6 +741,103 @@ export function findPlayerPosition(mapData: MapData): [number, number] | null {
 }
 
 /**
+ * Throw a rock up to 4 tiles in the player's facing direction.
+ * Minimal slice: if inventory has a rock and there is a clear 4-tile floor path,
+ * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
+ */
+export function performThrowRock(gameState: GameState): GameState {
+  const pos = findPlayerPosition(gameState.mapData);
+  if (!pos) return gameState;
+  const [py, px] = pos;
+  const count = gameState.rockCount ?? 0;
+  if (count <= 0) return gameState;
+
+  // Determine direction vector
+  let vx = 0,
+    vy = 0;
+  switch (gameState.playerDirection) {
+    case Direction.UP:
+      vy = -1;
+      break;
+    case Direction.RIGHT:
+      vx = 1;
+      break;
+    case Direction.DOWN:
+      vy = 1;
+      break;
+    case Direction.LEFT:
+      vx = -1;
+      break;
+  }
+
+  const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
+  // Verify a clear floor path for 4 tiles
+  let ty = py;
+  let tx = px;
+  for (let step = 1; step <= 4; step++) {
+    ty += vy;
+    tx += vx;
+    if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
+      // Early stop: consume a rock, no placement (future: collide/bam)
+      return { ...gameState, rockCount: count - 1 };
+    }
+    // Check enemy collision first
+    const enemies = gameState.enemies ?? [];
+    const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
+    if (hitIdx !== -1) {
+      const newEnemies = enemies.slice();
+      const target = { ...newEnemies[hitIdx] };
+      const newHealth = (target.health ?? 1) - 2; // rock deals 2 damage
+      if (newHealth <= 0) {
+        // Enemy dies: remove and record for spirit VFX
+        const removed = newEnemies.splice(hitIdx, 1)[0];
+        const newStats = {
+          ...gameState.stats,
+          enemiesDefeated: gameState.stats.enemiesDefeated + 1,
+        };
+        const newRecent = (gameState.recentDeaths ? gameState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
+        return {
+          ...gameState,
+          enemies: newEnemies,
+          stats: newStats,
+          recentDeaths: newRecent,
+          rockCount: count - 1,
+        };
+      } else {
+        // Enemy survives: update its health in place
+        target.health = newHealth;
+        newEnemies[hitIdx] = target as typeof newEnemies[number];
+        return {
+          ...gameState,
+          enemies: newEnemies,
+          rockCount: count - 1,
+        };
+      }
+    }
+    if (newMapData.tiles[ty][tx] !== FLOOR) {
+      // Early stop on wall/obstacle: consume a rock, no placement
+      return { ...gameState, rockCount: count - 1 };
+    }
+    // Floor tile: check for pot collision
+    const subs = newMapData.subtypes[ty][tx] || [];
+    if (subs.includes(TileSubtype.POT)) {
+      // Remove the pot and consume the rock; no rock placement
+      newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
+      return { ...gameState, mapData: newMapData, rockCount: count - 1 };
+    }
+  }
+
+  // Land the rock on the 4th tile
+  newMapData.subtypes[ty][tx] = [TileSubtype.ROCK];
+
+  return {
+    ...gameState,
+    mapData: newMapData,
+    rockCount: count - 1,
+  };
+}
+
+/**
  * Enum representing possible movement directions
  */
 export enum Direction {
@@ -919,8 +1016,9 @@ export function movePlayer(
       }
     );
     if (damage > 0) {
-      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
-      newGameState.stats.damageTaken += damage;
+      const applied = Math.min(2, damage);
+      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
+      newGameState.stats.damageTaken += applied;
     }
     console.log(
       "Enemies updated:",
@@ -1120,11 +1218,12 @@ export function movePlayer(
               }
             );
             if (damage > 0) {
+              const applied = Math.min(2, damage);
               newGameState.heroHealth = Math.max(
                 0,
-                newGameState.heroHealth - damage
+                newGameState.heroHealth - applied
               );
-              newGameState.stats.damageTaken += damage;
+              newGameState.stats.damageTaken += applied;
             }
             console.log(
               "Enemies updated:",
@@ -1145,11 +1244,12 @@ export function movePlayer(
             }
           );
           if (damage > 0) {
+            const applied = Math.min(2, damage);
             newGameState.heroHealth = Math.max(
               0,
-              newGameState.heroHealth - damage
+              newGameState.heroHealth - applied
             );
-            newGameState.stats.damageTaken += damage;
+            newGameState.stats.damageTaken += applied;
           }
           console.log(
             "Enemies updated:",

@@ -89,8 +89,8 @@ describe('Floating combat damage numbers', () => {
     expect(float).toHaveAttribute('data-target', 'hero');
     expect(float).toHaveAttribute('data-y', '5');
     expect(float).toHaveAttribute('data-x', '5');
-    // enemy base(1) + variance(+2 from 0.9 per enemy.ts) - defense(0) = 3
-    expect(float).toHaveAttribute('data-amount', '3');
+    // enemy base(1) + variance(+2 from 0.9 per enemy.ts) - defense(0) = 3, but capped at 2 per tick
+    expect(float).toHaveAttribute('data-amount', '2');
     expect(float).toHaveAttribute('data-color', 'green');
 
     // Effect should disappear after a short time
