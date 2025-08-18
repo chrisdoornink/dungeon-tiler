@@ -786,7 +786,7 @@ export function performThrowRock(gameState: GameState): GameState {
     const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
-      const target = { ...newEnemies[hitIdx] };
+      const target: Enemy = newEnemies[hitIdx];
       const newHealth = (target.health ?? 1) - 2; // rock deals 2 damage
       if (newHealth <= 0) {
         // Enemy dies: remove and record for spirit VFX
@@ -806,7 +806,7 @@ export function performThrowRock(gameState: GameState): GameState {
       } else {
         // Enemy survives: update its health in place
         target.health = newHealth;
-        newEnemies[hitIdx] = target as typeof newEnemies[number];
+        newEnemies[hitIdx] = target;
         return {
           ...gameState,
           enemies: newEnemies,

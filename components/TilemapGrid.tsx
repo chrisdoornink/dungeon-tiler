@@ -193,47 +193,75 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
       const next = performThrowRock(prev);
-      // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
-      if (preEnemyAtImpact && impact) {
-        const postEnemy = (next.enemies || []).find((e) => e.y === impact.y && e.x === impact.x);
-        let dmg = 0;
-        if (postEnemy) {
-          dmg = Math.max(0, preEnemyHealth - postEnemy.health);
-        } else {
-          // Enemy died; damage equals its remaining health before the hit
-          dmg = preEnemyHealth;
-        }
-        if (dmg > 0) {
-          const spawn = () => {
-            const now = Date.now();
-            const id = `fd-enemy-${impact!.y},${impact!.x}-${now}-${Math.random().toString(36).slice(2, 7)}`;
-            setFloating((prevF) => {
-              const nextF = [
-                ...prevF,
-                {
-                  id,
-                  y: impact!.y,
-                  x: impact!.x,
-                  amount: dmg,
-                  color: "red" as const,
-                  target: "enemy" as const,
-                  sign: "-" as const,
-                  createdAt: now,
-                },
-              ];
-              setTimeout(() => {
-                setFloating((curr) => curr.filter((f) => f.id !== id));
-              }, 1200);
-              return nextF;
-            });
-          };
-          if (process.env.NODE_ENV === "test") {
-            spawn();
+      try {
+        // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
+        if (preEnemyAtImpact && impact) {
+          const postEnemy = (next.enemies || []).find((e) => e.y === impact.y && e.x === impact.x);
+          const preHP = typeof preEnemyHealth === 'number' && !Number.isNaN(preEnemyHealth) ? preEnemyHealth : (preEnemyAtImpact.health ?? 0);
+          let dmg = 0;
+          if (postEnemy) {
+            const postHP = Math.max(0, postEnemy.health ?? 0);
+            dmg = Math.max(0, preHP - postHP);
           } else {
-            // Align roughly with BAM flash timing
-            setTimeout(spawn, 100);
+            // Enemy died; damage equals its remaining health before the hit
+            dmg = Math.max(0, preHP);
+          }
+          if (dmg > 0 && Number.isFinite(dmg)) {
+            const spawn = () => {
+              const now = Date.now();
+              const id = `fd-enemy-${impact!.y},${impact!.x}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              setFloating((prevF) => {
+                const nextF = [
+                  ...prevF,
+                  {
+                    id,
+                    y: impact!.y,
+                    x: impact!.x,
+                    amount: dmg,
+                    color: "red" as const,
+                    target: "enemy" as const,
+                    sign: "-" as const,
+                    createdAt: now,
+                  },
+                ];
+                setTimeout(() => {
+                  setFloating((curr) => curr.filter((f) => f.id !== id));
+                }, 1200);
+                return nextF;
+              });
+            };
+            if (process.env.NODE_ENV === "test") {
+              spawn();
+            } else {
+              // Align roughly with BAM flash timing
+              setTimeout(spawn, 100);
+            }
           }
         }
+      } catch (err) {
+        // Prevent any exception here from freezing input handling
+        console.error('Rock hit damage popup error:', err);
+      }
+      try {
+        // Spawn spirits directly if rock kills occurred (no movement tick in this flow)
+        const died = next.recentDeaths || [];
+        if (died.length > 0) {
+          const now = Date.now();
+          setSpirits((prevS) => {
+            const out = [...prevS];
+            for (const [y, x] of died) {
+              const key = `${y},${x}`;
+              const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              out.push({ id, y, x, createdAt: now });
+              setTimeout(() => {
+                setSpirits((curr) => curr.filter((s) => s.id !== id));
+              }, 2000);
+            }
+            return out;
+          });
+        }
+      } catch (err) {
+        console.error('Rock kill spirit spawn error:', err);
       }
       return next;
     });
