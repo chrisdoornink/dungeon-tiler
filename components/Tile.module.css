@@ -153,6 +153,40 @@
   background-repeat: no-repeat;
 }
 
+/* Torch icon: CSS-only flame with flicker */
+.torchIcon {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 20px;
+  border-radius: 50% 50% 40% 40%/60% 60% 40% 40%;
+  /* Stylized flame using layered gradients */
+  background:
+    radial-gradient(closest-side at 50% 40%, rgba(255,200,80,0.95), rgba(255,140,0,0.8) 70%, rgba(0,0,0,0) 72%),
+    radial-gradient(closest-side at 50% 70%, rgba(255,240,170,0.9), rgba(255,165,0,0.85) 60%, rgba(0,0,0,0) 63%);
+  box-shadow:
+    0 0 6px 2px rgba(255, 170, 50, 0.55),
+    0 0 12px 6px rgba(255, 120, 20, 0.25);
+  animation-name: torchFlickerTier2;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  animation-timing-function: ease-in-out;
+  z-index: 11500; /* above enemies (10500), below wallTopOverlay (12000) */
+}
+
+/* Positioning class for sprite-based wall torch */
+.torchSprite {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px; /* Slightly larger than CSS flame for clarity */
+  height: 24px;
+  z-index: 11500; /* above enemies (10500), below wallTopOverlay (12000) */
+}
+
 /* Absolute overlay for revealed items to appear above chests */
 .overlayIcon {
   position: absolute;

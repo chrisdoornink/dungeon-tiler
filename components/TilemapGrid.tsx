@@ -12,6 +12,7 @@ import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
+import { computeTorchGlow, ADJACENT_GLOW, DIAGONAL_GLOW } from "../lib/torch_glow";
 
 // Grid configuration constants
 const GRID_WIDTH = 25;
@@ -667,6 +668,24 @@ function renderTileGrid(
   // Calculate visibility for each tile
   const visibility = calculateVisibility(grid, playerPosition, showFullMap);
 
+  // Precompute torch glow positions by scanning for WALL_TORCH subtypes
+  const glowMap = new Map<string, number>();
+  if (subtypes) {
+    for (let y = 0; y < subtypes.length; y++) {
+      for (let x = 0; x < subtypes[y].length; x++) {
+        const st = subtypes[y][x];
+        if (st && st.includes(TileSubtype.WALL_TORCH)) {
+          const m = computeTorchGlow(y, x, grid);
+          for (const [k, v] of m.entries()) {
+            // If overlapping glows occur, keep the stronger one
+            const prev = glowMap.get(k) ?? 0;
+            glowMap.set(k, Math.max(prev, v));
+          }
+        }
+      }
+    }
+  }
+
   // Function to safely get a tile ID at specific coordinates
   const getTileAt = (row: number, col: number): number | null => {
     if (row < 0 || row >= grid.length || col < 0 || col >= grid[0].length) {
@@ -706,7 +725,15 @@ function renderTileGrid(
       return (
         <div
           key={`${rowIndex}-${colIndex}`}
-          className={`relative ${styles.tileWrapper}`}
+          className={`relative ${styles.tileWrapper} ${(() => {
+            const key = `${rowIndex},${colIndex}`;
+            const g = glowMap.get(key);
+            if (g === ADJACENT_GLOW) return 'torchGlowAdj';
+            if (g === DIAGONAL_GLOW) return 'torchGlowDiag';
+            return '';
+          })()}`}
+          data-row={rowIndex}
+          data-col={colIndex}
         >
           <Tile
             tileId={tileId}

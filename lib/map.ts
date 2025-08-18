@@ -171,6 +171,7 @@ export enum TileSubtype {
   ROCK = 13,
   FOOD = 14,
   MED = 15,
+  WALL_TORCH = 16,
 }
 
 export interface MapData {
@@ -594,8 +595,54 @@ export function generateCompleteMap(): MapData {
   const withPots = addPotsToMap(withKeys);
   // Place a small number of rocks on empty floor tiles
   const withRocks = addRocksToMap(withPots);
+  // Place 3–6 wall torches on front-facing walls (wall with floor directly below)
+  const withTorches = addWallTorchesToMap(withRocks);
   // Finally place player
-  return addPlayerToMap(withRocks);
+  return addPlayerToMap(withTorches);
+}
+
+/**
+ * Add a random number (3–6) of wall torches to front-facing walls.
+ * A front-facing wall is defined as a WALL tile that has a FLOOR tile directly below it (south).
+ * Avoids tiles that already carry important wall subtypes (EXIT, DOOR, LOCK) or any existing subtype.
+ */
+export function addWallTorchesToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const h = grid.length;
+  const w = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < h - 1; y++) {
+    for (let x = 0; x < w; x++) {
+      if (grid[y][x] !== WALL) continue;
+      // Front-facing: floor right below
+      if (grid[y + 1][x] !== FLOOR) continue;
+      // Skip if any existing subtypes (avoid doors/exits/locks/etc.)
+      const subs = newMapData.subtypes[y][x];
+      if (subs.length > 0 && !subs.includes(TileSubtype.NONE)) continue;
+      eligible.push([y, x]);
+    }
+  }
+
+  if (eligible.length === 0) return newMapData;
+
+  // Shuffle eligible positions
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const count = 3 + Math.floor(Math.random() * 4); // 3–6
+  const toPlace = Math.min(count, eligible.length);
+  for (let i = 0; i < toPlace; i++) {
+    const [ty, tx] = eligible[i];
+    newMapData.subtypes[ty][tx] = [TileSubtype.WALL_TORCH];
+    // Optional: log for debugging
+    // console.log(`Placed wall torch at [${ty}, ${tx}]`);
+  }
+
+  return newMapData;
 }
 
 /**

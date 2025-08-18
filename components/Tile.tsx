@@ -42,6 +42,29 @@ export const Tile: React.FC<TileProps> = ({
   hasSword,
   hasShield,
 }) => {
+  // Per-instance randomized torch animation interval (200–300ms)
+  const torchDuration = React.useMemo(() => {
+    // Stable-ish per tile via coords seed
+    const seed = ((row ?? 0) * 73856093) ^ ((col ?? 0) * 19349663);
+    const rnd = Math.abs(Math.sin(seed)) * 1000; // 0..1000
+    const val = 200 + Math.floor((rnd % 101)); // 200..300
+    return val;
+  }, [row, col]);
+
+  // Frame-based torch animation: cycle 3 frames using the per-instance interval
+  const [torchFrame, setTorchFrame] = React.useState(0);
+  React.useEffect(() => {
+    // Only animate if this tile actually has a torch
+    if (!hasWallTorch(subtype)) return;
+    // Phase offset based on coords to desync from neighbors
+    const phaseOffset = (((row ?? 0) * 17 + (col ?? 0) * 31) % 3);
+    setTorchFrame(phaseOffset);
+    const id = setInterval(() => {
+      setTorchFrame((f) => (f + 1) % 3);
+    }, torchDuration);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [torchDuration, row, col, Array.isArray(subtype) ? subtype.join(',') : '']);
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
   const getWallVariantName = (n: NeighborInfo): string => {
@@ -230,6 +253,9 @@ export const Tile: React.FC<TileProps> = ({
   const hasMed = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.MED) || false;
   };
+  const hasWallTorch = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.WALL_TORCH) || false;
+  };
   const hasSwordItem = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SWORD) || false;
   };
@@ -270,6 +296,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.ROCK &&
         subtype !== TileSubtype.FOOD &&
         subtype !== TileSubtype.MED &&
+        subtype !== TileSubtype.WALL_TORCH &&
         subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
     );
   };
@@ -322,6 +349,20 @@ export const Tile: React.FC<TileProps> = ({
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Render wall torch with simple animated frame handling (duration randomized per instance) */}
+        {hasWallTorch(subtypes) && (
+          <div
+            key="wall-torch"
+            data-testid="wall-torch"
+            data-duration-ms={String(torchDuration)}
+            data-frame={String((torchFrame % 3) + 1)}
+            className={`${styles.assetIcon} ${styles.torchSprite}`}
+            style={{
+              backgroundImage: `url(/images/items/wall-torch-${(torchFrame % 3) + 1}.png)`,
+            }}
           />
         )}
 
