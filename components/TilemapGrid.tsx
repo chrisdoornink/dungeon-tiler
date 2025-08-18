@@ -106,6 +106,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [spirits, setSpirits] = useState<
     Array<{ id: string; y: number; x: number; createdAt: number }>
   >([]);
+  // Transient floating damage numbers (hero/enemy hits)
+  const [floating, setFloating] = useState<
+    Array<{
+      id: string;
+      y: number;
+      x: number;
+      amount: number;
+      color: 'red' | 'green';
+      target: 'enemy' | 'hero';
+      createdAt: number;
+    }>
+  >([]);
 
   useEffect(() => {
     // Find player position whenever gameState changes
@@ -252,6 +264,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const handlePlayerMove = useCallback(
     (direction: Direction) => {
       // Detect potential combat: moving into an adjacent enemy tile
+      const prePlayerY = playerPosition ? playerPosition[0] : null;
+      const prePlayerX = playerPosition ? playerPosition[1] : null;
+      let targetY = prePlayerY;
+      let targetX = prePlayerX;
+      let preEnemyAtTarget: Enemy | undefined;
+      let preEnemyHealth = 0;
       if (playerPosition && gameState.enemies && gameState.enemies.length > 0) {
         const [py, px] = playerPosition;
         let ty = py;
@@ -270,8 +288,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             tx = px - 1;
             break;
         }
+        targetY = ty;
+        targetX = tx;
         const enemy = gameState.enemies.find((e) => e.y === ty && e.x === tx);
         if (enemy) {
+          preEnemyAtTarget = enemy;
+          preEnemyHealth = enemy.health;
           // Show BAM at midpoint between player and enemy
           const yMid = (py + enemy.y) / 2;
           const xMid = (px + enemy.x) / 2;
@@ -288,6 +310,81 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       const newGameState = movePlayer(gameState, direction);
+      // Compute floating damage numbers based on differences
+      // 1) Enemy damage taken when attacking into enemy tile
+      if (
+        preEnemyAtTarget &&
+        typeof targetY === 'number' &&
+        typeof targetX === 'number'
+      ) {
+        // Check enemy at same position after move
+        const postEnemy = (newGameState.enemies || []).find(
+          (e) => e.y === targetY && e.x === targetX
+        );
+        let dmg = 0;
+        if (postEnemy) {
+          dmg = Math.max(0, preEnemyHealth - postEnemy.health);
+        } else {
+          // Enemy died -> damage equals its remaining health before the hit
+          dmg = preEnemyHealth;
+        }
+        if (dmg > 0) {
+          const now = Date.now();
+          const id = `fd-enemy-${targetY},${targetX}-${now}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}`;
+          setFloating((prev) => {
+            const next = [
+              ...prev,
+              {
+                id,
+                y: targetY as number,
+                x: targetX as number,
+                amount: dmg,
+                color: 'red' as const,
+                target: 'enemy' as const,
+                createdAt: now,
+              },
+            ];
+            // Auto-remove after ~1200ms
+            setTimeout(() => {
+              setFloating((curr) => curr.filter((f) => f.id !== id));
+            }, 1200);
+            return next;
+          });
+        }
+      }
+      // 2) Hero damage taken from enemies this tick
+      if (
+        typeof prePlayerY === 'number' &&
+        typeof prePlayerX === 'number'
+      ) {
+        const heroDmg = Math.max(0, gameState.heroHealth - newGameState.heroHealth);
+        if (heroDmg > 0) {
+          const now = Date.now();
+          const id = `fd-hero-${prePlayerY},${prePlayerX}-${now}-${Math.random()
+            .toString(36)
+            .slice(2, 7)}`;
+          setFloating((prev) => {
+            const next = [
+              ...prev,
+              {
+                id,
+                y: prePlayerY as number,
+                x: prePlayerX as number,
+                amount: heroDmg,
+                color: 'green' as const,
+                target: 'hero' as const,
+                createdAt: now,
+              },
+            ];
+            setTimeout(() => {
+              setFloating((curr) => curr.filter((f) => f.id !== id));
+            }, 1200);
+            return next;
+          });
+        }
+      }
       // Spawn spirits only for actual deaths reported by the engine this tick
       const died = newGameState.recentDeaths || [];
       if (died.length > 0) {
@@ -525,6 +622,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     }}
                   />
                 );
+              })()}
+            {floating.length > 0 &&
+              (() => {
+                const tileSize = 40; // px
+                return floating.map((f) => {
+                  const pxLeft = (f.x + 0.5) * tileSize;
+                  const pxTop = (f.y + 0.5) * tileSize;
+                  return (
+                    <div
+                      key={f.id}
+                      data-testid="floating-damage"
+                      data-target={f.target}
+                      data-y={String(f.y)}
+                      data-x={String(f.x)}
+                      data-amount={String(f.amount)}
+                      data-color={f.color}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pxLeft}px`,
+                        top: `${pxTop}px`,
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: 11500,
+                        color: f.color === 'red' ? '#ff4242' : '#6afc7a',
+                        fontWeight: 800,
+                        textShadow: '0 1px 0 rgba(0,0,0,0.6)',
+                        // Match spirit effect speed/distance: rise ~100px over ~1800ms
+                        animation: 'spiritRiseFade 1800ms ease-out forwards',
+                      }}
+                    >
+                      -{f.amount}
+                    </div>
+                  );
+                });
               })()}
             {spirits.length > 0 &&
               (() => {
