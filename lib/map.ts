@@ -777,6 +777,8 @@ export interface GameState {
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
+  // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
+  heroTorchLit?: boolean;
 }
 
 /**
@@ -788,11 +790,23 @@ export function initializeGameState(): GameState {
   // Find player position to place enemies at a safe distance
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
-    ? placeEnemies({ grid: mapData.tiles, player: { y: playerPos[0], x: playerPos[1] }, count: 3, minDistanceFromPlayer: 8 })
+    ? placeEnemies({
+        grid: mapData.tiles,
+        player: { y: playerPos[0], x: playerPos[1] },
+        count: 3,
+        minDistanceFromPlayer: 8,
+      })
     : [];
+  // Mark the first enemy as a ghost to test the light-steal mechanic
+  if (enemies.length > 0) {
+    enemies[0].kind = "ghost";
+  }
 
   if (enemies.length > 0) {
-    console.log(`Placed ${enemies.length} enemies:`, enemies.map(e => `[${e.y}, ${e.x}]`).join(", "));
+    console.log(
+      `Placed ${enemies.length} enemies:`,
+      enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
+    );
   } else {
     console.log("No enemies placed.");
   }
@@ -810,6 +824,7 @@ export function initializeGameState(): GameState {
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
+    heroTorchLit: true,
     stats: {
       damageDealt: 0,
       damageTaken: 0,
@@ -888,11 +903,13 @@ export function movePlayer(
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
           if (!adj) return false;
           // Enemy is to the right, player moved left
-          if (e.y === currentY && e.x === currentX + 1 && dx === -1) return true;
+          if (e.y === currentY && e.x === currentX + 1 && dx === -1)
+            return true;
           // Enemy is to the left, player moved right
           if (e.y === currentY && e.x === currentX - 1 && dx === 1) return true;
           // Enemy is below, player moved up
-          if (e.x === currentX && e.y === currentY + 1 && dy === -1) return true;
+          if (e.x === currentX && e.y === currentY + 1 && dy === -1)
+            return true;
           // Enemy is above, player moved down
           if (e.x === currentX && e.y === currentY - 1 && dy === 1) return true;
           return false;
@@ -907,6 +924,16 @@ export function movePlayer(
       "Enemies updated:",
       newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
     );
+
+    // Ghost effect: if any ghost ends adjacent to the player, extinguish hero torch
+    const anyGhostAdjacent = newGameState.enemies.some((e) => {
+      const isGhost = e.kind === "ghost";
+      if (!isGhost) return false;
+      return Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
+    });
+    if (anyGhostAdjacent) {
+      newGameState.heroTorchLit = false;
+    }
   }
 
   // Check if the new position is a wall
@@ -928,6 +955,26 @@ export function movePlayer(
       ].filter((type) => type !== TileSubtype.PLAYER);
       newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
       moved = true;
+
+      // Relight hero torch if adjacent to any wall torch after moving
+      const adj: Array<[number, number]> = [
+        [newY - 1, newX],
+        [newY + 1, newX],
+        [newY, newX - 1],
+        [newY, newX + 1],
+      ];
+      for (const [ay, ax] of adj) {
+        if (
+          ay >= 0 &&
+          ay < GRID_SIZE &&
+          ax >= 0 &&
+          ax < GRID_SIZE &&
+          newMapData.subtypes[ay][ax]?.includes(TileSubtype.WALL_TORCH)
+        ) {
+          newGameState.heroTorchLit = true;
+          break;
+        }
+      }
     }
     // If it's a lock and player has key, unlock it
     else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
@@ -985,7 +1032,10 @@ export function movePlayer(
     }
 
     // If it's FOOD or MED, apply healing (capped at 5) and proceed to move
-    if (subtype.includes(TileSubtype.FOOD) || subtype.includes(TileSubtype.MED)) {
+    if (
+      subtype.includes(TileSubtype.FOOD) ||
+      subtype.includes(TileSubtype.MED)
+    ) {
       const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
       newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
       // Movement/clearing of the item happens below in the generic move logic
@@ -994,7 +1044,8 @@ export function movePlayer(
     // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry
     // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened)
     if (
-      (subtype.includes(TileSubtype.SWORD) || subtype.includes(TileSubtype.SHIELD)) &&
+      (subtype.includes(TileSubtype.SWORD) ||
+        subtype.includes(TileSubtype.SHIELD)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
       if (subtype.includes(TileSubtype.SWORD)) {
@@ -1012,19 +1063,29 @@ export function movePlayer(
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
       newMapData.subtypes[newY][newX] = [];
-      console.log("Player picked up a rock! Total rocks:", newGameState.rockCount);
+      console.log(
+        "Player picked up a rock! Total rocks:",
+        newGameState.rockCount
+      );
     }
 
     // Combat: if an enemy occupies the destination, resolve attack
     if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
-      const idx = newGameState.enemies.findIndex((e) => e.y === newY && e.x === newX);
+      const idx = newGameState.enemies.findIndex(
+        (e) => e.y === newY && e.x === newX
+      );
       if (idx !== -1) {
         // Apply hero damage to enemy with variance and sword bonus
         const enemy = newGameState.enemies[idx];
         const rng = newGameState.combatRng; // undefined => no variance
-        const variance = rng ? ((r => (r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng())) : 0;
+        const variance = rng
+          ? ((r) => (r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1))(rng())
+          : 0;
         const swordBonus = newGameState.hasSword ? 2 : 0;
-        const heroDamage = Math.max(0, newGameState.heroAttack + swordBonus + variance);
+        const heroDamage = Math.max(
+          0,
+          newGameState.heroAttack + swordBonus + variance
+        );
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
 
@@ -1043,10 +1104,16 @@ export function movePlayer(
               newMapData.tiles,
               newGameState.enemies,
               { y: finalPlayerPos[0], x: finalPlayerPos[1] },
-              { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
+              {
+                rng: newGameState.combatRng,
+                defense: newGameState.hasShield ? 2 : 0,
+              }
             );
             if (damage > 0) {
-              newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
+              newGameState.heroHealth = Math.max(
+                0,
+                newGameState.heroHealth - damage
+              );
               newGameState.stats.damageTaken += damage;
             }
             console.log(
@@ -1062,10 +1129,16 @@ export function movePlayer(
             newMapData.tiles,
             newGameState.enemies,
             { y: finalPlayerPos[0], x: finalPlayerPos[1] },
-            { rng: newGameState.combatRng, defense: newGameState.hasShield ? 2 : 0 }
+            {
+              rng: newGameState.combatRng,
+              defense: newGameState.hasShield ? 2 : 0,
+            }
           );
           if (damage > 0) {
-            newGameState.heroHealth = Math.max(0, newGameState.heroHealth - damage);
+            newGameState.heroHealth = Math.max(
+              0,
+              newGameState.heroHealth - damage
+            );
             newGameState.stats.damageTaken += damage;
           }
           console.log(
@@ -1160,9 +1233,33 @@ export function movePlayer(
     }
     // If we picked up FOOD/MED/SWORD/SHIELD, remove those subtypes from dest
     newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-      (t) => t !== TileSubtype.FOOD && t !== TileSubtype.MED && t !== TileSubtype.SWORD && t !== TileSubtype.SHIELD
+      (t) =>
+        t !== TileSubtype.FOOD &&
+        t !== TileSubtype.MED &&
+        t !== TileSubtype.SWORD &&
+        t !== TileSubtype.SHIELD
     );
     moved = true;
+
+    // Relight hero torch if adjacent to any wall torch after normal movement
+    const adj2: Array<[number, number]> = [
+      [newY - 1, newX],
+      [newY + 1, newX],
+      [newY, newX - 1],
+      [newY, newX + 1],
+    ];
+    for (const [ay, ax] of adj2) {
+      if (
+        ay >= 0 &&
+        ay < GRID_SIZE &&
+        ax >= 0 &&
+        ax < GRID_SIZE &&
+        newMapData.subtypes[ay][ax]?.includes(TileSubtype.WALL_TORCH)
+      ) {
+        newGameState.heroTorchLit = true;
+        break;
+      }
+    }
   }
 
   // Enemies have already been updated at the start of this turn

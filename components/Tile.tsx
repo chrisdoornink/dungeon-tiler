@@ -24,6 +24,7 @@ interface TileProps {
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
+  invisibleClassName?: string; // Optional class override for invisible tiles
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -41,6 +42,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyFacing,
   hasSword,
   hasShield,
+  invisibleClassName,
 }) => {
   // Per-instance randomized torch animation interval (200–300ms)
   const torchDuration = React.useMemo(() => {
@@ -622,7 +624,7 @@ export const Tile: React.FC<TileProps> = ({
       // Invisible floor
       return (
         <div
-          className={`${styles.tileContainer} ${styles.invisible} bg-gray-900`}
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? 'bg-gray-900'}`}
           data-testid={`tile-${tileId}`}
         />
       );
@@ -760,7 +762,7 @@ export const Tile: React.FC<TileProps> = ({
       // Invisible wall - same style as invisible floor
       return (
         <div
-          className={`${styles.tileContainer} ${styles.invisible} bg-gray-900`}
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? 'bg-gray-900'}`}
           data-testid={`tile-${tileId}`}
         />
       );

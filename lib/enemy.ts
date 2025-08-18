@@ -19,6 +19,9 @@ export class Enemy {
   // Simple facing state without importing Direction to avoid circular deps
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
+  // Basic species/kind classification for behavior and rendering tweaks
+  // 'goblin' default; 'ghost' steals the hero's light when adjacent
+  kind: 'goblin' | 'ghost' = 'goblin';
 
   constructor(pos: { y: number; x: number }) {
     this.y = pos.y;

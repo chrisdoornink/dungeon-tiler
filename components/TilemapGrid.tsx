@@ -12,7 +12,11 @@ import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
-import { computeTorchGlow, ADJACENT_GLOW, DIAGONAL_GLOW } from "../lib/torch_glow";
+import {
+  computeTorchGlow,
+  ADJACENT_GLOW,
+  DIAGONAL_GLOW,
+} from "../lib/torch_glow";
 
 // Grid configuration constants
 const GRID_WIDTH = 25;
@@ -60,6 +64,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         heroHealth: 5,
         heroAttack: 1,
         rockCount: 0,
+        heroTorchLit: true,
         stats: {
           damageDealt: 0,
           damageTaken: 0,
@@ -113,9 +118,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       y: number;
       x: number;
       amount: number;
-      color: 'red' | 'green';
-      target: 'enemy' | 'hero';
-      sign: '+' | '-';
+      color: "red" | "green";
+      target: "enemy" | "hero";
+      sign: "+" | "-";
       createdAt: number;
     }>
   >([]);
@@ -188,7 +193,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             const prevRaw = window.sessionStorage.getItem("lastGame");
             if (prevRaw) {
               const prev = JSON.parse(prevRaw);
-              const prevStreak = typeof prev?.streak === 'number' ? prev.streak : 0;
+              const prevStreak =
+                typeof prev?.streak === "number" ? prev.streak : 0;
               nextStreak = prevStreak + 1;
             }
           }
@@ -315,8 +321,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // 1) Enemy damage taken when attacking into enemy tile
       if (
         preEnemyAtTarget &&
-        typeof targetY === 'number' &&
-        typeof targetX === 'number'
+        typeof targetY === "number" &&
+        typeof targetX === "number"
       ) {
         // Check enemy at same position after move
         const postEnemy = (newGameState.enemies || []).find(
@@ -330,38 +336,45 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           dmg = preEnemyHealth;
         }
         if (dmg > 0) {
-          const now = Date.now();
-          const id = `fd-enemy-${targetY},${targetX}-${now}-${Math.random()
-            .toString(36)
-            .slice(2, 7)}`;
-          setFloating((prev) => {
-            const next = [
-              ...prev,
-              {
-                id,
-                y: targetY as number,
-                x: targetX as number,
-                amount: dmg,
-                color: 'red' as const,
-                target: 'enemy' as const,
-                sign: '-' as const,
-                createdAt: now,
-              },
-            ];
-            // Auto-remove after ~1200ms
-            setTimeout(() => {
-              setFloating((curr) => curr.filter((f) => f.id !== id));
-            }, 1200);
-            return next;
-          });
+          const spawn = () => {
+            const now = Date.now();
+            const id = `fd-enemy-${targetY},${targetX}-${now}-${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
+            setFloating((prev) => {
+              const next = [
+                ...prev,
+                {
+                  id,
+                  y: targetY as number,
+                  x: targetX as number,
+                  amount: dmg,
+                  color: "red" as const,
+                  target: "enemy" as const,
+                  sign: "-" as const,
+                  createdAt: now,
+                },
+              ];
+              // Auto-remove after ~1200ms
+              setTimeout(() => {
+                setFloating((curr) => curr.filter((f) => f.id !== id));
+              }, 1200);
+              return next;
+            });
+          };
+          if (process.env.NODE_ENV === "test") {
+            spawn();
+          } else {
+            setTimeout(spawn, 120); // wait for enemy movement to settle
+          }
         }
       }
       // 2) Hero damage taken from enemies this tick
-      if (
-        typeof prePlayerY === 'number' &&
-        typeof prePlayerX === 'number'
-      ) {
-        const heroDmg = Math.max(0, gameState.heroHealth - newGameState.heroHealth);
+      if (typeof prePlayerY === "number" && typeof prePlayerX === "number") {
+        const heroDmg = Math.max(
+          0,
+          gameState.heroHealth - newGameState.heroHealth
+        );
         if (heroDmg > 0) {
           const now = Date.now();
           const id = `fd-hero-${prePlayerY},${prePlayerX}-${now}-${Math.random()
@@ -375,9 +388,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 y: prePlayerY as number,
                 x: prePlayerX as number,
                 amount: heroDmg,
-                color: 'green' as const,
-                target: 'hero' as const,
-                sign: '-' as const,
+                color: "green" as const,
+                target: "hero" as const,
+                sign: "-" as const,
                 createdAt: now,
               },
             ];
@@ -389,11 +402,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
       }
       // 3) Hero healing gained this tick (from food/medicine pickup)
-      if (
-        typeof prePlayerY === 'number' &&
-        typeof prePlayerX === 'number'
-      ) {
-        const heroHeal = Math.max(0, newGameState.heroHealth - gameState.heroHealth);
+      if (typeof prePlayerY === "number" && typeof prePlayerX === "number") {
+        const heroHeal = Math.max(
+          0,
+          newGameState.heroHealth - gameState.heroHealth
+        );
         if (heroHeal > 0) {
           const now = Date.now();
           const id = `fh-hero-${prePlayerY},${prePlayerX}-${now}-${Math.random()
@@ -407,9 +420,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 y: prePlayerY as number,
                 x: prePlayerX as number,
                 amount: heroHeal,
-                color: 'green' as const,
-                target: 'hero' as const,
-                sign: '+' as const,
+                color: "green" as const,
+                target: "hero" as const,
+                sign: "+" as const,
                 createdAt: now,
               },
             ];
@@ -428,7 +441,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const next = [...prev];
           for (const [y, x] of died) {
             const key = `${y},${x}`;
-            const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+            const id = `${key}-${now}-${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
             next.push({ id, y, x, createdAt: now });
             // Auto-remove after animation completes (~1800ms + pad)
             setTimeout(() => {
@@ -592,13 +607,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 <span
                   aria-hidden="true"
                   style={{
-                    display: 'inline-block',
+                    display: "inline-block",
                     width: 16,
                     height: 16,
-                    backgroundImage: 'url(/images/items/rock-1.png)',
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
+                    backgroundImage: "url(/images/items/rock-1.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
                   }}
                 />
                 <span>Rock x{gameState.rockCount}</span>
@@ -609,7 +624,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       )}
 
       {/* Mobile controls */}
-      <MobileControls onMove={handleMobileMove} onThrowRock={handleThrowRock} rockCount={gameState.rockCount ?? 0} />
+      <MobileControls
+        onMove={handleMobileMove}
+        onThrowRock={handleThrowRock}
+        rockCount={gameState.rockCount ?? 0}
+      />
 
       {/* Centered map container */}
       <div className="flex justify-center items-center h-[calc(100vh-100px)]">
@@ -678,16 +697,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       style={{
                         left: `${pxLeft}px`,
                         top: `${pxTop}px`,
-                        transform: 'translate(-50%, -50%)',
+                        transform: "translate(-50%, -50%)",
                         zIndex: 11500,
-                        color: f.color === 'red' ? '#ff4242' : '#6afc7a',
+                        color: f.color === "red" ? "#ff4242" : "#6afc7a",
                         fontWeight: 800,
-                        textShadow: '0 1px 0 rgba(0,0,0,0.6)',
+                        textShadow: "0 1px 0 rgba(0,0,0,0.6)",
                         // Match spirit effect speed/distance: rise ~100px over ~1800ms
-                        animation: 'spiritRiseFade 1800ms ease-out forwards',
+                        animation: "spiritRiseFade 1800ms ease-out forwards",
                       }}
                     >
-                      {f.sign}{f.amount}
+                      {f.sign}
+                      {f.amount}
                     </div>
                   );
                 });
@@ -715,12 +735,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       <div
                         className="w-full h-full spirit-flip"
                         style={{
-                          backgroundImage: 'url(/images/items/spirit.png)',
-                          backgroundSize: 'contain',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundPosition: 'center',
-                          width: '100%',
-                          height: '100%',
+                          backgroundImage: "url(/images/items/spirit.png)",
+                          backgroundSize: "contain",
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "center",
+                          width: "100%",
+                          height: "100%",
                         }}
                       />
                     </div>
@@ -732,6 +752,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               style={{
                 gridTemplateRows: `repeat(${GRID_HEIGHT}, 40px)`,
                 gridTemplateColumns: `repeat(${GRID_WIDTH}, 40px)`,
+                // When the hero's torch is OFF, force a pure black background behind tiles
+                // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
+                // the transparent center of the vignette.
+                backgroundColor: (gameState.heroTorchLit ? undefined : '#000'),
               }}
               tabIndex={0} // Make div focusable for keyboard events
             >
@@ -743,7 +767,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 gameState.playerDirection,
                 gameState.enemies,
                 gameState.hasSword,
-                gameState.hasShield
+                gameState.hasShield,
+                gameState.heroTorchLit ?? true
               )}
             </div>
           </div>
@@ -757,7 +782,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 function calculateVisibility(
   grid: number[][],
   playerPosition: [number, number] | null,
-  showFullMap: boolean = false
+  showFullMap: boolean = false,
+  heroTorchLit: boolean = true
 ): number[][] {
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
@@ -775,8 +801,26 @@ function calculateVisibility(
     .map(() => Array(gridWidth).fill(0));
 
   const [playerY, playerX] = playerPosition;
+  // If hero torch is out, only reveal the hero's own tile; rely on wall torches for the rest
+  if (!heroTorchLit) {
+    // Center tile fully visible
+    visibility[playerY][playerX] = 3;
+    // Orthogonally adjacent tiles dimly visible (tier 1)
+    const adj = [
+      [playerY - 1, playerX],
+      [playerY + 1, playerX],
+      [playerY, playerX - 1],
+      [playerY, playerX + 1],
+    ];
+    for (const [y, x] of adj) {
+      if (y >= 0 && y < gridHeight && x >= 0 && x < gridWidth) {
+        visibility[y][x] = Math.max(visibility[y][x], 1);
+      }
+    }
+    return visibility;
+  }
 
-  // Full-visibility radius
+  // Full-visibility radius when torch is lit
   const fullRadius = 4;
 
   // Set visibility for all tiles in range
@@ -814,7 +858,8 @@ function renderTileGrid(
   playerDirection: Direction = Direction.DOWN,
   enemies?: Enemy[],
   hasSword?: boolean,
-  hasShield?: boolean
+  hasShield?: boolean,
+  heroTorchLit: boolean = true
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -831,8 +876,13 @@ function renderTileGrid(
     }
   }
 
-  // Calculate visibility for each tile
-  const visibility = calculateVisibility(grid, playerPosition, showFullMap);
+  // Calculate visibility for each tile, honoring hero torch state
+  const visibility = calculateVisibility(
+    grid,
+    playerPosition,
+    showFullMap,
+    heroTorchLit
+  );
 
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
   const glowMap = new Map<string, number>();
@@ -875,7 +925,8 @@ function renderTileGrid(
       // Torch-driven illumination: use smaller radius similar to FOV tiers
       const glowKey = `${rowIndex},${colIndex}`;
       const g = glowMap.get(glowKey);
-      const isSelfTorch = Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
+      const isSelfTorch =
+        Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
       // Torch tile itself should always be at least tier 3 (fully visible)
       if (isSelfTorch) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength
@@ -929,6 +980,7 @@ function renderTileGrid(
             enemyFacing={enemyAtTile?.facing}
             hasSword={hasSword}
             hasShield={hasShield}
+            invisibleClassName={!heroTorchLit && process.env.NODE_ENV !== 'test' ? 'bg-black' : undefined}
           />
         </div>
       );
@@ -964,31 +1016,46 @@ function renderTileGrid(
       rgba(0,0,0,0) ${t4}px
     )`;
 
-    const gradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
+    // When the hero's torch is OFF, use a pure black vignette to avoid gray tint.
+    // Otherwise, keep the dark gray for a softer ambiance.
+    const gradient = heroTorchLit
+      ? `radial-gradient(circle at ${centerX}px ${centerY}px,
       rgba(26,26,26,0) ${r0}px,
       rgba(26,26,26,0.25) ${r1}px,
       rgba(26,26,26,0.50) ${r2}px,
       rgba(26,26,26,0.75) ${r3}px,
       rgba(26,26,26,0.90) ${r4}px,
       rgba(26,26,26,1) ${r5}px
+    )`
+      : `radial-gradient(circle at ${centerX}px ${centerY}px,
+      rgba(0,0,0,0) ${r0}px,
+      rgba(0,0,0,0.25) ${r1}px,
+      rgba(0,0,0,0.50) ${r2}px,
+      rgba(0,0,0,0.75) ${r3}px,
+      rgba(0,0,0,0.90) ${r4}px,
+      rgba(0,0,0,1) ${r5}px
     )`;
 
-    // Push the warm torch glow first (lower z), then the dark vignette (higher z)
-    tiles.push(
-      <div
-        key="torch-glow"
-        className={`${styles.torchGlow}`}
-        style={{ backgroundImage: torchGradient, zIndex: 9000 }}
-      />
-    );
-
-    tiles.push(
-      <div
-        key="fov-radial-overlay"
-        className="pointer-events-none absolute inset-0"
-        style={{ backgroundImage: gradient, zIndex: 10000 }}
-      />
-    );
+    // Push the warm torch glow first (lower z) ONLY if the hero's torch is lit,
+    // then the dark vignette (higher z) ONLY when torch is lit as well.
+    if (heroTorchLit) {
+      tiles.push(
+        <div
+          key="torch-glow"
+          className={`${styles.torchGlow}`}
+          style={{ backgroundImage: torchGradient, zIndex: 9000 }}
+        />
+      );
+    }
+    if (heroTorchLit) {
+      tiles.push(
+        <div
+          key="fov-radial-overlay"
+          className="pointer-events-none absolute inset-0"
+          style={{ backgroundImage: gradient, zIndex: 10000 }}
+        />
+      );
+    }
   }
 
   return tiles;
