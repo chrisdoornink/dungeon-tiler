@@ -7,12 +7,16 @@
 
 /* Global utility classes moved from CSS Modules (Vercel CSS Modules purity) */
 .fov-tier-3 { filter: none; }
-.fov-tier-2 { 
+/* Adjacent to torch: medium brightness */
+.fov-tier-2 {
+  filter: brightness(0.80) saturate(0.95);
   animation: torchFlickerTier2 2.2s ease-in-out infinite;
   position: relative;
   z-index: 0;
 }
-.fov-tier-1 { 
+/* Diagonal to torch: about half as bright as tier-2 */
+.fov-tier-1 {
+  filter: brightness(0.40) saturate(0.90);
   animation: torchFlickerTier1 2.7s ease-in-out infinite;
   position: relative;
   z-index: 0;
@@ -72,8 +76,8 @@ body {
   --forest-dark: #1e2a22;
 
   /* Torch flicker colors (tile flicker usage) */
-  --torch-glow-tier1: rgba(255, 200, 120, 0.15);
-  --torch-glow-tier2: rgba(255, 200, 120, 0.1);
+  --torch-glow-tier1: rgba(255, 200, 120, 0.12);
+  --torch-glow-tier2: rgba(255, 200, 120, 0.18);
 
   /* Torch/glow colors for viewport glow layer */
   --torch-core: rgba(190, 170, 140, 0.04);

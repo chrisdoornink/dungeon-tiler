@@ -705,7 +705,19 @@ function renderTileGrid(
       const tileType = tileTypes[tileId];
       const subtype =
         subtypes && subtypes[rowIndex] ? subtypes[rowIndex][colIndex] : [];
-      const tier = visibility[rowIndex][colIndex];
+      let tier = visibility[rowIndex][colIndex];
+      // Torch-driven illumination: use smaller radius similar to FOV tiers
+      const glowKey = `${rowIndex},${colIndex}`;
+      const g = glowMap.get(glowKey);
+      const isSelfTorch = Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
+      // Torch tile itself should always be at least tier 3 (fully visible)
+      if (isSelfTorch) tier = Math.max(tier, 3);
+      // Neighbor illumination based on glow strength
+      if (g === ADJACENT_GLOW) {
+        tier = Math.max(tier, 2);
+      } else if (g === DIAGONAL_GLOW) {
+        tier = Math.max(tier, 1);
+      }
       const isVisible = tier > 0;
 
       // Get neighboring tiles
@@ -725,13 +737,14 @@ function renderTileGrid(
       return (
         <div
           key={`${rowIndex}-${colIndex}`}
-          className={`relative ${styles.tileWrapper} ${(() => {
-            const key = `${rowIndex},${colIndex}`;
-            const g = glowMap.get(key);
-            const base = g === ADJACENT_GLOW ? 'torchGlowAdj' : g === DIAGONAL_GLOW ? 'torchGlowDiag' : '';
-            const self = subtype && subtype.includes(TileSubtype.WALL_TORCH) ? ' torchGlowSelf' : '';
-            return base + self;
-          })()}`}
+          className={`relative ${styles.tileWrapper}`}
+          style={(() => {
+            // Raise z-index so lit tiles appear above the dark vignette overlay
+            if (g != null || isSelfTorch) {
+              return { zIndex: 10050 as number };
+            }
+            return undefined;
+          })()}
           data-row={rowIndex}
           data-col={colIndex}
         >

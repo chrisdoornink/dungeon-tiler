@@ -29,52 +29,6 @@
   line-height: 0;
 }
 
-/* Torch tile and neighbor glow overlays (global class names from TSX) */
-:global(.torchGlowSelf)::after,
-:global(.torchGlowAdj)::after,
-:global(.torchGlowDiag)::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  mix-blend-mode: screen;
-  border-radius: 2px;
-  animation: torchFlicker 8000ms ease-in-out infinite;
-}
-
-/* Strongest on the torch's own tile */
-:global(.torchGlowSelf)::after {
-  background: radial-gradient(circle at 50% 65%,
-    rgba(255, 200, 80, 0.45) 0%,
-    rgba(255, 160, 40, 0.28) 35%,
-    rgba(255, 120, 20, 0.12) 60%,
-    rgba(0, 0, 0, 0) 75%
-  );
-  filter: blur(0.5px);
-}
-
-/* Adjacent orthogonal neighbors */
-:global(.torchGlowAdj)::after {
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255, 200, 80, 0.20) 0%,
-    rgba(255, 160, 40, 0.12) 40%,
-    rgba(255, 120, 20, 0.05) 65%,
-    rgba(0, 0, 0, 0) 80%
-  );
-  filter: blur(1px);
-}
-
-/* Diagonal neighbors (faint) */
-:global(.torchGlowDiag)::after {
-  background: radial-gradient(circle at 50% 50%,
-    rgba(255, 200, 80, 0.12) 0%,
-    rgba(255, 160, 40, 0.08) 35%,
-    rgba(255, 120, 20, 0.03) 60%,
-    rgba(0, 0, 0, 0) 78%
-  );
-  filter: blur(1.5px);
-}
-
 .torchGlow {
   position: absolute;
   inset: 0;
