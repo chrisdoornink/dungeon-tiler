@@ -728,9 +728,9 @@ function renderTileGrid(
           className={`relative ${styles.tileWrapper} ${(() => {
             const key = `${rowIndex},${colIndex}`;
             const g = glowMap.get(key);
-            if (g === ADJACENT_GLOW) return 'torchGlowAdj';
-            if (g === DIAGONAL_GLOW) return 'torchGlowDiag';
-            return '';
+            const base = g === ADJACENT_GLOW ? 'torchGlowAdj' : g === DIAGONAL_GLOW ? 'torchGlowDiag' : '';
+            const self = subtype && subtype.includes(TileSubtype.WALL_TORCH) ? ' torchGlowSelf' : '';
+            return base + self;
           })()}`}
           data-row={rowIndex}
           data-col={colIndex}
