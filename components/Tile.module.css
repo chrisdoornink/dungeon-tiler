@@ -153,6 +153,15 @@
   background-repeat: no-repeat;
 }
 
+/* Absolute overlay for revealed items to appear above chests */
+.overlayIcon {
+  position: absolute;
+  inset: 0;
+  z-index: 5000;
+  pointer-events: none;
+  margin: auto;
+}
+
 /* Special full-height asset icon for doors */
 .fullHeightAssetIcon {
   width: 28px;
@@ -210,6 +219,15 @@
 
 .medIcon {
   background-image: url('/images/items/meds-1.png');
+}
+
+/* Sword and Shield assets */
+.swordIcon {
+  background-image: url('/images/items/sword.png');
+}
+
+.shieldIcon {
+  background-image: url('/images/items/shield.png');
 }
 
 @keyframes exitPulse {

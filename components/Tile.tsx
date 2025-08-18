@@ -301,26 +301,14 @@ export const Tile: React.FC<TileProps> = ({
           <div
             key="sword-revealed"
             data-testid={`subtype-icon-${TileSubtype.SWORD}`}
-            className={`${styles.assetIcon}`}
-            style={{
-              backgroundImage: `url(${pickVariant([
-                '/images/items/food-1.png',
-                '/images/items/food-2.png',
-                '/images/items/food-3.png',
-              ])})`,
-              zIndex: 3,
-            }}
+            className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.swordIcon}`}
           />
         )}
         {hasOpenChest(subtypes) && hasShieldItem(subtypes) && (
           <div
             key="shield-revealed"
             data-testid={`subtype-icon-${TileSubtype.SHIELD}`}
-            className={`${styles.assetIcon}`}
-            style={{
-              backgroundImage: `url('/images/items/meds-1.png')`,
-              zIndex: 3,
-            }}
+            className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.shieldIcon}`}
           />
         )}
 

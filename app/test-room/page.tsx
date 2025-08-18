@@ -47,12 +47,15 @@ function buildTestRoom(): GameState {
   }
 
   const cycle = [TileSubtype.CHEST, TileSubtype.POT, TileSubtype.ROCK];
+  let chestIdx = 0;
   for (let i = 0; i < borderPositions.length; i++) {
     const [y, x] = borderPositions[i];
     const t = cycle[i % cycle.length];
     if (t === TileSubtype.CHEST) {
-      // Just a closed chest; simpler for a showcase room
-      subtypes[y][x] = [TileSubtype.CHEST];
+      // Alternate SWORD/SHIELD contents; no LOCK for quick testing
+      const content = chestIdx % 2 === 0 ? TileSubtype.SWORD : TileSubtype.SHIELD;
+      subtypes[y][x] = [TileSubtype.CHEST, content];
+      chestIdx++;
     } else if (t === TileSubtype.POT) {
       subtypes[y][x] = [TileSubtype.POT];
     } else if (t === TileSubtype.ROCK) {
