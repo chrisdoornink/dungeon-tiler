@@ -68,4 +68,4 @@ Always write one test at a time, make it run, then improve structure. Always run
 
 After each test is passing, mark it as completed in the plan file, and add an entry to the changelog in `__plans__/changelog.md`.
 
-Before finishing run `rm -rf .next && npm run build` to ensure the build is working and will pass vercel deployment.
+Before finishing run `npm run build` to ensure the build is working and will pass vercel deployment.
