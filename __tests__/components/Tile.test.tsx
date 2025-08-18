@@ -14,6 +14,39 @@ describe('Tile component', () => {
     expect(tile).toHaveStyle('background-color: #c8c8c8');
   });
 
+  it("renders '-snuff' hero image when torch is unlit", () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    // Front facing, no equipment
+    const { rerender } = render(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        heroTorchLit={false}
+        playerDirection={Direction.DOWN}
+      />
+    );
+    let heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-snuff-static.png')");
+
+    // Right facing with both sword and shield should use '-shield-sword-snuff'
+    rerender(
+      <Tile 
+        tileId={0} 
+        tileType={mockTileType} 
+        subtype={[TileSubtype.PLAYER]} 
+        isVisible={true} 
+        heroTorchLit={false}
+        hasSword={true}
+        hasShield={true}
+        playerDirection={Direction.RIGHT}
+      />
+    );
+    heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-shield-sword-snuff-static.png')");
+  });
+
   it('adds an exaggerated bottom border and base shadow on walls when there is a floor below (forced perspective)', () => {
     const mockTileType = { id: 1, name: 'wall', color: '#333', walkable: false };
     render(

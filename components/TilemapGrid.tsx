@@ -975,6 +975,7 @@ function renderTileGrid(
             visibilityTier={tier}
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
+            heroTorchLit={heroTorchLit}
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}

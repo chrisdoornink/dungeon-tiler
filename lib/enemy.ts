@@ -44,6 +44,7 @@ export class Enemy {
       if (stepX !== 0) tryMoves.push([0, stepX]);
       if (stepY !== 0) tryMoves.push([stepY, 0]);
 
+      let moved = false;
       for (const [dy, dx] of tryMoves) {
         const ny = this.y + dy;
         const nx = this.x + dx;
@@ -59,13 +60,45 @@ export class Enemy {
           }
           return this.attack;
         }
-        if (isFloor(grid, ny, nx) && !wouldCollideWithPlayer) {
+        if (isFloor(grid, ny, nx)) {
           // Update facing based on chosen step
           if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
           else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
           this.y = ny;
           this.x = nx;
+          moved = true;
           break;
+        }
+        // Ghosts can phase through walls: continue along axis until next floor tile
+        if (this.kind === 'ghost' && (dy !== 0 || dx !== 0)) {
+          let ty = ny;
+          let tx = nx;
+          // advance along same axis until a floor is found or out of bounds
+          while (ty >= 0 && ty < grid.length && tx >= 0 && tx < grid[0].length) {
+            // stop if we reach the player's tile; treat as attack opportunity
+            if (ty === player.y && tx === player.x) {
+              if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
+                this.facing = dxRaw > 0 ? 'RIGHT' : 'LEFT';
+              } else {
+                this.facing = dyRaw > 0 ? 'DOWN' : 'UP';
+              }
+              return this.attack;
+            }
+            if (isFloor(grid, ty, tx)) {
+              if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
+              else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
+              this.y = ty;
+              this.x = tx;
+              // moved successfully through walls
+              moved = true;
+              break;
+            }
+            // continue stepping through walls
+            ty += dy;
+            tx += dx;
+          }
+          // if we moved, break out of tryMoves loop
+          if (moved) break;
         }
       }
     } else {

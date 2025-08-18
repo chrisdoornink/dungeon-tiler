@@ -19,6 +19,7 @@ interface TileProps {
   visibilityTier?: number; // 0-3 for FOV fade tiers
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
+  heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -38,6 +39,7 @@ export const Tile: React.FC<TileProps> = ({
   visibilityTier = 3,
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
+  heroTorchLit = true,
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
@@ -473,7 +475,7 @@ export const Tile: React.FC<TileProps> = ({
     );
   };
 
-  // Get the appropriate hero image based on player direction and equipment if this is a player tile
+  // Get the appropriate hero image based on player direction, equipment, and torch state if this is a player tile
   const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER)
     ? (() => {
         const equip = () => {
@@ -498,7 +500,8 @@ export const Tile: React.FC<TileProps> = ({
           default:
             dir = 'front';
         }
-        return `/images/hero/hero-${dir}${equip()}-static.png`;
+        const snuff = heroTorchLit ? '' : '-snuff';
+        return `/images/hero/hero-${dir}${equip()}${snuff}-static.png`;
       })()
     : '';
   
