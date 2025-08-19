@@ -82,6 +82,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Stepping onto a chest item should add the item in the chest to the inventory and remove the chest from the tile, adding an OPEN_CHEST subtype on that tile.
 - [x] Building off the visual design implemented currently, try to give some forced perspective to the walls by making the bottom border if the wall tile has a floor tile below it taller than the other borders.
 - [x] Implement this // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile - need the asset first
+- [ ] Throwing a rock should count as a movement by the player, so the enemies should get a movement turn when the rock is thrown. This movement should occur before the rock leaves its starting point and reaches its destination, so if an enemy is no longer in the path of the throw, then it should not hit them.
 
 ### Visual Polish
 
@@ -182,38 +183,46 @@ Goal: Introduce decorative `ROCK` tiles and interactive `POT` containers that re
 
 TDD Test Breakdown (behavior-first, smallest steps):
 
-1) Lib: New subtypes are defined
+1. Lib: New subtypes are defined
+
 - [ ] lib: `TileSubtype` contains `POT`, `ROCK`, `FOOD`, `MED` with stable numeric values.
 
-2) Lib: Generation counts (bounded)
+2. Lib: Generation counts (bounded)
+
 - [ ] lib: `generateCompleteMap()` places between 3 and 7 `POT` subtypes on valid floor tiles (inclusive bounds).
 - [ ] lib: `generateCompleteMap()` places between 3 and 7 `ROCK` subtypes on valid floor tiles (inclusive bounds).
 
-3) Lib: Placement heuristics (tendencies)
+3. Lib: Placement heuristics (tendencies)
+
 - [ ] lib: A majority (>=60%) of `POT`s are placed adjacent to at least one wall tile.
 - [ ] lib: A majority (>=60%) of `ROCK`s are placed in open floor areas (no adjacent walls in 4-neighborhood).
   - Note: Use seeded RNG to make this check stable.
 
-4) Lib: Pot reveal on bump, without moving
+4. Lib: Pot reveal on bump, without moving
+
 - [ ] lib: When attempting to move into a `POT` tile, the player does not change position, and the `POT` is replaced by revealed content: `FOOD`, `MED`, or nothing (no subtype) according to RNG.
 - [ ] lib: After reveal, a second move into the same tile succeeds and the player enters the tile.
 
-5) Lib: Pickup effects on entering revealed item
+5. Lib: Pickup effects on entering revealed item
+
 - [ ] lib: Moving onto a tile with `FOOD` increases `heroHealth` by 1 (capped by max, if any) and removes `FOOD` from the tile.
 - [ ] lib: Moving onto a tile with `MED` increases `heroHealth` by 3 (capped) and removes `MED` from the tile.
 
-6) Lib: Contents distribution (probabilistic via injected RNG)
+6. Lib: Contents distribution (probabilistic via injected RNG)
+
 - [ ] lib: With RNG stub returning values <0.5, reveal yields `FOOD`.
 - [ ] lib: With RNG stub in [0.5, 0.75), reveal yields `MED`.
 - [ ] lib: With RNG stub >=0.75, reveal yields nothing.
 
-7) Components: Rendering of new subtypes
+7. Components: Rendering of new subtypes
+
 - [ ] components/Tile: Renders icon for `POT`.
 - [ ] components/Tile: Renders icon for `ROCK`.
 - [ ] components/Tile: Renders icon for `FOOD`.
 - [ ] components/Tile: Renders icon for `MED`.
 
-8) Components: Interaction UX (bump reveal, then pickup)
+8. Components: Interaction UX (bump reveal, then pickup)
+
 - [ ] components/TilemapGrid: Simulate bump into `POT` using keyboard; assert player position unchanged and tile now shows revealed `FOOD`/`MED`/none per stubbed RNG.
 - [ ] components/TilemapGrid: Simulate moving onto `FOOD` tile; assert health +1 and icon removed.
 - [ ] components/TilemapGrid: Simulate moving onto `MED` tile; assert health +3 and icon removed.
@@ -231,6 +240,7 @@ Implementation Notes:
 - Rendering uses assets now present in `public/images/items/` (e.g., `pot-*.png`, `rock-*.png`, `food-*.png`, `meds-*.png`). Map these in `components/Tile.tsx` icon logic.
 
 Order of work:
+
 1. Define subtypes (lib) → tests.
 2. Generation min/max counts (lib) → tests.
 3. Reveal without movement (lib) → tests for RNG stubs.

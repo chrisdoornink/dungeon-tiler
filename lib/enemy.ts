@@ -1,5 +1,7 @@
 import { canSee } from "./line_of_sight";
 
+export const ENEMY_PURSUIT_TTL = 5;
+
 export enum EnemyState {
   IDLE = "IDLE",
   HUNTING = "HUNTING",
@@ -43,6 +45,8 @@ export class Enemy {
 
   update(ctx: EnemyUpdateContext): number {
     const { grid, player } = ctx;
+    // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
+    this.state = EnemyState.IDLE;
     // Ghosts can see through walls; others use standard LOS
     const seesNow = this.kind === 'ghost'
       ? true
@@ -50,7 +54,7 @@ export class Enemy {
 
     // Update pursuit memory
     if (seesNow) {
-      this.pursuitTtl = 5; // refresh memory window
+      this.pursuitTtl = ENEMY_PURSUIT_TTL; // refresh memory window
       this.lastKnownPlayer = { y: player.y, x: player.x };
     } else if (this.pursuitTtl > 0 && this.lastKnownPlayer) {
       this.pursuitTtl -= 1;
@@ -60,7 +64,6 @@ export class Enemy {
     const targetPos = seesNow ? player : (this.lastKnownPlayer as { y: number; x: number } | null);
 
     if (hasPursuitTarget && targetPos) {
-      this.state = EnemyState.HUNTING;
       // Take one greedy step toward the target, biasing to retain line-of-sight when we currently see them.
       const dyRaw = targetPos.y - this.y;
       const dxRaw = targetPos.x - this.x;
@@ -100,6 +103,16 @@ export class Enemy {
         tryMoves = candMoves.slice(0, 1);
       }
 
+      // In memory mode, if the primary step is not walkable, drop pursuit immediately
+      if (!seesNow) {
+        const canAnyMove = tryMoves.some(([dy, dx]) => isFloor(grid, this.y + dy, this.x + dx));
+        if (!canAnyMove) {
+          this.pursuitTtl = 0;
+          this.state = EnemyState.IDLE;
+          return 0;
+        }
+      }
+
       let moved = false;
       for (const [dy, dx] of tryMoves) {
         const ny = this.y + dy;
@@ -109,6 +122,7 @@ export class Enemy {
         if (wouldCollideWithPlayer) {
           // Attack the player instead of moving
           // Facing was already aligned above
+          this.state = EnemyState.HUNTING;
           return this.attack;
         }
         if (isFloor(grid, ny, nx)) {
@@ -133,6 +147,7 @@ export class Enemy {
               } else {
                 this.facing = dyRaw > 0 ? 'DOWN' : 'UP';
               }
+              this.state = EnemyState.HUNTING;
               return this.attack;
             }
             if (isFloor(grid, ty, tx)) {
@@ -152,10 +167,11 @@ export class Enemy {
           if (moved) break;
         }
       }
-      // If we failed to move while only pursuing memory (not currently seeing), drop pursuit
-      if (!moved && !seesNow) {
+      // Decide state after attempting action
+      if (seesNow || moved) this.state = EnemyState.HUNTING;
+      else {
+        // If we failed to move while only pursuing memory (not currently seeing), drop pursuit
         this.pursuitTtl = 0;
-        // If we reached the last known position or are blocked, lose interest
         this.state = EnemyState.IDLE;
       }
     } else {

@@ -33,10 +33,9 @@ describe("Enemy basic behaviors (TDD)", () => {
     enemy.update({ grid, player });
     expect(enemy.state).toBe(EnemyState.HUNTING);
 
-    // Player ducks behind wall at y=4. Ensure LOS is blocked by adding an occluder off the enemy's row,
-    // without blocking the row-5 path towards last-known position
+    // Player ducks behind wall at y=4. Close the gap at (5,4) to guarantee LOS is blocked
     player.y = 4; player.x = 2;
-    grid[4][5] = 1; // occlude diagonal LOS, keep row 5 free
+    grid[5][4] = 1; // close gap used earlier so LOS is now blocked
     expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(false);
 
     // Enemy should continue moving left toward last-known position without LOS
@@ -61,10 +60,13 @@ describe("Enemy basic behaviors (TDD)", () => {
     expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(true);
     enemy.update({ grid, player }); // now has last-known position and TTL
 
-    // Lose LOS by moving player behind wall row and block immediate horizontal step at (5,6)
+    // Lose LOS by moving player behind wall row and block immediate horizontal step from current enemy pos (now at 5,6) to (5,5)
     player.y = 4; player.x = 2;
     grid[5][4] = 1; // close gap to ensure no LOS
-    grid[5][6] = 1; // corner/block directly in front of enemy
+    grid[5][5] = 1; // corner/block directly in front of enemy's next step
+
+    // Confirm LOS is indeed blocked
+    expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(false);
 
     // Update while only pursuing memory; movement is blocked so pursuit should drop to IDLE
     enemy.update({ grid, player });
