@@ -778,7 +778,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 type="button"
                 onClick={handleThrowRock}
                 className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                title={`Throw rock (${gameState.rockCount})`}
+                title={`Throw rock (${gameState.rockCount}) — tap this or press R`}
               >
                 <span
                   aria-hidden="true"
@@ -793,6 +793,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   }}
                 />
                 <span>Rock x{gameState.rockCount}</span>
+                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">(tap or R)</span>
               </button>
             )}
           </div>
