@@ -633,8 +633,10 @@ export function addWallTorchesToMap(mapData: MapData): MapData {
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
-  const count = 3 + Math.floor(Math.random() * 4); // 3–6
-  const toPlace = Math.min(count, eligible.length);
+  const baseCount = 3 + Math.floor(Math.random() * 4); // 3–6
+  // Reduce by ~20%, but keep at least 1 if eligible exist
+  const reduced = Math.max(1, Math.floor(baseCount * 0.8));
+  const toPlace = Math.min(reduced, eligible.length);
   for (let i = 0; i < toPlace; i++) {
     const [ty, tx] = eligible[i];
     newMapData.subtypes[ty][tx] = [TileSubtype.WALL_TORCH];

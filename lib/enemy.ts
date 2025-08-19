@@ -30,19 +30,44 @@ export class Enemy {
 
   update(ctx: EnemyUpdateContext): number {
     const { grid, player } = ctx;
-    const sees = canSee(grid, [this.y, this.x], [player.y, player.x]);
+    // Ghosts can see through walls; others use standard LOS
+    const sees = this.kind === 'ghost'
+      ? true
+      : canSee(grid, [this.y, this.x], [player.y, player.x]);
     if (sees) {
       this.state = EnemyState.HUNTING;
-      // Take one greedy step toward the player, without walking through walls.
+      // Take one greedy step toward the player, biasing to retain line-of-sight.
       const dyRaw = player.y - this.y;
       const dxRaw = player.x - this.x;
       const stepY = dyRaw === 0 ? 0 : dyRaw > 0 ? 1 : -1;
       const stepX = dxRaw === 0 ? 0 : dxRaw > 0 ? 1 : -1;
 
-      // Prefer horizontal movement when on same row, or generally attempt horizontal first
+      // Always face toward the player when seen, even if we cannot move this tick
+      if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
+        this.facing = dxRaw > 0 ? 'RIGHT' : (dxRaw < 0 ? 'LEFT' : this.facing);
+      } else {
+        this.facing = dyRaw > 0 ? 'DOWN' : (dyRaw < 0 ? 'UP' : this.facing);
+      }
+
+      // Candidate moves toward the player
+      const candMoves: Array<[number, number]> = [];
+      if (stepX !== 0) candMoves.push([0, stepX]);
+      if (stepY !== 0) candMoves.push([stepY, 0]);
+
+      // Reorder to prefer moves that preserve LOS after moving
       const tryMoves: Array<[number, number]> = [];
-      if (stepX !== 0) tryMoves.push([0, stepX]);
-      if (stepY !== 0) tryMoves.push([stepY, 0]);
+      const losPreserving: Array<[number, number]> = [];
+      const nonLos: Array<[number, number]> = [];
+      for (const [dy, dx] of candMoves) {
+        const ny = this.y + dy;
+        const nx = this.x + dx;
+        if (isFloor(grid, ny, nx)) {
+          if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
+          else nonLos.push([dy, dx]);
+        }
+      }
+      // Keep original bias (horizontal-first) within each bucket
+      tryMoves.push(...losPreserving, ...nonLos);
 
       let moved = false;
       for (const [dy, dx] of tryMoves) {
@@ -52,12 +77,7 @@ export class Enemy {
         const wouldCollideWithPlayer = ny === player.y && nx === player.x;
         if (wouldCollideWithPlayer) {
           // Attack the player instead of moving
-          // Face toward the player even if not moving
-          if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
-            this.facing = dxRaw > 0 ? 'RIGHT' : 'LEFT';
-          } else {
-            this.facing = dyRaw > 0 ? 'DOWN' : 'UP';
-          }
+          // Facing was already aligned above
           return this.attack;
         }
         if (isFloor(grid, ny, nx)) {
@@ -173,8 +193,26 @@ export function updateEnemies(
   const defense = opts?.defense ?? 0;
   const suppress = opts?.suppress;
   let totalDamage = 0;
+  // Track occupied tiles this tick to prevent overlaps; start with current positions
+  const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
   for (const e of enemies) {
+    const prevKey = `${e.y},${e.x}`;
+    const prevY = e.y;
+    const prevX = e.x;
     const base = e.update({ grid, player });
+    // If moved, validate occupancy (cannot occupy another enemy's tile)
+    const newKey = `${e.y},${e.x}`;
+    if (newKey !== prevKey) {
+      if (occupied.has(newKey)) {
+        // Revert move; keep this enemy at previous position
+        e.y = prevY;
+        e.x = prevX;
+      } else {
+        // Reserve new tile and release old
+        occupied.delete(prevKey);
+        occupied.add(newKey);
+      }
+    }
     // Optionally suppress this enemy's attack for this tick
     if (base > 0 && !suppress?.(e)) {
       const variance = rng

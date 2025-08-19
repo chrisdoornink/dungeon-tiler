@@ -1,5 +1,5 @@
 import { canSee } from "../../lib/line_of_sight";
-import { Enemy, EnemyState, placeEnemies } from "../../lib/enemy";
+import { Enemy, EnemyState, placeEnemies, updateEnemies } from "../../lib/enemy";
 
 // Helper: simple empty 10x10 floor map with a few walls for LOS tests
 const makeMap = () => {
@@ -20,6 +20,57 @@ describe("Enemy basic behaviors (TDD)", () => {
     expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(true);
     enemy.update({ grid, player });
     expect(enemy.state).toBe(EnemyState.HUNTING);
+  });
+
+  test("updateEnemies: prevents two enemies from occupying the same tile in a single tick (conflict resolution)", () => {
+    const grid = makeMap();
+    const player = { y: 0, x: 0 }; // irrelevant for this test
+    const a = new Enemy({ y: 2, x: 2 });
+    const b = new Enemy({ y: 2, x: 4 });
+
+    // Force both enemies to try to move into (2,3)
+    const targetY = 2;
+    const targetX = 3;
+    const origUpdateA = a.update.bind(a);
+    const origUpdateB = b.update.bind(b);
+    a.update = (ctx) => {
+      // ensure target is floor
+      expect(grid[targetY][targetX]).toBe(0);
+      a.y = targetY; a.x = targetX; // propose move
+      return 0;
+    };
+    b.update = (ctx) => {
+      expect(grid[targetY][targetX]).toBe(0);
+      b.y = targetY; b.x = targetX; // propose same move
+      return 0;
+    };
+
+    // Run the tick; conflict resolver should allow only one to occupy (2,3)
+    updateEnemies(grid, [a, b], player);
+
+    const aKey = `${a.y},${a.x}`;
+    const bKey = `${b.y},${b.x}`;
+    expect([aKey, bKey].filter((k) => k === `${targetY},${targetX}`)).toHaveLength(1);
+    // One should have been reverted to original position
+    expect(aKey === "2,2" || bKey === "2,4").toBe(true);
+
+    // restore (not strictly necessary in isolated test)
+    a.update = origUpdateA;
+    b.update = origUpdateB;
+  });
+
+  test("ghosts see through walls: HUNTING even when canSee() is false", () => {
+    const grid = makeMap();
+    // Place player and ghost separated by a solid wall (no gap on row 4)
+    const player = { y: 4, x: 2 };
+    const ghost = new Enemy({ y: 4, x: 7 });
+    ghost.kind = 'ghost';
+
+    // Sanity: regular LOS should be false
+    expect(canSee(grid, [ghost.y, ghost.x], [player.y, player.x])).toBe(false);
+
+    ghost.update({ grid, player });
+    expect(ghost.state).toBe(EnemyState.HUNTING);
   });
 
   test("enemy does not move onto the player's tile (no overlap policy)", () => {
