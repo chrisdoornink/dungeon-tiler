@@ -754,10 +754,37 @@ export function performThrowRock(gameState: GameState): GameState {
   const count = gameState.rockCount ?? 0;
   if (count <= 0) return gameState;
 
+  // Treat throw as a player turn: enemies move first relative to current player position
+  const preTickState: GameState = { ...gameState };
+  // Reset transient deaths for this tick
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const damage = updateEnemies(
+      preTickState.mapData.tiles,
+      preTickState.enemies,
+      { y: py, x: px },
+      {
+        rng: preTickState.combatRng,
+        defense: preTickState.hasShield ? 2 : 0,
+        // Ghosts adjacent this tick should not deal damage
+        suppress: (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === 'ghost',
+      }
+    );
+    if (damage > 0) {
+      const applied = Math.min(2, damage);
+      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      preTickState.stats = {
+        ...preTickState.stats,
+        damageTaken: preTickState.stats.damageTaken + applied,
+      };
+    }
+    // Note: Do NOT apply adjacent ghost vanish on rock-throw turns; only move enemies.
+  }
+
   // Determine direction vector
   let vx = 0,
     vy = 0;
-  switch (gameState.playerDirection) {
+  switch (preTickState.playerDirection) {
     case Direction.UP:
       vy = -1;
       break;
@@ -772,7 +799,7 @@ export function performThrowRock(gameState: GameState): GameState {
       break;
   }
 
-  const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
+  const newMapData = JSON.parse(JSON.stringify(preTickState.mapData)) as MapData;
   // Verify a clear floor path for 4 tiles
   let ty = py;
   let tx = px;
@@ -781,10 +808,10 @@ export function performThrowRock(gameState: GameState): GameState {
     tx += vx;
     if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
       // Early stop: consume a rock, no placement (future: collide/bam)
-      return { ...gameState, rockCount: count - 1 };
+      return { ...preTickState, rockCount: count - 1 };
     }
     // Check enemy collision first
-    const enemies = gameState.enemies ?? [];
+    const enemies = preTickState.enemies ?? [];
     const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
@@ -794,12 +821,12 @@ export function performThrowRock(gameState: GameState): GameState {
         // Enemy dies: remove and record for spirit VFX
         const removed = newEnemies.splice(hitIdx, 1)[0];
         const newStats = {
-          ...gameState.stats,
-          enemiesDefeated: gameState.stats.enemiesDefeated + 1,
+          ...preTickState.stats,
+          enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
         };
-        const newRecent = (gameState.recentDeaths ? gameState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
+        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
         return {
-          ...gameState,
+          ...preTickState,
           enemies: newEnemies,
           stats: newStats,
           recentDeaths: newRecent,
@@ -810,7 +837,7 @@ export function performThrowRock(gameState: GameState): GameState {
         target.health = newHealth;
         newEnemies[hitIdx] = target;
         return {
-          ...gameState,
+          ...preTickState,
           enemies: newEnemies,
           rockCount: count - 1,
         };
@@ -818,14 +845,14 @@ export function performThrowRock(gameState: GameState): GameState {
     }
     if (newMapData.tiles[ty][tx] !== FLOOR) {
       // Early stop on wall/obstacle: consume a rock, no placement
-      return { ...gameState, rockCount: count - 1 };
+      return { ...preTickState, rockCount: count - 1 };
     }
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
       // Remove the pot and consume the rock; no rock placement
       newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
-      return { ...gameState, mapData: newMapData, rockCount: count - 1 };
+      return { ...preTickState, mapData: newMapData, rockCount: count - 1 };
     }
   }
 
@@ -833,7 +860,7 @@ export function performThrowRock(gameState: GameState): GameState {
   newMapData.subtypes[ty][tx] = [TileSubtype.ROCK];
 
   return {
-    ...gameState,
+    ...preTickState,
     mapData: newMapData,
     rockCount: count - 1,
   };

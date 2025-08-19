@@ -159,7 +159,7 @@ describe('Rock Throwing - hit pot: pot removed, no rock placed', () => {
 });
 
 describe('Rock Throwing - hit ghost: 2 damage per rock, spirit on death', () => {
-  it('one hit deals 2 damage and defeats ghost (2 HP), records death, no rock placed', () => {
+  it('one hit defeats ghost after enemy pre-tick (enemy moves first), records death at new position, no rock placed', () => {
     const base = generateMapWithSubtypes();
     // Start with all walls
     for (let y = 0; y < base.tiles.length; y++) {
@@ -204,7 +204,8 @@ describe('Rock Throwing - hit ghost: 2 damage per rock, spirit on death', () => 
     expect(after.rockCount).toBe(2);
     expect(after.enemies?.length ?? 0).toBe(0);
     expect(after.stats.enemiesDefeated).toBe(1);
-    expect(after.recentDeaths).toContainEqual([py, px + 2]);
+    // Enemy moved one step toward the player during the pre-tick, so death occurs at (py, px+1)
+    expect(after.recentDeaths).toContainEqual([py, px + 1]);
     // No rock placed on path when hitting enemy
     expect(after.mapData.subtypes[py][px + 1]).not.toContain(TileSubtype.ROCK);
     expect(after.mapData.subtypes[py][px + 2]).not.toContain(TileSubtype.ROCK);
