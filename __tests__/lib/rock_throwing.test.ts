@@ -159,7 +159,7 @@ describe('Rock Throwing - hit pot: pot removed, no rock placed', () => {
 });
 
 describe('Rock Throwing - hit ghost: 2 damage per rock, spirit on death', () => {
-  it('first hit deals 2 damage (enemy remains), no rock placed; second hit defeats and records death', () => {
+  it('one hit deals 2 damage and defeats ghost (2 HP), records death, no rock placed', () => {
     const base = generateMapWithSubtypes();
     // Start with all walls
     for (let y = 0; y < base.tiles.length; y++) {
@@ -199,31 +199,17 @@ describe('Rock Throwing - hit ghost: 2 damage per rock, spirit on death', () => 
       recentDeaths: [],
     };
 
-    // First throw: enemy should take 2 damage (from 3 -> 1), remain alive
-    const after1 = performThrowRock(gameState);
-    expect(after1.rockCount).toBe(2);
-    expect(after1.enemies?.length ?? 0).toBe(1);
-    expect(after1.enemies![0].y).toBe(py);
-    expect(after1.enemies![0].x).toBe(px + 2);
-    expect(after1.enemies![0].health).toBe(1);
-    expect(after1.stats.enemiesDefeated).toBe(0);
+    // Throw: enemy should die immediately (2 HP -> 0), be removed, and death recorded
+    const after = performThrowRock(gameState);
+    expect(after.rockCount).toBe(2);
+    expect(after.enemies?.length ?? 0).toBe(0);
+    expect(after.stats.enemiesDefeated).toBe(1);
+    expect(after.recentDeaths).toContainEqual([py, px + 2]);
     // No rock placed on path when hitting enemy
-    expect(after1.mapData.subtypes[py][px + 1]).not.toContain(TileSubtype.ROCK);
-    expect(after1.mapData.subtypes[py][px + 2]).not.toContain(TileSubtype.ROCK);
-    expect(after1.mapData.subtypes[py][px + 3]).not.toContain(TileSubtype.ROCK);
-    expect(after1.mapData.subtypes[py][px + 4]).not.toContain(TileSubtype.ROCK);
-
-    // Second throw: should finish the enemy (1 -> -1), remove it and record death
-    const after2 = performThrowRock(after1);
-    expect(after2.rockCount).toBe(1);
-    expect(after2.enemies?.length ?? 0).toBe(0);
-    expect(after2.stats.enemiesDefeated).toBe(1);
-    expect(after2.recentDeaths).toContainEqual([py, px + 2]);
-    // Still no rock placement when the throw hits an enemy
-    expect(after2.mapData.subtypes[py][px + 1]).not.toContain(TileSubtype.ROCK);
-    expect(after2.mapData.subtypes[py][px + 2]).not.toContain(TileSubtype.ROCK);
-    expect(after2.mapData.subtypes[py][px + 3]).not.toContain(TileSubtype.ROCK);
-    expect(after2.mapData.subtypes[py][px + 4]).not.toContain(TileSubtype.ROCK);
+    expect(after.mapData.subtypes[py][px + 1]).not.toContain(TileSubtype.ROCK);
+    expect(after.mapData.subtypes[py][px + 2]).not.toContain(TileSubtype.ROCK);
+    expect(after.mapData.subtypes[py][px + 3]).not.toContain(TileSubtype.ROCK);
+    expect(after.mapData.subtypes[py][px + 4]).not.toContain(TileSubtype.ROCK);
   });
 });
 

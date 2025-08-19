@@ -21,7 +21,20 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'goblin' default; 'ghost' steals the hero's light when adjacent
-  kind: 'goblin' | 'ghost' = 'goblin';
+  private _kind: 'goblin' | 'ghost' = 'goblin';
+  get kind(): 'goblin' | 'ghost' { return this._kind; }
+  set kind(k: 'goblin' | 'ghost') {
+    this._kind = k;
+    if (k === 'ghost') {
+      // Ghosts are fragile: 2 HP. If currently higher (default 3), clamp to 2.
+      if (this.health > 2) this.health = 2;
+      // Keep attack as-is unless design says otherwise (currently 1)
+    }
+  }
+  // Pursuit memory: how many ticks to keep chasing after losing LOS
+  private pursuitTtl: number = 0;
+  // Last known player position when LOS was available
+  private lastKnownPlayer: { y: number; x: number } | null = null;
 
   constructor(pos: { y: number; x: number }) {
     this.y = pos.y;
@@ -31,43 +44,61 @@ export class Enemy {
   update(ctx: EnemyUpdateContext): number {
     const { grid, player } = ctx;
     // Ghosts can see through walls; others use standard LOS
-    const sees = this.kind === 'ghost'
+    const seesNow = this.kind === 'ghost'
       ? true
       : canSee(grid, [this.y, this.x], [player.y, player.x]);
-    if (sees) {
+
+    // Update pursuit memory
+    if (seesNow) {
+      this.pursuitTtl = 5; // refresh memory window
+      this.lastKnownPlayer = { y: player.y, x: player.x };
+    } else if (this.pursuitTtl > 0 && this.lastKnownPlayer) {
+      this.pursuitTtl -= 1;
+    }
+
+    const hasPursuitTarget = seesNow || (this.pursuitTtl > 0 && this.lastKnownPlayer !== null);
+    const targetPos = seesNow ? player : (this.lastKnownPlayer as { y: number; x: number } | null);
+
+    if (hasPursuitTarget && targetPos) {
       this.state = EnemyState.HUNTING;
-      // Take one greedy step toward the player, biasing to retain line-of-sight.
-      const dyRaw = player.y - this.y;
-      const dxRaw = player.x - this.x;
+      // Take one greedy step toward the target, biasing to retain line-of-sight when we currently see them.
+      const dyRaw = targetPos.y - this.y;
+      const dxRaw = targetPos.x - this.x;
       const stepY = dyRaw === 0 ? 0 : dyRaw > 0 ? 1 : -1;
       const stepX = dxRaw === 0 ? 0 : dxRaw > 0 ? 1 : -1;
 
-      // Always face toward the player when seen, even if we cannot move this tick
+      // Always face toward the target when pursuing, even if we cannot move this tick
       if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
         this.facing = dxRaw > 0 ? 'RIGHT' : (dxRaw < 0 ? 'LEFT' : this.facing);
       } else {
         this.facing = dyRaw > 0 ? 'DOWN' : (dyRaw < 0 ? 'UP' : this.facing);
       }
 
-      // Candidate moves toward the player
+      // Candidate moves toward the target
       const candMoves: Array<[number, number]> = [];
       if (stepX !== 0) candMoves.push([0, stepX]);
       if (stepY !== 0) candMoves.push([stepY, 0]);
 
-      // Reorder to prefer moves that preserve LOS after moving
-      const tryMoves: Array<[number, number]> = [];
-      const losPreserving: Array<[number, number]> = [];
-      const nonLos: Array<[number, number]> = [];
-      for (const [dy, dx] of candMoves) {
-        const ny = this.y + dy;
-        const nx = this.x + dx;
-        if (isFloor(grid, ny, nx)) {
-          if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
-          else nonLos.push([dy, dx]);
+      // Determine move ordering
+      let tryMoves: Array<[number, number]> = [];
+      if (seesNow) {
+        // Prefer moves that preserve LOS after moving
+        const losPreserving: Array<[number, number]> = [];
+        const nonLos: Array<[number, number]> = [];
+        for (const [dy, dx] of candMoves) {
+          const ny = this.y + dy;
+          const nx = this.x + dx;
+          if (isFloor(grid, ny, nx)) {
+            if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
+            else nonLos.push([dy, dx]);
+          }
         }
+        // Keep original bias (horizontal-first) within each bucket
+        tryMoves = [...losPreserving, ...nonLos];
+      } else {
+        // Memory pursuit: only try the primary axis step; if blocked, give up
+        tryMoves = candMoves.slice(0, 1);
       }
-      // Keep original bias (horizontal-first) within each bucket
-      tryMoves.push(...losPreserving, ...nonLos);
 
       let moved = false;
       for (const [dy, dx] of tryMoves) {
@@ -120,6 +151,12 @@ export class Enemy {
           // if we moved, break out of tryMoves loop
           if (moved) break;
         }
+      }
+      // If we failed to move while only pursuing memory (not currently seeing), drop pursuit
+      if (!moved && !seesNow) {
+        this.pursuitTtl = 0;
+        // If we reached the last known position or are blocked, lose interest
+        this.state = EnemyState.IDLE;
       }
     } else {
       // Keep IDLE for now; we'll expand later (e.g., patrol)

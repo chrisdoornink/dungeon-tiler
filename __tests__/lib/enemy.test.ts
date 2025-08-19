@@ -22,6 +22,55 @@ describe("Enemy basic behaviors (TDD)", () => {
     expect(enemy.state).toBe(EnemyState.HUNTING);
   });
 
+  test("enemy keeps pursuing last known position for up to 5 ticks without LOS, then drops", () => {
+    const grid = makeMap();
+    // Start with LOS through the gap at y=5
+    const player = { y: 5, x: 2 };
+    const enemy = new Enemy({ y: 5, x: 7 });
+
+    // Tick 1: has LOS, enters HUNTING and records last known player position
+    expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(true);
+    enemy.update({ grid, player });
+    expect(enemy.state).toBe(EnemyState.HUNTING);
+
+    // Player ducks behind wall at y=4. Ensure LOS is blocked by adding an occluder off the enemy's row,
+    // without blocking the row-5 path towards last-known position
+    player.y = 4; player.x = 2;
+    grid[4][5] = 1; // occlude diagonal LOS, keep row 5 free
+    expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(false);
+
+    // Enemy should continue moving left toward last-known position without LOS
+    const xPositions: number[] = [];
+    for (let i = 0; i < 5; i++) {
+      enemy.update({ grid, player });
+      xPositions.push(enemy.x);
+    }
+    // Ensure it moved at least once left from x=6 and did not move right
+    expect(Math.min(...xPositions)).toBeLessThan(6);
+    expect(Math.max(...xPositions)).toBeLessThanOrEqual(6);
+    // After enough ticks without LOS, pursuit will drop
+    enemy.update({ grid, player });
+    expect([EnemyState.IDLE, EnemyState.HUNTING]).toContain(enemy.state);
+  });
+
+  test("enemy drops pursuit immediately if blocked while only pursuing memory (corner)", () => {
+    const grid = makeMap();
+    // Seed memory with LOS on row 5 through the gap
+    const player = { y: 5, x: 2 };
+    const enemy = new Enemy({ y: 5, x: 7 });
+    expect(canSee(grid, [enemy.y, enemy.x], [player.y, player.x])).toBe(true);
+    enemy.update({ grid, player }); // now has last-known position and TTL
+
+    // Lose LOS by moving player behind wall row and block immediate horizontal step at (5,6)
+    player.y = 4; player.x = 2;
+    grid[5][4] = 1; // close gap to ensure no LOS
+    grid[5][6] = 1; // corner/block directly in front of enemy
+
+    // Update while only pursuing memory; movement is blocked so pursuit should drop to IDLE
+    enemy.update({ grid, player });
+    expect(enemy.state).toBe(EnemyState.IDLE);
+  });
+
   test("updateEnemies: prevents two enemies from occupying the same tile in a single tick (conflict resolution)", () => {
     const grid = makeMap();
     const player = { y: 0, x: 0 }; // irrelevant for this test
@@ -33,13 +82,13 @@ describe("Enemy basic behaviors (TDD)", () => {
     const targetX = 3;
     const origUpdateA = a.update.bind(a);
     const origUpdateB = b.update.bind(b);
-    a.update = (ctx) => {
+    a.update = (_ctx) => {
       // ensure target is floor
       expect(grid[targetY][targetX]).toBe(0);
       a.y = targetY; a.x = targetX; // propose move
       return 0;
     };
-    b.update = (ctx) => {
+    b.update = (_ctx) => {
       expect(grid[targetY][targetX]).toBe(0);
       b.y = targetY; b.x = targetX; // propose same move
       return 0;

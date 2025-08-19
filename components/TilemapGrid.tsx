@@ -724,7 +724,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           width: 18,
                           height: 18,
                           backgroundImage:
-                            "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                            e.kind === 'ghost'
+                              ? "url(/images/enemies/lantern-wisp.png)"
+                              : "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
