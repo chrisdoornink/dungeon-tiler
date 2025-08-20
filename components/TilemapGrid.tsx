@@ -28,6 +28,7 @@ interface TilemapGridProps {
   tileTypes: Record<number, TileType>;
   subtypes?: number[][][];
   initialGameState?: GameState;
+  forceDaylight?: boolean; // when true, override lighting to full visibility
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -35,6 +36,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   tileTypes,
   subtypes,
   initialGameState,
+  forceDaylight = false,
 }) => {
   const router = useRouter();
 
@@ -342,14 +344,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Auto-disable full map visibility after 3 seconds
   useEffect(() => {
+    if (forceDaylight) return; // do not auto-disable when daylight override is on
     if (gameState.showFullMap) {
-      // Auto-disable after 3 seconds
       const timer = setTimeout(() => {
         setGameState((prev) => ({ ...prev, showFullMap: false }));
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.showFullMap]);
+  }, [gameState.showFullMap, forceDaylight]);
 
   // Redirect to end page and persist game snapshot on win
   useEffect(() => {
@@ -965,12 +967,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 gameState.mapData.tiles,
                 tileTypes,
                 gameState.mapData.subtypes,
-                gameState.showFullMap,
+                gameState.showFullMap || forceDaylight,
                 gameState.playerDirection,
                 gameState.enemies,
                 gameState.hasSword,
                 gameState.hasShield,
-                gameState.heroTorchLit ?? true
+                gameState.heroTorchLit ?? true,
+                forceDaylight
               )}
             </div>
           </div>
@@ -1061,7 +1064,8 @@ function renderTileGrid(
   enemies?: Enemy[],
   hasSword?: boolean,
   hasShield?: boolean,
-  heroTorchLit: boolean = true
+  heroTorchLit: boolean = true,
+  forceDaylight: boolean = false
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -1196,7 +1200,7 @@ function renderTileGrid(
   );
 
   // Add a smooth radial gradient overlay centered on the player for continuous fade
-  if (playerPosition && !showFullMap) {
+  if (playerPosition && !showFullMap && !forceDaylight) {
     const [py, px] = playerPosition; // grid coords
     const tileSize = 40; // px (w-10/h-10)
     const centerX = (px + 0.5) * tileSize;

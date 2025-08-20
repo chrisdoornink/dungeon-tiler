@@ -15,7 +15,7 @@
 }
 .ghostFlicker {
   opacity: 0.6; /* base */
-  animation: ghost-flicker 900ms ease-in-out infinite;
+  animation: ghost-flicker 2000ms ease-in-out infinite;
 }
 /* Adjacent to torch: medium brightness */
 .fov-tier-2 {
