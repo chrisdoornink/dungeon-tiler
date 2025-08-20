@@ -8,6 +8,7 @@ export type TileType = {
 
 // Enemy integration
 import { Enemy, placeEnemies, updateEnemies } from "./enemy";
+import { enemyTypeAssignement } from "./enemy_assignment";
 
 // Map of tile types by ID
 export const tileTypes: Record<number, TileType> = {
@@ -924,16 +925,12 @@ export function initializeGameState(): GameState {
     ? placeEnemies({
         grid: mapData.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: 3,
+        count: Math.floor(Math.random() * 5) + 4, // 4–8 enemies
         minDistanceFromPlayer: 8,
       })
     : [];
-  // Composition: 1 ghost, 1 goblin, 1 stone-exciter (if available)
-  if (enemies.length > 0) {
-    enemies[0].kind = "ghost";
-    if (enemies.length > 1) enemies[1].kind = "goblin"; // explicit for clarity
-    if (enemies.length > 2) enemies[2].kind = "stone-exciter";
-  }
+
+  enemyTypeAssignement(enemies);
 
   if (enemies.length > 0) {
     console.log(
