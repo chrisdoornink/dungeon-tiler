@@ -419,3 +419,36 @@
 .invisible {
   background: #1b1b1b; /* requested darker neutral */
 }
+
+/* Eerie green glow for stone-exciter when near the hero */
+.exciterGlow {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 10490; /* just below enemy sprite (10500) */
+  /* Stronger multi-layered green glow */
+  background:
+    radial-gradient(62% 62% at 50% 45%, rgba(80, 255, 180, 0.28), rgba(80, 255, 180, 0.14) 45%, rgba(0,0,0,0) 75%),
+    radial-gradient(90% 90% at 50% 55%, rgba(60, 210, 150, 0.09), rgba(0,0,0,0) 60%);
+  filter: blur(2.5px) saturate(110%);
+  mix-blend-mode: screen; /* lift glow over darker tiles */
+  animation: exciterPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes exciterPulse {
+  0% {
+    transform: translateY(-6px) scale(0.95);
+    opacity: 0.42;
+    filter: blur(2.5px) saturate(110%);
+  }
+  50% {
+    transform: translateY(-6px) scale(1.08);
+    opacity: 0.72;
+    filter: blur(2.3px) saturate(125%);
+  }
+  100% {
+    transform: translateY(-6px) scale(0.95);
+    opacity: 0.42;
+    filter: blur(2.5px) saturate(110%);
+  }
+}

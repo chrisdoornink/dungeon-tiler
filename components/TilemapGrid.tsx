@@ -728,7 +728,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           backgroundImage:
                             e.kind === 'ghost'
                               ? "url(/images/enemies/lantern-wisp.png)"
-                              : "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                              : (e.kind === 'stone-exciter'
+                                  ? "url(/images/enemies/stone-exciter-front.png)"
+                                  : "url(/images/enemies/fire-goblin/fire-goblin-front.png)"),
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -1185,7 +1187,14 @@ function renderTileGrid(
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
-            enemyKind={enemyAtTile?.kind as 'goblin' | 'ghost' | undefined}
+            enemyKind={enemyAtTile?.kind as 'goblin' | 'ghost' | 'stone-exciter' | undefined}
+            enemyAura={(() => {
+              if (!enemyAtTile) return false;
+              if (enemyAtTile.kind !== 'stone-exciter') return false;
+              if (!playerPosition) return false;
+              const d = Math.abs(enemyAtTile.y - playerPosition[0]) + Math.abs(enemyAtTile.x - playerPosition[1]);
+              return d <= 2;
+            })()}
             hasSword={hasSword}
             hasShield={hasShield}
             invisibleClassName={

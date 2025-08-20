@@ -23,7 +23,8 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'goblin' | 'ghost';
+  enemyKind?: 'goblin' | 'ghost' | 'stone-exciter';
+  enemyAura?: boolean; // show eerie green glow when close to hero
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
   invisibleClassName?: string; // Optional class override for invisible tiles
@@ -44,6 +45,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyVisible = undefined,
   enemyFacing,
   enemyKind,
+  enemyAura,
   hasSword,
   hasShield,
   invisibleClassName,
@@ -583,6 +585,9 @@ export const Tile: React.FC<TileProps> = ({
           {/* Enemy rendering: sprite (when visible) */}
           {hasEnemy && (
             <>
+              {enemyAura && (
+                <div className={styles.exciterGlow} aria-hidden="true" />
+              )}
               {((enemyVisible ?? isVisible) === true) && (
                 <div
                   className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
@@ -591,6 +596,19 @@ export const Tile: React.FC<TileProps> = ({
                       if (enemyKind === 'ghost') {
                         return '/images/enemies/lantern-wisp.png';
                       }
+                      if (enemyKind === 'stone-exciter') {
+                        switch (enemyFacing) {
+                          case 'UP':
+                            return '/images/enemies/stone-exciter-back.png';
+                          case 'RIGHT':
+                          case 'LEFT':
+                            return '/images/enemies/stone-exciter-right.png';
+                          case 'DOWN':
+                          default:
+                            return '/images/enemies/stone-exciter-front.png';
+                        }
+                      }
+                      // default goblin
                       switch (enemyFacing) {
                         case 'UP':
                           return '/images/enemies/fire-goblin/fire-goblin-back.png';
@@ -602,9 +620,9 @@ export const Tile: React.FC<TileProps> = ({
                           return '/images/enemies/fire-goblin/fire-goblin-front.png';
                       }
                     })()})`,
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
                     zIndex: 10500, // above fog (10000), below wall tops (12000)
                     transform: enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none'),
                   }}

@@ -767,7 +767,8 @@ export function performThrowRock(gameState: GameState): GameState {
         rng: preTickState.combatRng,
         defense: preTickState.hasShield ? 2 : 0,
         // Ghosts adjacent this tick should not deal damage
-        suppress: (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === 'ghost',
+        suppress: (e) =>
+          Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
       }
     );
     if (damage > 0) {
@@ -799,7 +800,9 @@ export function performThrowRock(gameState: GameState): GameState {
       break;
   }
 
-  const newMapData = JSON.parse(JSON.stringify(preTickState.mapData)) as MapData;
+  const newMapData = JSON.parse(
+    JSON.stringify(preTickState.mapData)
+  ) as MapData;
   // Verify a clear floor path for 4 tiles
   let ty = py;
   let tx = px;
@@ -824,7 +827,9 @@ export function performThrowRock(gameState: GameState): GameState {
           ...preTickState.stats,
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
         };
-        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
+        const newRecent = (
+          preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
+        ).concat([[removed.y, removed.x] as [number, number]]);
         return {
           ...preTickState,
           enemies: newEnemies,
@@ -923,9 +928,11 @@ export function initializeGameState(): GameState {
         minDistanceFromPlayer: 8,
       })
     : [];
-  // Mark the first enemy as a ghost to test the light-steal mechanic
+  // Composition: 1 ghost, 1 goblin, 1 stone-exciter (if available)
   if (enemies.length > 0) {
     enemies[0].kind = "ghost";
+    if (enemies.length > 1) enemies[1].kind = "goblin"; // explicit for clarity
+    if (enemies.length > 2) enemies[2].kind = "stone-exciter";
   }
 
   if (enemies.length > 0) {
@@ -1028,7 +1035,7 @@ export function movePlayer(
           const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
           // Ghosts adjacent this tick should not deal damage
-          if (e.kind === 'ghost' && adj) return true;
+          if (e.kind === "ghost" && adj) return true;
           if (!adj) return false;
           // Enemy is to the right, player moved left
           if (e.y === currentY && e.x === currentX + 1 && dx === -1)
@@ -1056,7 +1063,9 @@ export function movePlayer(
 
     // Ghost effect: any ghost ending adjacent snuffs torch and vanishes with death effect
     const adjacentGhosts = newGameState.enemies.filter(
-      (e) => e.kind === 'ghost' && Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
+      (e) =>
+        e.kind === "ghost" &&
+        Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
     );
     if (adjacentGhosts.length > 0) {
       newGameState.heroTorchLit = false;
@@ -1068,7 +1077,11 @@ export function movePlayer(
       newGameState.stats.enemiesDefeated += adjacentGhosts.length;
       // Remove adjacent ghosts from active enemies
       newGameState.enemies = newGameState.enemies.filter(
-        (e) => !(e.kind === 'ghost' && Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1)
+        (e) =>
+          !(
+            e.kind === "ghost" &&
+            Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
+          )
       );
     }
   }
@@ -1219,10 +1232,11 @@ export function movePlayer(
           ? ((r) => (r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1))(rng())
           : 0;
         const swordBonus = newGameState.hasSword ? 2 : 0;
-        const heroDamage = Math.max(
-          0,
-          newGameState.heroAttack + swordBonus + variance
-        );
+        // Stone-exciter takes exactly 1 damage from melee regardless of sword/variance
+        const heroDamage =
+          enemy.kind === "stone-exciter"
+            ? 1
+            : Math.max(0, newGameState.heroAttack + swordBonus + variance);
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
 
