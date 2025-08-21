@@ -21,6 +21,7 @@ type LastGame = {
     damageTaken: number;
     enemiesDefeated: number;
     steps?: number;
+    byKind?: { goblin: number; ghost: number; 'stone-exciter': number };
   };
 };
 
@@ -134,25 +135,63 @@ export default function EndPage() {
               )}
               <div className="flex items-center justify-between">
                 <div className="font-medium">Enemies Defeated</div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: Math.min(12, last.stats.enemiesDefeated) }).map((_, i) => (
-                    <div
-                      key={i}
-                      aria-label="enemy"
-                      title="enemy"
-                      className="w-5 h-5"
-                      style={{
-                        backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                  ))}
-                  {last.stats.enemiesDefeated > 12 && (
-                    <span className="text-xs text-gray-600">+{last.stats.enemiesDefeated - 12}</span>
-                  )}
-                </div>
+                {(() => {
+                  const by = last.stats?.byKind || { goblin: 0, ghost: 0, 'stone-exciter': 0 };
+                  const items: Array<{ key: string; count: number; src: string; title: string }>= [
+                    { key: 'goblin', count: by.goblin || 0, src: '/images/enemies/fire-goblin/fire-goblin-front.png', title: 'goblin' },
+                    { key: 'ghost', count: by.ghost || 0, src: '/images/enemies/lantern-wisp.png', title: 'ghost' },
+                    { key: 'stone-exciter', count: by['stone-exciter'] || 0, src: '/images/enemies/stone-exciter-front.png', title: 'stone-exciter' },
+                  ];
+                  const visible = items.filter(i => i.count > 0);
+                  const fallbackTotal = last.stats?.enemiesDefeated || 0;
+                  return (
+                    <div className="flex items-center gap-2">
+                      {visible.length === 0 ? (
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: Math.min(12, fallbackTotal) }).map((_, i) => (
+                            <div
+                              key={i}
+                              aria-label="enemy"
+                              title="enemy"
+                              className="w-5 h-5"
+                              style={{
+                                backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                              }}
+                            />
+                          ))}
+                          {fallbackTotal > 12 && (
+                            <span className="text-xs text-gray-600">+{fallbackTotal - 12}</span>
+                          )}
+                        </div>
+                      ) : (
+                        visible.map((i) => (
+                          <div key={i.key} className="flex items-center gap-1">
+                            {Array.from({ length: Math.min(6, i.count) }).map((_, idx) => (
+                              <div
+                                key={`${i.key}-${idx}`}
+                                aria-label={i.title}
+                                title={i.title}
+                                className="w-5 h-5"
+                                style={{
+                                  backgroundImage: `url(${i.src})`,
+                                  backgroundSize: "contain",
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "center",
+                                }}
+                              />
+                            ))}
+                            {i.count > 6 && (
+                              <span className="text-xs text-gray-600">+{i.count - 6}</span>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </>
           )}

@@ -73,6 +73,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: 0,
           enemiesDefeated: 0,
           steps: 0,
+          byKind: { goblin: 0, ghost: 0, 'stone-exciter': 0 },
         },
       };
     } else {

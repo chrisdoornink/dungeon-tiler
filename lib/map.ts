@@ -828,6 +828,12 @@ export function performThrowRock(gameState: GameState): GameState {
           ...preTickState.stats,
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
         };
+        // Track per-kind kill for rock kills
+        const byKind = newStats.byKind || { goblin: 0, ghost: 0, 'stone-exciter': 0 };
+        if (removed.kind === 'goblin') byKind.goblin += 1;
+        else if (removed.kind === 'ghost') byKind.ghost += 1;
+        else if (removed.kind === 'stone-exciter') byKind['stone-exciter'] += 1;
+        newStats.byKind = byKind;
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
         ).concat([[removed.y, removed.x] as [number, number]]);
@@ -906,6 +912,7 @@ export interface GameState {
     damageTaken: number;
     enemiesDefeated: number;
     steps: number;
+    byKind?: { goblin: number; ghost: number; 'stone-exciter': number };
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
@@ -925,7 +932,7 @@ export function initializeGameState(): GameState {
     ? placeEnemies({
         grid: mapData.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: Math.floor(Math.random() * 5) + 4, // 4–8 enemies
+        count: Math.floor(Math.random() * 5) + 6, // 6–10 enemies
         minDistanceFromPlayer: 8,
       })
     : [];
@@ -960,6 +967,7 @@ export function initializeGameState(): GameState {
       damageTaken: 0,
       enemiesDefeated: 0,
       steps: 0,
+      byKind: { goblin: 0, ghost: 0, 'stone-exciter': 0 },
     },
     recentDeaths: [],
   };
@@ -1072,6 +1080,9 @@ export function movePlayer(
       }
       // Count them as defeated
       newGameState.stats.enemiesDefeated += adjacentGhosts.length;
+      // Track type-specific defeats (all ghosts here)
+      if (!newGameState.stats.byKind) newGameState.stats.byKind = { goblin: 0, ghost: 0, 'stone-exciter': 0 };
+      newGameState.stats.byKind.ghost += adjacentGhosts.length;
       // Remove adjacent ghosts from active enemies
       newGameState.enemies = newGameState.enemies.filter(
         (e) =>
@@ -1241,6 +1252,11 @@ export function movePlayer(
           // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;
+          // Track per-kind kill for melee
+          if (!newGameState.stats.byKind) newGameState.stats.byKind = { goblin: 0, ghost: 0, 'stone-exciter': 0 };
+          if (enemy.kind === 'goblin') newGameState.stats.byKind.goblin += 1;
+          else if (enemy.kind === 'ghost') newGameState.stats.byKind.ghost += 1;
+          else if (enemy.kind === 'stone-exciter') newGameState.stats.byKind['stone-exciter'] += 1;
           // Record death at the enemy's tile (newY, newX)
           if (!newGameState.recentDeaths) newGameState.recentDeaths = [];
           newGameState.recentDeaths.push([newY, newX]);
