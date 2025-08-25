@@ -11,6 +11,7 @@ import {
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
+import { getEnemyIcon, createEmptyByKind } from "../lib/enemies/registry";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
 import {
@@ -73,7 +74,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: 0,
           enemiesDefeated: 0,
           steps: 0,
-          byKind: { goblin: 0, ghost: 0, 'stone-exciter': 0 },
+          byKind: createEmptyByKind(),
         },
       };
     } else {
@@ -726,12 +727,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         style={{
                           width: 18,
                           height: 18,
-                          backgroundImage:
-                            e.kind === 'ghost'
-                              ? "url(/images/enemies/lantern-wisp.png)"
-                              : (e.kind === 'stone-exciter'
-                                  ? "url(/images/enemies/stone-exciter-front.png)"
-                                  : "url(/images/enemies/fire-goblin/fire-goblin-front.png)"),
+                          backgroundImage: `url(${getEnemyIcon(e.kind, 'front')})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",

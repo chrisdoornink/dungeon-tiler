@@ -8,6 +8,8 @@ export type TileType = {
 
 // Enemy integration
 import { Enemy, placeEnemies, updateEnemies } from "./enemy";
+import { EnemyRegistry, createEmptyByKind } from "./enemies/registry";
+import type { EnemyKind } from "./enemies/registry";
 import { enemyTypeAssignement } from "./enemy_assignment";
 
 // Map of tile types by ID
@@ -767,6 +769,10 @@ export function performThrowRock(gameState: GameState): GameState {
       {
         rng: preTickState.combatRng,
         defense: preTickState.hasShield ? 2 : 0,
+        playerTorchLit: preTickState.heroTorchLit ?? true,
+        setPlayerTorchLit: (lit: boolean) => {
+          preTickState.heroTorchLit = lit;
+        },
         // Ghosts adjacent this tick should not deal damage
         suppress: (e) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
@@ -829,10 +835,9 @@ export function performThrowRock(gameState: GameState): GameState {
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
         };
         // Track per-kind kill for rock kills
-        const byKind = newStats.byKind || { goblin: 0, ghost: 0, 'stone-exciter': 0 };
-        if (removed.kind === 'goblin') byKind.goblin += 1;
-        else if (removed.kind === 'ghost') byKind.ghost += 1;
-        else if (removed.kind === 'stone-exciter') byKind['stone-exciter'] += 1;
+        const byKind = newStats.byKind || createEmptyByKind();
+        const k = removed.kind as EnemyKind;
+        byKind[k] = (byKind[k] ?? 0) + 1;
         newStats.byKind = byKind;
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
@@ -912,7 +917,7 @@ export interface GameState {
     damageTaken: number;
     enemiesDefeated: number;
     steps: number;
-    byKind?: { goblin: number; ghost: number; 'stone-exciter': number };
+    byKind?: Record<EnemyKind, number>;
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
@@ -932,7 +937,7 @@ export function initializeGameState(): GameState {
     ? placeEnemies({
         grid: mapData.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: Math.floor(Math.random() * 5) + 6, // 6–10 enemies
+        count: Math.floor(Math.random() * 3) + 5, // 5–8 enemies
         minDistanceFromPlayer: 8,
       })
     : [];
@@ -967,7 +972,7 @@ export function initializeGameState(): GameState {
       damageTaken: 0,
       enemiesDefeated: 0,
       steps: 0,
-      byKind: { goblin: 0, ghost: 0, 'stone-exciter': 0 },
+      byKind: createEmptyByKind(),
     },
     recentDeaths: [],
   };
@@ -1034,6 +1039,10 @@ export function movePlayer(
       {
         rng: newGameState.combatRng,
         defense: newGameState.hasShield ? 2 : 0,
+        playerTorchLit: newGameState.heroTorchLit ?? true,
+        setPlayerTorchLit: (lit: boolean) => {
+          newGameState.heroTorchLit = lit;
+        },
         // Suppress only when the player moves directly away from an adjacent enemy along the same axis
         suppress: (e) => {
           const dy = newY - currentY;
@@ -1081,7 +1090,8 @@ export function movePlayer(
       // Count them as defeated
       newGameState.stats.enemiesDefeated += adjacentGhosts.length;
       // Track type-specific defeats (all ghosts here)
-      if (!newGameState.stats.byKind) newGameState.stats.byKind = { goblin: 0, ghost: 0, 'stone-exciter': 0 };
+      if (!newGameState.stats.byKind)
+        newGameState.stats.byKind = { goblin: 0, ghost: 0, "stone-exciter": 0 };
       newGameState.stats.byKind.ghost += adjacentGhosts.length;
       // Remove adjacent ghosts from active enemies
       newGameState.enemies = newGameState.enemies.filter(
@@ -1240,11 +1250,11 @@ export function movePlayer(
           ? ((r) => (r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1))(rng())
           : 0;
         const swordBonus = newGameState.hasSword ? 2 : 0;
-        // Stone-exciter takes exactly 1 damage from melee regardless of sword/variance
-        const heroDamage =
-          enemy.kind === "stone-exciter"
-            ? 1
-            : Math.max(0, newGameState.heroAttack + swordBonus + variance);
+        const heroDamage = EnemyRegistry[enemy.kind].calcMeleeDamage({
+          heroAttack: newGameState.heroAttack,
+          swordBonus,
+          variance,
+        });
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
 
@@ -1253,10 +1263,13 @@ export function movePlayer(
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;
           // Track per-kind kill for melee
-          if (!newGameState.stats.byKind) newGameState.stats.byKind = { goblin: 0, ghost: 0, 'stone-exciter': 0 };
-          if (enemy.kind === 'goblin') newGameState.stats.byKind.goblin += 1;
-          else if (enemy.kind === 'ghost') newGameState.stats.byKind.ghost += 1;
-          else if (enemy.kind === 'stone-exciter') newGameState.stats.byKind['stone-exciter'] += 1;
+          if (!newGameState.stats.byKind)
+            newGameState.stats.byKind = createEmptyByKind();
+          {
+            const k = enemy.kind as EnemyKind;
+            newGameState.stats.byKind[k] =
+              (newGameState.stats.byKind[k] ?? 0) + 1;
+          }
           // Record death at the enemy's tile (newY, newX)
           if (!newGameState.recentDeaths) newGameState.recentDeaths = [];
           newGameState.recentDeaths.push([newY, newX]);
@@ -1271,6 +1284,10 @@ export function movePlayer(
               {
                 rng: newGameState.combatRng,
                 defense: newGameState.hasShield ? 2 : 0,
+                playerTorchLit: newGameState.heroTorchLit ?? true,
+                setPlayerTorchLit: (lit: boolean) => {
+                  newGameState.heroTorchLit = lit;
+                },
               }
             );
             if (damage > 0) {
@@ -1297,6 +1314,10 @@ export function movePlayer(
             {
               rng: newGameState.combatRng,
               defense: newGameState.hasShield ? 2 : 0,
+              playerTorchLit: newGameState.heroTorchLit ?? true,
+              setPlayerTorchLit: (lit: boolean) => {
+                newGameState.heroTorchLit = lit;
+              },
             }
           );
           if (damage > 0) {

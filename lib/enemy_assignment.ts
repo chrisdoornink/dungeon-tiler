@@ -1,4 +1,5 @@
 import { Enemy } from "./enemy";
+import { getSpawnWeights, type EnemyKind } from "./enemies/registry";
 
 /**
  * Assign enemy kinds based on simple probability distribution.
@@ -15,14 +16,17 @@ export function enemyTypeAssignement(
   opts?: { rng?: () => number }
 ): void {
   const rng = opts?.rng ?? Math.random;
-  for (const e of enemies) {
-    const r = rng();
-    if (r < 0.6) {
-      e.kind = "goblin";
-    } else if (r < 0.8) {
-      e.kind = "ghost";
-    } else {
-      e.kind = "stone-exciter";
+  const weights = getSpawnWeights();
+  const total = weights.reduce((s, w) => s + w.weight, 0);
+  const pick = (): EnemyKind => {
+    let r = rng() * total;
+    for (const w of weights) {
+      if (r < w.weight) return w.kind;
+      r -= w.weight;
     }
+    return weights[weights.length - 1].kind;
+  };
+  for (const e of enemies) {
+    e.kind = pick();
   }
 }

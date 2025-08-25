@@ -1,5 +1,7 @@
 import React from "react";
 import { TileType, TileSubtype, Direction } from "../lib/map";
+import { getEnemyIcon } from "../lib/enemies/registry";
+import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import styles from "./Tile.module.css";
 
 type NeighborInfo = {
@@ -593,32 +595,23 @@ export const Tile: React.FC<TileProps> = ({
                   className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
                   style={{
                     backgroundImage: `url(${(() => {
-                      if (enemyKind === 'ghost') {
-                        return '/images/enemies/lantern-wisp.png';
-                      }
-                      if (enemyKind === 'stone-exciter') {
-                        switch (enemyFacing) {
+                      // Map Tile.tsx enemyFacing to registry Facing
+                      const toFacing = (f: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' | undefined): Facing => {
+                        switch (f) {
                           case 'UP':
-                            return '/images/enemies/stone-exciter-back.png';
+                            return 'back';
                           case 'RIGHT':
+                            return 'right';
                           case 'LEFT':
-                            return '/images/enemies/stone-exciter-right.png';
+                            return 'left';
                           case 'DOWN':
                           default:
-                            return '/images/enemies/stone-exciter-front.png';
+                            return 'front';
                         }
-                      }
-                      // default goblin
-                      switch (enemyFacing) {
-                        case 'UP':
-                          return '/images/enemies/fire-goblin/fire-goblin-back.png';
-                        case 'RIGHT':
-                        case 'LEFT':
-                          return '/images/enemies/fire-goblin/fire-goblin-right.png';
-                        case 'DOWN':
-                        default:
-                          return '/images/enemies/fire-goblin/fire-goblin-front.png';
-                      }
+                      };
+                      const kind: EnemyKind = (enemyKind ?? 'goblin');
+                      const facing: Facing = toFacing(enemyFacing);
+                      return getEnemyIcon(kind, facing);
                     })()})`,
                     backgroundSize: 'contain',
                     backgroundRepeat: 'no-repeat',

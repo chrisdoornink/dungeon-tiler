@@ -1,4 +1,5 @@
 import { canSee } from "./line_of_sight";
+import { EnemyRegistry, BehaviorContext } from "./enemies/registry";
 
 export const ENEMY_PURSUIT_TTL = 5;
 
@@ -25,6 +26,9 @@ export class Enemy {
   // Basic species/kind classification for behavior and rendering tweaks
   // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter
   private _kind: 'goblin' | 'ghost' | 'stone-exciter' = 'goblin';
+  // Per-enemy memory bag for registry-driven behaviors
+  private _behaviorMem: Record<string, unknown> = {};
+  get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
   get kind(): 'goblin' | 'ghost' | 'stone-exciter' { return this._kind; }
   set kind(k: 'goblin' | 'ghost' | 'stone-exciter') {
     this._kind = k;
@@ -43,9 +47,6 @@ export class Enemy {
   private pursuitTtl: number = 0;
   // Last known player position when LOS was available
   private lastKnownPlayer: { y: number; x: number } | null = null;
-  // Stone-exciter internal counters
-  private exciterHuntTurns: number = 0; // remaining double-move turns (5 when triggered)
-  private exciterRequireOutOfRange: boolean = false; // after finishing, must get >4 away to retrigger
 
   constructor(pos: { y: number; x: number }) {
     this.y = pos.y;
@@ -56,211 +57,6 @@ export class Enemy {
     const { grid, player } = ctx;
     // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
     this.state = EnemyState.IDLE;
-    // Stone-exciter behavior: blind wander; within 4 tiles hunts for 5 turns, double-steps (toward + perpendicular). Contact deals 5. After 5 turns, stop until out of range.
-    if (this.kind === 'stone-exciter') {
-      const dy = player.y - this.y;
-      const dx = player.x - this.x;
-      const dist = Math.abs(dy) + Math.abs(dx); // Manhattan trigger
-      const ghostDist = Array.isArray(ctx.ghosts) && ctx.ghosts.length > 0
-        ? Math.min(...ctx.ghosts.map(g => Math.abs(g.y - this.y) + Math.abs(g.x - this.x)))
-        : Infinity;
-      let startedThisTick = false;
-      if (this.exciterHuntTurns <= 0) {
-        if (!this.exciterRequireOutOfRange && (dist <= 4 || ghostDist <= 4)) {
-          this.exciterHuntTurns = 5; // 5 turns of double steps
-          startedThisTick = true;
-        }
-      }
-
-      if (this.exciterHuntTurns > 0) {
-        this.state = EnemyState.HUNTING;
-        // Close-range special applies ONLY on the first tick we start hunting.
-        // Otherwise use regular two-step movement without attacking during hunting.
-        if (dist <= 2 && startedThisTick) {
-          // Always face the hero while in close range
-          if (Math.abs(dx) >= Math.abs(dy)) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
-          else this.facing = dy > 0 ? 'DOWN' : 'UP';
-          // Step 1 toward hero
-          let stepsTaken = 0;
-          const toward1: [number, number] = Math.abs(dx) >= Math.abs(dy)
-            ? [0, dx > 0 ? 1 : -1]
-            : [dy > 0 ? 1 : -1, 0];
-          let ny = this.y + toward1[0];
-          let nx = this.x + toward1[1];
-          if (isFloor(grid, ny, nx) && !(ny === player.y && nx === player.x)) {
-            if (toward1[1] !== 0) this.facing = toward1[1] > 0 ? 'RIGHT' : 'LEFT';
-            else if (toward1[0] !== 0) this.facing = toward1[0] > 0 ? 'DOWN' : 'UP';
-            this.y = ny; this.x = nx;
-            stepsTaken += 1;
-          }
-          // Step 2 prefer toward hero; if that would land on the player's tile, SKIP the second step (remain adjacent)
-          const ddy = player.y - this.y; const ddx = player.x - this.x;
-          const toward2: [number, number] = Math.abs(ddx) >= Math.abs(ddy)
-            ? [0, ddx > 0 ? 1 : -1]
-            : [ddy > 0 ? 1 : -1, 0];
-          ny = this.y + toward2[0];
-          nx = this.x + toward2[1];
-          let moved2 = false;
-          if (ny === player.y && nx === player.x) {
-            // skip second step entirely to avoid stepping onto the hero; remain adjacent
-            moved2 = true; // treat as handled to avoid fallback attempts
-          } else if (isFloor(grid, ny, nx)) {
-            if (toward2[1] !== 0) this.facing = toward2[1] > 0 ? 'RIGHT' : 'LEFT';
-            else if (toward2[0] !== 0) this.facing = toward2[0] > 0 ? 'DOWN' : 'UP';
-            this.y = ny; this.x = nx;
-            stepsTaken += 1;
-            moved2 = true;
-          } else {
-            const perpChoices: Array<[number, number]> = toward2[0] === 0
-              ? [ [-1,0], [1,0] ]
-              : [ [0,-1], [0,1] ];
-            for (const [py, px] of perpChoices) {
-              const nny = this.y + py;
-              const nnx = this.x + px;
-              if (!isFloor(grid, nny, nnx)) continue;
-              if (nny === player.y && nnx === player.x) continue;
-              if (px !== 0) this.facing = px > 0 ? 'RIGHT' : 'LEFT';
-              else if (py !== 0) this.facing = py > 0 ? 'DOWN' : 'UP';
-              this.y = nny; this.x = nnx;
-              stepsTaken += 1;
-              moved2 = true;
-              break;
-            }
-          }
-          if (!moved2) {
-            // final greedy that avoids player tile
-            const dyf = player.y - this.y; const dxf = player.x - this.x;
-            const stepF: [number, number] = Math.abs(dxf) >= Math.abs(dyf)
-              ? [0, dxf > 0 ? 1 : -1]
-              : [dyf > 0 ? 1 : -1, 0];
-            const nyf = this.y + stepF[0];
-            const nxf = this.x + stepF[1];
-            if (isFloor(grid, nyf, nxf) && !(nyf === player.y && nxf === player.x)) {
-              if (stepF[1] !== 0) this.facing = stepF[1] > 0 ? 'RIGHT' : 'LEFT';
-              else if (stepF[0] !== 0) this.facing = stepF[0] > 0 ? 'DOWN' : 'UP';
-              this.y = nyf; this.x = nxf;
-              stepsTaken += 1;
-            }
-          }
-          // If still fewer than 2 steps, try one more greedy move
-          if (stepsTaken < 2) {
-            const dyf2 = player.y - this.y; const dxf2 = player.x - this.x;
-            const stepF2: [number, number] = Math.abs(dxf2) >= Math.abs(dyf2)
-              ? [0, dxf2 > 0 ? 1 : -1]
-              : [dyf2 > 0 ? 1 : -1, 0];
-            const nyf2 = this.y + stepF2[0];
-            const nxf2 = this.x + stepF2[1];
-            if (isFloor(grid, nyf2, nxf2) && !(nyf2 === player.y && nxf2 === player.x)) {
-              if (stepF2[1] !== 0) this.facing = stepF2[1] > 0 ? 'RIGHT' : 'LEFT';
-              else if (stepF2[0] !== 0) this.facing = stepF2[0] > 0 ? 'DOWN' : 'UP';
-              this.y = nyf2; this.x = nxf2;
-              stepsTaken += 1;
-            }
-          }
-          // After close-range movement, if adjacent and JUST started hunting this tick, deal contact damage
-          if (startedThisTick && (Math.abs(player.y - this.y) + Math.abs(player.x - this.x) === 1)) {
-            // Consume one hunting turn and possibly enter cooldown before returning damage
-            this.exciterHuntTurns -= 1;
-            if (this.exciterHuntTurns <= 0) {
-              this.exciterRequireOutOfRange = true;
-            }
-            return this.attack; // 5 for stone-exciter
-          }
-        } else {
-          // Regular hunting: first step toward player, second step perpendicular (sporadic)
-          // First step: greedy toward player (one axis step)
-          let stepsTaken = 0;
-          let step1: [number, number] | null = null;
-          if (Math.abs(dx) >= Math.abs(dy)) step1 = [0, dx > 0 ? 1 : -1];
-          else step1 = [dy > 0 ? 1 : -1, 0];
-          const s1y = this.y + step1[0];
-          const s1x = this.x + step1[1];
-          if (isFloor(grid, s1y, s1x) && !(s1y === player.y && s1x === player.x)) {
-            // update facing
-            if (step1[1] !== 0) this.facing = step1[1] > 0 ? 'RIGHT' : 'LEFT';
-            else if (step1[0] !== 0) this.facing = step1[0] > 0 ? 'DOWN' : 'UP';
-            this.y = s1y; this.x = s1x;
-            stepsTaken += 1;
-          }
-          // Second step: greedy toward player again; if blocked, fall back to perpendicular options
-          const ddy2 = player.y - this.y; const ddx2 = player.x - this.x;
-          const toward2: [number, number] = Math.abs(ddx2) >= Math.abs(ddy2)
-            ? [0, ddx2 > 0 ? 1 : -1]
-            : [ddy2 > 0 ? 1 : -1, 0];
-          let moved2 = false;
-          const n2y = this.y + toward2[0];
-          const n2x = this.x + toward2[1];
-          if (isFloor(grid, n2y, n2x) && !(n2y === player.y && n2x === player.x)) {
-            if (toward2[1] !== 0) this.facing = toward2[1] > 0 ? 'RIGHT' : 'LEFT';
-            else if (toward2[0] !== 0) this.facing = toward2[0] > 0 ? 'DOWN' : 'UP';
-            this.y = n2y; this.x = n2x;
-            stepsTaken += 1;
-            moved2 = true;
-          }
-          if (!moved2) {
-            const perpChoices: Array<[number, number]> = toward2[0] === 0
-              ? [ [-1,0], [1,0] ]
-              : [ [0,-1], [0,1] ];
-            for (const [py, px] of perpChoices) {
-              const nny = this.y + py;
-              const nnx = this.x + px;
-              if (!isFloor(grid, nny, nnx)) continue;
-              if (nny === player.y && nnx === player.x) continue; // do not step onto the player
-              if (px !== 0) this.facing = px > 0 ? 'RIGHT' : 'LEFT';
-              else if (py !== 0) this.facing = py > 0 ? 'DOWN' : 'UP';
-              this.y = nny; this.x = nnx;
-              stepsTaken += 1;
-              moved2 = true;
-              break;
-            }
-          }
-          // Final guarantee: if we only achieved one step due to constraints, try one more greedy step if possible
-          if (stepsTaken < 2) {
-            const dyf = player.y - this.y; const dxf = player.x - this.x;
-            const stepF: [number, number] = Math.abs(dxf) >= Math.abs(dyf)
-              ? [0, dxf > 0 ? 1 : -1]
-              : [dyf > 0 ? 1 : -1, 0];
-            const nyf = this.y + stepF[0];
-            const nxf = this.x + stepF[1];
-            if (isFloor(grid, nyf, nxf) && !(nyf === player.y && nxf === player.x)) {
-              if (stepF[1] !== 0) this.facing = stepF[1] > 0 ? 'RIGHT' : 'LEFT';
-              else if (stepF[0] !== 0) this.facing = stepF[0] > 0 ? 'DOWN' : 'UP';
-              this.y = nyf; this.x = nxf;
-              stepsTaken += 1;
-            }
-          }
-        }
-        this.exciterHuntTurns -= 1;
-        if (this.exciterHuntTurns <= 0) {
-          // Enter cool-down until out of range
-          this.exciterRequireOutOfRange = true;
-        }
-        return 0;
-      }
-
-      // Not hunting: wander aimlessly (blind), one random orthogonal step if floor and not onto player
-      const dirs: Array<[number, number]> = [[-1,0],[0,1],[1,0],[0,-1]];
-      const choices: Array<[number, number]> = [];
-      for (const [wy, wx] of dirs) {
-        const ny = this.y + wy; const nx = this.x + wx;
-        if (!isFloor(grid, ny, nx)) continue;
-        if (ny === player.y && nx === player.x) continue;
-        choices.push([wy, wx]);
-      }
-      if (choices.length > 0) {
-        const pick = choices[Math.floor(Math.random() * choices.length)];
-        const ny = this.y + pick[0];
-        const nx = this.x + pick[1];
-        if (pick[1] !== 0) this.facing = pick[1] > 0 ? 'RIGHT' : 'LEFT';
-        else if (pick[0] !== 0) this.facing = pick[0] > 0 ? 'DOWN' : 'UP';
-        this.y = ny; this.x = nx;
-      }
-      // If fully out of range (>4), allow retrigger again
-      if (this.exciterRequireOutOfRange && dist > 4) {
-        this.exciterRequireOutOfRange = false;
-      }
-      return 0;
-    }
     // Ghosts can see through walls; others use standard LOS
     const seesNow = this.kind === 'ghost'
       ? true
@@ -454,21 +250,62 @@ export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
   player: { y: number; x: number },
-  opts?: { rng?: () => number; defense?: number; suppress?: (e: Enemy) => boolean }
+  opts?: {
+    rng?: () => number;
+    defense?: number;
+    suppress?: (e: Enemy) => boolean;
+    // Player torch state provided by caller; defaults to true
+    playerTorchLit?: boolean;
+    // Engine-side setter to update torch state
+    setPlayerTorchLit?: (lit: boolean) => void;
+  }
 ): number {
   const rng = opts?.rng; // undefined means no variance
   const defense = opts?.defense ?? 0;
   const suppress = opts?.suppress;
   let totalDamage = 0;
+  // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
-  for (const e of enemies) {
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
     const prevKey = `${e.y},${e.x}`;
     const prevY = e.y;
     const prevX = e.x;
-    const base = e.update({ grid, player, ghosts: ghostPositions });
+    // Delegate to registry customUpdate when available (e.g., stone-exciter)
+    const cfg = EnemyRegistry[e.kind];
+    let base: number;
+    if (cfg?.behavior?.customUpdate) {
+      const enemyCtx: BehaviorContext['enemy'] = {
+        y: e.y,
+        x: e.x,
+        facing: e.facing,
+        memory: e.behaviorMemory,
+        attack: e.attack,
+      };
+      base = cfg.behavior.customUpdate({
+        grid,
+        enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health })),
+        enemyIndex: i,
+        player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
+        ghosts: ghostPositions,
+        rng,
+        setPlayerTorchLit: opts?.setPlayerTorchLit,
+        enemy: enemyCtx,
+      });
+      // Write back any mutations from customUpdate
+      e.y = enemyCtx.y;
+      e.x = enemyCtx.x;
+      e.facing = enemyCtx.facing;
+      const mem = enemyCtx.memory as { exciterState?: 'HUNTING' | 'IDLE' };
+      if (mem.exciterState) {
+        e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
+      }
+    } else {
+      base = e.update({ grid, player, ghosts: ghostPositions });
+    }
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;
     if (newKey !== prevKey) {
@@ -489,6 +326,27 @@ export function updateEnemies(
         : 0;
       const effective = Math.max(0, base + variance - defense);
       totalDamage += effective;
+    }
+
+    // Proximity behavior hook (e.g., ghost snuff torch) based on post-move adjacency
+    const isAdjacent = Math.abs(e.y - player.y) + Math.abs(e.x - player.x) === 1;
+    if (cfg?.behavior?.onProximity && isAdjacent) {
+      cfg.behavior.onProximity({
+        grid,
+        enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health })),
+        enemyIndex: i,
+        player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
+        rng,
+        setPlayerTorchLit: opts?.setPlayerTorchLit,
+        ghosts: ghostPositions,
+        enemy: {
+          y: e.y,
+          x: e.x,
+          facing: e.facing,
+          memory: e.behaviorMemory,
+          attack: e.attack,
+        },
+      });
     }
   }
   return totalDamage;

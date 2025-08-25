@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { go } from "../../lib/navigation";
+import { getEnemyIcon, enemyKinds, createEmptyByKind, type EnemyKind } from "../../lib/enemies/registry";
 
 type LastGame = {
   completedAt: string;
@@ -136,12 +137,13 @@ export default function EndPage() {
               <div className="flex items-center justify-between">
                 <div className="font-medium">Enemies Defeated</div>
                 {(() => {
-                  const by = last.stats?.byKind || { goblin: 0, ghost: 0, 'stone-exciter': 0 };
-                  const items: Array<{ key: string; count: number; src: string; title: string }>= [
-                    { key: 'goblin', count: by.goblin || 0, src: '/images/enemies/fire-goblin/fire-goblin-front.png', title: 'goblin' },
-                    { key: 'ghost', count: by.ghost || 0, src: '/images/enemies/lantern-wisp.png', title: 'ghost' },
-                    { key: 'stone-exciter', count: by['stone-exciter'] || 0, src: '/images/enemies/stone-exciter-front.png', title: 'stone-exciter' },
-                  ];
+                  const by: Record<EnemyKind, number> = (last.stats?.byKind as Record<EnemyKind, number>) || createEmptyByKind();
+                  const items: Array<{ key: EnemyKind; count: number; src: string; title: string }>= enemyKinds.map((k: EnemyKind) => ({
+                    key: k,
+                    count: by[k] || 0,
+                    src: getEnemyIcon(k, 'front'),
+                    title: k,
+                  }));
                   const visible = items.filter(i => i.count > 0);
                   const fallbackTotal = last.stats?.enemiesDefeated || 0;
                   return (
