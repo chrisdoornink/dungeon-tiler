@@ -250,6 +250,49 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
   return enemies;
 }
 
+// Rehydrate a list of plain enemy objects (e.g., from JSON) back into Enemy instances
+export type PlainEnemy = {
+  y: number;
+  x: number;
+  kind?: 'goblin' | 'ghost' | 'stone-exciter';
+  _kind?: 'goblin' | 'ghost' | 'stone-exciter';
+  health?: number;
+  attack?: number;
+  facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+  state?: EnemyState;
+  behaviorMemory?: Record<string, unknown>;
+  _behaviorMem?: Record<string, unknown>;
+};
+
+export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
+  if (!Array.isArray(list)) return [];
+  return list.map((d: PlainEnemy) => {
+    const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
+    // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
+    const k = d?.kind ?? d?._kind;
+    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin') {
+      e.kind = k;
+    }
+    // Preserve health/attack if present after kind effects
+    if (typeof d?.health === 'number') e.health = d.health;
+    if (typeof d?.attack === 'number') e.attack = d.attack;
+    // Facing
+    if (d?.facing === 'UP' || d?.facing === 'RIGHT' || d?.facing === 'DOWN' || d?.facing === 'LEFT') {
+      e.facing = d.facing;
+    }
+    // State (best-effort)
+    if (d?.state === EnemyState.HUNTING) e.state = EnemyState.HUNTING;
+    else e.state = EnemyState.IDLE;
+    // Behavior memory bag
+    const mem = d?.behaviorMemory ?? d?._behaviorMem;
+    if (mem && typeof mem === 'object') {
+      // @ts-expect-error accessing private bag for rehydration
+      e._behaviorMem = { ...mem };
+    }
+    return e;
+  });
+}
+
 export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],

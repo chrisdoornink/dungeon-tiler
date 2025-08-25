@@ -979,6 +979,76 @@ export function initializeGameState(): GameState {
 }
 
 /**
+ * Initialize a new game state from an existing MapData snapshot.
+ * Useful for replaying the same dungeon layout (tiles/subtypes) with a fresh run.
+ */
+export function initializeGameStateFromMap(mapData: MapData): GameState {
+  // Ensure a player exists on the map; if not, place one
+  let ensured = mapData as MapData;
+  const pos = findPlayerPosition(ensured);
+  if (!pos) {
+    ensured = addPlayerToMap(ensured);
+  }
+
+  const playerPos = findPlayerPosition(ensured);
+  const enemies = playerPos
+    ? placeEnemies({
+        grid: ensured.tiles,
+        player: { y: playerPos[0], x: playerPos[1] },
+        count: Math.floor(Math.random() * 3) + 5, // 5–8 enemies
+        minDistanceFromPlayer: 8,
+      })
+    : [];
+
+  enemyTypeAssignement(enemies);
+
+  return {
+    hasKey: false,
+    hasExitKey: false,
+    hasSword: false,
+    hasShield: false,
+    mapData: ensured,
+    showFullMap: false,
+    win: false,
+    playerDirection: Direction.DOWN,
+    enemies,
+    heroHealth: 5,
+    heroAttack: 1,
+    rockCount: 0,
+    heroTorchLit: true,
+    stats: {
+      damageDealt: 0,
+      damageTaken: 0,
+      enemiesDefeated: 0,
+      steps: 0,
+      byKind: createEmptyByKind(),
+    },
+    recentDeaths: [],
+  };
+}
+
+/**
+ * Compute a stable ID for a MapData snapshot for persistence and sharing.
+ * Uses a simple 32-bit FNV-1a hash over the JSON string of tiles+subtypes.
+ */
+export function computeMapId(mapData: MapData): string {
+  try {
+    const payload = JSON.stringify({ t: mapData.tiles, s: mapData.subtypes });
+    let hash = 0x811c9dc5; // FNV offset basis
+    for (let i = 0; i < payload.length; i++) {
+      hash ^= payload.charCodeAt(i);
+      // FNV prime multiplication (mod 2^32)
+      hash = (hash >>> 0) * 0x01000193;
+    }
+    // Convert to unsigned hex string
+    return (hash >>> 0).toString(16);
+  } catch {
+    // Fallback: random id
+    return Math.random().toString(36).slice(2, 10);
+  }
+}
+
+/**
  * Move the player in the specified direction if possible
  * @param gameState Current game state
  * @param direction Direction to move
