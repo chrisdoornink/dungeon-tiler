@@ -1369,30 +1369,31 @@ export function movePlayer(
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
-      // If locked and no key, block movement and do not open
+      // If locked and no key: allow stepping onto the chest tile, but do NOT open.
       if (isLocked && !newGameState.hasKey) {
         console.log("Chest is locked. Need a key.");
+        // Fall through to normal movement logic below. The coexist rules will
+        // allow PLAYER to share the tile with CHEST+LOCK, leaving it closed.
+      } else {
+        // Remove LOCK if present (universal key is not consumed)
+        if (isLocked && newGameState.hasKey) {
+          newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
+            newX
+          ].filter((t) => t !== TileSubtype.LOCK);
+        }
+
+        // Open the chest in place, but DO NOT grant item yet and DO NOT move the player
+        // Keep the item (SWORD/SHIELD) visible on top of the opened chest
+        // Remove only the CHEST marker, leave item subtype as-is
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+          (t) => t !== TileSubtype.CHEST
+        );
+        if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
+          newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
+        }
+        // Return without moving
         return newGameState;
       }
-
-      // Remove LOCK if present (universal key is not consumed)
-      if (isLocked && newGameState.hasKey) {
-        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
-          newX
-        ].filter((t) => t !== TileSubtype.LOCK);
-      }
-
-      // Open the chest in place, but DO NOT grant item yet and DO NOT move the player
-      // Keep the item (SWORD/SHIELD) visible on top of the opened chest
-      // Remove only the CHEST marker, leave item subtype as-is
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-        (t) => t !== TileSubtype.CHEST
-      );
-      if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
-        newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
-      }
-      // Return without moving
-      return newGameState;
     }
 
     // Move player to the new position
@@ -1418,14 +1419,17 @@ export function movePlayer(
       // For other tiles, just set to player
       newMapData.subtypes[newY][newX] = [TileSubtype.PLAYER];
     }
-    // If we picked up FOOD/MED/SWORD/SHIELD, remove those subtypes from dest
-    newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-      (t) =>
-        t !== TileSubtype.FOOD &&
-        t !== TileSubtype.MED &&
-        t !== TileSubtype.SWORD &&
-        t !== TileSubtype.SHIELD
-    );
+    // If we picked up FOOD/MED, always remove. For SWORD/SHIELD, only
+    // remove when the destination does NOT contain a closed CHEST. This
+    // ensures stepping onto a locked (closed) chest without a key will not
+    // pick up the item yet.
+    const dest = newMapData.subtypes[newY][newX];
+    const hasClosedChest = dest.includes(TileSubtype.CHEST);
+    newMapData.subtypes[newY][newX] = dest.filter((t) => {
+      if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
+      if ((t === TileSubtype.SWORD || t === TileSubtype.SHIELD) && !hasClosedChest) return false;
+      return true;
+    });
     moved = true;
 
     // Relight hero torch if adjacent to any wall torch after normal movement

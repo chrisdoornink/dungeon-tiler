@@ -54,6 +54,50 @@ describe('Chests and Keys invariants', () => {
     expect(hasShield).toBe(true);
   });
 
+  test('can step onto a locked chest without a key; chest stays closed and locked', () => {
+    const size = 25;
+    const subtypes = Array.from({ length: size }, () => Array.from({ length: size }, () => [] as number[]));
+    const tiles = Array.from({ length: size }, () => Array(size).fill(0));
+
+    // Place player at (10,10)
+    subtypes[10][10] = [TileSubtype.PLAYER];
+    // Place locked chest with SWORD at (10,11)
+    subtypes[10][11] = [TileSubtype.CHEST, TileSubtype.LOCK, TileSubtype.SWORD];
+
+    // Assemble GameState with no key
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const gs0: any = {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      showFullMap: false,
+      win: false,
+      playerDirection: 2,
+      heroHealth: 5,
+      heroAttack: 1,
+      enemies: [],
+      mapData: { tiles, subtypes },
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    // Move RIGHT onto the locked chest
+    const afterStep = movePlayer(gs0, Direction.RIGHT);
+
+    // Player should have moved onto the chest tile
+    const p = findAll(afterStep.mapData, (s) => s.includes(TileSubtype.PLAYER));
+    expect(p).toEqual([[10, 11]]);
+    // Chest remains closed and locked; no OPEN_CHEST marker added
+    expect(afterStep.mapData.subtypes[10][11].includes(TileSubtype.CHEST)).toBe(true);
+    expect(afterStep.mapData.subtypes[10][11].includes(TileSubtype.LOCK)).toBe(true);
+    expect(afterStep.mapData.subtypes[10][11].includes(TileSubtype.OPEN_CHEST)).toBe(false);
+    // Item not picked up, still present on tile
+    expect(afterStep.mapData.subtypes[10][11].includes(TileSubtype.SWORD)).toBe(true);
+    // Inventory unchanged
+    expect(afterStep.hasKey).toBe(false);
+    expect(afterStep.hasSword).toBe(false);
+  });
+
   test('bump-opening a locked chest with a key reveals item without moving; second step picks it up', () => {
     // Build a minimal custom map
     const size = 25;
