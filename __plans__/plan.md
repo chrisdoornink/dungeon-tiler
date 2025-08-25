@@ -84,7 +84,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Implement this // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile - need the asset first
 - [x] Throwing a rock should count as a movement by the player, so the enemies should get a movement turn when the rock is thrown. This movement should occur before the rock leaves its starting point and reaches its destination, so if an enemy is no longer in the path of the throw, then it should not hit them.
 
-- [ ] Make it 'daylight' mode by default.
-- [ ] Make the ghost still affect the mode when it snuffs tehe users torch
-- [ ] Expand the snuffed visibility range to 1 tile in all directions.
-- [ ]
+- [x] Make it 'daylight' mode by default.
+- [x] Make the ghost still affect the mode when it snuffs tehe users torch
+- [ ] Expand the snuffed visibility range 1 tile in all directions. Subtly affect the visibility of the map.
+- [ ] The dungeon exit key must be at least 14 tiles away from the exit door.

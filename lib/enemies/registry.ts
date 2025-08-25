@@ -46,8 +46,10 @@ export interface EnemyConfig {
   kind: EnemyKind;
   displayName: string;
   assets: Partial<Record<Facing, string>> & { front: string };
-  spawnWeight: number;
   base: { health: number; attack: number };
+  // Desired per-level count bounds used by assignment logic
+  desiredMinCount?: number;
+  desiredMaxCount?: number;
   // Compute melee damage dealt by hero to this enemy
   calcMeleeDamage: (ctx: {
     heroAttack: number;
@@ -70,7 +72,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/fire-goblin/fire-goblin-right.png",
       back: "/images/enemies/fire-goblin/fire-goblin-back.png",
     },
-    spawnWeight: 60,
+    desiredMinCount: 3,
+    desiredMaxCount: 4,
     base: { health: 5, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
@@ -85,7 +88,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/lantern-wisp.png", // placeholder
       back: "/images/enemies/lantern-wisp.png", // placeholder
     },
-    spawnWeight: 20,
+    desiredMinCount: 1,
+    desiredMaxCount: 2,
     base: { health: 2, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
@@ -109,7 +113,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/stone-exciter-right.png",
       back: "/images/enemies/stone-exciter-back.png",
     },
-    spawnWeight: 20,
+    desiredMinCount: 1,
+    desiredMaxCount: 2,
     base: { health: 8, attack: 5 },
     // Takes exactly 1 melee damage regardless of sword/variance
     calcMeleeDamage: () => 1,
@@ -126,11 +131,19 @@ export function getEnemyIcon(
 }
 
 // Optional helper: deterministic weights surface for spawner
-export function getSpawnWeights(): Array<{ kind: EnemyKind; weight: number }> {
-  return (Object.keys(EnemyRegistry) as EnemyKind[]).map((k) => ({
-    kind: k,
-    weight: EnemyRegistry[k].spawnWeight,
-  }));
+// Removed legacy spawn weights; assignment uses desired count ranges.
+
+// Helper: desired min/max counts for assignment logic
+export function getDesiredCountRanges(): Record<EnemyKind, { min: number; max: number }> {
+  const res = {} as Record<EnemyKind, { min: number; max: number }>;
+  (Object.keys(EnemyRegistry) as EnemyKind[]).forEach((k) => {
+    const cfg = EnemyRegistry[k];
+    res[k] = {
+      min: cfg.desiredMinCount ?? 0,
+      max: cfg.desiredMaxCount ?? 0,
+    };
+  });
+  return res;
 }
 
 export const enemyKinds = Object.keys(EnemyRegistry) as EnemyKind[];
