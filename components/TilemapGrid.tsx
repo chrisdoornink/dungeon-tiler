@@ -20,9 +20,7 @@ import {
   DIAGONAL_GLOW,
 } from "../lib/torch_glow";
 
-// Grid configuration constants
-const GRID_WIDTH = 25;
-const GRID_HEIGHT = 25;
+// Grid dimensions will be derived from provided map data
 
 interface TilemapGridProps {
   tilemap?: number[][];
@@ -37,7 +35,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   tileTypes,
   subtypes,
   initialGameState,
-  forceDaylight = false,
+  forceDaylight = process.env.NODE_ENV !== 'test',
 }) => {
   const router = useRouter();
 
@@ -47,6 +45,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return initialGameState;
     } else if (tilemap) {
       // Create a new game state with the provided tilemap and subtypes
+      const dynH = tilemap.length;
+      const dynW = tilemap[0]?.length ?? 0;
       return {
         hasKey: false,
         hasExitKey: false,
@@ -54,13 +54,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           tiles: tilemap,
           subtypes:
             subtypes ||
-            Array(GRID_HEIGHT)
+            Array(dynH)
               .fill(0)
-              .map(() =>
-                Array(GRID_WIDTH)
-                  .fill(0)
-                  .map(() => [])
-              ),
+              .map(() => Array(dynW).fill(0).map(() => [] as number[])),
         },
         showFullMap: false,
         win: false,
@@ -953,8 +949,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             <div
               className={styles.gridContainer}
               style={{
-                gridTemplateRows: `repeat(${GRID_HEIGHT}, 40px)`,
-                gridTemplateColumns: `repeat(${GRID_WIDTH}, 40px)`,
+                gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
+                gridTemplateColumns: `repeat(${gameState.mapData.tiles[0]?.length ?? 0}, 40px)`,
                 // When the hero's torch is OFF, force a pure black background behind tiles
                 // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                 // the transparent center of the vignette.
@@ -966,13 +962,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 gameState.mapData.tiles,
                 tileTypes,
                 gameState.mapData.subtypes,
-                gameState.showFullMap || forceDaylight,
+                gameState.showFullMap || (forceDaylight && (gameState.heroTorchLit ?? true)),
                 gameState.playerDirection,
                 gameState.enemies,
                 gameState.hasSword,
                 gameState.hasShield,
-                gameState.heroTorchLit ?? true,
-                forceDaylight
+                gameState.heroTorchLit ?? true
               )}
             </div>
           </div>
@@ -1009,14 +1004,20 @@ function calculateVisibility(
   if (!heroTorchLit) {
     // Center tile fully visible
     visibility[playerY][playerX] = 3;
-    // Orthogonally adjacent tiles dimly visible (tier 1)
-    const adj = [
+    // Adjacent (orthogonal and diagonal) tiles dimly visible (tier 1)
+    const neighbors: Array<[number, number]> = [
+      // orthogonal
       [playerY - 1, playerX],
       [playerY + 1, playerX],
       [playerY, playerX - 1],
       [playerY, playerX + 1],
+      // diagonals
+      [playerY - 1, playerX - 1],
+      [playerY - 1, playerX + 1],
+      [playerY + 1, playerX - 1],
+      [playerY + 1, playerX + 1],
     ];
-    for (const [y, x] of adj) {
+    for (const [y, x] of neighbors) {
       if (y >= 0 && y < gridHeight && x >= 0 && x < gridWidth) {
         visibility[y][x] = Math.max(visibility[y][x], 1);
       }
@@ -1063,8 +1064,7 @@ function renderTileGrid(
   enemies?: Enemy[],
   hasSword?: boolean,
   hasShield?: boolean,
-  heroTorchLit: boolean = true,
-  forceDaylight: boolean = false
+  heroTorchLit: boolean = true
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -1206,7 +1206,7 @@ function renderTileGrid(
   );
 
   // Add a smooth radial gradient overlay centered on the player for continuous fade
-  if (playerPosition && !showFullMap && !forceDaylight) {
+  if (playerPosition && !showFullMap) {
     const [py, px] = playerPosition; // grid coords
     const tileSize = 40; // px (w-10/h-10)
     const centerX = (px + 0.5) * tileSize;

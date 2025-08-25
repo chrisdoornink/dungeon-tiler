@@ -2,6 +2,9 @@ import { canSee } from "./line_of_sight";
 import { EnemyRegistry, BehaviorContext } from "./enemies/registry";
 
 export const ENEMY_PURSUIT_TTL = 5;
+// Maximum vision radius for enemies, measured in Manhattan distance.
+// Matches HUD proximity (8 tiles) so enemies don't aggro before you can see them.
+export const ENEMY_VISION_RADIUS = 8;
 
 export enum EnemyState {
   IDLE = "IDLE",
@@ -57,10 +60,11 @@ export class Enemy {
     const { grid, player } = ctx;
     // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
     this.state = EnemyState.IDLE;
-    // Ghosts can see through walls; others use standard LOS
-    const seesNow = this.kind === 'ghost'
-      ? true
-      : canSee(grid, [this.y, this.x], [player.y, player.x]);
+    // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
+    const distManhattan = Math.abs(player.y - this.y) + Math.abs(player.x - this.x);
+    const withinRange = distManhattan <= ENEMY_VISION_RADIUS;
+    // Ghosts can see through walls (ignore LOS) but still obey range.
+    const seesNow = withinRange && (this.kind === 'ghost' ? true : canSee(grid, [this.y, this.x], [player.y, player.x]));
 
     // Update pursuit memory
     if (seesNow) {

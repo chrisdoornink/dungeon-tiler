@@ -28,8 +28,8 @@ const WALL = 1;
 const dx = [0, 1, 0, -1];
 const dy = [-1, 0, 1, 0];
 
-// Constants for dungeon generation
-const GRID_SIZE = 25;
+// Constants for dungeon generation (configurable via env)
+const GRID_SIZE = Number(process.env.NEXT_PUBLIC_MAP_SIZE) || 25;
 const MIN_ROOM_SIZE = 3;
 const MAX_ROOM_SIZE = 8;
 // Maximum rooms is controlled by numRooms variable in generateMap

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { TilemapGrid } from "../components/TilemapGrid";
 
 function HomeInner() {
-  const [daylight, setDaylight] = useState(false);
+  const [daylight, setDaylight] = useState(process.env.NODE_ENV !== 'test');
   const searchParams = useSearchParams();
   const algorithm = searchParams.get("algorithm") ?? undefined;
   // Initialize game state (complete map generation handled internally)

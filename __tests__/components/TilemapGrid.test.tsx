@@ -40,10 +40,81 @@ describe('TilemapGrid component', () => {
     expect(gridContainer).toHaveStyle({
       gridTemplateColumns: 'repeat(25, 1fr)',
     });
-
     // Should have 625 tiles (25x25)
     const tiles = screen.getAllByTestId(/^tile-/);
     expect(tiles).toHaveLength(25 * 25);
+  });
+
+  it('shows diagonals at tier-1 visibility when the hero torch is snuffed', () => {
+    // Arrange: 25x25 floor with PLAYER at center and torch unlit
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    const c = Math.floor(size / 2);
+    subtypes[c][c] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      heroTorchLit: false,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    render(
+      <TilemapGrid
+        tilemap={tiles}
+        tileTypes={mockTileTypes}
+        subtypes={subtypes}
+        initialGameState={initialGameState}
+      />
+    );
+
+    const width = 25;
+    const idx = (r: number, col: number) => r * width + col;
+    const allTiles = screen.getAllByTestId(/^tile-/);
+
+    // Center is fully visible
+    expect(allTiles[idx(c, c)]).toHaveClass('fov-tier-3');
+    // Orthogonal neighbor visible (tier-1 at minimum)
+    expect(allTiles[idx(c, c + 1)]).toHaveClass('fov-tier-1');
+    // Diagonal neighbor should also be visible (tier-1)
+    expect(allTiles[idx(c + 1, c + 1)]).toHaveClass('fov-tier-1');
+    // A tile two steps away should remain black
+    expect(allTiles[idx(c + 2, c + 2)]).toHaveClass('bg-gray-900');
+  });
+
+  it('defaults to daylight (full visibility) when NODE_ENV is not test', () => {
+    const prevEnv = process.env.NODE_ENV;
+    try {
+      // Force environment to production for this test
+      (process.env as unknown as { NODE_ENV: string }).NODE_ENV = 'production';
+
+      const size = 25;
+      const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+      const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+      subtypes[2][2] = [TileSubtype.PLAYER];
+
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+        />
+      );
+
+      const allTiles = screen.getAllByTestId(/^tile-/);
+      // Pick a far-away tile; in daylight it should not be black
+      const far = allTiles[0]; // (0,0)
+      expect(far).not.toHaveClass('bg-gray-900');
+    } finally {
+      (process.env as unknown as { NODE_ENV: string }).NODE_ENV = prevEnv as string;
+    }
   });
 
   it('increments streak on consecutive wins', () => {
