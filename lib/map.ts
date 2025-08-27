@@ -768,7 +768,7 @@ export function performThrowRock(gameState: GameState): GameState {
       { y: py, x: px },
       {
         rng: preTickState.combatRng,
-        defense: preTickState.hasShield ? 2 : 0,
+        defense: preTickState.hasShield ? 1 : 0,
         playerTorchLit: preTickState.heroTorchLit ?? true,
         setPlayerTorchLit: (lit: boolean) => {
           preTickState.heroTorchLit = lit;
@@ -1109,7 +1109,7 @@ export function movePlayer(
       {
         // Use provided RNG, else fallback to Math.random so variance is active in runtime
         rng: newGameState.combatRng ?? Math.random,
-        defense: newGameState.hasShield ? 2 : 0,
+        defense: newGameState.hasShield ? 1 : 0,
         playerTorchLit: newGameState.heroTorchLit ?? true,
         setPlayerTorchLit: (lit: boolean) => {
           newGameState.heroTorchLit = lit;

@@ -76,7 +76,7 @@ describe("Combat variance and equipment", () => {
     expect(after.stats.damageTaken).toBe(2);
   });
 
-  test("shield gives +2 damage reduction (protection)", () => {
+  test("shield gives +1 damage reduction (protection)", () => {
     const gs = makeState(2, 2, {
       hasShield: true,
       combatRng: () => 0.7, // +1 variance (no crit)
@@ -87,9 +87,9 @@ describe("Combat variance and equipment", () => {
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // incoming = 1 + 1 = 2; defense = 2; net = 0
-    expect(after.heroHealth).toBe(before);
-    expect(after.stats.damageTaken).toBe(0);
+    // incoming = 1 + 1 = 2; defense = 1; net = 1
+    expect(after.heroHealth).toBe(before - 1);
+    expect(after.stats.damageTaken).toBe(1);
   });
 
   test("sword adds +2 to hero attack; variance applies; enemy can be one-shot", () => {

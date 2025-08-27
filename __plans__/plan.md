@@ -95,60 +95,60 @@ Future Tickets
 
 Dungeon Game To-Do List
 
-1. Repurpose Switch Functionality
-   • Switches no longer control dungeon visibility.
-   • Each switch affects something within an 8-tile radius to ensure clarity for the player.
-   • Possible effects:
-   • Release caged item: Unlock a cage containing a special item (to be defined; may be designed to counter specific enemies).
-   • Trigger enemy defeat: Release or activate something that can kill a specific enemy type.
-   • Open trapdoors: Cause enemies (or the player) on those tiles to fall through.
+- [ ] Repurpose Switch Functionality
+      • Switches no longer control dungeon visibility.
+      • Each switch affects something within an 8-tile radius to ensure clarity for the player.
+      • Possible effects:
+      • Release caged item: Unlock a cage containing a special item (to be defined; may be designed to counter specific enemies).
+      • Trigger enemy defeat: Release or activate something that can kill a specific enemy type.
+      • Open trapdoors: Cause enemies (or the player) on those tiles to fall through.
 
-2. Combat Variability
-   • Default enemy fight should have ~75% win chance if player and enemy health are equal.
-   • Requires probability-based outcomes and testing to ensure correctness.
+- [ ] Combat Variability
+      • Default enemy fight should have ~75% win chance if player and enemy health are equal.
+      • Requires probability-based outcomes and testing to ensure correctness.
 
-3. Shield Mechanics
-   • Adjust shield so it’s not full invulnerability.
-   • Allow player to tank 2–3 enemies more easily but still take damage if overwhelmed.
+- [ ] Shield Mechanics
+      • Adjust shield so it’s not full invulnerability.
+      • Allow player to tank 2–3 enemies more easily but still take damage if overwhelmed.
 
-4. Combat Refactor
-   • Build stable, predictable combat system with clearer structure.
-   • Needed for future enemies (e.g., sword-wielders).
+- [x] Combat Refactor
+      • Build stable, predictable combat system with clearer structure.
+      • Needed for future enemies (e.g., sword-wielders).
 
-5. Stone Exciter Counter Item
-   • Single-use item that instantly destroys a Stone Exciter.
-   • Found rarely (e.g., once per map) inside a clay pot.
-   • Acts like a normal thrown rock against other enemies.
-   • Final design: ancient rune with green glow matching Stone Exciter’s glow.
+- [ ] Stone Exciter Counter Item
+      • Single-use item that instantly destroys a Stone Exciter.
+      • Found rarely (e.g., once per map) inside a clay pot.
+      • Acts like a normal thrown rock against other enemies.
+      • Final design: ancient rune with green glow matching Stone Exciter’s glow.
 
-6. Environmental Debris Items
-   • Add small throwables/collectibles: bones, broken pottery, rusty tools, scraps of rope/cloth.
-   • Expand dungeon flavor and player resource variety.
+- [ ] Environmental Debris Items
+      • Add small throwables/collectibles: bones, broken pottery, rusty tools, scraps of rope/cloth.
+      • Expand dungeon flavor and player resource variety.
 
-7. Exit Portal Redesign
-   • Replace directional door with a glowing ground portal.
-   • Always visible and recognizable from any approach angle.
+- [ ] Exit Portal Redesign
+      • Replace directional door with a glowing ground portal.
+      • Always visible and recognizable from any approach angle.
 
-8. Locked Portal Mechanism
-   • Exit requires both:
-   • Ancient key (pickup).
-   • Lock tile (stone pedestal with runes, recognizable from above).
-   • Lock tile: faint pulsing rune glow when inactive; fully glows when key is inserted.
+- [ ] Locked Portal Mechanism
+      • Exit requires both:
+      • Ancient key (pickup).
+      • Lock tile (stone pedestal with runes, recognizable from above).
+      • Lock tile: faint pulsing rune glow when inactive; fully glows when key is inserted.
 
-9. Trapdoors
-   • Hazard tiles visible on the map.
-   • Both player and enemies fall through if stepped on.
-   • Most enemies avoid them, except:
-   • Ghost-type enemies (immune).
-   • Stone Exciter in hunt mode (glowing) will not avoid trapdoors and can fall through.
+- [ ] Trapdoors
+      • Hazard tiles visible on the map.
+      • Both player and enemies fall through if stepped on.
+      • Most enemies avoid them, except:
+      • Ghost-type enemies (immune).
+      • Stone Exciter in hunt mode (glowing) will not avoid trapdoors and can fall through.
 
-10. Multi-Tile Boss Enemy
-    • Occupies multiple tiles in larger rooms.
-    • Performs area attacks (e.g., rotating strikes, shockwaves, or projectiles).
-    • Adds strategic layer to navigation and positioning.
+- [ ] Multi-Tile Boss Enemy
+      • Occupies multiple tiles in larger rooms.
+      • Performs area attacks (e.g., rotating strikes, shockwaves, or projectiles).
+      • Adds strategic layer to navigation and positioning.
 
-11. Additional Enemy Concepts (future tickets)
-    • Mimic enemy: disguises as item or debris until approached.
-    • Shadow enemy: slips through walls/floors, reemerges unpredictably.
-    • Light-eater enemy: grows stronger or heals near torches, requiring player to manage lighting.
-    • Beam-attack enemy: charges then fires directional energy wave/shockwave, forcing timing-based dodges.
+- [ ] Additional Enemy Concepts (future tickets)
+      • Mimic enemy: disguises as item or debris until approached.
+      • Shadow enemy: slips through walls/floors, reemerges unpredictably.
+      • Light-eater enemy: grows stronger or heals near torches, requiring player to manage lighting.
+      • Beam-attack enemy: charges then fires directional energy wave/shockwave, forcing timing-based dodges.
