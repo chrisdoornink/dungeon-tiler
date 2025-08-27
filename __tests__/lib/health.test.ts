@@ -64,6 +64,8 @@ function makeEmptyStateWithPlayer(y: number, x: number): GameState {
     enemies: [] as Enemy[],
     heroHealth: 5,
     heroAttack: 1,
+    // Deterministic variance for tests: 0 -> no +/- change
+    combatRng: () => 0.5,
     stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
   } as GameState;
 }
@@ -155,6 +157,6 @@ describe("Health system - initial goblin health", () => {
     const enemies = placeEnemies({ grid, player, count: 1, minDistanceFromPlayer: 0, rng: () => 0.5 });
     expect(enemies.length).toBe(1);
     // New field to introduce via TDD
-    expect(enemies[0].health).toBe(3);
+    expect(enemies[0].health).toBe(5);
   });
 });

@@ -58,8 +58,8 @@ describe('Floating combat damage numbers', () => {
     expect(float).toHaveAttribute('data-target', 'enemy');
     expect(float).toHaveAttribute('data-y', '1');
     expect(float).toHaveAttribute('data-x', '2');
-    // UI shows actual health removed; enemy had 3 HP, so 3
-    expect(float).toHaveAttribute('data-amount', '3');
+    // UI shows raw damage dealt (base 1 + sword 2 + variance +1 = 4)
+    expect(float).toHaveAttribute('data-amount', '4');
     expect(float).toHaveAttribute('data-color', 'red');
 
     // Effect should disappear after a short time

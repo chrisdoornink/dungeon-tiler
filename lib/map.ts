@@ -1107,7 +1107,8 @@ export function movePlayer(
       newGameState.enemies,
       { y: playerPosNow[0], x: playerPosNow[1] },
       {
-        rng: newGameState.combatRng,
+        // Use provided RNG, else fallback to Math.random so variance is active in runtime
+        rng: newGameState.combatRng ?? Math.random,
         defense: newGameState.hasShield ? 2 : 0,
         playerTorchLit: newGameState.heroTorchLit ?? true,
         setPlayerTorchLit: (lit: boolean) => {
@@ -1118,25 +1119,17 @@ export function movePlayer(
           const dy = newY - currentY;
           const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
-          // Ghosts adjacent this tick should not deal damage
-          if (e.kind === "ghost" && adj) return true;
-          if (!adj) return false;
-          // Enemy is to the right, player moved left
-          if (e.y === currentY && e.x === currentX + 1 && dx === -1)
-            return true;
-          // Enemy is to the left, player moved right
-          if (e.y === currentY && e.x === currentX - 1 && dx === 1) return true;
-          // Enemy is below, player moved up
-          if (e.x === currentX && e.y === currentY + 1 && dy === -1)
-            return true;
-          // Enemy is above, player moved down
-          if (e.x === currentX && e.y === currentY - 1 && dy === 1) return true;
-          return false;
+          const movingAway = (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
+            (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
+          return adj && movingAway;
         },
       }
     );
     if (damage > 0) {
       const applied = Math.min(2, damage);
+      try {
+        console.log("[EnemyDamageTick]", JSON.stringify({ raw: damage, applied, shield: newGameState.hasShield }));
+      } catch {}
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
     }
@@ -1315,7 +1308,8 @@ export function movePlayer(
       if (idx !== -1) {
         // Apply hero damage to enemy with variance and sword bonus
         const enemy = newGameState.enemies[idx];
-        const rng = newGameState.combatRng; // undefined => no variance
+        // Use provided RNG, else fallback to Math.random so variance applies in gameplay
+        const rng = newGameState.combatRng ?? Math.random;
         const variance = rng
           ? ((r) => (r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1))(rng())
           : 0;
@@ -1325,6 +1319,12 @@ export function movePlayer(
           swordBonus,
           variance,
         });
+        try {
+          console.log(
+            "[HeroAttack]",
+            JSON.stringify({ kind: enemy.kind, heroAttack: newGameState.heroAttack, swordBonus, variance, damage: heroDamage })
+          );
+        } catch {}
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
 
@@ -1344,64 +1344,10 @@ export function movePlayer(
           if (!newGameState.recentDeaths) newGameState.recentDeaths = [];
           newGameState.recentDeaths.push([newY, newX]);
 
-          // After combat (no movement), update enemies relative to current player position
-          const finalPlayerPos = [currentY, currentX] as [number, number];
-          if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
-            const damage = updateEnemies(
-              newMapData.tiles,
-              newGameState.enemies,
-              { y: finalPlayerPos[0], x: finalPlayerPos[1] },
-              {
-                rng: newGameState.combatRng,
-                defense: newGameState.hasShield ? 2 : 0,
-                playerTorchLit: newGameState.heroTorchLit ?? true,
-                setPlayerTorchLit: (lit: boolean) => {
-                  newGameState.heroTorchLit = lit;
-                },
-              }
-            );
-            if (damage > 0) {
-              const applied = Math.min(2, damage);
-              newGameState.heroHealth = Math.max(
-                0,
-                newGameState.heroHealth - applied
-              );
-              newGameState.stats.damageTaken += applied;
-            }
-            console.log(
-              "Enemies updated:",
-              newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
-            );
-          }
+          // End of turn after combat; do not tick enemies again this input
           return newGameState;
         } else {
-          // Enemy survived: player stays put; update enemies and return
-          const finalPlayerPos = [currentY, currentX] as [number, number];
-          const damage = updateEnemies(
-            newMapData.tiles,
-            newGameState.enemies,
-            { y: finalPlayerPos[0], x: finalPlayerPos[1] },
-            {
-              rng: newGameState.combatRng,
-              defense: newGameState.hasShield ? 2 : 0,
-              playerTorchLit: newGameState.heroTorchLit ?? true,
-              setPlayerTorchLit: (lit: boolean) => {
-                newGameState.heroTorchLit = lit;
-              },
-            }
-          );
-          if (damage > 0) {
-            const applied = Math.min(2, damage);
-            newGameState.heroHealth = Math.max(
-              0,
-              newGameState.heroHealth - applied
-            );
-            newGameState.stats.damageTaken += applied;
-          }
-          console.log(
-            "Enemies updated:",
-            newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
-          );
+          // Enemy survived: end turn without another enemy tick
           return newGameState;
         }
       }

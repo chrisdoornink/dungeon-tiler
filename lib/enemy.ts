@@ -21,7 +21,7 @@ export class Enemy {
   y: number;
   x: number;
   state: EnemyState = EnemyState.IDLE;
-  health: number = 3; // Goblin base health
+  health: number = 5; // Goblin base health aligned with hero baseline
   attack: number = 1; // Goblin base attack
   // Simple facing state without importing Direction to avoid circular deps
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
@@ -368,10 +368,25 @@ export function updateEnemies(
     }
     // Optionally suppress this enemy's attack for this tick
     if (base > 0 && !suppress?.(e)) {
-      const variance = rng
-        ? ((r => (r >= 0.75 ? 2 : r < 1/3 ? -1 : r < 2/3 ? 0 : 1))(rng()))
-        : 0;
+      // Variance: goblins mirror hero damage spread (-1/0/+1). Other enemies keep 25% crit (+2).
+      let variance = 0;
+      let rVal: number | null = null;
+      if (rng) {
+        rVal = rng();
+        if (e.kind === 'goblin') {
+          variance = rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
+        } else {
+          variance = rVal >= 0.75 ? 2 : rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
+        }
+      }
       const effective = Math.max(0, base + variance - defense);
+      // Debug: per-enemy attack breakdown
+      try {
+        console.log(
+          "[EnemyAttack]",
+          JSON.stringify({ kind: e.kind, base, r: rVal, variance, defense, effective })
+        );
+      } catch {}
       totalDamage += effective;
     }
 

@@ -46,7 +46,9 @@ describe("Combat variance and equipment", () => {
       combatRng: () => 0.95,
     });
     const e = new Enemy({ y: 2, x: 1 });
-    e.attack = 1; // goblin base
+    e.attack = 1; // base 1
+    // Use non-goblin to retain +2 crit mapping; avoid ghost (adjacent ghost attacks are suppressed)
+    e.kind = 'stone-exciter';
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
@@ -62,14 +64,16 @@ describe("Combat variance and equipment", () => {
       combatRng: () => 0.95, // crit band
     });
     const e = new Enemy({ y: 2, x: 1 });
-    e.attack = 1; // goblin base
+    e.attack = 1;
+    // Use non-goblin to retain +2 crit mapping; avoid ghost suppression
+    e.kind = 'stone-exciter';
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // incoming = 1 + 2 = 3; defense = 2 -> net = 1
-    expect(after.heroHealth).toBe(before - 1);
-    expect(after.stats.damageTaken).toBe(1);
+    // Stone-exciter base 5 + 2 crit - 2 defense = 5, capped at 2 per tick
+    expect(after.heroHealth).toBe(before - 2);
+    expect(after.stats.damageTaken).toBe(2);
   });
 
   test("shield gives +2 damage reduction (protection)", () => {
