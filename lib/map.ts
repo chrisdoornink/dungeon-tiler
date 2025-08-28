@@ -63,6 +63,7 @@ export function generateMap(): number[][] {
     for (let x = 0; x < GRID_SIZE; x++) {
       row.push(WALL);
     }
+
     grid.push(row);
   }
   // Create 2-4 rooms
@@ -175,6 +176,7 @@ export enum TileSubtype {
   FOOD = 14,
   MED = 15,
   WALL_TORCH = 16,
+  RUNE = 17,
 }
 
 export interface MapData {
@@ -369,6 +371,55 @@ export function addLightswitchToMap(mapData: MapData): MapData {
     console.warn(
       "Could not place lightswitch - no eligible floor tiles available"
     );
+  }
+
+  return newMapData;
+}
+
+/**
+ * Place one POT containing a RUNE for each stone-exciter enemy on the map.
+ * Pots are placed on empty FLOOR tiles (no other subtypes) and never on the same
+ * tile as any enemy. Each rune pot is `[POT, RUNE]` so that when revealed it
+ * becomes a pickup-able RUNE.
+ */
+export function addRunePotsForStoneExciters(
+  mapData: MapData,
+  enemies: Enemy[]
+): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const h = grid.length;
+  const w = grid[0].length;
+
+  const stones = enemies.filter((e) => e.kind === "stone-exciter");
+  if (stones.length === 0) return newMapData;
+
+  const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (grid[y][x] !== FLOOR) continue;
+      const subs = newMapData.subtypes[y][x] ?? [];
+      if (subs.length > 0 && !subs.includes(TileSubtype.NONE)) continue;
+      if (occupied.has(`${y},${x}`)) continue;
+      eligible.push([y, x]);
+    }
+  }
+
+  if (eligible.length === 0) return newMapData;
+
+  // Shuffle eligible positions
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  // Place up to one rune pot per stone-exciter
+  const toPlace = Math.min(stones.length, eligible.length);
+  for (let i = 0; i < toPlace; i++) {
+    const [py, px] = eligible[i];
+    newMapData.subtypes[py][px] = [TileSubtype.POT, TileSubtype.RUNE];
   }
 
   return newMapData;
@@ -826,6 +877,29 @@ export function performThrowRock(gameState: GameState): GameState {
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
       const target: Enemy = newEnemies[hitIdx];
+      // If we have a rune and the target is a stone-exciter, consume a rune to instantly kill
+      if (target.kind === "stone-exciter" && (preTickState.runeCount ?? 0) > 0) {
+        // Enemy dies instantly
+        const removed = newEnemies.splice(hitIdx, 1)[0];
+        const newStats = {
+          ...preTickState.stats,
+          enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+        };
+        const byKind = newStats.byKind || createEmptyByKind();
+        const k = removed.kind as EnemyKind;
+        byKind[k] = (byKind[k] ?? 0) + 1;
+        newStats.byKind = byKind;
+        const newRecent = (
+          preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
+        ).concat([[removed.y, removed.x] as [number, number]]);
+        return {
+          ...preTickState,
+          enemies: newEnemies,
+          stats: newStats,
+          recentDeaths: newRecent,
+          runeCount: (preTickState.runeCount ?? 0) - 1,
+        };
+      }
       const newHealth = (target.health ?? 1) - 2; // rock deals 2 damage
       if (newHealth <= 0) {
         // Enemy dies: remove and record for spirit VFX
@@ -867,8 +941,12 @@ export function performThrowRock(gameState: GameState): GameState {
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
-      // Remove the pot and consume the rock; no rock placement
-      newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
+      // If this pot contains a rune, reveal it; otherwise remove pot
+      if (subs.includes(TileSubtype.RUNE)) {
+        newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+      } else {
+        newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
+      }
       return { ...preTickState, mapData: newMapData, rockCount: count - 1 };
     }
   }
@@ -881,6 +959,157 @@ export function performThrowRock(gameState: GameState): GameState {
     mapData: newMapData,
     rockCount: count - 1,
   };
+}
+
+/**
+ * Throw a rune up to 4 tiles. Differences from rocks:
+ * - If it hits a wall or goes OOB, it lands on the last traversed floor tile before impact and can be picked up again.
+ * - If it hits an enemy:
+ *   - stone-exciter: instantly killed, rune is consumed (removed from inventory).
+ *   - others: deal 2 damage; if enemy dies, rune is consumed; otherwise, rune lands on the last traversed floor tile.
+ */
+export function performThrowRune(gameState: GameState): GameState {
+  const pos = findPlayerPosition(gameState.mapData);
+  if (!pos) return gameState;
+  const [py, px] = pos;
+  const count = gameState.runeCount ?? 0;
+  if (count <= 0) return gameState;
+
+  // Enemies act relative to current player position
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const damage = updateEnemies(
+      preTickState.mapData.tiles,
+      preTickState.enemies,
+      { y: py, x: px },
+      {
+        rng: preTickState.combatRng,
+        defense: preTickState.hasShield ? 1 : 0,
+        playerTorchLit: preTickState.heroTorchLit ?? true,
+        setPlayerTorchLit: (lit: boolean) => {
+          preTickState.heroTorchLit = lit;
+        },
+        suppress: (e) =>
+          Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
+      }
+    );
+    if (damage > 0) {
+      const applied = Math.min(2, damage);
+      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      preTickState.stats = {
+        ...preTickState.stats,
+        damageTaken: preTickState.stats.damageTaken + applied,
+      };
+    }
+  }
+
+  // Direction vector
+  let vx = 0, vy = 0;
+  switch (preTickState.playerDirection) {
+    case Direction.UP: vy = -1; break;
+    case Direction.RIGHT: vx = 1; break;
+    case Direction.DOWN: vy = 1; break;
+    case Direction.LEFT: vx = -1; break;
+  }
+
+  const newMapData = JSON.parse(JSON.stringify(preTickState.mapData)) as MapData;
+
+  // Track last floor tile traversed (start at player tile, but don't drop there)
+  let lastFloorY = py;
+  let lastFloorX = px;
+  let ty = py;
+  let tx = px;
+  for (let step = 1; step <= 4; step++) {
+    ty += vy;
+    tx += vx;
+
+    // Out of bounds -> drop on last traversed floor tile
+    if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
+      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+      }
+      // No valid landing spot found; keep inventory unchanged
+      return preTickState;
+    }
+
+    // Enemy collision
+    const enemies = preTickState.enemies ?? [];
+    const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
+    if (hitIdx !== -1) {
+      const newEnemies = enemies.slice();
+      const target: Enemy = newEnemies[hitIdx];
+      if (target.kind === "stone-exciter") {
+        // Instant kill, rune consumed
+        const removed = newEnemies.splice(hitIdx, 1)[0];
+        const newStats = { ...preTickState.stats, enemiesDefeated: preTickState.stats.enemiesDefeated + 1 };
+        const byKind = newStats.byKind || createEmptyByKind();
+        const k = removed.kind as EnemyKind;
+        byKind[k] = (byKind[k] ?? 0) + 1;
+        newStats.byKind = byKind;
+        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
+        return { ...preTickState, enemies: newEnemies, stats: newStats, recentDeaths: newRecent, runeCount: count - 1 };
+      }
+      // Non-stone enemy: deal 2 damage
+      const newHealth = (target.health ?? 1) - 2;
+      if (newHealth <= 0) {
+        const removed = newEnemies.splice(hitIdx, 1)[0];
+        const newStats = { ...preTickState.stats, enemiesDefeated: preTickState.stats.enemiesDefeated + 1 };
+        const byKind = newStats.byKind || createEmptyByKind();
+        const k = removed.kind as EnemyKind;
+        byKind[k] = (byKind[k] ?? 0) + 1;
+        newStats.byKind = byKind;
+        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
+        return { ...preTickState, enemies: newEnemies, stats: newStats, recentDeaths: newRecent, runeCount: count - 1 };
+      } else {
+        target.health = newHealth;
+        newEnemies[hitIdx] = target;
+        // Drop rune on last floor tile
+        if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+          newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+          return { ...preTickState, enemies: newEnemies, mapData: newMapData, runeCount: count - 1 };
+        }
+        return { ...preTickState, enemies: newEnemies };
+      }
+    }
+
+    // Wall/obstacle -> drop on last floor tile
+    if (newMapData.tiles[ty][tx] !== FLOOR) {
+      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+      }
+      return preTickState;
+    }
+
+    // Pot on floor tile
+    const subs = newMapData.subtypes[ty][tx] || [];
+    if (subs.includes(TileSubtype.POT)) {
+      if (subs.includes(TileSubtype.RUNE)) {
+        newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+      } else {
+        newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
+      }
+      // Drop rune before the pot
+      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+      }
+      return preTickState;
+    }
+
+    // Continue traversal over floor
+    lastFloorY = ty;
+    lastFloorX = tx;
+  }
+
+  // Clear path for 4 tiles -> land on 4th tile
+  if (newMapData.tiles[ty][tx] === FLOOR) {
+    newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+    return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+  }
+  return preTickState;
 }
 
 /**
@@ -912,6 +1141,7 @@ export interface GameState {
   combatRng?: () => number;
   // Inventory
   rockCount?: number; // Count of collected rocks
+  runeCount?: number; // Count of collected runes
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -944,6 +1174,9 @@ export function initializeGameState(): GameState {
 
   enemyTypeAssignement(enemies);
 
+  // After enemies are assigned, place one rune pot per stone-exciter
+  const withRunes = addRunePotsForStoneExciters(mapData, enemies);
+
   if (enemies.length > 0) {
     console.log(
       `Placed ${enemies.length} enemies:`,
@@ -958,7 +1191,7 @@ export function initializeGameState(): GameState {
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
-    mapData,
+    mapData: withRunes,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN, // Default facing down/front
@@ -966,6 +1199,7 @@ export function initializeGameState(): GameState {
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
+    runeCount: 0,
     heroTorchLit: true,
     stats: {
       damageDealt: 0,
@@ -1256,9 +1490,13 @@ export function movePlayer(
 
     // If it's a POT, reveal content without moving
     if (subtype.includes(TileSubtype.POT)) {
-      // Reveal FOOD or MED with a simple 50/50
-      const reveal = Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
-      newMapData.subtypes[newY][newX] = [reveal];
+      // If this pot is tagged with RUNE, reveal the rune; otherwise reveal FOOD/MED 50/50
+      if (subtype.includes(TileSubtype.RUNE)) {
+        newMapData.subtypes[newY][newX] = [TileSubtype.RUNE];
+      } else {
+        const reveal = Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
+        newMapData.subtypes[newY][newX] = [reveal];
+      }
       return newGameState;
     }
 
@@ -1270,6 +1508,16 @@ export function movePlayer(
       const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
       newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
       // Movement/clearing of the item happens below in the generic move logic
+    }
+
+    // If it's a RUNE, pick it up and clear the tile
+    if (subtype.includes(TileSubtype.RUNE)) {
+      newGameState.runeCount = (newGameState.runeCount || 0) + 1;
+      newMapData.subtypes[newY][newX] = [];
+      console.log(
+        "Player picked up a rune! Total runes:",
+        newGameState.runeCount
+      );
     }
 
     // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry

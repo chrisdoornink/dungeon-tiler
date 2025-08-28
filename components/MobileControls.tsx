@@ -4,9 +4,11 @@ interface MobileControlsProps {
   onMove: (direction: string) => void;
   onThrowRock?: () => void;
   rockCount?: number;
+  onUseRune?: () => void;
+  runeCount?: number;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, rockCount }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, rockCount, onUseRune, runeCount }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
     UP: false,
@@ -88,79 +90,109 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, ro
   return (
     <div 
       data-testid="mobile-controls" 
-      className={`fixed bottom-4 right-4 grid grid-cols-3 gap-1 z-10 ${!isMobile ? 'opacity-70 scale-90' : ''}`}
+      className={`fixed bottom-4 right-4 z-10 ${!isMobile ? 'opacity-70 scale-90' : ''}`}
     >
-      {/* Empty space for top-left */}
-      <div></div>
-      {/* Up button */}
-      <button 
-        data-testid="mobile-control-up"
-        className={getButtonStyle('UP')}
-        onClick={() => onMove('UP')}
-        aria-label="Move Up"
-      >
-        ▲
-      </button>
-      {/* Empty space for top-right */}
-      <div></div>
-      
-      {/* Left button */}
-      <button 
-        data-testid="mobile-control-left"
-        className={getButtonStyle('LEFT')}
-        onClick={() => onMove('LEFT')}
-        aria-label="Move Left"
-      >
-        ◄
-      </button>
-      {/* Center action: Throw rock */}
-      <button
-        data-testid="mobile-control-throw"
-        className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
-          (rockCount ?? 0) > 0 ? (isMobile ? 'bg-[#333333] hover:bg-[#444444] text-white' : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]') : 'bg-[#222222] text-[#666666] cursor-not-allowed'
-        }`}
-        onClick={() => (rockCount ?? 0) > 0 && onThrowRock && onThrowRock()}
-        aria-label="Throw Rock"
-        disabled={(rockCount ?? 0) <= 0}
-        title={(rockCount ?? 0) > 0 ? `Throw rock (${rockCount})` : 'No rocks'}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            display: 'inline-block',
-            width: isMobile ? 22 : 18,
-            height: isMobile ? 22 : 18,
-            backgroundImage: "url(/images/items/rock-1.png)",
-            backgroundSize: 'contain',
-            backgroundRepeat: 'no-repeat',
-            backgroundPosition: 'center',
-            verticalAlign: 'middle'
-          }}
-        />
-      </button>
-      {/* Right button */}
-      <button 
-        data-testid="mobile-control-right"
-        className={getButtonStyle('RIGHT')}
-        onClick={() => onMove('RIGHT')}
-        aria-label="Move Right"
-      >
-        ►
-      </button>
-      
-      {/* Empty space for bottom-left */}
-      <div></div>
-      {/* Down button */}
-      <button 
-        data-testid="mobile-control-down"
-        className={getButtonStyle('DOWN')}
-        onClick={() => onMove('DOWN')}
-        aria-label="Move Down"
-      >
-        ▼
-      </button>
-      {/* Empty space for bottom-right */}
-      <div></div>
+      {/* Action bar above d-pad: Rock and Rune buttons */}
+      <div className="flex justify-end gap-2 mb-2">
+        {(rockCount ?? 0) > 0 && (
+          <button
+            data-testid="mobile-action-rock"
+            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
+              (rockCount ?? 0) > 0
+                ? (isMobile
+                    ? 'bg-[#333333] hover:bg-[#444444] text-white'
+                    : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]')
+                : 'bg-[#222222] text-[#666666] cursor-not-allowed'
+            }`}
+            onClick={() => (rockCount ?? 0) > 0 && onThrowRock && onThrowRock()}
+            aria-label="Throw Rock"
+            title={`Throw rock (${rockCount})`}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-block',
+                width: isMobile ? 22 : 18,
+                height: isMobile ? 22 : 18,
+                backgroundImage: "url(/images/items/rock-1.png)",
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                verticalAlign: 'middle'
+              }}
+            />
+          </button>
+        )}
+        {(runeCount ?? 0) > 0 && (
+          <button
+            data-testid="mobile-action-rune"
+            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
+              (runeCount ?? 0) > 0
+                ? (isMobile
+                    ? 'bg-[#333333] hover:bg-[#444444] text-white'
+                    : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]')
+                : 'bg-[#222222] text-[#666666] cursor-not-allowed'
+            }`}
+            onClick={() => (runeCount ?? 0) > 0 && onUseRune && onUseRune()}
+            aria-label="Use Rune"
+            title={`Use rune (${runeCount})`}
+          >
+            <span aria-hidden="true" role="img" style={{ fontSize: isMobile ? 18 : 16 }}>💎</span>
+          </button>
+        )}
+      </div>
+
+      {/* D-pad grid */}
+      <div className={`grid grid-cols-3 gap-1`}>
+        {/* Empty space for top-left */}
+        <div></div>
+        {/* Up button */}
+        <button 
+          data-testid="mobile-control-up"
+          className={getButtonStyle('UP')}
+          onClick={() => onMove('UP')}
+          aria-label="Move Up"
+        >
+          ▲
+        </button>
+        {/* Empty space for top-right */}
+        <div></div>
+        
+        {/* Left button */}
+        <button 
+          data-testid="mobile-control-left"
+          className={getButtonStyle('LEFT')}
+          onClick={() => onMove('LEFT')}
+          aria-label="Move Left"
+        >
+          ◄
+        </button>
+        {/* Center placeholder */}
+        <div></div>
+        {/* Right button */}
+        <button 
+          data-testid="mobile-control-right"
+          className={getButtonStyle('RIGHT')}
+          onClick={() => onMove('RIGHT')}
+          aria-label="Move Right"
+        >
+          ►
+        </button>
+        
+        {/* Empty space for bottom-left */}
+        <div></div>
+        {/* Down button */}
+        <button 
+          data-testid="mobile-control-down"
+          className={getButtonStyle('DOWN')}
+          onClick={() => onMove('DOWN')}
+          aria-label="Move Down"
+        >
+          ▼
+        </button>
+        {/* Empty space for bottom-right */}
+        <div></div>
+      </div>
     </div>
   );
 };

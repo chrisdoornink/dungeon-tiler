@@ -7,6 +7,7 @@ import {
   movePlayer,
   TileSubtype,
   performThrowRock,
+  performThrowRune,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
@@ -85,6 +86,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Transient moving rock effect
   const [rockEffect, setRockEffect] = useState<null | { y: number; x: number; id: string }>(null);
+
+  // Handle throwing a rune: resolve immediately and spawn spirit VFX if enemies died
+  const handleThrowRune = useCallback(() => {
+    setGameState((prev) => {
+      const next = performThrowRune(prev);
+      try {
+        const died = next.recentDeaths || [];
+        if (died.length > 0) {
+          const now = Date.now();
+          setSpirits((prevS) => {
+            const out = [...prevS];
+            for (const [y, x] of died) {
+              const key = `${y},${x}`;
+              const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              out.push({ id, y, x, createdAt: now });
+              setTimeout(() => {
+                setSpirits((curr) => curr.filter((s) => s.id !== id));
+              }, 2000);
+            }
+            return out;
+          });
+        }
+      } catch (err) {
+        console.error('Rune kill spirit spawn error:', err);
+      }
+      return next;
+    });
+  }, []);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -671,6 +700,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Throw a rock
           handleThrowRock();
           return; // do not also move
+        case "t":
+        case "T":
+          // Use a rune
+          handleThrowRune();
+          return;
       }
 
       if (direction !== null) {
@@ -682,7 +716,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [gameState, handlePlayerMove, handleThrowRock]);
+  }, [gameState, handlePlayerMove, handleThrowRock, handleThrowRune]);
 
   return (
     <div
@@ -743,7 +777,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         gameState.hasExitKey ||
         gameState.hasSword ||
         gameState.hasShield ||
-        (gameState.rockCount ?? 0) > 0) && (
+        (gameState.rockCount ?? 0) > 0 ||
+        (gameState.runeCount ?? 0) > 0) && (
         <div
           className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md"
           style={{ maxWidth: "200px" }}
@@ -775,7 +810,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 type="button"
                 onClick={handleThrowRock}
                 className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                title={`Throw rock (${gameState.rockCount}) — tap this or press R`}
+                title={`Throw rock (${gameState.rockCount}) — tap or press R`}
               >
                 <span
                   aria-hidden="true"
@@ -793,6 +828,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">(tap or R)</span>
               </button>
             )}
+            {(gameState.runeCount ?? 0) > 0 && (
+              <button
+                type="button"
+                onClick={handleThrowRune}
+                className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                title={`Use rune (${gameState.runeCount}) — tap or press T`}
+              >
+                <span role="img" aria-label="rune">💎</span>
+                <span>Rune x{gameState.runeCount}</span>
+                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">(tap or T)</span>
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -802,6 +849,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         onMove={handleMobileMove}
         onThrowRock={handleThrowRock}
         rockCount={gameState.rockCount ?? 0}
+        onUseRune={handleThrowRune}
+        runeCount={gameState.runeCount ?? 0}
       />
 
       {/* Centered map container */}
