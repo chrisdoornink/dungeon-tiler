@@ -151,6 +151,8 @@
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
+  position: relative; /* allow z-index stacking over glow */
+  z-index: 1;
 }
 
 /* Torch icon: CSS-only flame with flicker */
@@ -258,6 +260,42 @@
 /* Rune asset */
 .runeIcon {
   background-image: url('/images/items/rune1.png');
+}
+
+/* Small pulsing green glow for rune (behind asset) */
+.runeGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  z-index: 0; /* under assetIcon */
+  background:
+    radial-gradient(60% 60% at 50% 50%, rgba(80, 255, 180, 0.35), rgba(80, 255, 180, 0.0) 70%),
+    radial-gradient(80% 80% at 50% 50%, rgba(60, 210, 150, 0.18), rgba(0,0,0,0) 75%);
+  filter: blur(2px) saturate(115%);
+  mix-blend-mode: screen;
+  animation: runePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes runePulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.45;
+    filter: blur(2.2px) saturate(110%);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 0.9;
+    filter: blur(2px) saturate(125%);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.45;
+    filter: blur(2.2px) saturate(110%);
+  }
 }
 
 /* Sword and Shield assets */

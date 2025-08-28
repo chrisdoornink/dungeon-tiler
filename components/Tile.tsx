@@ -471,14 +471,18 @@ export const Tile: React.FC<TileProps> = ({
 
         {/* Render RUNE when revealed (do not show if still inside a POT) */}
         {hasRune(subtypes) && !hasPot(subtypes) && (
-          <div
-            key="rune"
-            data-testid={`subtype-icon-${TileSubtype.RUNE}`}
-            className={`${styles.assetIcon} ${styles.runeIcon}`}
-            style={{
-              backgroundImage: `url('/images/items/rune1.png')`,
-            }}
-          />
+          <>
+            {/* Glow behind the rune asset */}
+            <div className={styles.runeGlow} aria-hidden="true" />
+            <div
+              key="rune"
+              data-testid={`subtype-icon-${TileSubtype.RUNE}`}
+              className={`${styles.assetIcon} ${styles.runeIcon}`}
+              style={{
+                backgroundImage: `url('/images/items/rune1.png')`,
+              }}
+            />
+          </>
         )}
 
         {/* Render remaining subtypes with standard icons */}
