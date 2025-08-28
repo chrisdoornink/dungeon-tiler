@@ -263,6 +263,9 @@ export const Tile: React.FC<TileProps> = ({
   const hasMed = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.MED) || false;
   };
+  const hasRune = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.RUNE) || false;
+  };
   const hasWallTorch = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.WALL_TORCH) || false;
   };
@@ -306,6 +309,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.ROCK &&
         subtype !== TileSubtype.FOOD &&
         subtype !== TileSubtype.MED &&
+        subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.WALL_TORCH &&
         subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
     );
@@ -461,6 +465,18 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.medIcon}`}
             style={{
               backgroundImage: `url('/images/items/meds-1.png')`,
+            }}
+          />
+        )}
+
+        {/* Render RUNE when revealed (do not show if still inside a POT) */}
+        {hasRune(subtypes) && !hasPot(subtypes) && (
+          <div
+            key="rune"
+            data-testid={`subtype-icon-${TileSubtype.RUNE}`}
+            className={`${styles.assetIcon} ${styles.runeIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/rune1.png')`,
             }}
           />
         )}

@@ -137,7 +137,19 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, ro
             aria-label="Use Rune"
             title={`Use rune (${runeCount})`}
           >
-            <span aria-hidden="true" role="img" style={{ fontSize: isMobile ? 18 : 16 }}>💎</span>
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-block',
+                width: isMobile ? 22 : 18,
+                height: isMobile ? 22 : 18,
+                backgroundImage: "url(/images/items/rune1.png)",
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                verticalAlign: 'middle'
+              }}
+            />
           </button>
         )}
       </div>

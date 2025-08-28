@@ -255,6 +255,11 @@
   background-image: url('/images/items/meds-1.png');
 }
 
+/* Rune asset */
+.runeIcon {
+  background-image: url('/images/items/rune1.png');
+}
+
 /* Sword and Shield assets */
 .swordIcon {
   background-image: url('/images/items/sword.png');
