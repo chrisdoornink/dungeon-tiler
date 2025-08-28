@@ -36,9 +36,10 @@ export class Enemy {
   set kind(k: 'goblin' | 'ghost' | 'stone-exciter') {
     this._kind = k;
     if (k === 'ghost') {
-      // Ghosts are fragile: 2 HP. If currently higher (default 3), clamp to 2.
+      // Ghosts are fragile and do not deal contact damage.
+      // Set HP to 2 and ensure attack is 0 so they never hurt the hero directly.
       if (this.health > 2) this.health = 2;
-      // Keep attack as-is unless design says otherwise (currently 1)
+      this.attack = 0;
     } else if (k === 'stone-exciter') {
       // Stone-exciter uses fixed 5 damage when contacting the hero
       this.attack = 5;
@@ -160,6 +161,14 @@ export class Enemy {
                 this.facing = dxRaw > 0 ? 'RIGHT' : 'LEFT';
               } else {
                 this.facing = dyRaw > 0 ? 'DOWN' : 'UP';
+              }
+              // End adjacent to the player (at the tile just before the player's tile)
+              // so proximity hooks (e.g., torch snuff) can trigger this tick.
+              const adjY = ty - dy;
+              const adjX = tx - dx;
+              if (isFloor(grid, adjY, adjX)) {
+                this.y = adjY;
+                this.x = adjX;
               }
               this.state = EnemyState.HUNTING;
               return this.attack;
@@ -409,6 +418,10 @@ export function updateEnemies(
           attack: e.attack,
         },
       });
+    }
+    // Robust fallback: if a ghost is adjacent, ensure torch is snuffed regardless of hook wiring
+    if (isAdjacent && e.kind === 'ghost' && opts?.setPlayerTorchLit) {
+      opts.setPlayerTorchLit(false);
     }
   }
   return totalDamage;
