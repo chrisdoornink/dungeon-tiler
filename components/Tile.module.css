@@ -234,10 +234,34 @@
 }
 
 .exitIcon {
-  background-image: url('/images/items/exit-door-closed.png');
-  /* Add subtle glow effect to make exit door more visible */
-  filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.5));
-  animation: exitPulse 2s infinite alternate;
+  background-image: url('/images/door/exit-dark.png');
+  /* Keep subtle emphasis for visibility on floor */
+  filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.4));
+  /* Scale up and center */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 31px;  /* 24px * 1.3 */
+  height: 31px; /* 24px * 1.3 */
+  z-index: 2;
+}
+
+/* Gold chain lock overlay for locked exit */
+.exitLockIcon {
+  background-image: url('/images/door/gold-chain-lock.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0.95;
+  /* Scale up and center */
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 31px;  /* 24px * 1.3 */
+  height: 31px; /* 24px * 1.3 */
+  z-index: 3;
 }
 
 /* Pots, Rocks, Food, Meds */
@@ -308,8 +332,57 @@
 }
 
 @keyframes exitPulse {
-  from { filter: drop-shadow(0 0 4px rgba(72, 187, 120, 0.4)); }
-  to { filter: drop-shadow(0 0 6px rgba(72, 187, 120, 0.7)); }
+  0% {
+    transform: translate(-50%, -50%) scale(1.0);
+    filter: drop-shadow(0 0 5px rgba(72, 187, 120, 0.45));
+    opacity: 0.55;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.08);
+    filter: drop-shadow(0 0 9px rgba(72, 187, 120, 0.85));
+    opacity: 0.85;
+  }
+}
+
+/* Soft pulsing green glow behind the exit icon */
+.exitGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  pointer-events: none;
+  z-index: 0; /* under assetIcon */
+  background:
+    radial-gradient(62% 62% at 50% 50%, rgba(82, 245, 160, 0.35), rgba(0,0,0,0) 70%),
+    radial-gradient(86% 86% at 50% 50%, rgba(72, 187, 120, 0.18), rgba(0,0,0,0) 75%);
+  filter: blur(1.8px) saturate(112%);
+  mix-blend-mode: screen;
+  animation: exitPulse 2.2s ease-in-out infinite alternate;
+}
+
+@keyframes exitPulseUnlocked {
+  0% {
+    transform: translate(-50%, -50%) scale(1.06);
+    filter: drop-shadow(0 0 8px rgba(82, 245, 160, 0.65));
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.22);
+    filter: drop-shadow(0 0 14px rgba(82, 245, 160, 0.95));
+    opacity: 1;
+  }
+}
+
+/* Larger/brighter pulse when player has the exit key */
+.exitGlowUnlocked {
+  width: 36px;
+  height: 36px;
+  background:
+    radial-gradient(64% 64% at 50% 50%, rgba(82, 245, 160, 0.42), rgba(0,0,0,0) 72%),
+    radial-gradient(90% 90% at 50% 50%, rgba(72, 187, 120, 0.24), rgba(0,0,0,0) 78%);
+  animation: exitPulseUnlocked 1.9s ease-in-out infinite alternate;
 }
 
 /* Variant: wall_pillar (front perspective) */

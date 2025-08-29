@@ -30,6 +30,7 @@ interface TileProps {
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
   invisibleClassName?: string; // Optional class override for invisible tiles
+  playerHasExitKey?: boolean; // Player holds the exit key for conditional exit rendering
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -51,6 +52,7 @@ export const Tile: React.FC<TileProps> = ({
   hasSword,
   hasShield,
   invisibleClassName,
+  playerHasExitKey,
 }) => {
   // Per-instance randomized torch animation interval (200–300ms)
   const torchDuration = React.useMemo(() => {
@@ -236,7 +238,7 @@ export const Tile: React.FC<TileProps> = ({
   };
 
   // Check if a tile has an exit key subtype
-  const hasExitKey = (subtypes: number[] | undefined): boolean => {
+  const hasExitKeySubtype = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.EXITKEY) || false;
   };
 
@@ -390,7 +392,7 @@ export const Tile: React.FC<TileProps> = ({
         )}
 
         {/* Render exit key with asset if present */}
-        {hasExitKey(subtypes) && (
+        {hasExitKeySubtype(subtypes) && (
           <div
             key="exit-key"
             data-testid={`subtype-icon-${TileSubtype.EXITKEY}`}
@@ -407,13 +409,28 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render exit with asset if present - using full height icon */}
+        {/* Render exit with asset if present (floor overlay) */}
         {hasExit(subtypes) && (
-          <div
-            key="exit"
-            data-testid={`subtype-icon-${TileSubtype.EXIT}`}
-            className={`${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
-          />
+          <>
+            {/* Soft pulsing glow behind the exit icon (bigger/brighter when key owned) */}
+            <div
+              aria-hidden="true"
+              className={`${styles.exitGlow} ${playerHasExitKey ? styles.exitGlowUnlocked : ''}`}
+            />
+            <div
+              key="exit"
+              data-testid={`subtype-icon-${TileSubtype.EXIT}`}
+              className={`${styles.assetIcon} ${styles.exitIcon}`}
+              style={{
+                backgroundImage: `url(${playerHasExitKey ? '/images/door/exit-transparent.png' : '/images/door/exit-dark.png'})`,
+              }}
+            />
+            <div
+              key="exit-lock"
+              data-testid={`subtype-icon-exit-lock`}
+              className={`${styles.assetIcon} ${styles.exitLockIcon}`}
+            />
+          </>
         )}
 
         {/* Render POT/ROCK/FOOD/MED with assets if present */}
@@ -608,7 +625,10 @@ export const Tile: React.FC<TileProps> = ({
           {hasEnemy && (
             <>
               {enemyAura && (
-                <div className={styles.exciterGlow} aria-hidden="true" />
+                <div
+                  className={styles.exitGlow}
+                  aria-hidden="true"
+                />
               )}
               {((enemyVisible ?? isVisible) === true) && (
                 <div

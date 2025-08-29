@@ -36,7 +36,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   tileTypes,
   subtypes,
   initialGameState,
-  forceDaylight = process.env.NODE_ENV !== 'test',
+  forceDaylight = process.env.NODE_ENV !== "test",
 }) => {
   const router = useRouter();
 
@@ -57,7 +57,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             subtypes ||
             Array(dynH)
               .fill(0)
-              .map(() => Array(dynW).fill(0).map(() => [] as number[])),
+              .map(() =>
+                Array(dynW)
+                  .fill(0)
+                  .map(() => [] as number[])
+              ),
         },
         showFullMap: false,
         win: false,
@@ -85,9 +89,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   );
 
   // Transient moving rock effect
-  const [rockEffect, setRockEffect] = useState<null | { y: number; x: number; id: string }>(null);
+  const [rockEffect, setRockEffect] = useState<null | {
+    y: number;
+    x: number;
+    id: string;
+  }>(null);
   // Transient moving rune effect
-  const [runeEffect, setRuneEffect] = useState<null | { y: number; x: number; id: string }>(null);
+  const [runeEffect, setRuneEffect] = useState<null | {
+    y: number;
+    x: number;
+    id: string;
+  }>(null);
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
@@ -98,22 +110,38 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (!pos) return prev;
       const [py, px] = pos;
       // Determine direction vector
-      let vx = 0, vy = 0;
+      let vx = 0,
+        vy = 0;
       switch (prev.playerDirection) {
-        case Direction.UP: vy = -1; break;
-        case Direction.RIGHT: vx = 1; break;
-        case Direction.DOWN: vy = 1; break;
-        case Direction.LEFT: vx = -1; break;
+        case Direction.UP:
+          vy = -1;
+          break;
+        case Direction.RIGHT:
+          vx = 1;
+          break;
+        case Direction.DOWN:
+          vy = 1;
+          break;
+        case Direction.LEFT:
+          vx = -1;
+          break;
       }
 
       // Compute animation path (up to 4 steps)
       const path: Array<[number, number]> = [];
-      let ty = py, tx = px;
+      let ty = py,
+        tx = px;
       let impact: { y: number; x: number } | null = null;
       for (let step = 1; step <= 4; step++) {
-        ty += vy; tx += vx;
+        ty += vy;
+        tx += vx;
         // Out of bounds: stop before leaving grid
-        if (ty < 0 || ty >= prev.mapData.tiles.length || tx < 0 || tx >= prev.mapData.tiles[0].length) {
+        if (
+          ty < 0 ||
+          ty >= prev.mapData.tiles.length ||
+          tx < 0 ||
+          tx >= prev.mapData.tiles[0].length
+        ) {
           const last = path[path.length - 1];
           if (last) impact = { y: last[0], x: last[1] };
           break;
@@ -155,7 +183,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             return;
           }
           const [ny, nx] = path[idx];
-          setRuneEffect((cur) => (cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur));
+          setRuneEffect((cur) =>
+            cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+          );
         }, stepMs);
         // Safety: clear after 1s
         setTimeout(() => {
@@ -167,7 +197,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const bamDelay = Math.max(0, path.length) * stepMs + 10;
           setTimeout(() => {
             const bamIdx = 1 + Math.floor(Math.random() * 3);
-            setBamEffect({ y: impact.y, x: impact.x, src: `/images/items/bam${bamIdx}.png` });
+            setBamEffect({
+              y: impact.y,
+              x: impact.x,
+              src: `/images/items/bam${bamIdx}.png`,
+            });
             setTimeout(() => setBamEffect(null), 300);
           }, bamDelay);
         }
@@ -185,7 +219,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     const out = [...prevS];
                     for (const [y, x] of died) {
                       const key = `${y},${x}`;
-                      const sid = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+                      const sid = `${key}-${now}-${Math.random()
+                        .toString(36)
+                        .slice(2, 7)}`;
                       out.push({ id: sid, y, x, createdAt: now });
                       setTimeout(() => {
                         setSpirits((curr) => curr.filter((s) => s.id !== sid));
@@ -195,7 +231,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   });
                 }
               } catch (err) {
-                console.error('Rune kill spirit spawn error:', err);
+                console.error("Rune kill spirit spawn error:", err);
               }
               return next;
             });
@@ -214,7 +250,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             const out = [...prevS];
             for (const [y, x] of died) {
               const key = `${y},${x}`;
-              const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              const id = `${key}-${now}-${Math.random()
+                .toString(36)
+                .slice(2, 7)}`;
               out.push({ id, y, x, createdAt: now });
               setTimeout(() => {
                 setSpirits((curr) => curr.filter((s) => s.id !== id));
@@ -224,7 +262,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           });
         }
       } catch (err) {
-        console.error('Rune kill spirit spawn error:', err);
+        console.error("Rune kill spirit spawn error:", err);
       }
       return next;
     });
@@ -239,25 +277,41 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (!pos) return prev;
       const [py, px] = pos;
       // Determine direction vector
-      let vx = 0, vy = 0;
+      let vx = 0,
+        vy = 0;
       switch (prev.playerDirection) {
-        case Direction.UP: vy = -1; break;
-        case Direction.RIGHT: vx = 1; break;
-        case Direction.DOWN: vy = 1; break;
-        case Direction.LEFT: vx = -1; break;
+        case Direction.UP:
+          vy = -1;
+          break;
+        case Direction.RIGHT:
+          vx = 1;
+          break;
+        case Direction.DOWN:
+          vy = 1;
+          break;
+        case Direction.LEFT:
+          vx = -1;
+          break;
       }
 
       // Compute animation path (up to 4 steps)
       const path: Array<[number, number]> = [];
-      let ty = py, tx = px;
+      let ty = py,
+        tx = px;
       let impact: { y: number; x: number } | null = null;
       // Track pre-hit enemy (if any) at the impact tile to compute floating damage later
       let preEnemyAtImpact: Enemy | undefined;
       let preEnemyHealth = 0;
       for (let step = 1; step <= 4; step++) {
-        ty += vy; tx += vx;
+        ty += vy;
+        tx += vx;
         // Out of bounds: stop before leaving grid
-        if (ty < 0 || ty >= prev.mapData.tiles.length || tx < 0 || tx >= prev.mapData.tiles[0].length) {
+        if (
+          ty < 0 ||
+          ty >= prev.mapData.tiles.length ||
+          tx < 0 ||
+          tx >= prev.mapData.tiles[0].length
+        ) {
           // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
           const last = path[path.length - 1];
           if (last) impact = { y: last[0], x: last[1] };
@@ -302,7 +356,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             return;
           }
           const [ny, nx] = path[idx];
-          setRockEffect((cur) => (cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur));
+          setRockEffect((cur) =>
+            cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+          );
         }, stepMs);
         // Safety: clear after 1s
         setTimeout(() => {
@@ -314,7 +370,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const bamDelay = Math.max(0, path.length) * stepMs + 10;
           setTimeout(() => {
             const bamIdx = 1 + Math.floor(Math.random() * 3);
-            setBamEffect({ y: impact.y, x: impact.x, src: `/images/items/bam${bamIdx}.png` });
+            setBamEffect({
+              y: impact.y,
+              x: impact.x,
+              src: `/images/items/bam${bamIdx}.png`,
+            });
             setTimeout(() => setBamEffect(null), 300);
           }, bamDelay);
         }
@@ -331,7 +391,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // If there was an immediate impact with no path advanced (e.g., wall adjacent), still show BAM
       else if (impact) {
         const bamIdx = 1 + Math.floor(Math.random() * 3);
-        setBamEffect({ y: impact.y, x: impact.x, src: `/images/items/bam${bamIdx}.png` });
+        setBamEffect({
+          y: impact.y,
+          x: impact.x,
+          src: `/images/items/bam${bamIdx}.png`,
+        });
         setTimeout(() => setBamEffect(null), 300);
       }
 
@@ -340,8 +404,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       try {
         // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
         if (preEnemyAtImpact && impact) {
-          const postEnemy = (next.enemies || []).find((e) => e.y === impact.y && e.x === impact.x);
-          const preHP = typeof preEnemyHealth === 'number' && !Number.isNaN(preEnemyHealth) ? preEnemyHealth : (preEnemyAtImpact.health ?? 0);
+          const postEnemy = (next.enemies || []).find(
+            (e) => e.y === impact.y && e.x === impact.x
+          );
+          const preHP =
+            typeof preEnemyHealth === "number" && !Number.isNaN(preEnemyHealth)
+              ? preEnemyHealth
+              : preEnemyAtImpact.health ?? 0;
           let dmg = 0;
           if (postEnemy) {
             const postHP = Math.max(0, postEnemy.health ?? 0);
@@ -353,7 +422,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (dmg > 0 && Number.isFinite(dmg)) {
             const spawn = () => {
               const now = Date.now();
-              const id = `fd-enemy-${impact!.y},${impact!.x}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              const id = `fd-enemy-${impact!.y},${
+                impact!.x
+              }-${now}-${Math.random().toString(36).slice(2, 7)}`;
               setFloating((prevF) => {
                 const nextF = [
                   ...prevF,
@@ -384,7 +455,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
       } catch (err) {
         // Prevent any exception here from freezing input handling
-        console.error('Rock hit damage popup error:', err);
+        console.error("Rock hit damage popup error:", err);
       }
       try {
         // Spawn spirits directly if rock kills occurred (no movement tick in this flow)
@@ -395,7 +466,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             const out = [...prevS];
             for (const [y, x] of died) {
               const key = `${y},${x}`;
-              const id = `${key}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              const id = `${key}-${now}-${Math.random()
+                .toString(36)
+                .slice(2, 7)}`;
               out.push({ id, y, x, createdAt: now });
               setTimeout(() => {
                 setSpirits((curr) => curr.filter((s) => s.id !== id));
@@ -405,7 +478,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           });
         }
       } catch (err) {
-        console.error('Rock kill spirit spawn error:', err);
+        console.error("Rock kill spirit spawn error:", err);
       }
       return next;
     });
@@ -872,7 +945,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         style={{
                           width: 18,
                           height: 18,
-                          backgroundImage: `url(${getEnemyIcon(e.kind, 'front')})`,
+                          backgroundImage: `url(${getEnemyIcon(
+                            e.kind,
+                            "front"
+                          )})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -940,7 +1016,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   }}
                 />
                 <span>Rock x{gameState.rockCount}</span>
-                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">(tap or R)</span>
+                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                  (tap or R)
+                </span>
               </button>
             )}
             {(gameState.runeCount ?? 0) > 0 && (
@@ -950,9 +1028,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
                 title={`Use rune (${gameState.runeCount}) — tap or press T`}
               >
-                <span role="img" aria-label="rune">💎</span>
+                <span role="img" aria-label="rune">
+                  💎
+                </span>
                 <span>Rune x{gameState.runeCount}</span>
-                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">(tap or T)</span>
+                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                  (tap or T)
+                </span>
               </button>
             )}
           </div>
@@ -986,56 +1068,58 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 : "none",
             }}
           >
-            {rockEffect && (() => {
-              const tileSize = 40;
-              const pxLeft = (rockEffect.x + 0.5) * tileSize;
-              const pxTop = (rockEffect.y + 0.5) * tileSize;
-              const size = 28;
-              return (
-                <div
-                  aria-hidden="true"
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${pxLeft - size / 2}px`,
-                    top: `${pxTop - size / 2}px`,
-                    width: `${size}px`,
-                    height: `${size}px`,
-                    zIndex: 11900,
-                    backgroundImage: "url(/images/items/rock-1.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                    filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
-                    transition: `left 50ms linear, top 50ms linear`,
-                  }}
-                />
-              );
-            })()}
-            {runeEffect && (() => {
-              const tileSize = 40;
-              const pxLeft = (runeEffect.x + 0.5) * tileSize;
-              const pxTop = (runeEffect.y + 0.5) * tileSize;
-              const size = 28;
-              return (
-                <div
-                  aria-hidden="true"
-                  className="absolute pointer-events-none"
-                  style={{
-                    left: `${pxLeft - size / 2}px`,
-                    top: `${pxTop - size / 2}px`,
-                    width: `${size}px`,
-                    height: `${size}px`,
-                    zIndex: 11900,
-                    backgroundImage: "url(/images/items/rune1.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                    filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
-                    transition: `left 50ms linear, top 50ms linear`,
-                  }}
-                />
-              );
-            })()}
+            {rockEffect &&
+              (() => {
+                const tileSize = 40;
+                const pxLeft = (rockEffect.x + 0.5) * tileSize;
+                const pxTop = (rockEffect.y + 0.5) * tileSize;
+                const size = 28;
+                return (
+                  <div
+                    aria-hidden="true"
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${pxLeft - size / 2}px`,
+                      top: `${pxTop - size / 2}px`,
+                      width: `${size}px`,
+                      height: `${size}px`,
+                      zIndex: 11900,
+                      backgroundImage: "url(/images/items/rock-1.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                      filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
+                      transition: `left 50ms linear, top 50ms linear`,
+                    }}
+                  />
+                );
+              })()}
+            {runeEffect &&
+              (() => {
+                const tileSize = 40;
+                const pxLeft = (runeEffect.x + 0.5) * tileSize;
+                const pxTop = (runeEffect.y + 0.5) * tileSize;
+                const size = 28;
+                return (
+                  <div
+                    aria-hidden="true"
+                    className="absolute pointer-events-none"
+                    style={{
+                      left: `${pxLeft - size / 2}px`,
+                      top: `${pxTop - size / 2}px`,
+                      width: `${size}px`,
+                      height: `${size}px`,
+                      zIndex: 11900,
+                      backgroundImage: "url(/images/items/rune1.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                      filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
+                      transition: `left 50ms linear, top 50ms linear`,
+                    }}
+                  />
+                );
+              })()}
             {bamEffect &&
               (() => {
                 const tileSize = 40; // px
@@ -1139,11 +1223,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               className={styles.gridContainer}
               style={{
                 gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
-                gridTemplateColumns: `repeat(${gameState.mapData.tiles[0]?.length ?? 0}, 40px)`,
+                gridTemplateColumns: `repeat(${
+                  gameState.mapData.tiles[0]?.length ?? 0
+                }, 40px)`,
                 // When the hero's torch is OFF, force a pure black background behind tiles
                 // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                 // the transparent center of the vignette.
-                backgroundColor: (gameState.heroTorchLit ? undefined : '#000'),
+                backgroundColor: gameState.heroTorchLit ? undefined : "#000",
               }}
               tabIndex={0} // Make div focusable for keyboard events
             >
@@ -1151,12 +1237,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 gameState.mapData.tiles,
                 tileTypes,
                 gameState.mapData.subtypes,
-                gameState.showFullMap || (forceDaylight && (gameState.heroTorchLit ?? true)),
+                gameState.showFullMap ||
+                  (forceDaylight && (gameState.heroTorchLit ?? true)),
                 gameState.playerDirection,
                 gameState.enemies,
                 gameState.hasSword,
                 gameState.hasShield,
-                gameState.heroTorchLit ?? true
+                gameState.heroTorchLit ?? true,
+                gameState.hasExitKey
               )}
             </div>
           </div>
@@ -1253,7 +1341,8 @@ function renderTileGrid(
   enemies?: Enemy[],
   hasSword?: boolean,
   hasShield?: boolean,
-  heroTorchLit: boolean = true
+  heroTorchLit: boolean = true,
+  hasExitKey?: boolean
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -1373,21 +1462,32 @@ function renderTileGrid(
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
-            enemyKind={enemyAtTile?.kind as 'goblin' | 'ghost' | 'stone-exciter' | undefined}
+            enemyKind={
+              enemyAtTile?.kind as
+                | "goblin"
+                | "ghost"
+                | "stone-exciter"
+                | undefined
+            }
             enemyAura={(() => {
               if (!enemyAtTile) return false;
-              if (enemyAtTile.kind !== 'stone-exciter') return false;
+              if (enemyAtTile.kind !== "stone-exciter") return false;
               if (!playerPosition) return false;
-              const d = Math.abs(enemyAtTile.y - playerPosition[0]) + Math.abs(enemyAtTile.x - playerPosition[1]);
+              const d =
+                Math.abs(enemyAtTile.y - playerPosition[0]) +
+                Math.abs(enemyAtTile.x - playerPosition[1]);
               return d <= 2;
             })()}
             hasSword={hasSword}
             hasShield={hasShield}
             invisibleClassName={
-              process.env.NODE_ENV === 'test'
-                ? 'bg-gray-900'
-                : (!heroTorchLit ? 'bg-black' : undefined)
+              process.env.NODE_ENV === "test"
+                ? "bg-gray-900"
+                : !heroTorchLit
+                ? "bg-black"
+                : undefined
             }
+            playerHasExitKey={hasExitKey}
           />
         </div>
       );

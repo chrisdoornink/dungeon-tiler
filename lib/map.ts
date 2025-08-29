@@ -207,7 +207,7 @@ export function generateMapWithSubtypes(): MapData {
 
 /**
  * Generate a map with exit subtype
- * Places exactly one exit on a wall tile adjacent to floor tiles
+ * Places exactly one EXIT on an empty FLOOR tile (overlay asset like a switch)
  * @returns MapData object with exit subtype placed
  */
 export function generateMapWithExit(baseMapData?: MapData): MapData {
@@ -219,39 +219,33 @@ export function generateMapWithExit(baseMapData?: MapData): MapData {
   const h = mapData.tiles.length;
   const w = mapData.tiles[0].length;
 
-  // Collect all wall tiles adjacent to at least one floor for exit placement
-  const wallsNextToFloor: Array<[number, number]> = [];
+  // Collect all eligible FLOOR tiles that have no other subtype
+  const eligible: Array<[number, number]> = [];
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      if (mapData.tiles[y][x] !== WALL) continue;
-      const hasAdjacentFloor =
-        (y > 0 && mapData.tiles[y - 1][x] === FLOOR) ||
-        (y < h - 1 && mapData.tiles[y + 1][x] === FLOOR) ||
-        (x > 0 && mapData.tiles[y][x - 1] === FLOOR) ||
-        (x < w - 1 && mapData.tiles[y][x + 1] === FLOOR);
-      if (hasAdjacentFloor) {
-        wallsNextToFloor.push([y, x]);
+      if (
+        mapData.tiles[y][x] === FLOOR &&
+        (mapData.subtypes[y][x].length === 0 ||
+          mapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
       }
     }
   }
 
-  // Need at least one wall for the exit
-  if (wallsNextToFloor.length < 1) {
-    console.warn("Not enough walls next to floor tiles for exit placement");
+  if (eligible.length < 1) {
+    console.warn("No eligible floor tiles found for exit placement");
     return mapData;
   }
 
   // Shuffle candidates
-  for (let i = wallsNextToFloor.length - 1; i > 0; i--) {
+  for (let i = eligible.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
-    [wallsNextToFloor[i], wallsNextToFloor[j]] = [
-      wallsNextToFloor[j],
-      wallsNextToFloor[i],
-    ];
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
-  // Place the exit on the first candidate
-  const [exitY, exitX] = wallsNextToFloor[0];
+  // Place the exit on the first candidate floor tile
+  const [exitY, exitX] = eligible[0];
   mapData.subtypes[exitY][exitX] = [TileSubtype.EXIT];
 
   return mapData;
@@ -1518,6 +1512,20 @@ export function movePlayer(
         "Player picked up a rune! Total runes:",
         newGameState.runeCount
       );
+    }
+
+    // If it's an EXIT (floor overlay)
+    if (subtype.includes(TileSubtype.EXIT)) {
+      if (!newGameState.hasExitKey) {
+        // Block movement onto EXIT tile without the exit key
+        return newGameState;
+      } else {
+        // With key: stepping onto EXIT triggers win. Do NOT remove EXIT from map.
+        newGameState.hasExitKey = false;
+        newGameState.win = true;
+        console.log("Player reached the exit with the key! You win.");
+        // Continue to generic movement below so the player moves onto the tile this tick
+      }
     }
 
     // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry
