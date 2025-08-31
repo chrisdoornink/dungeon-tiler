@@ -426,7 +426,7 @@ export function addRunePotsForStoneExciters(
  * Places exactly 2 FAULTY_FLOOR subtypes per map on empty floor tiles.
  */
 export function addFaultyFloorsToMap(mapData: MapData): MapData {
-  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const newMapData: MapData = JSON.parse(JSON.stringify(mapData));
   const grid = newMapData.tiles;
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
@@ -450,13 +450,36 @@ export function addFaultyFloorsToMap(mapData: MapData): MapData {
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
+  let placed = 0;
   const toPlace = Math.min(2, eligible.length);
-  for (let i = 0; i < toPlace; i++) {
+  
+  for (let i = 0; i < eligible.length && placed < toPlace; i++) {
     const [fy, fx] = eligible[i];
-    newMapData.subtypes[fy][fx] = [TileSubtype.FAULTY_FLOOR];
+    
+    // Test if placing faulty floor here would break connectivity
+    if (canPlaceFaultyFloorSafely(newMapData, fy, fx)) {
+      newMapData.subtypes[fy][fx] = [TileSubtype.FAULTY_FLOOR];
+      placed++;
+    }
   }
 
   return newMapData;
+}
+
+/**
+ * Check if placing a faulty floor at the given position would break map connectivity
+ * @param mapData The current map data
+ * @param y Y coordinate to test
+ * @param x X coordinate to test
+ * @returns True if faulty floor can be safely placed, false if it would break connectivity
+ */
+function canPlaceFaultyFloorSafely(mapData: MapData, y: number, x: number): boolean {
+  // Create a temporary grid with the faulty floor treated as a wall
+  const testGrid = mapData.tiles.map(row => [...row]);
+  testGrid[y][x] = WALL; // Temporarily treat faulty floor as wall for connectivity test
+  
+  // Check if all remaining floor tiles are still connected
+  return areAllFloorsConnected(testGrid);
 }
 
 /**
