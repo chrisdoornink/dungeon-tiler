@@ -17,6 +17,10 @@ type LastGame = {
     subtypes: number[][][];
   };
   outcome?: "win" | "dead";
+  deathCause?: {
+    type: 'enemy' | 'faulty_floor';
+    enemyKind?: string;
+  };
   stats?: {
     damageDealt: number;
     damageTaken: number;
@@ -59,6 +63,42 @@ export default function EndPage() {
   const title = last.outcome === "dead" ? "You died in the dungeon!" : "You escaped the dungeon!";
   const subtitle = last.outcome === "dead" ? "Defeated at" : "Completed at";
 
+  // Death cause specific messages and images
+  const getDeathDetails = () => {
+    if (last.outcome !== "dead" || !last.deathCause) return null;
+    
+    switch (last.deathCause.type) {
+      case 'faulty_floor':
+        return {
+          message: "You stepped on a crack and fell into the abyss",
+          image: "/images/floor/crack3.png",
+          alt: "Floor crack"
+        };
+      case 'enemy':
+        const enemyKind = last.deathCause.enemyKind || 'goblin';
+        let enemyImage = "/images/enemies/fire-goblin/fire-goblin-front.png";
+        let enemyName = "a goblin";
+        
+        if (enemyKind === 'ghost') {
+          enemyImage = "/images/enemies/ghost/ghost-front.png";
+          enemyName = "a ghost";
+        } else if (enemyKind === 'stone-exciter') {
+          enemyImage = "/images/enemies/stone-exciter/stone-exciter-front.png";
+          enemyName = "a stone exciter";
+        }
+        
+        return {
+          message: `You were slain by ${enemyName}`,
+          image: enemyImage,
+          alt: enemyName
+        };
+      default:
+        return null;
+    }
+  };
+
+  const deathDetails = getDeathDetails();
+
   // Build a simple shareable summary using emoji/icons we already use
   const shareLines: string[] = [];
   const dateStr = new Date(last.completedAt).toLocaleDateString();
@@ -91,6 +131,23 @@ export default function EndPage() {
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full text-center text-[#1B1B1B]">
         <h1 className="text-2xl font-semibold mb-2">{title}</h1>
         <p className="text-gray-700 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
+
+        {/* Death cause specific subtitle with image */}
+        {deathDetails && (
+          <div className="flex items-center justify-center gap-3 mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+            <div
+              className="w-8 h-8 flex-shrink-0"
+              style={{
+                backgroundImage: `url(${deathDetails.image})`,
+                backgroundSize: "contain",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center",
+              }}
+              aria-label={deathDetails.alt}
+            />
+            <p className="text-red-700 text-sm font-medium">{deathDetails.message}</p>
+          </div>
+        )}
 
         {/* Pickups: show only icons for what the player obtained */}
         <div className="flex items-center justify-center flex-wrap gap-2 mb-4">

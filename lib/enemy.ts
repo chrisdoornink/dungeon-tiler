@@ -13,6 +13,7 @@ export enum EnemyState {
 
 export type EnemyUpdateContext = {
   grid: number[][];
+  subtypes?: number[][][];
   player: { y: number; x: number };
   ghosts?: Array<{ y: number; x: number }>;
 };
@@ -58,7 +59,7 @@ export class Enemy {
   }
 
   update(ctx: EnemyUpdateContext): number {
-    const { grid, player } = ctx;
+    const { grid, subtypes, player } = ctx;
     // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
     this.state = EnemyState.IDLE;
     // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
@@ -106,7 +107,7 @@ export class Enemy {
         for (const [dy, dx] of candMoves) {
           const ny = this.y + dy;
           const nx = this.x + dx;
-          if (isFloor(grid, ny, nx)) {
+          if (isSafeFloor(grid, subtypes, ny, nx)) {
             if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
             else nonLos.push([dy, dx]);
           }
@@ -120,7 +121,7 @@ export class Enemy {
 
       // In memory mode, if the primary step is not walkable, drop pursuit immediately
       if (!seesNow) {
-        const canAnyMove = tryMoves.some(([dy, dx]) => isFloor(grid, this.y + dy, this.x + dx));
+        const canAnyMove = tryMoves.some(([dy, dx]) => isSafeFloor(grid, subtypes, this.y + dy, this.x + dx));
         if (!canAnyMove) {
           this.pursuitTtl = 0;
           this.state = EnemyState.IDLE;
@@ -140,7 +141,7 @@ export class Enemy {
           this.state = EnemyState.HUNTING;
           return this.attack;
         }
-        if (isFloor(grid, ny, nx)) {
+        if (isSafeFloor(grid, subtypes, ny, nx)) {
           // Update facing based on chosen step
           if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
           else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
@@ -166,14 +167,14 @@ export class Enemy {
               // so proximity hooks (e.g., torch snuff) can trigger this tick.
               const adjY = ty - dy;
               const adjX = tx - dx;
-              if (isFloor(grid, adjY, adjX)) {
+              if (isSafeFloor(grid, subtypes, adjY, adjX)) {
                 this.y = adjY;
                 this.x = adjX;
               }
               this.state = EnemyState.HUNTING;
               return this.attack;
             }
-            if (isFloor(grid, ty, tx)) {
+            if (isSafeFloor(grid, subtypes, ty, tx)) {
               if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
               else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
               this.y = ty;
@@ -215,6 +216,15 @@ export type PlaceEnemiesArgs = {
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
   return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && grid[y][x] === 0;
+}
+
+function isSafeFloor(grid: number[][], subtypes: number[][][] | undefined, y: number, x: number): boolean {
+  if (!isFloor(grid, y, x)) return false;
+  // If no subtypes provided, assume all floors are safe (backward compatibility)
+  if (!subtypes) return true;
+  // Check if tile has faulty floor subtype (TileSubtype.FAULTY_FLOOR = 18)
+  const tileSubs = subtypes[y]?.[x] || [];
+  return !tileSubs.includes(18); // Avoid faulty floors
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
@@ -304,21 +314,45 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
 
 export function updateEnemies(
   grid: number[][],
-  enemies: Enemy[],
-  player: { y: number; x: number },
+  subtypesOrEnemies: number[][][] | Enemy[],
+  enemiesOrPlayer?: Enemy[] | { y: number; x: number },
+  playerOrOpts?: { y: number; x: number } | {
+    rng?: () => number;
+    defense?: number;
+    suppress?: (e: Enemy) => boolean;
+    playerTorchLit?: boolean;
+    setPlayerTorchLit?: (lit: boolean) => void;
+  },
   opts?: {
     rng?: () => number;
     defense?: number;
     suppress?: (e: Enemy) => boolean;
-    // Player torch state provided by caller; defaults to true
     playerTorchLit?: boolean;
-    // Engine-side setter to update torch state
     setPlayerTorchLit?: (lit: boolean) => void;
   }
 ): number {
-  const rng = opts?.rng; // undefined means no variance
-  const defense = opts?.defense ?? 0;
-  const suppress = opts?.suppress;
+  // Handle backward compatibility: old signature was (grid, enemies, player, opts)
+  let subtypes: number[][][] | undefined;
+  let enemies: Enemy[];
+  let player: { y: number; x: number };
+  let finalOpts: typeof opts;
+
+  if (Array.isArray(subtypesOrEnemies) && subtypesOrEnemies.length > 0 && 'y' in subtypesOrEnemies[0]) {
+    // Old signature: updateEnemies(grid, enemies, player, opts)
+    subtypes = undefined;
+    enemies = subtypesOrEnemies as Enemy[];
+    player = enemiesOrPlayer as { y: number; x: number };
+    finalOpts = playerOrOpts as typeof opts;
+  } else {
+    // New signature: updateEnemies(grid, subtypes, enemies, player, opts)
+    subtypes = subtypesOrEnemies as number[][][];
+    enemies = enemiesOrPlayer as Enemy[];
+    player = playerOrOpts as { y: number; x: number };
+    finalOpts = opts;
+  }
+  const rng = finalOpts?.rng; // undefined means no variance
+  const defense = finalOpts?.defense ?? 0;
+  const suppress = finalOpts?.suppress;
   let totalDamage = 0;
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
@@ -360,7 +394,7 @@ export function updateEnemies(
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
       }
     } else {
-      base = e.update({ grid, player, ghosts: ghostPositions });
+      base = e.update({ grid, subtypes, player, ghosts: ghostPositions });
     }
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;
@@ -402,14 +436,16 @@ export function updateEnemies(
     // Proximity behavior hook (e.g., ghost snuff torch) based on post-move adjacency
     const isAdjacent = Math.abs(e.y - player.y) + Math.abs(e.x - player.x) === 1;
     if (cfg?.behavior?.onProximity && isAdjacent) {
+      const playerTorchLit = finalOpts?.playerTorchLit ?? true;
+      const setPlayerTorchLit = finalOpts?.setPlayerTorchLit;
       cfg.behavior.onProximity({
         grid,
         enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health })),
         enemyIndex: i,
-        player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
-        rng,
-        setPlayerTorchLit: opts?.setPlayerTorchLit,
+        player: { y: player.y, x: player.x, torchLit: playerTorchLit },
         ghosts: ghostPositions,
+        rng,
+        setPlayerTorchLit,
         enemy: {
           y: e.y,
           x: e.x,

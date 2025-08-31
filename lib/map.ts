@@ -886,6 +886,7 @@ export function performThrowRock(gameState: GameState): GameState {
   if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
     const damage = updateEnemies(
       preTickState.mapData.tiles,
+      preTickState.mapData.subtypes,
       preTickState.enemies,
       { y: py, x: px },
       {
@@ -896,7 +897,7 @@ export function performThrowRock(gameState: GameState): GameState {
           preTickState.heroTorchLit = lit;
         },
         // Ghosts adjacent this tick should not deal damage
-        suppress: (e) =>
+        suppress: (e: Enemy) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
       }
     );
@@ -1052,6 +1053,7 @@ export function performThrowRune(gameState: GameState): GameState {
   if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
     const damage = updateEnemies(
       preTickState.mapData.tiles,
+      preTickState.mapData.subtypes,
       preTickState.enemies,
       { y: py, x: px },
       {
@@ -1061,7 +1063,7 @@ export function performThrowRune(gameState: GameState): GameState {
         setPlayerTorchLit: (lit: boolean) => {
           preTickState.heroTorchLit = lit;
         },
-        suppress: (e) =>
+        suppress: (e: Enemy) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
       }
     );
@@ -1414,6 +1416,7 @@ export function movePlayer(
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
     const damage = updateEnemies(
       newMapData.tiles,
+      newMapData.subtypes,
       newGameState.enemies,
       { y: playerPosNow[0], x: playerPosNow[1] },
       {
@@ -1425,7 +1428,7 @@ export function movePlayer(
           newGameState.heroTorchLit = lit;
         },
         // Suppress only when the player moves directly away from an adjacent enemy along the same axis
-        suppress: (e) => {
+        suppress: (e: Enemy) => {
           const dy = newY - currentY;
           const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
@@ -1442,6 +1445,17 @@ export function movePlayer(
       } catch {}
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
+      
+      // If player dies from enemy damage, track which enemy killed them
+      if (newGameState.heroHealth === 0) {
+        // Find the enemy that dealt damage (closest to player)
+        const killerEnemy = newGameState.enemies.find(e => 
+          Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
+        );
+        if (killerEnemy) {
+          newGameState.deathCause = { type: 'enemy', enemyKind: killerEnemy.kind };
+        }
+      }
     }
     console.log(
       "Enemies updated:",
