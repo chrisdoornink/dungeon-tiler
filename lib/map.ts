@@ -536,6 +536,18 @@ export function addExitKeyToMap(mapData: MapData): MapData {
 
   const eligibleTiles: Array<[number, number]> = [];
 
+  // Locate the EXIT position first to compute distances
+  let exitPos: [number, number] | null = null;
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (newMapData.subtypes[y][x].includes(TileSubtype.EXIT)) {
+        exitPos = [y, x];
+        break;
+      }
+    }
+    if (exitPos) break;
+  }
+
   for (let y = 0; y < gridHeight; y++) {
     for (let x = 0; x < gridWidth; x++) {
       if (
@@ -548,17 +560,40 @@ export function addExitKeyToMap(mapData: MapData): MapData {
     }
   }
 
-  if (eligibleTiles.length > 0) {
-    const randomIndex = Math.floor(Math.random() * eligibleTiles.length);
-    const [ey, ex] = eligibleTiles[randomIndex];
-    newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
-    console.log(`Placed exit key at [${ey}, ${ex}]`);
-  } else {
+  if (eligibleTiles.length === 0) {
     console.warn(
       "Could not place exit key - no eligible floor tiles available"
     );
+    return newMapData;
   }
 
+  // If we know where the exit is, choose farthest eligible by Manhattan distance.
+  // Enforce minimum distance of 13 when possible.
+  if (exitPos) {
+    const dist = (p: [number, number]) => Math.abs(p[0] - exitPos![0]) + Math.abs(p[1] - exitPos![1]);
+
+    // Prefer tiles meeting the minimum distance
+    const MIN_D = 13;
+    const farEnough = eligibleTiles.filter((p) => dist(p) >= MIN_D);
+    const candidates = farEnough.length > 0 ? farEnough : eligibleTiles;
+
+    // Find max distance among candidates
+    let maxD = -1;
+    for (const p of candidates) {
+      const d = dist(p);
+      if (d > maxD) maxD = d;
+    }
+    const farthest = candidates.filter((p) => dist(p) === maxD);
+    const choice = farthest[Math.floor(Math.random() * farthest.length)];
+    const [ey, ex] = choice;
+    newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
+    // console.log(`Placed exit key at [${ey}, ${ex}] (d=${maxD})`);
+    return newMapData;
+  }
+
+  // Fallback: no exit found (shouldn't happen if pipeline calls generateMapWithExit first)
+  const [ey, ex] = eligibleTiles[Math.floor(Math.random() * eligibleTiles.length)];
+  newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
   return newMapData;
 }
 

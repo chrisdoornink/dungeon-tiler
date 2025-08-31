@@ -103,11 +103,7 @@ Dungeon Game To-Do List
       • Trigger enemy defeat: Release or activate something that can kill a specific enemy type.
       • Open trapdoors: Cause enemies (or the player) on those tiles to fall through.
 
-- [ ] Combat Variability
-      • Default enemy fight should have ~75% win chance if player and enemy health are equal.
-      • Requires probability-based outcomes and testing to ensure correctness.
-
-- [ ] Shield Mechanics
+- [x] Shield Mechanics
       • Adjust shield so it’s not full invulnerability.
       • Allow player to tank 2–3 enemies more easily but still take damage if overwhelmed.
 
@@ -115,7 +111,7 @@ Dungeon Game To-Do List
       • Build stable, predictable combat system with clearer structure.
       • Needed for future enemies (e.g., sword-wielders).
 
-- [ ] Stone Exciter Counter Item
+- [x] Stone Exciter Counter Item
       • Single-use item that instantly destroys a Stone Exciter.
       • Found rarely (e.g., once per map) inside a clay pot.
       • Acts like a normal thrown rock against other enemies.
@@ -125,7 +121,7 @@ Dungeon Game To-Do List
       • Add small throwables/collectibles: bones, broken pottery, rusty tools, scraps of rope/cloth.
       • Expand dungeon flavor and player resource variety.
 
-- [ ] Exit Portal Redesign
+- [x] Exit Portal Redesign
       • Replace directional door with a glowing ground portal.
       • Always visible and recognizable from any approach angle.
 
