@@ -632,6 +632,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           stats: gameState.stats,
           outcome: "dead",
           streak: 0,
+          deathCause: gameState.deathCause,
         } as const;
         if (typeof window !== "undefined") {
           window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
@@ -647,6 +648,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.hasExitKey,
     gameState.hasSword,
     gameState.hasShield,
+    gameState.deathCause,
     gameState.showFullMap,
     gameState.mapData,
     gameState.stats,
