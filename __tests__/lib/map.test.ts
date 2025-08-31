@@ -139,7 +139,7 @@ describe("Tile Subtypes", () => {
     }
   });
   
-  it("should place exactly one exit (subtype 1) on a wall tile next to floor tiles", () => {
+  it("should place exactly one exit (subtype 1) on a floor tile", () => {
     const mapData = generateMapWithExit();
     
     // Check for exactly one exit (subtype 1)
@@ -149,7 +149,7 @@ describe("Tile Subtypes", () => {
     // Count exit tiles
     for (let y = 0; y < 25; y++) {
       for (let x = 0; x < 25; x++) {
-        if (mapData.tiles[y][x] === 1 && mapData.subtypes[y][x].includes(TileSubtype.EXIT)) {
+        if (mapData.tiles[y][x] === 0 && mapData.subtypes[y][x].includes(TileSubtype.EXIT)) {
           exitCount++;
           exitPosition = [y, x];
         }
@@ -159,17 +159,11 @@ describe("Tile Subtypes", () => {
     // Should have exactly one exit
     expect(exitCount).toBe(1);
     
-    // Exit should be next to at least one floor tile
+    // Exit should be on a floor tile
     expect(exitPosition).not.toBeNull();
     if (exitPosition) {
       const [y, x] = exitPosition;
-      const hasAdjacentFloor = (
-        (y > 0 && mapData.tiles[y-1][x] === 0) ||                 // North
-        (y < 24 && mapData.tiles[y+1][x] === 0) ||                // South
-        (x > 0 && mapData.tiles[y][x-1] === 0) ||                 // West
-        (x < 24 && mapData.tiles[y][x+1] === 0)                   // East
-      );
-      expect(hasAdjacentFloor).toBe(true);
+      expect(mapData.tiles[y][x]).toBe(0); // Floor tile
     }
   });
   

@@ -277,6 +277,21 @@ export const Tile: React.FC<TileProps> = ({
   const hasShieldItem = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SHIELD) || false;
   };
+  const hasFaultyFloor = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.FAULTY_FLOOR) || false;
+  };
+  const hasDarkness = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.DARKNESS) || false;
+  };
+
+  // Generate random rotation for faulty floors based on coordinates
+  const getFaultyFloorRotation = (): number => {
+    const y = typeof row === 'number' ? row : 0;
+    const x = typeof col === 'number' ? col : 0;
+    // Generate deterministic rotation between 0-360 degrees
+    const seed = (y * 73 + x * 127) % 360;
+    return seed;
+  };
 
   // Deterministic variant picker based on coordinates
   const pickVariant = (choices: string[]): string => {
@@ -313,6 +328,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.WALL_TORCH &&
+        subtype !== TileSubtype.FAULTY_FLOOR &&
+        subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
     );
   };
@@ -420,7 +437,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               key="exit"
               data-testid={`subtype-icon-${TileSubtype.EXIT}`}
-              className={`${styles.assetIcon} ${styles.exitIcon}`}
+              className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
               style={{
                 backgroundImage: `url(${playerHasExitKey ? '/images/door/exit-transparent.png' : '/images/door/exit-dark.png'})`,
               }}
@@ -502,6 +519,18 @@ export const Tile: React.FC<TileProps> = ({
           </>
         )}
 
+        {/* Render faulty floor cracks overlay */}
+        {hasFaultyFloor(subtypes) && (
+          <div
+            key="faulty-floor"
+            data-testid={`subtype-icon-${TileSubtype.FAULTY_FLOOR}`}
+            className={`${styles.assetIcon} ${styles.faultyFloorIcon}`}
+            style={{
+              transform: `translate(-50%, -50%) rotate(${getFaultyFloorRotation()}deg)`,
+            }}
+          />
+        )}
+
         {/* Render remaining subtypes with standard icons */}
         {filteredSubtypes.map((subtype) => (
           <div
@@ -554,7 +583,9 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
-      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      // Check if this floor tile has darkness (collapsed faulty floor)
+      const isDarkness = hasDarkness(subtype);
+      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : styles.floor} ${tierClass}`;
 
       // Map floor variant to NESW asset filename based on neighbors
       let floorAsset = "/images/floor/floor-try-1.png"; // Default floor

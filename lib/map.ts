@@ -177,6 +177,8 @@ export enum TileSubtype {
   MED = 15,
   WALL_TORCH = 16,
   RUNE = 17,
+  FAULTY_FLOOR = 18,
+  DARKNESS = 19,
 }
 
 export interface MapData {
@@ -414,6 +416,44 @@ export function addRunePotsForStoneExciters(
   for (let i = 0; i < toPlace; i++) {
     const [py, px] = eligible[i];
     newMapData.subtypes[py][px] = [TileSubtype.POT, TileSubtype.RUNE];
+  }
+
+  return newMapData;
+}
+
+/**
+ * Add faulty floors (visual cracks overlay) to random empty floor tiles.
+ * Places exactly 2 FAULTY_FLOOR subtypes per map on empty floor tiles.
+ */
+export function addFaultyFloorsToMap(mapData: MapData): MapData {
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+
+  // Shuffle
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const toPlace = Math.min(2, eligible.length);
+  for (let i = 0; i < toPlace; i++) {
+    const [fy, fx] = eligible[i];
+    newMapData.subtypes[fy][fx] = [TileSubtype.FAULTY_FLOOR];
   }
 
   return newMapData;
@@ -678,8 +718,10 @@ export function generateCompleteMap(): MapData {
   const withPots = addPotsToMap(withKeys);
   // Place a small number of rocks on empty floor tiles
   const withRocks = addRocksToMap(withPots);
+  // Place faulty floors (visual cracks) on empty floor tiles
+  const withFaultyFloors = addFaultyFloorsToMap(withRocks);
   // Place 3–6 wall torches on front-facing walls (wall with floor directly below)
-  const withTorches = addWallTorchesToMap(withRocks);
+  const withTorches = addWallTorchesToMap(withFaultyFloors);
   // Finally place player
   return addPlayerToMap(withTorches);
 }
@@ -1182,6 +1224,11 @@ export interface GameState {
   recentDeaths?: Array<[number, number]>;
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
+  // Death cause tracking for specific death messages
+  deathCause?: {
+    type: 'enemy' | 'faulty_floor';
+    enemyKind?: string;
+  };
 }
 
 /**
@@ -1547,6 +1594,15 @@ export function movePlayer(
         "Player picked up a rune! Total runes:",
         newGameState.runeCount
       );
+    }
+
+    // If it's a FAULTY_FLOOR, trigger the trap
+    if (subtype.includes(TileSubtype.FAULTY_FLOOR)) {
+      // Convert the faulty floor to darkness and kill player instantly
+      newMapData.subtypes[newY][newX] = [TileSubtype.DARKNESS, TileSubtype.PLAYER];
+      newGameState.heroHealth = 0;
+      newGameState.deathCause = { type: 'faulty_floor' };
+      console.log("Player stepped on a faulty floor! The ground collapses and they fall into darkness!");
     }
 
     // If it's an EXIT (floor overlay)

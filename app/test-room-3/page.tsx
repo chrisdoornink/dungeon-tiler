@@ -45,6 +45,26 @@ function buildTestRoom3(): GameState {
   if (py - 1 >= start) subtypes[py - 1][px] = [TileSubtype.SWORD];
   if (py - 2 >= start) subtypes[py - 2][px] = [TileSubtype.SHIELD];
 
+  // Add multiple faulty floor tiles with cracks throughout the room
+  const faultyFloorPositions = [
+    [start + 1, start + 1], // top-left area
+    [start + 2, start + 4], // top-middle area
+    [start + 6, start + 2], // bottom-left area
+    [end - 1, end - 2], // bottom-right area
+    [py + 1, px - 2], // below and left of player
+    [py - 1, px + 2], // above and right of player
+    [start + 3, end - 1], // middle-right area
+    [end - 2, start + 3], // bottom-left area
+  ];
+
+  // Place faulty floors on empty floor tiles
+  for (const [fy, fx] of faultyFloorPositions) {
+    if (fy >= start && fy <= end && fx >= start && fx <= end && 
+        subtypes[fy][fx].length === 0) {
+      subtypes[fy][fx] = [TileSubtype.FAULTY_FLOOR];
+    }
+  }
+
   // Two goblins on opposite ends of the room (left and right midpoints of the room)
   const gy = py; // same row as player
   const leftGoblinX = start;
