@@ -1,11 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { tileTypes, initializeGameState, initializeGameStateFromMap, generateMap, generateCompleteMap, computeMapId, type GameState } from "../lib/map";
+import { tileTypes, initializeGameState, initializeGameStateFromMap, generateMap, generateCompleteMap, type GameState } from "../lib/map";
 import { useSearchParams } from "next/navigation";
 import { rehydrateEnemies } from "../lib/enemy";
 import { TilemapGrid } from "../components/TilemapGrid";
-import { deleteSavedMap, loadSavedMaps, upsertSavedMap, type SavedMapEntry } from "../lib/saved_maps";
+// import { deleteSavedMap, loadSavedMaps, upsertSavedMap, type SavedMapEntry } from "../lib/saved_maps";
 
 function HomeInner() {
   const [daylight, setDaylight] = useState(process.env.NODE_ENV !== 'test');
@@ -89,46 +89,46 @@ function HomeInner() {
   // Use replay state if available, otherwise use initial state
   const finalInitialState = replayState || initialState;
 
-  // Saved maps UI state
-  const [savedMaps, setSavedMaps] = useState<SavedMapEntry[]>([]);
-  const [rating, setRating] = useState<1 | 2 | 3 | 4 | 5>(3);
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
-  const currentMapId = useMemo(() => {
-    try {
-      return finalInitialState?.mapData ? computeMapId(finalInitialState.mapData) : undefined;
-    } catch {
-      return undefined;
-    }
-  }, [finalInitialState]);
+  // Saved maps UI state - hidden
+  // const [savedMaps, setSavedMaps] = useState<SavedMapEntry[]>([]);
+  // const [rating, setRating] = useState<1 | 2 | 3 | 4 | 5>(3);
+  // const [title, setTitle] = useState("");
+  // const [notes, setNotes] = useState("");
+  // const currentMapId = useMemo(() => {
+  //   try {
+  //     return finalInitialState?.mapData ? computeMapId(finalInitialState.mapData) : undefined;
+  //   } catch {
+  //     return undefined;
+  //   }
+  // }, [finalInitialState]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    setSavedMaps(loadSavedMaps());
-  }, []);
+  // useEffect(() => {
+  //   if (typeof window === 'undefined') return;
+  //   setSavedMaps(loadSavedMaps());
+  // }, []);
 
-  function handleSave() {
-    if (!finalInitialState || !currentMapId) return;
-    const entry: SavedMapEntry = {
-      id: currentMapId,
-      rating,
-      title: title || undefined,
-      notes: notes || undefined,
-      savedAt: new Date().toISOString(),
-      initialGameState: finalInitialState,
-    };
-    upsertSavedMap(entry);
-    setSavedMaps(loadSavedMaps());
-  }
+  // function handleSave() {
+  //   if (!finalInitialState || !currentMapId) return;
+  //   const entry: SavedMapEntry = {
+  //     id: currentMapId,
+  //     rating,
+  //     title: title || undefined,
+  //     notes: notes || undefined,
+  //     savedAt: new Date().toISOString(),
+  //     initialGameState: finalInitialState,
+  //   };
+  //   upsertSavedMap(entry);
+  //   setSavedMaps(loadSavedMaps());
+  // }
 
-  function handleLoad(id: string) {
-    window.location.href = `/?map=${encodeURIComponent(id)}`;
-  }
+  // function handleLoad(id: string) {
+  //   window.location.href = `/?map=${encodeURIComponent(id)}`;
+  // }
 
-  function handleDelete(id: string) {
-    deleteSavedMap(id);
-    setSavedMaps(loadSavedMaps());
-  }
+  // function handleDelete(id: string) {
+  //   deleteSavedMap(id);
+  //   setSavedMaps(loadSavedMaps());
+  // }
 
   return (
     <div 
@@ -142,6 +142,8 @@ function HomeInner() {
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
         <TilemapGrid tileTypes={tileTypes} initialGameState={finalInitialState} forceDaylight={daylight} isDailyChallenge={isDailyChallenge} />
+        {/* Hidden game control buttons */}
+        {/* 
         <div className="mt-4 mb-4 flex items-center gap-2">
           <button
             onClick={() => window.location.reload()}
@@ -157,9 +159,11 @@ function HomeInner() {
             {daylight ? 'Daylight: ON' : 'Daylight: OFF'}
           </button>
         </div>
+        */}
       </div>
 
-      {/* Sidebar: Saved Maps */}
+      {/* Hidden Sidebar: Saved Maps - commented out to hide save functionality */}
+      {/* 
       <aside className="w-[380px] max-w-[90vw] bg-[#222] rounded p-3 sticky top-4 self-start">
         <div className="mb-3">
           <div className="text-sm text-gray-300">Current map ID</div>
@@ -227,6 +231,7 @@ function HomeInner() {
           </div>
         </div>
       </aside>
+      */}
     </div>
   );
 }

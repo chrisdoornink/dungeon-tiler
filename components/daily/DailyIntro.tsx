@@ -42,8 +42,8 @@ export default function DailyIntro({ onComplete }: DailyIntroProps) {
             <li>
               • You get <strong>one attempt per day</strong>
             </li>
-            <li>• Build your streak by completing consecutive days</li>
-            <li>• Track your progress and compete with yourself</li>
+            <li>• Build your streak by winning consecutive days</li>
+            <li>• Losing a game resets your streak</li>
             <li>• Return tomorrow for a new challenge!</li>
           </ul>
         </div>
