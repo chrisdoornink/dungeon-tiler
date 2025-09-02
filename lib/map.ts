@@ -738,9 +738,9 @@ export function generateCompleteMap(): MapData {
   const withExit = generateMapWithExit(base);
   // Place exit key and lightswitch
   const withExitKey = addExitKeyToMap(withExit);
-  const withLights = addLightswitchToMap(withExitKey);
+  // const withLights = addLightswitchToMap(withExitKey); // Disabled for now
   // Place exactly two chests (sword + shield), some locked
-  const withChests = addChestsToMap(withLights);
+  const withChests = addChestsToMap(withExitKey);
   // Place exactly one generic key for all generic locks
   const withKeys = addSingleKeyToMap(withChests);
   // Place a small number of pots on empty floor tiles
