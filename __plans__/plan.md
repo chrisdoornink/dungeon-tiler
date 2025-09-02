@@ -148,3 +148,71 @@ Dungeon Game To-Do List
       • Shadow enemy: slips through walls/floors, reemerges unpredictably.
       • Light-eater enemy: grows stronger or heals near torches, requiring player to manage lighting.
       • Beam-attack enemy: charges then fires directional energy wave/shockwave, forcing timing-based dodges.
+
+## Daily Challenge System (DT-DAILY)
+
+### Overview
+A daily challenge system that serves as the main entry point to the game, providing a single dungeon run per day with persistent tracking and progression.
+
+### Requirements
+
+#### Route Structure
+- **Route**: `/daily` (development and production)
+- **Folder Structure**: `app/daily/` with dedicated pages
+- **Main Entry Point**: This becomes the primary way users access the game
+
+#### Local Storage Tracking
+The system tracks the following data in localStorage under key `dailyChallenge`:
+```typescript
+interface DailyChallengeData {
+  // User progression
+  hasSeenIntro: boolean;
+  currentStreak: number;
+  totalGamesPlayed: number;
+  totalGamesWon: number;
+  
+  // Daily tracking
+  lastPlayedDate: string; // ISO date string (YYYY-MM-DD)
+  todayCompleted: boolean;
+  todayResult: 'won' | 'lost' | null;
+  
+  // Historical data
+  streakHistory: Array<{
+    date: string;
+    result: 'won' | 'lost';
+    streak: number;
+  }>;
+}
+```
+
+#### Flow States
+1. **First Time User**: Shows intro screen, sets `hasSeenIntro: true`
+2. **Daily Available**: User can play today's challenge
+3. **Daily Completed**: Shows results, no replay until next day
+4. **Daily Cooldown**: User must wait until next day
+
+#### Game Integration
+- Game over screen removes replay functionality
+- Navigation prevents going back to game after completion
+- Completion triggers daily challenge data update
+- Streak calculation based on consecutive days played
+
+#### TDD Implementation Plan
+1. **Storage Service Tests**: Test localStorage operations
+2. **Date Utility Tests**: Test day comparison logic
+3. **Flow State Tests**: Test state determination logic
+4. **Component Tests**: Test UI components for each state
+5. **Integration Tests**: Test complete user flows
+
+### Task Breakdown
+- [ ] Create daily challenge storage service with TDD
+- [ ] Create date utility functions with TDD  
+- [ ] Create flow state management with TDD
+- [ ] Create `/daily` route structure
+- [ ] Create intro flow component
+- [ ] Create daily available component
+- [ ] Create daily completed component  
+- [ ] Create daily cooldown component
+- [ ] Integrate with existing game completion flow
+- [ ] Remove replay functionality from game over
+- [ ] Add navigation guards to prevent replay

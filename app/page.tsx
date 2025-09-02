@@ -14,59 +14,80 @@ function HomeInner() {
   const replay = searchParams.get("replay") === "1";
   const replayExact = searchParams.get("replayExact") === "1";
   const mapIdParam = searchParams.get("map") ?? undefined;
+  const isDailyChallenge = searchParams.get("daily") === "true";
+  
   // Initialize game state (complete map generation handled internally)
   // Tests expect these functions to be called depending on the prop
-  // If loading exact state, try localStorage first and avoid regenerating
-  let initialState: GameState | undefined;
-  if ((replayExact || mapIdParam) && typeof window !== 'undefined') {
-    try {
-      const key = mapIdParam ? `initialGame:${mapIdParam}` : 'initialGame';
-      const rawExact = window.localStorage.getItem(key);
-      if (rawExact) {
-        const parsedExact = JSON.parse(rawExact);
-        if (parsedExact && parsedExact.mapData && parsedExact.mapData.tiles && parsedExact.mapData.subtypes) {
-          // Rehydrate enemies into class instances so methods exist
-          if (Array.isArray(parsedExact.enemies)) {
-            parsedExact.enemies = rehydrateEnemies(parsedExact.enemies);
-          }
-          initialState = parsedExact;
-        }
-      }
-    } catch {
-      // ignore
-    }
-  }
-  if (!initialState) {
-    if (algorithm === "default") {
-      generateMap();
-    } else {
-      generateCompleteMap();
-    }
-    initialState = initializeGameState();
-    // Persist the exact initial game for reproducibility
-    if (typeof window !== 'undefined' && initialState && initialState.mapData) {
+  // Use useMemo to prevent re-initialization on every render
+  const initialState = useMemo(() => {
+    let state: GameState | undefined;
+    
+    // If loading exact state, try localStorage first and avoid regenerating
+    if ((replayExact || mapIdParam) && typeof window !== 'undefined') {
       try {
-        const id = computeMapId(initialState.mapData);
-        window.localStorage.setItem('initialGame', JSON.stringify(initialState));
-        window.localStorage.setItem(`initialGame:${id}`, JSON.stringify(initialState));
+        // For map-specific loading, try the map-specific key first, then fallback to generic
+        const keys = mapIdParam ? [`initialGame:${mapIdParam}`, 'initialGame'] : ['initialGame'];
+        for (const key of keys) {
+          const rawExact = window.localStorage.getItem(key);
+          if (rawExact) {
+            const parsedExact = JSON.parse(rawExact);
+            if (parsedExact && parsedExact.mapData && parsedExact.mapData.tiles && parsedExact.mapData.subtypes) {
+              // Rehydrate enemies into class instances so methods exist
+              if (Array.isArray(parsedExact.enemies)) {
+                parsedExact.enemies = rehydrateEnemies(parsedExact.enemies);
+              }
+              state = parsedExact;
+              break;
+            }
+          }
+        }
       } catch {
-        // ignore storage errors
+        // ignore
       }
     }
-  } else if (replay && typeof window !== 'undefined') {
-    // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
-    try {
-      const raw = window.sessionStorage.getItem("lastGame");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.mapData && parsed.mapData.tiles && parsed.mapData.subtypes) {
-          initialState = initializeGameStateFromMap(parsed.mapData);
+    
+    if (!state) {
+      if (algorithm === "default") {
+        generateMap();
+      } else {
+        generateCompleteMap();
+      }
+      state = initializeGameState();
+      // Persist the exact initial game for reproducibility (single instance)
+      if (typeof window !== 'undefined' && state && state.mapData) {
+        try {
+          // Use single key, replace previous game data
+          window.localStorage.setItem('initialGame', JSON.stringify(state));
+        } catch {
+          // ignore storage errors
         }
       }
-    } catch {
-      // ignore bad storage/parse
     }
-  }
+    
+    return state;
+  }, [algorithm, replayExact, mapIdParam]);
+
+  // Handle legacy replay logic - this modifies the initial state after creation
+  const [replayState, setReplayState] = useState<GameState | undefined>();
+  useEffect(() => {
+    if (replay && typeof window !== 'undefined') {
+      // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
+      try {
+        const raw = window.sessionStorage.getItem("lastGame");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.mapData && parsed.mapData.tiles && parsed.mapData.subtypes) {
+            setReplayState(initializeGameStateFromMap(parsed.mapData));
+          }
+        }
+      } catch {
+        // ignore bad storage/parse
+      }
+    }
+  }, [replay]);
+
+  // Use replay state if available, otherwise use initial state
+  const finalInitialState = replayState || initialState;
 
   // Saved maps UI state
   const [savedMaps, setSavedMaps] = useState<SavedMapEntry[]>([]);
@@ -75,11 +96,11 @@ function HomeInner() {
   const [notes, setNotes] = useState("");
   const currentMapId = useMemo(() => {
     try {
-      return initialState?.mapData ? computeMapId(initialState.mapData) : undefined;
+      return finalInitialState?.mapData ? computeMapId(finalInitialState.mapData) : undefined;
     } catch {
       return undefined;
     }
-  }, [initialState]);
+  }, [finalInitialState]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -87,14 +108,14 @@ function HomeInner() {
   }, []);
 
   function handleSave() {
-    if (!initialState || !currentMapId) return;
+    if (!finalInitialState || !currentMapId) return;
     const entry: SavedMapEntry = {
       id: currentMapId,
       rating,
       title: title || undefined,
       notes: notes || undefined,
       savedAt: new Date().toISOString(),
-      initialGameState: initialState,
+      initialGameState: finalInitialState,
     };
     upsertSavedMap(entry);
     setSavedMaps(loadSavedMaps());
@@ -112,7 +133,7 @@ function HomeInner() {
   return (
     <div className="min-h-screen flex flex-row items-start justify-center p-4 gap-4 bg-[#1B1B1B] text-white">
       <div className="flex flex-col items-center">
-        <TilemapGrid tileTypes={tileTypes} initialGameState={initialState} forceDaylight={daylight} />
+        <TilemapGrid tileTypes={tileTypes} initialGameState={finalInitialState} forceDaylight={daylight} isDailyChallenge={isDailyChallenge} />
         <div className="mt-4 mb-4 flex items-center gap-2">
           <button
             onClick={() => window.location.reload()}

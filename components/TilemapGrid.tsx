@@ -20,6 +20,7 @@ import {
   ADJACENT_GLOW,
   DIAGONAL_GLOW,
 } from "../lib/torch_glow";
+import { DailyChallengeFlow } from "../lib/daily_challenge_flow";
 
 // Grid dimensions will be derived from provided map data
 
@@ -29,6 +30,7 @@ interface TilemapGridProps {
   subtypes?: number[][][];
   initialGameState?: GameState;
   forceDaylight?: boolean; // when true, override lighting to full visibility
+  isDailyChallenge?: boolean; // when true, handle daily challenge completion
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -37,6 +39,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   subtypes,
   initialGameState,
   forceDaylight = process.env.NODE_ENV !== "test",
+  isDailyChallenge = false,
 }) => {
   const router = useRouter();
 
@@ -571,39 +574,46 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Redirect to end page and persist game snapshot on win
   useEffect(() => {
     if (gameState.win) {
-      try {
-        // Compute streak: increment from previous lastGame.streak if available
-        let nextStreak = 1;
+      if (isDailyChallenge) {
+        // Handle daily challenge completion
+        DailyChallengeFlow.handleGameComplete('won');
+        router.push("/daily");
+      } else {
+        // Handle regular game completion
         try {
-          if (typeof window !== "undefined") {
-            const prevRaw = window.sessionStorage.getItem("lastGame");
-            if (prevRaw) {
-              const prev = JSON.parse(prevRaw);
-              const prevStreak =
-                typeof prev?.streak === "number" ? prev.streak : 0;
-              nextStreak = prevStreak + 1;
+          // Compute streak: increment from previous lastGame.streak if available
+          let nextStreak = 1;
+          try {
+            if (typeof window !== "undefined") {
+              const prevRaw = window.sessionStorage.getItem("lastGame");
+              if (prevRaw) {
+                const prev = JSON.parse(prevRaw);
+                const prevStreak =
+                  typeof prev?.streak === "number" ? prev.streak : 0;
+                nextStreak = prevStreak + 1;
+              }
             }
+          } catch {}
+          const payload = {
+            completedAt: new Date().toISOString(),
+            hasKey: gameState.hasKey,
+            hasExitKey: gameState.hasExitKey,
+            hasSword: !!gameState.hasSword,
+            hasShield: !!gameState.hasShield,
+            showFullMap: !!gameState.showFullMap,
+            mapData: gameState.mapData,
+            stats: gameState.stats,
+            outcome: "win" as const,
+            streak: nextStreak,
+          };
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
           }
-        } catch {}
-        const payload = {
-          completedAt: new Date().toISOString(),
-          hasKey: gameState.hasKey,
-          hasExitKey: gameState.hasExitKey,
-          hasSword: !!gameState.hasSword,
-          hasShield: !!gameState.hasShield,
-          showFullMap: !!gameState.showFullMap,
-          mapData: gameState.mapData,
-          stats: gameState.stats,
-          outcome: "win" as const,
-          streak: nextStreak,
-        };
-        if (typeof window !== "undefined") {
-          window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+        } catch {
+          // no-op – storage may be unavailable in some environments
         }
-      } catch {
-        // no-op – storage may be unavailable in some environments
+        router.push("/end");
       }
-      router.push("/end");
     }
   }, [
     gameState.win,
@@ -615,32 +625,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.mapData,
     gameState.stats,
     router,
+    isDailyChallenge,
   ]);
 
   // Redirect to end page and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth <= 0) {
-      try {
-        const payload = {
-          completedAt: new Date().toISOString(),
-          hasKey: gameState.hasKey,
-          hasExitKey: gameState.hasExitKey,
-          hasSword: !!gameState.hasSword,
-          hasShield: !!gameState.hasShield,
-          showFullMap: !!gameState.showFullMap,
-          mapData: gameState.mapData,
-          stats: gameState.stats,
-          outcome: "dead",
-          streak: 0,
-          deathCause: gameState.deathCause,
-        } as const;
-        if (typeof window !== "undefined") {
-          window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+      if (isDailyChallenge) {
+        // Handle daily challenge death
+        DailyChallengeFlow.handleGameComplete('lost');
+        router.push("/daily");
+      } else {
+        // Handle regular game death
+        try {
+          const payload = {
+            completedAt: new Date().toISOString(),
+            hasKey: gameState.hasKey,
+            hasExitKey: gameState.hasExitKey,
+            hasSword: !!gameState.hasSword,
+            hasShield: !!gameState.hasShield,
+            showFullMap: !!gameState.showFullMap,
+            mapData: gameState.mapData,
+            stats: gameState.stats,
+            outcome: "dead",
+            streak: 0,
+            deathCause: gameState.deathCause,
+          } as const;
+          if (typeof window !== "undefined") {
+            window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+          }
+        } catch {
+          // ignore storage errors
         }
-      } catch {
-        // ignore storage errors
+        router.push("/end");
       }
-      router.push("/end");
     }
   }, [
     gameState.heroHealth,
@@ -653,6 +671,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.mapData,
     gameState.stats,
     router,
+    isDailyChallenge,
   ]);
 
   // Handle player movement
