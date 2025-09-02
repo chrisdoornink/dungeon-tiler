@@ -98,8 +98,22 @@ function buildTestRoom(): GameState {
 function TestRoomInner() {
   const initialState = buildTestRoom();
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#1B1B1B] text-white">
-      <TilemapGrid tileTypes={tileTypes} initialGameState={initialState} />
+    <div 
+      className="min-h-screen flex flex-col items-center justify-center p-4 text-white relative"
+      style={{
+        backgroundImage: "url(/images/presentational/wall-up-close.png)",
+        backgroundRepeat: "repeat",
+        backgroundSize: "auto"
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+      <div className="relative z-10">
+        <TilemapGrid
+          tileTypes={tileTypes}
+          initialGameState={initialState}
+          forceDaylight={true}
+        />
+      </div>
     </div>
   );
 }

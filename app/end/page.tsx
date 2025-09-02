@@ -49,10 +49,17 @@ export default function EndPage() {
 
   if (!last) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-semibold mb-2">No game data found</h1>
-          <p className="text-gray-600">Play a game to see your results here.</p>
+      <div 
+        className="flex min-h-screen items-center justify-center p-6"
+        style={{
+          backgroundImage: "url(/images/presentational/wall-up-close.png)",
+          backgroundRepeat: "repeat",
+          backgroundSize: "auto"
+        }}
+      >
+        <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
+          <h1 className="text-2xl font-semibold mb-2 text-gray-100">No game data found</h1>
+          <p className="text-gray-200">Play a game to see your results here.</p>
         </div>
       </div>
     );
@@ -127,14 +134,21 @@ export default function EndPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center p-6">
-      <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full text-center text-[#1B1B1B]">
-        <h1 className="text-2xl font-semibold mb-2">{title}</h1>
-        <p className="text-gray-700 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
+    <div 
+      className="flex min-h-screen items-center justify-center p-6"
+      style={{
+        backgroundImage: "url(/images/presentational/wall-up-close.png)",
+        backgroundRepeat: "repeat",
+        backgroundSize: "auto"
+      }}
+    >
+      <div className="rounded-lg shadow-xl p-6 max-w-md w-full text-center">
+        <h1 className="text-2xl font-semibold mb-2 text-gray-100">{title}</h1>
+        <p className="text-gray-200 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
 
         {/* Death cause specific subtitle with image */}
         {deathDetails && (
-          <div className="flex items-center justify-center gap-3 mb-4 p-3 bg-red-50 rounded-lg border border-red-200">
+          <div className="flex items-center justify-center gap-3 mb-4 p-3 rounded-lg border border-red-400">
             <div
               className="w-8 h-8 flex-shrink-0"
               style={{
@@ -145,30 +159,30 @@ export default function EndPage() {
               }}
               aria-label={deathDetails.alt}
             />
-            <p className="text-red-700 text-sm font-medium">{deathDetails.message}</p>
+            <p className="text-red-300 text-sm font-medium">{deathDetails.message}</p>
           </div>
         )}
 
         {/* Pickups: show only icons for what the player obtained */}
         <div className="flex items-center justify-center flex-wrap gap-2 mb-4">
           {last.hasKey && (
-            <span className="px-2 py-0.5 text-sm bg-[#F1F5F9] rounded">🔑</span>
+            <span className="px-2 py-0.5 text-sm bg-gray-700 text-gray-100 rounded">🔑</span>
           )}
           {last.hasExitKey && (
-            <span className="px-2 py-0.5 text-sm bg-[#F1F5F9] rounded">🗝️</span>
+            <span className="px-2 py-0.5 text-sm bg-gray-700 text-gray-100 rounded">🗝️</span>
           )}
           {last.hasSword && (
-            <span className="px-2 py-0.5 text-sm bg-[#F1F5F9] rounded">🗡️</span>
+            <span className="px-2 py-0.5 text-sm bg-gray-700 text-gray-100 rounded">🗡️</span>
           )}
           {last.hasShield && (
-            <span className="px-2 py-0.5 text-sm bg-[#F1F5F9] rounded">🛡️</span>
+            <span className="px-2 py-0.5 text-sm bg-gray-700 text-gray-100 rounded">🛡️</span>
           )}
           {last.showFullMap && (
-            <span className="px-2 py-0.5 text-sm bg-[#F1F5F9] rounded">💡</span>
+            <span className="px-2 py-0.5 text-sm bg-gray-700 text-gray-100 rounded">💡</span>
           )}
         </div>
 
-        <div className="text-left text-sm space-y-2">
+        <div className="text-left text-sm space-y-2 text-gray-200">
           {typeof last.streak === 'number' && (
             <div className="flex items-baseline justify-between">
               <div className="font-medium">Streak</div>

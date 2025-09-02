@@ -131,8 +131,16 @@ function HomeInner() {
   }
 
   return (
-    <div className="min-h-screen flex flex-row items-start justify-center p-4 gap-4 bg-[#1B1B1B] text-white">
-      <div className="flex flex-col items-center">
+    <div 
+      className="min-h-screen flex flex-row items-start justify-center p-4 gap-4 text-white relative"
+      style={{
+        backgroundImage: "url(/images/presentational/wall-up-close.png)",
+        backgroundRepeat: "repeat",
+        backgroundSize: "auto"
+      }}
+    >
+      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+      <div className="flex flex-col items-center relative z-10">
         <TilemapGrid tileTypes={tileTypes} initialGameState={finalInitialState} forceDaylight={daylight} isDailyChallenge={isDailyChallenge} />
         <div className="mt-4 mb-4 flex items-center gap-2">
           <button

@@ -37,8 +37,15 @@ export default function DailyChallengePage() {
   // Loading state
   if (state === null || data === null) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-xl text-gray-600">Loading...</div>
+      <div 
+        className="min-h-screen flex items-center justify-center"
+        style={{
+          backgroundImage: "url(/images/presentational/wall-up-close.png)",
+          backgroundRepeat: "repeat",
+          backgroundSize: "auto"
+        }}
+      >
+        <div className="text-xl text-gray-200 bg-black/70 rounded-lg p-6 backdrop-blur-sm">Loading...</div>
       </div>
     );
   }
@@ -56,8 +63,15 @@ export default function DailyChallengePage() {
     
     default:
       return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-xl text-red-600">Unknown state</div>
+        <div 
+          className="min-h-screen flex items-center justify-center"
+          style={{
+            backgroundImage: "url(/images/presentational/wall-up-close.png)",
+            backgroundRepeat: "repeat",
+            backgroundSize: "auto"
+          }}
+        >
+          <div className="text-xl text-red-300 bg-black/70 rounded-lg p-6 backdrop-blur-sm">Unknown state</div>
         </div>
       );
   }
