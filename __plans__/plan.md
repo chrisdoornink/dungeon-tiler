@@ -90,6 +90,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] The dungeon exit key must be at least 14 tiles away from the exit door.
 - [ ] ghosts should be able to travel on faulty floor tiles, other future enemies may be able to as well
 - [ ] ghosts should be able to travel on walls
+- [ ] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
 
 Future Tickets
 

@@ -119,7 +119,7 @@ describe('TilemapGrid component', () => {
 
   it('increments streak on consecutive wins', () => {
     // Arrange: simulate prior lastGame with streak: 2
-    window.sessionStorage.setItem('lastGame', JSON.stringify({ streak: 2 }));
+    window.localStorage.setItem('lastGame', JSON.stringify({ streak: 2 }));
 
     const size = 25;
     const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -157,7 +157,7 @@ describe('TilemapGrid component', () => {
     fireEvent.keyDown(window, { key: 'ArrowRight' }); // open and exit -> win
 
     // Assert new streak increased by at least 1 (StrictMode may double-invoke effects)
-    const raw = window.sessionStorage.getItem('lastGame');
+    const raw = window.localStorage.getItem('lastGame');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw as string);
     expect(parsed.outcome).toBe('win');
@@ -166,7 +166,7 @@ describe('TilemapGrid component', () => {
 
   it('resets streak to 0 on death', () => {
     // Arrange: prior streak exists
-    window.sessionStorage.setItem('lastGame', JSON.stringify({ streak: 5 }));
+    window.localStorage.setItem('lastGame', JSON.stringify({ streak: 5 }));
 
     const size = 25;
     const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -195,8 +195,8 @@ describe('TilemapGrid component', () => {
       />
     );
 
-    // Assert sessionStorage has streak reset
-    const raw = window.sessionStorage.getItem('lastGame');
+    // Assert localStorage has streak reset
+    const raw = window.localStorage.getItem('lastGame');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw as string);
     expect(parsed.outcome).toBe('dead');
@@ -242,8 +242,8 @@ describe('TilemapGrid component', () => {
     // Move right again to open exit and step onto it
     fireEvent.keyDown(window, { key: 'ArrowRight' });
 
-    // Assert sessionStorage contains lastGame payload
-    const raw = window.sessionStorage.getItem('lastGame');
+    // Assert localStorage contains lastGame payload
+    const raw = window.localStorage.getItem('lastGame');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw as string);
     expect(parsed).toHaveProperty('completedAt');
@@ -275,7 +275,7 @@ describe('TilemapGrid component', () => {
 
     // Clear prior mocks/payloads
     pushMock.mockClear();
-    window.sessionStorage.removeItem('lastGame');
+    window.localStorage.removeItem('lastGame');
 
     render(
       <TilemapGrid
@@ -291,7 +291,7 @@ describe('TilemapGrid component', () => {
 
     // Assert: no redirect and no persisted payload
     expect(pushMock).not.toHaveBeenCalled();
-    expect(window.sessionStorage.getItem('lastGame')).toBeNull();
+    expect(window.localStorage.getItem('lastGame')).toBeNull();
   });
 
   it('should render circular FOV with fading tiers', () => {

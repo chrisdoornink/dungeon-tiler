@@ -81,33 +81,6 @@ export default function DailyAvailable({ data, today }: DailyAvailableProps) {
               <li>• Losing a game resets your streak</li>
             </ul>
           </div>
-
-          {/* Challenge Info */}
-          <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Today&apos;s Challenge
-            </h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">📅</span>
-                <span className="text-gray-200">
-                  {new Date(today).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🎯</span>
-                <span className="text-gray-200">One attempt only</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🏆</span>
-                <span className="text-gray-200">Build your streak</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">⏰</span>
-                <span className="text-gray-200">Resets at midnight</span>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Recent History */}

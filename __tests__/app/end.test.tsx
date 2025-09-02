@@ -7,7 +7,7 @@ jest.mock('../../lib/navigation', () => ({ go: jest.fn() }));
 
 describe('End Page', () => {
   beforeEach(() => {
-    window.sessionStorage.clear();
+    window.localStorage.clear();
     jest.spyOn(Date.prototype, 'toLocaleString').mockReturnValue('MOCK_DATE');
   });
 
@@ -23,7 +23,7 @@ describe('End Page', () => {
     ).toBeInTheDocument();
   });
 
-  it('renders summary from sessionStorage lastGame', () => {
+  it('renders summary from localStorage lastGame', () => {
     const payload = {
       completedAt: new Date().toISOString(),
       hasKey: true,
@@ -36,7 +36,7 @@ describe('End Page', () => {
         subtypes: Array(5).fill(0).map(() => Array(7).fill(0).map(() => [] as number[])),
       },
     };
-    window.sessionStorage.setItem('lastGame', JSON.stringify(payload));
+    window.localStorage.setItem('lastGame', JSON.stringify(payload));
 
     render(<EndPage />);
 
@@ -54,7 +54,7 @@ describe('End Page', () => {
     expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
   });
 
-  it('Play Again preserves streak in sessionStorage and navigates home', () => {
+  it('Play Again preserves streak in localStorage and navigates home', () => {
     const payload = {
       completedAt: new Date().toISOString(),
       hasKey: true,
@@ -69,7 +69,7 @@ describe('End Page', () => {
       outcome: 'win' as const,
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
     };
-    window.sessionStorage.setItem('lastGame', JSON.stringify(payload));
+    window.localStorage.setItem('lastGame', JSON.stringify(payload));
 
     (nav.go as jest.Mock).mockImplementation(() => {});
 
@@ -80,7 +80,7 @@ describe('End Page', () => {
 
     expect(nav.go).toHaveBeenCalledWith('/');
 
-    const raw = window.sessionStorage.getItem('lastGame');
+    const raw = window.localStorage.getItem('lastGame');
     expect(raw).toBeTruthy();
     const parsed = JSON.parse(raw as string);
     expect(parsed.streak).toBe(4);

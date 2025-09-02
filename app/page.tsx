@@ -73,7 +73,7 @@ function HomeInner() {
     if (replay && typeof window !== 'undefined') {
       // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
       try {
-        const raw = window.sessionStorage.getItem("lastGame");
+        const raw = window.localStorage.getItem("lastGame");
         if (raw) {
           const parsed = JSON.parse(raw);
           if (parsed && parsed.mapData && parsed.mapData.tiles && parsed.mapData.subtypes) {

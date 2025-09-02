@@ -576,16 +576,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     if (gameState.win) {
       if (isDailyChallenge) {
         // Handle daily challenge completion
-        DailyChallengeFlow.handleGameComplete('won');
-        router.push("/daily");
-      } else {
-        // Handle regular game completion
         try {
-          // Compute streak: increment from previous lastGame.streak if available
+          // Store game data for daily challenge too
           let nextStreak = 1;
           try {
             if (typeof window !== "undefined") {
-              const prevRaw = window.sessionStorage.getItem("lastGame");
+              const prevRaw = window.localStorage.getItem("lastGame");
               if (prevRaw) {
                 const prev = JSON.parse(prevRaw);
                 const prevStreak =
@@ -605,9 +601,51 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             stats: gameState.stats,
             outcome: "win" as const,
             streak: nextStreak,
+            heroHealth: gameState.heroHealth,
           };
           if (typeof window !== "undefined") {
-            window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Storing daily challenge win to localStorage:", payload);
+            window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+          }
+        } catch {
+          // no-op – storage may be unavailable in some environments
+        }
+        DailyChallengeFlow.handleGameComplete('won');
+        router.push("/daily");
+      } else {
+        // Handle regular game completion
+        try {
+          // Compute streak: increment from previous lastGame.streak if available
+          let nextStreak = 1;
+          try {
+            if (typeof window !== "undefined") {
+              const prevRaw = window.localStorage.getItem("lastGame");
+              if (prevRaw) {
+                const prev = JSON.parse(prevRaw);
+                const prevStreak =
+                  typeof prev?.streak === "number" ? prev.streak : 0;
+                nextStreak = prevStreak + 1;
+              }
+            }
+          } catch {}
+          const payload = {
+            completedAt: new Date().toISOString(),
+            hasKey: gameState.hasKey,
+            hasExitKey: gameState.hasExitKey,
+            hasSword: !!gameState.hasSword,
+            hasShield: !!gameState.hasShield,
+            showFullMap: !!gameState.showFullMap,
+            mapData: gameState.mapData,
+            stats: gameState.stats,
+            outcome: "win" as const,
+            streak: nextStreak,
+            heroHealth: gameState.heroHealth,
+          };
+          if (typeof window !== "undefined") {
+            console.log("Storing win game to localStorage:", payload);
+            window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -633,6 +671,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     if (gameState.heroHealth <= 0) {
       if (isDailyChallenge) {
         // Handle daily challenge death
+        try {
+          const payload = {
+            completedAt: new Date().toISOString(),
+            hasKey: gameState.hasKey,
+            hasExitKey: gameState.hasExitKey,
+            hasSword: !!gameState.hasSword,
+            hasShield: !!gameState.hasShield,
+            showFullMap: !!gameState.showFullMap,
+            mapData: gameState.mapData,
+            stats: gameState.stats,
+            outcome: "dead",
+            streak: 0,
+            deathCause: gameState.deathCause,
+            heroHealth: 0, // Always 0 for deaths
+          } as const;
+          if (typeof window !== "undefined") {
+            console.log("Storing daily challenge death to localStorage:", payload);
+            window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+          }
+        } catch {
+          // ignore storage errors
+        }
         DailyChallengeFlow.handleGameComplete('lost');
         router.push("/daily");
       } else {
@@ -650,9 +711,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             outcome: "dead",
             streak: 0,
             deathCause: gameState.deathCause,
+            heroHealth: 0, // Always 0 for deaths
           } as const;
           if (typeof window !== "undefined") {
-            window.sessionStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Storing death game to localStorage:", payload);
+            window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
           }
         } catch {
           // ignore storage errors

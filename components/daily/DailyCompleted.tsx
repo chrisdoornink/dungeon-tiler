@@ -1,8 +1,49 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
-// Using sessionStorage directly instead of separate module
+// Using localStorage directly instead of separate module
+
+// Emoji translation map for game entities
+const EMOJI_MAP = {
+  // Game outcome
+  win: "🏆",
+  death: "💀",
+
+  // Items/pickups
+  key: "🔑",
+  exitKey: "🗝️",
+  sword: "🗡️",
+  shield: "🛡️",
+  map: "🗺️",
+
+  // Enemies
+  goblin: "👹",
+  ghost: "👻",
+  "stone-exciter": "🗿",
+
+  // Stats
+  damage: "⚔️",
+  health: "❤️",
+  steps: "👣",
+
+  // Health visualization
+  health_full: "🟩", // 5 health
+  health_good: "🟩", // 4 health
+  health_ok: "🟨", // 3 health
+  health_low: "🟧", // 2 health
+  health_critical: "🟥", // 1 health
+
+  // Death causes
+  faulty_floor: "🕳️",
+
+  // Streak indicators
+  streak_fire: "🔥",
+
+  // Result indicators (like Wordle)
+  win_square: "🟩",
+  loss_square: "🟥",
+} as const;
 
 interface DailyCompletedProps {
   data: DailyChallengeData;
@@ -11,12 +52,13 @@ interface DailyCompletedProps {
 export default function DailyCompleted({ data }: DailyCompletedProps) {
   const todayResult = data.todayResult;
   const isWin = todayResult === "won";
+  const [copied, setCopied] = useState(false);
 
-  // Get death details from last game result stored in sessionStorage
+  // Get death details from last game result stored in localStorage
   const getLastGame = () => {
     if (typeof window === "undefined") return null;
     try {
-      const stored = window.sessionStorage.getItem("lastGame");
+      const stored = window.localStorage.getItem("lastGame");
       return stored ? JSON.parse(stored) : null;
     } catch {
       return null;
@@ -46,10 +88,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         let enemyName = "a goblin";
 
         if (enemyKind === "ghost") {
-          enemyImage = "/images/enemies/ghost/ghost-front.png";
+          enemyImage = "/images/enemies/lantern-wisp.png";
           enemyName = "a ghost";
         } else if (enemyKind === "stone-exciter") {
-          enemyImage = "/images/enemies/stone-exciter/stone-exciter-front.png";
+          enemyImage = "/images/enemies/stone-exciter-front.png";
           enemyName = "a stone exciter";
         }
 
@@ -67,20 +109,94 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
   console.log("deathDetails", deathDetails);
 
-  const getTimeUntilMidnight = () => {
-    const now = new Date();
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
+  // Generate shareable text in Wordle/Rogule style
+  const generateShareText = () => {
+    const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD format
+    const lines: string[] = [];
 
-    const diff = tomorrow.getTime() - now.getTime();
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+    // Header like "Dungeon Tiler 2025-9-2"
+    lines.push(`#DungeonTiler ${today}`);
 
-    return { hours, minutes };
+    // Result and basic stats
+    const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
+    const statsLine = [
+      `${resultEmoji}`,
+      lastGame?.stats?.steps
+        ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
+        : "",
+      lastGame?.stats?.damageDealt
+        ? `${EMOJI_MAP.damage} ${lastGame.stats.damageDealt}`
+        : "",
+      lastGame?.stats?.enemiesDefeated
+        ? `👹 ${lastGame.stats.enemiesDefeated}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    lines.push(statsLine);
+
+    // Streak
+    lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
+
+    // Health visualization (5 tiles showing final health)
+    if (lastGame?.heroHealth !== undefined) {
+      const health = lastGame.heroHealth;
+      const healthTiles = [];
+      for (let i = 1; i <= 5; i++) {
+        if (i <= health) {
+          if (health === 5) healthTiles.push(EMOJI_MAP.health_full);
+          else if (health === 4) healthTiles.push(EMOJI_MAP.health_good);
+          else if (health === 3) healthTiles.push(EMOJI_MAP.health_ok);
+          else if (health === 2) healthTiles.push(EMOJI_MAP.health_low);
+          else if (health === 1) healthTiles.push(EMOJI_MAP.health_critical);
+        } else {
+          healthTiles.push("⬜"); // Empty health
+        }
+      }
+      lines.push(healthTiles.join(""));
+    }
+
+    // Enemies defeated (show actual emoji for each kill)
+    if (lastGame?.stats?.byKind) {
+      const enemyLine: string[] = [];
+      Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
+        const numCount = typeof count === "number" ? count : 0;
+        if (numCount > 0) {
+          const emoji =
+            EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP.goblin;
+          enemyLine.push(emoji.repeat(numCount));
+        }
+      });
+      if (enemyLine.length > 0) {
+        lines.push(enemyLine.join(""));
+      }
+    }
+
+    // Items collected
+    const items: string[] = [];
+    if (lastGame?.hasKey) items.push(EMOJI_MAP.key);
+    if (lastGame?.hasExitKey) items.push(EMOJI_MAP.exitKey);
+    if (lastGame?.hasSword) items.push(EMOJI_MAP.sword);
+    if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
+    if (items.length > 0) {
+      lines.push(items.join(""));
+    }
+
+    return lines.join("\n");
   };
 
-  const { hours, minutes } = getTimeUntilMidnight();
+  const onShare = async () => {
+    const shareText = generateShareText();
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(shareText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }
+    } catch {
+      // ignore share errors
+    }
+  };
 
   return (
     <div
@@ -117,7 +233,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           {deathDetails && (
             <div className="flex items-center justify-center gap-3 mt-4 p-3 rounded-lg border border-red-400">
               <div
-                className="w-8 h-8 flex-shrink-0"
+                className="w-12 h-12 flex-shrink-0"
                 style={{
                   backgroundImage: `url(${deathDetails.image})`,
                   backgroundSize: "contain",
@@ -131,6 +247,17 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               </p>
             </div>
           )}
+        </div>
+
+        {/* Share Button */}
+        <div className="text-center mb-4">
+          <button
+            type="button"
+            onClick={onShare}
+            className="px-6 py-3 rounded-md bg-[#2E7D32] text-white hover:bg-[#256628] transition-colors border-0 font-semibold"
+          >
+            {copied ? "Copied!" : "Share Results"}
+          </button>
         </div>
 
         {/* Stats Update */}
@@ -179,28 +306,76 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
           <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Next Challenge
+              Game Statistics
             </h2>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">⏰</span>
-                <span className="text-gray-200">
-                  {hours}h {minutes}m until reset
-                </span>
+            {lastGame && lastGame.stats ? (
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">Steps Taken:</span>
+                  <span className="text-lg font-semibold text-gray-200">
+                    {lastGame.stats.steps || 0}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">Damage Dealt:</span>
+                  <span className="text-lg font-semibold text-green-300">
+                    {lastGame.stats.damageDealt}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">Damage Taken:</span>
+                  <span className="text-lg font-semibold text-red-300">
+                    {lastGame.stats.damageTaken}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-300">Enemies Defeated:</span>
+                  <span className="text-lg font-semibold text-purple-300">
+                    {lastGame.stats.enemiesDefeated}
+                  </span>
+                </div>
+                {lastGame.stats.byKind && (
+                  <div className="mt-4 pt-3 border-t border-gray-600">
+                    <div className="text-sm text-gray-400 mb-2">
+                      Enemies defeated:
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(lastGame.stats.byKind).map(
+                        ([enemyType, count]) => {
+                          const numCount =
+                            typeof count === "number" ? count : 0;
+                          const enemies = [];
+                          for (let i = 0; i < numCount; i++) {
+                            enemies.push(
+                              <div
+                                key={`${enemyType}-${i}`}
+                                className="w-6 h-6"
+                                style={{
+                                  backgroundImage: `url(/images/enemies/${
+                                    enemyType === "stone-exciter"
+                                      ? "stone-exciter-front"
+                                      : enemyType === "ghost"
+                                      ? "lantern-wisp"
+                                      : "fire-goblin/fire-goblin-front"
+                                  }.png)`,
+                                  backgroundSize: "contain",
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "center",
+                                }}
+                                title={enemyType}
+                              />
+                            );
+                          }
+                          return enemies;
+                        }
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">📅</span>
-                <span className="text-gray-200">
-                  {new Date(
-                    Date.now() + 24 * 60 * 60 * 1000
-                  ).toLocaleDateString()}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🎯</span>
-                <span className="text-gray-200">Fresh dungeon awaits</span>
-              </div>
-            </div>
+            ) : (
+              <p className="text-gray-400">No game statistics available</p>
+            )}
           </div>
         </div>
 
@@ -223,7 +398,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         )}
 
         {/* Recent History */}
-        {data.streakHistory.length > 0 && (
+        {data.streakHistory.length > 0 && data.totalGamesPlayed > 5 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
               Your Journey
@@ -277,7 +452,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             )}
           </div>
         </div>
-        <p className="text-sm text-gray-300">
+
+        <p className="text-sm text-gray-300 text-center">
           Return tomorrow for a new dungeon challenge!
         </p>
       </div>

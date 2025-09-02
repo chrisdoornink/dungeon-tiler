@@ -452,10 +452,10 @@ export function addFaultyFloorsToMap(mapData: MapData): MapData {
 
   let placed = 0;
   const toPlace = Math.min(2, eligible.length);
-  
+
   for (let i = 0; i < eligible.length && placed < toPlace; i++) {
     const [fy, fx] = eligible[i];
-    
+
     // Test if placing faulty floor here would break connectivity
     if (canPlaceFaultyFloorSafely(newMapData, fy, fx)) {
       newMapData.subtypes[fy][fx] = [TileSubtype.FAULTY_FLOOR];
@@ -473,11 +473,15 @@ export function addFaultyFloorsToMap(mapData: MapData): MapData {
  * @param x X coordinate to test
  * @returns True if faulty floor can be safely placed, false if it would break connectivity
  */
-function canPlaceFaultyFloorSafely(mapData: MapData, y: number, x: number): boolean {
+function canPlaceFaultyFloorSafely(
+  mapData: MapData,
+  y: number,
+  x: number
+): boolean {
   // Create a temporary grid with the faulty floor treated as a wall
-  const testGrid = mapData.tiles.map(row => [...row]);
+  const testGrid = mapData.tiles.map((row) => [...row]);
   testGrid[y][x] = WALL; // Temporarily treat faulty floor as wall for connectivity test
-  
+
   // Check if all remaining floor tiles are still connected
   return areAllFloorsConnected(testGrid);
 }
@@ -633,7 +637,8 @@ export function addExitKeyToMap(mapData: MapData): MapData {
   // If we know where the exit is, choose farthest eligible by Manhattan distance.
   // Enforce minimum distance of 13 when possible.
   if (exitPos) {
-    const dist = (p: [number, number]) => Math.abs(p[0] - exitPos![0]) + Math.abs(p[1] - exitPos![1]);
+    const dist = (p: [number, number]) =>
+      Math.abs(p[0] - exitPos![0]) + Math.abs(p[1] - exitPos![1]);
 
     // Prefer tiles meeting the minimum distance
     const MIN_D = 13;
@@ -655,7 +660,8 @@ export function addExitKeyToMap(mapData: MapData): MapData {
   }
 
   // Fallback: no exit found (shouldn't happen if pipeline calls generateMapWithExit first)
-  const [ey, ex] = eligibleTiles[Math.floor(Math.random() * eligibleTiles.length)];
+  const [ey, ex] =
+    eligibleTiles[Math.floor(Math.random() * eligibleTiles.length)];
   newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
   return newMapData;
 }
@@ -973,7 +979,10 @@ export function performThrowRock(gameState: GameState): GameState {
       const newEnemies = enemies.slice();
       const target: Enemy = newEnemies[hitIdx];
       // If we have a rune and the target is a stone-exciter, consume a rune to instantly kill
-      if (target.kind === "stone-exciter" && (preTickState.runeCount ?? 0) > 0) {
+      if (
+        target.kind === "stone-exciter" &&
+        (preTickState.runeCount ?? 0) > 0
+      ) {
         // Enemy dies instantly
         const removed = newEnemies.splice(hitIdx, 1)[0];
         const newStats = {
@@ -1101,15 +1110,26 @@ export function performThrowRune(gameState: GameState): GameState {
   }
 
   // Direction vector
-  let vx = 0, vy = 0;
+  let vx = 0,
+    vy = 0;
   switch (preTickState.playerDirection) {
-    case Direction.UP: vy = -1; break;
-    case Direction.RIGHT: vx = 1; break;
-    case Direction.DOWN: vy = 1; break;
-    case Direction.LEFT: vx = -1; break;
+    case Direction.UP:
+      vy = -1;
+      break;
+    case Direction.RIGHT:
+      vx = 1;
+      break;
+    case Direction.DOWN:
+      vy = 1;
+      break;
+    case Direction.LEFT:
+      vx = -1;
+      break;
   }
 
-  const newMapData = JSON.parse(JSON.stringify(preTickState.mapData)) as MapData;
+  const newMapData = JSON.parse(
+    JSON.stringify(preTickState.mapData)
+  ) as MapData;
 
   // Track last floor tile traversed (start at player tile, but don't drop there)
   let lastFloorY = py;
@@ -1122,7 +1142,10 @@ export function performThrowRune(gameState: GameState): GameState {
 
     // Out of bounds -> drop on last traversed floor tile
     if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
-      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+      if (
+        !(lastFloorY === py && lastFloorX === px) &&
+        newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
+      ) {
         newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
         return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
       }
@@ -1139,32 +1162,62 @@ export function performThrowRune(gameState: GameState): GameState {
       if (target.kind === "stone-exciter") {
         // Instant kill, rune consumed
         const removed = newEnemies.splice(hitIdx, 1)[0];
-        const newStats = { ...preTickState.stats, enemiesDefeated: preTickState.stats.enemiesDefeated + 1 };
+        const newStats = {
+          ...preTickState.stats,
+          enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+        };
         const byKind = newStats.byKind || createEmptyByKind();
         const k = removed.kind as EnemyKind;
         byKind[k] = (byKind[k] ?? 0) + 1;
         newStats.byKind = byKind;
-        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
-        return { ...preTickState, enemies: newEnemies, stats: newStats, recentDeaths: newRecent, runeCount: count - 1 };
+        const newRecent = (
+          preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
+        ).concat([[removed.y, removed.x] as [number, number]]);
+        return {
+          ...preTickState,
+          enemies: newEnemies,
+          stats: newStats,
+          recentDeaths: newRecent,
+          runeCount: count - 1,
+        };
       }
       // Non-stone enemy: deal 2 damage
       const newHealth = (target.health ?? 1) - 2;
       if (newHealth <= 0) {
         const removed = newEnemies.splice(hitIdx, 1)[0];
-        const newStats = { ...preTickState.stats, enemiesDefeated: preTickState.stats.enemiesDefeated + 1 };
+        const newStats = {
+          ...preTickState.stats,
+          enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+        };
         const byKind = newStats.byKind || createEmptyByKind();
         const k = removed.kind as EnemyKind;
         byKind[k] = (byKind[k] ?? 0) + 1;
         newStats.byKind = byKind;
-        const newRecent = (preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []).concat([[removed.y, removed.x] as [number, number]]);
-        return { ...preTickState, enemies: newEnemies, stats: newStats, recentDeaths: newRecent, runeCount: count - 1 };
+        const newRecent = (
+          preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
+        ).concat([[removed.y, removed.x] as [number, number]]);
+        return {
+          ...preTickState,
+          enemies: newEnemies,
+          stats: newStats,
+          recentDeaths: newRecent,
+          runeCount: count - 1,
+        };
       } else {
         target.health = newHealth;
         newEnemies[hitIdx] = target;
         // Drop rune on last floor tile
-        if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+        if (
+          !(lastFloorY === py && lastFloorX === px) &&
+          newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
+        ) {
           newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-          return { ...preTickState, enemies: newEnemies, mapData: newMapData, runeCount: count - 1 };
+          return {
+            ...preTickState,
+            enemies: newEnemies,
+            mapData: newMapData,
+            runeCount: count - 1,
+          };
         }
         return { ...preTickState, enemies: newEnemies };
       }
@@ -1172,7 +1225,10 @@ export function performThrowRune(gameState: GameState): GameState {
 
     // Wall/obstacle -> drop on last floor tile
     if (newMapData.tiles[ty][tx] !== FLOOR) {
-      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+      if (
+        !(lastFloorY === py && lastFloorX === px) &&
+        newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
+      ) {
         newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
         return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
       }
@@ -1188,7 +1244,10 @@ export function performThrowRune(gameState: GameState): GameState {
         newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
       }
       // Drop rune before the pot
-      if (!(lastFloorY === py && lastFloorX === px) && newMapData.tiles[lastFloorY][lastFloorX] === FLOOR) {
+      if (
+        !(lastFloorY === py && lastFloorX === px) &&
+        newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
+      ) {
         newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
         return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
       }
@@ -1251,7 +1310,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: 'enemy' | 'faulty_floor';
+    type: "enemy" | "faulty_floor";
     enemyKind?: string;
   };
 }
@@ -1455,7 +1514,8 @@ export function movePlayer(
           const dy = newY - currentY;
           const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
-          const movingAway = (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
+          const movingAway =
+            (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
             (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
           return adj && movingAway;
         },
@@ -1464,26 +1524,36 @@ export function movePlayer(
     if (damage > 0) {
       const applied = Math.min(2, damage);
       try {
-        console.log("[EnemyDamageTick]", JSON.stringify({ raw: damage, applied, shield: newGameState.hasShield }));
+        console.log(
+          "[EnemyDamageTick]",
+          JSON.stringify({
+            raw: damage,
+            applied,
+            shield: newGameState.hasShield,
+          })
+        );
       } catch {}
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
-      
+
       // If player dies from enemy damage, track which enemy killed them
       if (newGameState.heroHealth === 0) {
         // Find the enemy that dealt damage (closest to player)
-        const killerEnemy = newGameState.enemies.find(e => 
-          Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
+        const killerEnemy = newGameState.enemies.find(
+          (e) => Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
         );
         if (killerEnemy) {
-          newGameState.deathCause = { type: 'enemy', enemyKind: killerEnemy.kind };
+          newGameState.deathCause = {
+            type: "enemy",
+            enemyKind: killerEnemy.kind,
+          };
         }
       }
     }
-    console.log(
-      "Enemies updated:",
-      newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
-    );
+    // console.log(
+    //   "Enemies updated:",
+    //   newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
+    // );
 
     // Ghost effect: any ghost ending adjacent snuffs torch and vanishes with death effect
     const adjacentGhosts = newGameState.enemies.filter(
@@ -1636,10 +1706,15 @@ export function movePlayer(
     // If it's a FAULTY_FLOOR, trigger the trap
     if (subtype.includes(TileSubtype.FAULTY_FLOOR)) {
       // Convert the faulty floor to darkness and kill player instantly
-      newMapData.subtypes[newY][newX] = [TileSubtype.DARKNESS, TileSubtype.PLAYER];
+      newMapData.subtypes[newY][newX] = [
+        TileSubtype.DARKNESS,
+        TileSubtype.PLAYER,
+      ];
       newGameState.heroHealth = 0;
-      newGameState.deathCause = { type: 'faulty_floor' };
-      console.log("Player stepped on a faulty floor! The ground collapses and they fall into darkness!");
+      newGameState.deathCause = { type: "faulty_floor" };
+      console.log(
+        "Player stepped on a faulty floor! The ground collapses and they fall into darkness!"
+      );
     }
 
     // If it's an EXIT (floor overlay)
@@ -1706,7 +1781,13 @@ export function movePlayer(
         try {
           console.log(
             "[HeroAttack]",
-            JSON.stringify({ kind: enemy.kind, heroAttack: newGameState.heroAttack, swordBonus, variance, damage: heroDamage })
+            JSON.stringify({
+              kind: enemy.kind,
+              heroAttack: newGameState.heroAttack,
+              swordBonus,
+              variance,
+              damage: heroDamage,
+            })
           );
         } catch {}
         enemy.health -= heroDamage;
@@ -1785,9 +1866,9 @@ export function movePlayer(
         // Open the chest in place, but DO NOT grant item yet and DO NOT move the player
         // Keep the item (SWORD/SHIELD) visible on top of the opened chest
         // Remove only the CHEST marker, leave item subtype as-is
-        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-          (t) => t !== TileSubtype.CHEST
-        );
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
+          newX
+        ].filter((t) => t !== TileSubtype.CHEST);
         if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
           newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
         }
@@ -1827,7 +1908,11 @@ export function movePlayer(
     const hasClosedChest = dest.includes(TileSubtype.CHEST);
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
-      if ((t === TileSubtype.SWORD || t === TileSubtype.SHIELD) && !hasClosedChest) return false;
+      if (
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD) &&
+        !hasClosedChest
+      )
+        return false;
       return true;
     });
     moved = true;

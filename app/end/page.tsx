@@ -37,7 +37,7 @@ export default function EndPage() {
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
-        const raw = window.sessionStorage.getItem("lastGame");
+        const raw = window.localStorage.getItem("lastGame");
         if (raw) {
           setLast(JSON.parse(raw));
         }
