@@ -119,8 +119,20 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
+    // If player died, add emoji for cause of death (enemy kind or faulty floor)
+    const deathEmoji = !isWin && lastGame?.deathCause
+      ? (lastGame.deathCause.type === "faulty_floor"
+          ? EMOJI_MAP.faulty_floor
+          : lastGame.deathCause.type === "enemy"
+          ? (EMOJI_MAP[
+              (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ??
+                "goblin"
+            ] || EMOJI_MAP.goblin)
+          : "")
+      : "";
     const statsLine = [
       `${resultEmoji}`,
+      deathEmoji,
       lastGame?.stats?.steps
         ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
         : "",
