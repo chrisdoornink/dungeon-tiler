@@ -2,19 +2,24 @@
 
 import React from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
-import { go } from "../../lib/navigation";
 
 interface DailyAvailableProps {
   data: DailyChallengeData;
   today: string;
   onGameComplete?: (result: "won" | "lost") => void;
+  onStart?: () => void;
 }
 
-export default function DailyAvailable({ data }: DailyAvailableProps) {
+export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
   const handleStartGame = () => {
-    // Navigate to the main game with daily challenge mode
-    // We'll need to modify the main game to accept daily challenge callbacks
-    go("/?daily=true");
+    try {
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("dailyMode", "true");
+      }
+    } catch {
+      // ignore storage failures
+    }
+    onStart?.();
   };
 
   return (

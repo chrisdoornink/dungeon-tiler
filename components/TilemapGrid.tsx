@@ -20,7 +20,7 @@ import {
   ADJACENT_GLOW,
   DIAGONAL_GLOW,
 } from "../lib/torch_glow";
-import { DailyChallengeFlow } from "../lib/daily_challenge_flow";
+// Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 
 // Grid dimensions will be derived from provided map data
 
@@ -31,6 +31,7 @@ interface TilemapGridProps {
   initialGameState?: GameState;
   forceDaylight?: boolean; // when true, override lighting to full visibility
   isDailyChallenge?: boolean; // when true, handle daily challenge completion
+  onDailyComplete?: (result: "won" | "lost") => void; // when daily, signal result instead of routing
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -40,6 +41,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   initialGameState,
   forceDaylight = process.env.NODE_ENV !== "test",
   isDailyChallenge = false,
+  onDailyComplete,
 }) => {
   const router = useRouter();
 
@@ -571,7 +573,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState.showFullMap, forceDaylight]);
 
-  // Redirect to end page and persist game snapshot on win
+  // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
     if (gameState.win) {
       if (isDailyChallenge) {
@@ -617,8 +619,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         } catch {
           // no-op – storage may be unavailable in some environments
         }
-        DailyChallengeFlow.handleGameComplete("won");
-        router.push("/daily");
+        if (onDailyComplete) {
+          onDailyComplete("won");
+        } else {
+          router.push("/daily");
+        }
       } else {
         // Handle regular game completion
         try {
@@ -674,9 +679,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.stats,
     router,
     isDailyChallenge,
+    onDailyComplete,
   ]);
 
-  // Redirect to end page and persist snapshot on death (heroHealth <= 0)
+  // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth <= 0) {
       if (isDailyChallenge) {
@@ -710,8 +716,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         } catch {
           // ignore storage errors
         }
-        DailyChallengeFlow.handleGameComplete("lost");
-        router.push("/daily");
+        if (onDailyComplete) {
+          onDailyComplete("lost");
+        } else {
+          router.push("/daily");
+        }
       } else {
         // Handle regular game death
         try {
@@ -755,6 +764,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.stats,
     router,
     isDailyChallenge,
+    onDailyComplete,
   ]);
 
   // Handle player movement

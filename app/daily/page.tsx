@@ -6,11 +6,13 @@ import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import DailyIntro from "../../components/daily/DailyIntro";
 import DailyAvailable from "../../components/daily/DailyAvailable";
 import DailyCompleted from "../../components/daily/DailyCompleted";
+import GameView from "../../components/GameView";
 
 export default function DailyChallengePage() {
   const [state, setState] = useState<DailyChallengeState | null>(null);
   const [data, setData] = useState<DailyChallengeData | null>(null);
   const [today, setToday] = useState<string>("");
+  const [showGame, setShowGame] = useState<boolean>(false);
 
   useEffect(() => {
     // Load initial state
@@ -56,7 +58,25 @@ export default function DailyChallengePage() {
       return <DailyIntro onComplete={handleIntroComplete} />;
     
     case DailyChallengeState.DAILY_AVAILABLE:
-      return <DailyAvailable data={data} today={today} onGameComplete={handleGameComplete} />;
+      if (showGame) {
+        return (
+          <GameView
+            isDailyChallenge
+            onDailyComplete={(result) => {
+              handleGameComplete(result);
+              setShowGame(false);
+            }}
+          />
+        );
+      }
+      return (
+        <DailyAvailable
+          data={data}
+          today={today}
+          onGameComplete={handleGameComplete}
+          onStart={() => setShowGame(true)}
+        />
+      );
     
     case DailyChallengeState.DAILY_COMPLETED:
       return <DailyCompleted data={data} />;
