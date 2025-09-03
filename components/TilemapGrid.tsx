@@ -604,14 +604,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
           };
           if (typeof window !== "undefined") {
-            console.log("Storing daily challenge win to localStorage:", payload);
+            console.log(
+              "Storing daily challenge win to localStorage:",
+              payload
+            );
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+            console.log(
+              "Stored successfully, checking:",
+              window.localStorage.getItem("lastGame")
+            );
           }
         } catch {
           // no-op – storage may be unavailable in some environments
         }
-        DailyChallengeFlow.handleGameComplete('won');
+        DailyChallengeFlow.handleGameComplete("won");
         router.push("/daily");
       } else {
         // Handle regular game completion
@@ -645,7 +651,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (typeof window !== "undefined") {
             console.log("Storing win game to localStorage:", payload);
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+            console.log(
+              "Stored successfully, checking:",
+              window.localStorage.getItem("lastGame")
+            );
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -687,14 +696,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: 0, // Always 0 for deaths
           } as const;
           if (typeof window !== "undefined") {
-            console.log("Storing daily challenge death to localStorage:", payload);
+            console.log(
+              "Storing daily challenge death to localStorage:",
+              payload
+            );
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+            console.log(
+              "Stored successfully, checking:",
+              window.localStorage.getItem("lastGame")
+            );
           }
         } catch {
           // ignore storage errors
         }
-        DailyChallengeFlow.handleGameComplete('lost');
+        DailyChallengeFlow.handleGameComplete("lost");
         router.push("/daily");
       } else {
         // Handle regular game death
@@ -716,7 +731,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (typeof window !== "undefined") {
             console.log("Storing death game to localStorage:", payload);
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log("Stored successfully, checking:", window.localStorage.getItem("lastGame"));
+            console.log(
+              "Stored successfully, checking:",
+              window.localStorage.getItem("lastGame")
+            );
           }
         } catch {
           // ignore storage errors
@@ -1062,23 +1080,71 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           <h3 className="text-xs font-medium mb-1 text-white">Inventory:</h3>
           <div className="flex flex-wrap gap-1">
             {gameState.hasKey && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
-                Key 🔑
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 20,
+                    height: 20,
+                    backgroundImage: "url(/images/items/key.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <span>Key</span>
               </div>
             )}
             {gameState.hasExitKey && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
-                Exit Key 🗝️
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 20,
+                    height: 20,
+                    backgroundImage: "url(/images/items/exit-key.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <span>Exit Key</span>
               </div>
             )}
             {gameState.hasSword && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
-                Sword 🗡️
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 24,
+                    height: 24,
+                    backgroundImage: "url(/images/items/sword.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <span>Sword</span>
               </div>
             )}
             {gameState.hasShield && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0">
-                Shield 🛡️
+              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 20,
+                    height: 20,
+                    backgroundImage: "url(/images/items/shield.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                />
+                <span>Shield</span>
               </div>
             )}
             {(gameState.rockCount ?? 0) > 0 && (
@@ -1092,8 +1158,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   aria-hidden="true"
                   style={{
                     display: "inline-block",
-                    width: 16,
-                    height: 16,
+                    width: 32,
+                    height: 32,
                     backgroundImage: "url(/images/items/rock-1.png)",
                     backgroundSize: "contain",
                     backgroundRepeat: "no-repeat",
@@ -1113,9 +1179,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
                 title={`Use rune (${gameState.runeCount}) — tap or press T`}
               >
-                <span role="img" aria-label="rune">
-                  💎
-                </span>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    display: "inline-block",
+                    width: 32,
+                    height: 32,
+                    backgroundImage: "url(/images/items/rune1.png)",
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                />
                 <span>Rune x{gameState.runeCount}</span>
                 <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
                   (tap or T)

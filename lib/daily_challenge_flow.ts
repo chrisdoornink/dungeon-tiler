@@ -1,10 +1,13 @@
-import { DailyChallengeStorage, DailyChallengeData } from './daily_challenge_storage';
-import { DateUtils } from './date_utils';
+import {
+  DailyChallengeStorage,
+  DailyChallengeData,
+} from "./daily_challenge_storage";
+import { DateUtils } from "./date_utils";
 
 export enum DailyChallengeState {
-  FIRST_TIME = 'FIRST_TIME',
-  DAILY_AVAILABLE = 'DAILY_AVAILABLE', 
-  DAILY_COMPLETED = 'DAILY_COMPLETED',
+  FIRST_TIME = "FIRST_TIME",
+  DAILY_AVAILABLE = "DAILY_AVAILABLE",
+  DAILY_COMPLETED = "DAILY_COMPLETED",
 }
 
 export interface DailyChallengeStateData {
@@ -21,6 +24,24 @@ export class DailyChallengeFlow {
 
     // First time user - show intro
     if (!data.hasSeenIntro) {
+      // If there's any prior saved game, skip intro automatically.
+      // Requirement: only show intro when there is no saved game data.
+      try {
+        if (typeof window !== "undefined") {
+          const dailyChallenge = window.localStorage.getItem("dailyChallenge");
+          if (!dailyChallenge) return DailyChallengeState.FIRST_TIME;
+          const parsed = JSON.parse(dailyChallenge);
+          if (
+            parsed?.lastPlayedDate &&
+            DateUtils.isToday(parsed.lastPlayedDate)
+          ) {
+            return DailyChallengeState.DAILY_COMPLETED;
+          }
+          return DailyChallengeState.DAILY_AVAILABLE;
+        }
+      } catch {
+        // ignore storage access errors and fall back to intro
+      }
       return DailyChallengeState.FIRST_TIME;
     }
 
@@ -53,7 +74,7 @@ export class DailyChallengeFlow {
   /**
    * Handle completion of daily challenge game
    */
-  static handleGameComplete(result: 'won' | 'lost'): DailyChallengeData {
+  static handleGameComplete(result: "won" | "lost"): DailyChallengeData {
     const today = DateUtils.getTodayString();
     return DailyChallengeStorage.recordGameResult(result, today);
   }

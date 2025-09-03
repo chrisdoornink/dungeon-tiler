@@ -107,7 +107,7 @@ export class Enemy {
         for (const [dy, dx] of candMoves) {
           const ny = this.y + dy;
           const nx = this.x + dx;
-          if (isSafeFloor(grid, subtypes, ny, nx)) {
+          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
             if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
             else nonLos.push([dy, dx]);
           }
@@ -121,7 +121,7 @@ export class Enemy {
 
       // In memory mode, if the primary step is not walkable, drop pursuit immediately
       if (!seesNow) {
-        const canAnyMove = tryMoves.some(([dy, dx]) => isSafeFloor(grid, subtypes, this.y + dy, this.x + dx));
+        const canAnyMove = tryMoves.some(([dy, dx]) => isSafeFloorForEnemy(grid, subtypes, this.y + dy, this.x + dx, this.kind));
         if (!canAnyMove) {
           this.pursuitTtl = 0;
           this.state = EnemyState.IDLE;
@@ -141,7 +141,7 @@ export class Enemy {
           this.state = EnemyState.HUNTING;
           return this.attack;
         }
-        if (isSafeFloor(grid, subtypes, ny, nx)) {
+        if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
           // Update facing based on chosen step
           if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
           else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
@@ -167,14 +167,14 @@ export class Enemy {
               // so proximity hooks (e.g., torch snuff) can trigger this tick.
               const adjY = ty - dy;
               const adjX = tx - dx;
-              if (isSafeFloor(grid, subtypes, adjY, adjX)) {
+              if (isSafeFloorForEnemy(grid, subtypes, adjY, adjX, this.kind)) {
                 this.y = adjY;
                 this.x = adjX;
               }
               this.state = EnemyState.HUNTING;
               return this.attack;
             }
-            if (isSafeFloor(grid, subtypes, ty, tx)) {
+            if (isSafeFloorForEnemy(grid, subtypes, ty, tx, this.kind)) {
               if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
               else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
               this.y = ty;
@@ -218,13 +218,33 @@ function isFloor(grid: number[][], y: number, x: number): boolean {
   return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && grid[y][x] === 0;
 }
 
-function isSafeFloor(grid: number[][], subtypes: number[][][] | undefined, y: number, x: number): boolean {
+function isInBounds(grid: number[][], y: number, x: number): boolean {
+  return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length;
+}
+
+function isWall(grid: number[][], y: number, x: number): boolean {
+  return isInBounds(grid, y, x) && grid[y][x] === 1; // WALL id from map.ts
+}
+
+// Variant that allows per-enemy rules: ghosts can traverse faulty floors.
+function isSafeFloorForEnemy(
+  grid: number[][],
+  subtypes: number[][][] | undefined,
+  y: number,
+  x: number,
+  kind: 'goblin' | 'ghost' | 'stone-exciter'
+): boolean {
+  if (!isInBounds(grid, y, x)) return false;
+  if (kind === 'ghost') {
+    // Ghosts can occupy floor or wall tiles
+    return isFloor(grid, y, x) || isWall(grid, y, x);
+  }
+  // Non-ghosts: must be a floor and not faulty
   if (!isFloor(grid, y, x)) return false;
-  // If no subtypes provided, assume all floors are safe (backward compatibility)
   if (!subtypes) return true;
-  // Check if tile has faulty floor subtype (TileSubtype.FAULTY_FLOOR = 18)
   const tileSubs = subtypes[y]?.[x] || [];
-  return !tileSubs.includes(18); // Avoid faulty floors
+  const isFaulty = tileSubs.includes(18);
+  return !isFaulty;
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {

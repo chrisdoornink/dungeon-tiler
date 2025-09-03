@@ -125,10 +125,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
         : "",
       lastGame?.stats?.damageDealt
-        ? `${EMOJI_MAP.damage} ${lastGame.stats.damageDealt}`
-        : "",
-      lastGame?.stats?.enemiesDefeated
-        ? `👹 ${lastGame.stats.enemiesDefeated}`
+        ? `💥 +${lastGame.stats.damageDealt} -${lastGame.stats.damageTaken}`
         : "",
     ]
       .filter(Boolean)

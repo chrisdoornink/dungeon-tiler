@@ -83,13 +83,12 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] Building off the visual design implemented currently, try to give some forced perspective to the walls by making the bottom border if the wall tile has a floor tile below it taller than the other borders.
 - [x] Implement this // TODO - if bottom neighbor is false then its a wall and we shoudl rend er the top of the wall in the bottom off this tile - need the asset first
 - [x] Throwing a rock should count as a movement by the player, so the enemies should get a movement turn when the rock is thrown. This movement should occur before the rock leaves its starting point and reaches its destination, so if an enemy is no longer in the path of the throw, then it should not hit them.
-
 - [x] Make it 'daylight' mode by default.
 - [x] Make the ghost still affect the mode when it snuffs tehe users torch
 - [x] Expand the snuffed visibility range 1 tile in all directions. Subtly affect the visibility of the map.
 - [x] The dungeon exit key must be at least 14 tiles away from the exit door.
-- [ ] ghosts should be able to travel on faulty floor tiles, other future enemies may be able to as well
-- [ ] ghosts should be able to travel on walls
+- [x] ghosts should be able to travel on faulty floor tiles, other future enemies may be able to as well
+- [x] ghosts should be able to travel on walls
 - [ ] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
 - [ ] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
 
