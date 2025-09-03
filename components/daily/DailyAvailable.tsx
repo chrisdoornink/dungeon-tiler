@@ -10,7 +10,7 @@ interface DailyAvailableProps {
   onGameComplete?: (result: "won" | "lost") => void;
 }
 
-export default function DailyAvailable({ data, today }: DailyAvailableProps) {
+export default function DailyAvailable({ data }: DailyAvailableProps) {
   const handleStartGame = () => {
     // Navigate to the main game with daily challenge mode
     // We'll need to modify the main game to accept daily challenge callbacks

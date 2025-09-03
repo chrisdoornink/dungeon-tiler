@@ -1,37 +1,51 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
-import { tileTypes, initializeGameState, initializeGameStateFromMap, generateMap, generateCompleteMap, type GameState } from "../../lib/map";
+import {
+  tileTypes,
+  initializeGameState,
+  initializeGameStateFromMap,
+  generateMap,
+  generateCompleteMap,
+  type GameState,
+} from "../../lib/map";
 import { useSearchParams } from "next/navigation";
 import { rehydrateEnemies } from "../../lib/enemy";
 import { TilemapGrid } from "../../components/TilemapGrid";
 // import { deleteSavedMap, loadSavedMaps, upsertSavedMap, type SavedMapEntry } from "../../lib/saved_maps";
 
 function HomeInner() {
-  const [daylight, setDaylight] = useState(process.env.NODE_ENV !== 'test');
+  const [daylight] = useState(process.env.NODE_ENV !== "test");
   const searchParams = useSearchParams();
   const algorithm = searchParams.get("algorithm") ?? undefined;
   const replay = searchParams.get("replay") === "1";
   const replayExact = searchParams.get("replayExact") === "1";
   const mapIdParam = searchParams.get("map") ?? undefined;
   const isDailyChallenge = searchParams.get("daily") === "true";
-  
+
   // Initialize game state (complete map generation handled internally)
   // Tests expect these functions to be called depending on the prop
   // Use useMemo to prevent re-initialization on every render
   const initialState = useMemo(() => {
     let state: GameState | undefined;
-    
+
     // If loading exact state, try localStorage first and avoid regenerating
-    if ((replayExact || mapIdParam) && typeof window !== 'undefined') {
+    if ((replayExact || mapIdParam) && typeof window !== "undefined") {
       try {
         // For map-specific loading, try the map-specific key first, then fallback to generic
-        const keys = mapIdParam ? [`initialGame:${mapIdParam}`, 'initialGame'] : ['initialGame'];
+        const keys = mapIdParam
+          ? [`initialGame:${mapIdParam}`, "initialGame"]
+          : ["initialGame"];
         for (const key of keys) {
           const rawExact = window.localStorage.getItem(key);
           if (rawExact) {
             const parsedExact = JSON.parse(rawExact);
-            if (parsedExact && parsedExact.mapData && parsedExact.mapData.tiles && parsedExact.mapData.subtypes) {
+            if (
+              parsedExact &&
+              parsedExact.mapData &&
+              parsedExact.mapData.tiles &&
+              parsedExact.mapData.subtypes
+            ) {
               // Rehydrate enemies into class instances so methods exist
               if (Array.isArray(parsedExact.enemies)) {
                 parsedExact.enemies = rehydrateEnemies(parsedExact.enemies);
@@ -45,7 +59,7 @@ function HomeInner() {
         // ignore
       }
     }
-    
+
     if (!state) {
       if (algorithm === "default") {
         generateMap();
@@ -54,29 +68,34 @@ function HomeInner() {
       }
       state = initializeGameState();
       // Persist the exact initial game for reproducibility (single instance)
-      if (typeof window !== 'undefined' && state && state.mapData) {
+      if (typeof window !== "undefined" && state && state.mapData) {
         try {
           // Use single key, replace previous game data
-          window.localStorage.setItem('initialGame', JSON.stringify(state));
+          window.localStorage.setItem("initialGame", JSON.stringify(state));
         } catch {
           // ignore storage errors
         }
       }
     }
-    
+
     return state;
   }, [algorithm, replayExact, mapIdParam]);
 
   // Handle legacy replay logic - this modifies the initial state after creation
   const [replayState, setReplayState] = useState<GameState | undefined>();
   useEffect(() => {
-    if (replay && typeof window !== 'undefined') {
+    if (replay && typeof window !== "undefined") {
       // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
       try {
         const raw = window.localStorage.getItem("lastGame");
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (parsed && parsed.mapData && parsed.mapData.tiles && parsed.mapData.subtypes) {
+          if (
+            parsed &&
+            parsed.mapData &&
+            parsed.mapData.tiles &&
+            parsed.mapData.subtypes
+          ) {
             setReplayState(initializeGameStateFromMap(parsed.mapData));
           }
         }
@@ -131,17 +150,22 @@ function HomeInner() {
   // }
 
   return (
-    <div 
+    <div
       className="min-h-screen flex flex-row items-start justify-center p-4 gap-4 text-white relative"
       style={{
         backgroundImage: "url(/images/presentational/wall-up-close.png)",
         backgroundRepeat: "repeat",
-        backgroundSize: "auto"
+        backgroundSize: "auto",
       }}
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
-        <TilemapGrid tileTypes={tileTypes} initialGameState={finalInitialState} forceDaylight={daylight} isDailyChallenge={isDailyChallenge} />
+        <TilemapGrid
+          tileTypes={tileTypes}
+          initialGameState={finalInitialState}
+          forceDaylight={daylight}
+          isDailyChallenge={isDailyChallenge}
+        />
         {/* Hidden game control buttons */}
         {/* 
         <div className="mt-4 mb-4 flex items-center gap-2">

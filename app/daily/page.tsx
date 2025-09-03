@@ -59,7 +59,7 @@ export default function DailyChallengePage() {
       return <DailyAvailable data={data} today={today} onGameComplete={handleGameComplete} />;
     
     case DailyChallengeState.DAILY_COMPLETED:
-      return <DailyCompleted data={data} today={today} />;
+      return <DailyCompleted data={data} />;
     
     default:
       return (

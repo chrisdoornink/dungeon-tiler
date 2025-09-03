@@ -664,6 +664,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [
     gameState.win,
+    gameState.heroHealth,
     gameState.hasKey,
     gameState.hasExitKey,
     gameState.hasSword,
