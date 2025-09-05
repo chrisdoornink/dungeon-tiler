@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import {
   TileType,
   GameState,
@@ -20,6 +19,7 @@ import {
   ADJACENT_GLOW,
   DIAGONAL_GLOW,
 } from "../lib/torch_glow";
+import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 
 // Grid dimensions will be derived from provided map data
@@ -44,6 +44,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onDailyComplete,
 }) => {
   const router = useRouter();
+
+  // Router removed; daily flow handled via onDailyComplete callback
 
   // Initialize game state
   const [gameState, setGameState] = useState<GameState>(() => {
@@ -677,9 +679,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.showFullMap,
     gameState.mapData,
     gameState.stats,
-    router,
     isDailyChallenge,
     onDailyComplete,
+    router,
   ]);
 
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
@@ -762,9 +764,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.showFullMap,
     gameState.mapData,
     gameState.stats,
-    router,
     isDailyChallenge,
     onDailyComplete,
+    router,
   ]);
 
   // Handle player movement
@@ -1025,193 +1027,399 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       className="relative flex justify-center"
       data-testid="tilemap-grid-wrapper"
     >
-      {/* HUD: Hero health and visible enemy healths (top-left) */}
-      <div className="absolute top-2 left-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md text-white min-w-[120px]">
-        <div className="text-xs font-medium mb-1">Status</div>
-        <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
-        {playerPosition &&
-          gameState.enemies &&
-          gameState.enemies.length > 0 &&
-          (() => {
-            const [py, px] = playerPosition;
-            const visibleNearby = gameState.enemies
-              .filter((e) =>
-                canSee(gameState.mapData.tiles, [py, px], [e.y, e.x])
-              )
-              .map((e) => ({
-                e,
-                d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
-              }))
-              .filter(({ d }) => d <= 8)
-              .sort((a, b) => a.d - b.d);
-            if (visibleNearby.length === 0) return null;
-            return (
-              <div className="mt-2">
-                <div className="text-xs font-medium mb-1">Enemies in sight</div>
-                <ul className="space-y-1">
-                  {visibleNearby.map(({ e }, idx) => (
-                    <li
-                      key={`${e.y},${e.x},${idx}`}
-                      className="text-sm flex items-center gap-2"
-                    >
-                      <span
-                        className="inline-block"
-                        style={{
-                          width: 18,
-                          height: 18,
-                          backgroundImage: `url(${getEnemyIcon(
-                            e.kind,
-                            "front"
-                          )})`,
-                          backgroundSize: "contain",
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "center",
-                        }}
-                        aria-hidden="true"
-                      />
-                      <span>HP {e.health}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })()}
-      </div>
-      {/* Fixed inventory at top right */}
-      {(gameState.hasKey ||
-        gameState.hasExitKey ||
-        gameState.hasSword ||
-        gameState.hasShield ||
-        (gameState.rockCount ?? 0) > 0 ||
-        (gameState.runeCount ?? 0) > 0) && (
+      {/* Vertically center the entire game UI within the viewport */}
+      <div className="w-full min-h-[100svh] flex items-center justify-center">
+        <div className="game-scale" data-testid="game-scale">
+        {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
         <div
-          className="absolute top-2 right-2 z-10 p-2 bg-[#1B1B1B] rounded-md shadow-md"
-          style={{ maxWidth: "200px" }}
+          className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
         >
-          <h3 className="text-xs font-medium mb-1 text-white">Inventory:</h3>
-          <div className="flex flex-wrap gap-1">
-            {gameState.hasKey && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 20,
-                    backgroundImage: "url(/images/items/key.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Key</span>
-              </div>
-            )}
-            {gameState.hasExitKey && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 20,
-                    backgroundImage: "url(/images/items/exit-key.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Exit Key</span>
-              </div>
-            )}
-            {gameState.hasSword && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 24,
-                    height: 24,
-                    backgroundImage: "url(/images/items/sword.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Sword</span>
-              </div>
-            )}
-            {gameState.hasShield && (
-              <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 20,
-                    height: 20,
-                    backgroundImage: "url(/images/items/shield.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Shield</span>
-              </div>
-            )}
-            {(gameState.rockCount ?? 0) > 0 && (
-              <button
-                type="button"
-                onClick={handleThrowRock}
-                className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                title={`Throw rock (${gameState.rockCount}) — tap or press R`}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 32,
-                    height: 32,
-                    backgroundImage: "url(/images/items/rock-1.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Rock x{gameState.rockCount}</span>
-                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                  (tap or R)
-                </span>
-              </button>
-            )}
-            {(gameState.runeCount ?? 0) > 0 && (
-              <button
-                type="button"
-                onClick={handleThrowRune}
-                className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                title={`Use rune (${gameState.runeCount}) — tap or press T`}
-              >
-                <span
-                  aria-hidden="true"
-                  style={{
-                    display: "inline-block",
-                    width: 32,
-                    height: 32,
-                    backgroundImage: "url(/images/items/rune1.png)",
-                    backgroundSize: "contain",
-                    backgroundRepeat: "no-repeat",
-                    backgroundPosition: "center",
-                  }}
-                />
-                <span>Rune x{gameState.runeCount}</span>
-                <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                  (tap or T)
-                </span>
-              </button>
-            )}
+          {/* Status (health + visible enemies) */}
+          <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white basis-1/2">
+            <div className="text-xs font-medium mb-1">Status</div>
+            <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
+            {playerPosition &&
+              gameState.enemies &&
+              gameState.enemies.length > 0 &&
+              (() => {
+                const [py, px] = playerPosition;
+                const visibleNearby = gameState.enemies
+                  .filter((e) =>
+                    canSee(gameState.mapData.tiles, [py, px], [e.y, e.x])
+                  )
+                  .map((e) => ({
+                    e,
+                    d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
+                  }))
+                  .filter(({ d }) => d <= 8)
+                  .sort((a, b) => a.d - b.d);
+                if (visibleNearby.length === 0) return null;
+                return (
+                  <div className="mt-2">
+                    <div className="text-xs font-medium mb-1">
+                      Enemies in sight
+                    </div>
+                    <ul className="space-y-1">
+                      {visibleNearby.map(({ e }, idx) => (
+                        <li
+                          key={`${e.y},${e.x},${idx}`}
+                          className="text-sm flex items-center gap-2"
+                        >
+                          <span
+                            className="inline-block"
+                            style={{
+                              width: 18,
+                              height: 18,
+                              backgroundImage: `url(${getEnemyIcon(
+                                e.kind,
+                                "front"
+                              )})`,
+                              backgroundSize: "contain",
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: "center",
+                            }}
+                            aria-hidden="true"
+                          />
+                          <span>HP {e.health}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })()}
+          </div>
+          {/* Inventory: always render to reserve half the width */}
+          <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white basis-1/2">
+            <h3 className="text-xs font-medium mb-1">Inventory</h3>
+            <div className="flex flex-wrap gap-1">
+              {gameState.hasKey && (
+                <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 20,
+                      height: 20,
+                      backgroundImage: "url(/images/items/key.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Key</span>
+                </div>
+              )}
+              {gameState.hasExitKey && (
+                <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 20,
+                      height: 20,
+                      backgroundImage: "url(/images/items/exit-key.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Exit Key</span>
+                </div>
+              )}
+              {gameState.hasSword && (
+                <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 24,
+                      height: 24,
+                      backgroundImage: "url(/images/items/sword.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Sword</span>
+                </div>
+              )}
+              {gameState.hasShield && (
+                <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 20,
+                      height: 20,
+                      backgroundImage: "url(/images/items/shield.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Shield</span>
+                </div>
+              )}
+              {(gameState.rockCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={handleThrowRock}
+                  className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                  title={`Throw rock (${gameState.rockCount}) — tap or press R`}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 32,
+                      height: 32,
+                      backgroundImage: "url(/images/items/rock-1.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Rock x{gameState.rockCount}</span>
+                  <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                    (tap or R)
+                  </span>
+                </button>
+              )}
+              {(gameState.runeCount ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={handleThrowRune}
+                  className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                  title={`Use rune (${gameState.runeCount}) — tap or press T`}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      display: "inline-block",
+                      width: 32,
+                      height: 32,
+                      backgroundImage: "url(/images/items/rune1.png)",
+                      backgroundSize: "contain",
+                      backgroundRepeat: "no-repeat",
+                      backgroundPosition: "center",
+                    }}
+                  />
+                  <span>Rune x{gameState.runeCount}</span>
+                  <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                    (tap or T)
+                  </span>
+                </button>
+              )}
+              {/* If nothing in inventory, leave the container empty to preserve layout */}
+            </div>
           </div>
         </div>
-      )}
+        {/* Spacer matching HUD height: pushes grid down until viewport is short */}
+        <div className="hud-spacer" aria-hidden="true" />
 
+        {/* Centered map container */}
+        <div className="flex justify-center items-center">
+          <div
+            className={`${styles.viewportContainer} max-w-full overflow-auto`}
+            data-testid="tilemap-grid-container"
+            style={{
+              gridTemplateColumns:
+                process.env.NODE_ENV === "test" ? "repeat(25, 1fr)" : undefined,
+            }}
+          >
+            <div
+              className={styles.mapContainer}
+              style={{
+                transform: playerPosition
+                  ? `translate(${calculateMapTransform(playerPosition)})`
+                  : "none",
+              }}
+            >
+              {rockEffect &&
+                (() => {
+                  const tileSize = 40;
+                  const pxLeft = (rockEffect.x + 0.5) * tileSize;
+                  const pxTop = (rockEffect.y + 0.5) * tileSize;
+                  const size = 28;
+                  return (
+                    <div
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pxLeft - size / 2}px`,
+                        top: `${pxTop - size / 2}px`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        zIndex: 11900,
+                        backgroundImage: "url(/images/items/rock-1.png)",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                        filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
+                        transition: `left 50ms linear, top 50ms linear`,
+                      }}
+                    />
+                  );
+                })()}
+              {runeEffect &&
+                (() => {
+                  const tileSize = 40;
+                  const pxLeft = (runeEffect.x + 0.5) * tileSize;
+                  const pxTop = (runeEffect.y + 0.5) * tileSize;
+                  const size = 28;
+                  return (
+                    <div
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pxLeft - size / 2}px`,
+                        top: `${pxTop - size / 2}px`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        zIndex: 11900,
+                        backgroundImage: "url(/images/items/rune1.png)",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                        filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
+                        transition: `left 50ms linear, top 50ms linear`,
+                      }}
+                    />
+                  );
+                })()}
+              {bamEffect &&
+                (() => {
+                  const tileSize = 40; // px
+                  // Use tile centers: add 0.5 to grid coords before converting to pixels
+                  const pxLeft = (bamEffect.x + 0.5) * tileSize;
+                  const pxTop = (bamEffect.y + 0.5) * tileSize;
+                  const size = 48; // effect image size in px
+                  return (
+                    <div
+                      data-testid="bam-effect"
+                      data-bam-y={String(bamEffect.y)}
+                      data-bam-x={String(bamEffect.x)}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pxLeft - size / 2}px`,
+                        top: `${pxTop - size / 2}px`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        backgroundImage: `url(${bamEffect.src})`,
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                        zIndex: 12000,
+                        animation: "popFade 300ms ease-out",
+                      }}
+                    />
+                  );
+                })()}
+              {floating.length > 0 &&
+                (() => {
+                  const tileSize = 40; // px
+                  return floating.map((f) => {
+                    const pxLeft = (f.x + 0.5) * tileSize;
+                    const pxTop = (f.y + 0.5) * tileSize;
+                    return (
+                      <div
+                        key={f.id}
+                        data-testid="floating-damage"
+                        data-target={f.target}
+                        data-y={String(f.y)}
+                        data-x={String(f.x)}
+                        data-amount={String(f.amount)}
+                        data-color={f.color}
+                        aria-hidden="true"
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${pxLeft}px`,
+                          top: `${pxTop}px`,
+                          transform: "translate(-50%, -50%)",
+                          zIndex: 11500,
+                          color: f.color === "red" ? "#ff4242" : "#6afc7a",
+                          fontWeight: 800,
+                          textShadow: "0 1px 0 rgba(0,0,0,0.6)",
+                          // Match spirit effect speed/distance: rise ~100px over ~1800ms
+                          animation: "spiritRiseFade 1800ms ease-out forwards",
+                        }}
+                      >
+                        {f.sign}
+                        {f.amount}
+                      </div>
+                    );
+                  });
+                })()}
+              {spirits.length > 0 &&
+                (() => {
+                  const tileSize = 40; // px
+                  return spirits.map((s) => {
+                    const pxLeft = (s.x + 0.5) * tileSize;
+                    const pxTop = (s.y + 0.5) * tileSize;
+                    const size = 40; // spirit size
+                    return (
+                      <div
+                        key={s.id}
+                        aria-hidden="true"
+                        className="absolute pointer-events-none spirit-rise-fade"
+                        style={{
+                          left: `${pxLeft - size / 2}px`,
+                          top: `${pxTop - size / 2}px`,
+                          width: `${size}px`,
+                          height: `${size}px`,
+                          zIndex: 11000,
+                        }}
+                      >
+                        <div
+                          className="w-full h-full spirit-flip"
+                          style={{
+                            backgroundImage: "url(/images/items/spirit.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                            width: "100%",
+                            height: "100%",
+                          }}
+                        />
+                      </div>
+                    );
+                  });
+                })()}
+              <div
+                className={styles.gridContainer}
+                style={{
+                  gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
+                  gridTemplateColumns: `repeat(${
+                    gameState.mapData.tiles[0]?.length ?? 0
+                  }, 40px)`,
+                  // When the hero's torch is OFF, force a pure black background behind tiles
+                  // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
+                  // the transparent center of the vignette.
+                  backgroundColor: gameState.heroTorchLit ? undefined : "#000",
+                }}
+                tabIndex={0} // Make div focusable for keyboard events
+              >
+                {renderTileGrid(
+                  gameState.mapData.tiles,
+                  tileTypes,
+                  gameState.mapData.subtypes,
+                  gameState.showFullMap ||
+                    (forceDaylight && (gameState.heroTorchLit ?? true)),
+                  gameState.playerDirection,
+                  gameState.enemies,
+                  gameState.hasSword,
+                  gameState.hasShield,
+                  gameState.heroTorchLit ?? true,
+                  gameState.hasExitKey
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* Close centering wrapper */}
+      </div>
       {/* Mobile controls */}
       <MobileControls
         onMove={handleMobileMove}
@@ -1220,207 +1428,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         onUseRune={handleThrowRune}
         runeCount={gameState.runeCount ?? 0}
       />
-
-      {/* Centered map container */}
-      <div className="flex justify-center items-center h-[calc(100vh-100px)]">
-        <div
-          className={`${styles.viewportContainer} max-w-full overflow-auto`}
-          data-testid="tilemap-grid-container"
-          style={{
-            gridTemplateColumns:
-              process.env.NODE_ENV === "test" ? "repeat(25, 1fr)" : undefined,
-          }}
-        >
-          <div
-            className={styles.mapContainer}
-            style={{
-              transform: playerPosition
-                ? `translate(${calculateMapTransform(playerPosition)})`
-                : "none",
-            }}
-          >
-            {rockEffect &&
-              (() => {
-                const tileSize = 40;
-                const pxLeft = (rockEffect.x + 0.5) * tileSize;
-                const pxTop = (rockEffect.y + 0.5) * tileSize;
-                const size = 28;
-                return (
-                  <div
-                    aria-hidden="true"
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${pxLeft - size / 2}px`,
-                      top: `${pxTop - size / 2}px`,
-                      width: `${size}px`,
-                      height: `${size}px`,
-                      zIndex: 11900,
-                      backgroundImage: "url(/images/items/rock-1.png)",
-                      backgroundSize: "contain",
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "center",
-                      filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
-                      transition: `left 50ms linear, top 50ms linear`,
-                    }}
-                  />
-                );
-              })()}
-            {runeEffect &&
-              (() => {
-                const tileSize = 40;
-                const pxLeft = (runeEffect.x + 0.5) * tileSize;
-                const pxTop = (runeEffect.y + 0.5) * tileSize;
-                const size = 28;
-                return (
-                  <div
-                    aria-hidden="true"
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${pxLeft - size / 2}px`,
-                      top: `${pxTop - size / 2}px`,
-                      width: `${size}px`,
-                      height: `${size}px`,
-                      zIndex: 11900,
-                      backgroundImage: "url(/images/items/rune1.png)",
-                      backgroundSize: "contain",
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "center",
-                      filter: "drop-shadow(0 1px 0 rgba(0,0,0,0.5))",
-                      transition: `left 50ms linear, top 50ms linear`,
-                    }}
-                  />
-                );
-              })()}
-            {bamEffect &&
-              (() => {
-                const tileSize = 40; // px
-                // Use tile centers: add 0.5 to grid coords before converting to pixels
-                const pxLeft = (bamEffect.x + 0.5) * tileSize;
-                const pxTop = (bamEffect.y + 0.5) * tileSize;
-                const size = 48; // effect image size in px
-                return (
-                  <div
-                    data-testid="bam-effect"
-                    data-bam-y={String(bamEffect.y)}
-                    data-bam-x={String(bamEffect.x)}
-                    aria-hidden="true"
-                    className="absolute pointer-events-none"
-                    style={{
-                      left: `${pxLeft - size / 2}px`,
-                      top: `${pxTop - size / 2}px`,
-                      width: `${size}px`,
-                      height: `${size}px`,
-                      backgroundImage: `url(${bamEffect.src})`,
-                      backgroundSize: "contain",
-                      backgroundRepeat: "no-repeat",
-                      backgroundPosition: "center",
-                      zIndex: 12000,
-                      animation: "popFade 300ms ease-out",
-                    }}
-                  />
-                );
-              })()}
-            {floating.length > 0 &&
-              (() => {
-                const tileSize = 40; // px
-                return floating.map((f) => {
-                  const pxLeft = (f.x + 0.5) * tileSize;
-                  const pxTop = (f.y + 0.5) * tileSize;
-                  return (
-                    <div
-                      key={f.id}
-                      data-testid="floating-damage"
-                      data-target={f.target}
-                      data-y={String(f.y)}
-                      data-x={String(f.x)}
-                      data-amount={String(f.amount)}
-                      data-color={f.color}
-                      aria-hidden="true"
-                      className="absolute pointer-events-none"
-                      style={{
-                        left: `${pxLeft}px`,
-                        top: `${pxTop}px`,
-                        transform: "translate(-50%, -50%)",
-                        zIndex: 11500,
-                        color: f.color === "red" ? "#ff4242" : "#6afc7a",
-                        fontWeight: 800,
-                        textShadow: "0 1px 0 rgba(0,0,0,0.6)",
-                        // Match spirit effect speed/distance: rise ~100px over ~1800ms
-                        animation: "spiritRiseFade 1800ms ease-out forwards",
-                      }}
-                    >
-                      {f.sign}
-                      {f.amount}
-                    </div>
-                  );
-                });
-              })()}
-            {spirits.length > 0 &&
-              (() => {
-                const tileSize = 40; // px
-                return spirits.map((s) => {
-                  const pxLeft = (s.x + 0.5) * tileSize;
-                  const pxTop = (s.y + 0.5) * tileSize;
-                  const size = 40; // spirit size
-                  return (
-                    <div
-                      key={s.id}
-                      aria-hidden="true"
-                      className="absolute pointer-events-none spirit-rise-fade"
-                      style={{
-                        left: `${pxLeft - size / 2}px`,
-                        top: `${pxTop - size / 2}px`,
-                        width: `${size}px`,
-                        height: `${size}px`,
-                        zIndex: 11000,
-                      }}
-                    >
-                      <div
-                        className="w-full h-full spirit-flip"
-                        style={{
-                          backgroundImage: "url(/images/items/spirit.png)",
-                          backgroundSize: "contain",
-                          backgroundRepeat: "no-repeat",
-                          backgroundPosition: "center",
-                          width: "100%",
-                          height: "100%",
-                        }}
-                      />
-                    </div>
-                  );
-                });
-              })()}
-            <div
-              className={styles.gridContainer}
-              style={{
-                gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
-                gridTemplateColumns: `repeat(${
-                  gameState.mapData.tiles[0]?.length ?? 0
-                }, 40px)`,
-                // When the hero's torch is OFF, force a pure black background behind tiles
-                // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
-                // the transparent center of the vignette.
-                backgroundColor: gameState.heroTorchLit ? undefined : "#000",
-              }}
-              tabIndex={0} // Make div focusable for keyboard events
-            >
-              {renderTileGrid(
-                gameState.mapData.tiles,
-                tileTypes,
-                gameState.mapData.subtypes,
-                gameState.showFullMap ||
-                  (forceDaylight && (gameState.heroTorchLit ?? true)),
-                gameState.playerDirection,
-                gameState.enemies,
-                gameState.hasSword,
-                gameState.hasShield,
-                gameState.heroTorchLit ?? true,
-                gameState.hasExitKey
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };

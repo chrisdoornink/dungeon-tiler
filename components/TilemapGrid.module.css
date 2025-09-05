@@ -39,6 +39,24 @@
   filter: blur(2px); /* Add slight blur for more realistic light diffusion */
 }
 
+/* HUD bar wrapper to allow responsive scaling on small screens */
+.hudBar {
+  width: 100%;
+}
+
+@media (max-width: 600px) {
+  .hudBar {
+    transform: scale(0.9);
+    transform-origin: top left;
+  }
+}
+
+@media (max-width: 480px) {
+  .hudBar {
+    transform: scale(0.82);
+  }
+}
+
 /* Slow, gentle torch glow variation */
 @keyframes torchFlicker {
   0% {

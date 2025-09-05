@@ -51,6 +51,8 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* Base scale for responsive game wrapper */
+  --game-scale: 1;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -149,3 +151,44 @@ body {
   /* Full cycle 1400ms -> flips state every 700ms with 2 steps */
   animation: spiritFlip 1400ms steps(2, end) infinite;
 }
+
+/* Responsive scaling: scale all game UI (except bottom controls) as a single unit below 650px */
+
+/* Scale the entire game UI (excluding MobileControls) from a 600px baseline */
+.game-scale {
+  transform-origin: top center;
+  width: 600px; /* baseline content width */
+  margin: 0 auto; /* keep centered when scaled */
+  will-change: transform;
+  display: block;
+}
+
+/* Reserve space for HUD above the grid so it doesn't overlap when there's room */
+.with-hud-padding {
+  padding-top: 110px; /* approximate HUD height incl. gap */
+}
+/* On short viewports, reclaim space and allow HUD to overlay the grid */
+@media (max-height: 760px) {
+  .with-hud-padding { padding-top: 72px; }
+}
+@media (max-height: 680px) {
+  .with-hud-padding { padding-top: 0; }
+}
+
+/* Spacer element version (more reliable with absolute HUD) */
+.hud-spacer { height: 110px; }
+@media (max-height: 760px) { .hud-spacer { height: 72px; } }
+@media (max-height: 680px) { .hud-spacer { height: 0; } }
+
+/* Stepped scaling for predictable transforms on mobile when CSS vars are suppressed */
+@media (max-width: 600px) { .game-scale { transform: scale(0.98); } }
+@media (max-width: 580px) { .game-scale { transform: scale(0.96); } }
+@media (max-width: 560px) { .game-scale { transform: scale(0.93); } }
+@media (max-width: 540px) { .game-scale { transform: scale(0.90); } }
+@media (max-width: 520px) { .game-scale { transform: scale(0.87); } }
+@media (max-width: 500px) { .game-scale { transform: scale(0.84); } }
+@media (max-width: 480px) { .game-scale { transform: scale(0.80); } }
+@media (max-width: 460px) { .game-scale { transform: scale(0.76); } }
+@media (max-width: 440px) { .game-scale { transform: scale(0.72); } }
+@media (max-width: 420px) { .game-scale { transform: scale(0.68); } }
+@media (max-width: 400px) { .game-scale { transform: scale(0.65); } }
