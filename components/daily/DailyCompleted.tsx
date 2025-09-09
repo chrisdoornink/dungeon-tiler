@@ -331,12 +331,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     {lastGame.stats.damageTaken}
                   </span>
                 </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Enemies Defeated:</span>
-                  <span className="text-lg font-semibold text-purple-300">
-                    {lastGame.stats.enemiesDefeated}
-                  </span>
-                </div>
+                {/* Removed numeric Enemies Defeated row per request */}
                 {lastGame.stats.byKind && (
                   <div className="mt-4 pt-3 border-t border-gray-600">
                     <div className="text-sm text-gray-400 mb-2">
@@ -347,7 +342,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         ([enemyType, count]) => {
                           const numCount =
                             typeof count === "number" ? count : 0;
-                          const enemies = [];
+                          const enemies: React.ReactElement[] = [];
                           for (let i = 0; i < numCount; i++) {
                             enemies.push(
                               <div
@@ -372,6 +367,32 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                           return enemies;
                         }
                       )}
+                    </div>
+
+                    {/* Inventory Collected moved into Game Statistics */}
+                    <div className="mt-4 pt-3 border-t border-gray-600">
+                      <div className="text-sm text-gray-400 mb-2">Inventory collected:</div>
+                      {(() => {
+                        const inv: Array<{ emoji: string; label: string }>= [];
+                        if (lastGame?.hasKey) inv.push({ emoji: '🔑', label: 'Key' });
+                        if (lastGame?.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
+                        if (lastGame?.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
+                        if (lastGame?.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
+                        if (lastGame?.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });
+                        if (inv.length === 0) {
+                          return <div className="text-gray-400">None</div>;
+                        }
+                        return (
+                          <ul className="grid sm:grid-cols-2 gap-y-2 gap-x-6">
+                            {inv.map((i, idx) => (
+                              <li key={idx} className="flex items-center gap-2 text-gray-200">
+                                <span className="text-lg">{i.emoji}</span>
+                                <span>{i.label}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

@@ -312,6 +312,32 @@ export default function EndPage() {
           )}
         </div>
 
+        {/* Inventory Collected Section */}
+        <div className="mt-4 text-left text-sm text-gray-200 border-t border-gray-700 pt-4">
+          <div className="font-medium mb-2">Inventory Collected</div>
+          {(() => {
+            const inv: Array<{ emoji: string; label: string }>= [];
+            if (last.hasKey) inv.push({ emoji: '🔑', label: 'Key' });
+            if (last.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
+            if (last.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
+            if (last.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
+            if (last.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });
+            if (inv.length === 0) {
+              return <div className="text-gray-400">None</div>;
+            }
+            return (
+              <ul className="grid grid-cols-2 gap-y-1 gap-x-4">
+                {inv.map((i, idx) => (
+                  <li key={idx} className="flex items-center gap-2">
+                    <span>{i.emoji}</span>
+                    <span>{i.label}</span>
+                  </li>
+                ))}
+              </ul>
+            );
+          })()}
+        </div>
+
         <div className="my-4 flex items-center justify-center gap-2">
           <button
             type="button"

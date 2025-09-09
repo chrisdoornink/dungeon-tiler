@@ -47,7 +47,9 @@ function GameViewInner({
     if ((replayExact || mapId) && typeof window !== "undefined") {
       try {
         // For map-specific loading, try the map-specific key first, then fallback to generic
-        const keys = mapId ? [`initialGame:${mapId}`, "initialGame"] : ["initialGame"];
+        const keys = mapId
+          ? [`initialGame:${mapId}`, "initialGame"]
+          : ["initialGame"];
         for (const key of keys) {
           const rawExact = window.localStorage.getItem(key);
           if (rawExact) {
@@ -129,6 +131,9 @@ function GameViewInner({
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
+        <h1 className="text-1xl font-bold text-center mb-8 text-gray-400">
+          Torch Boy
+        </h1>
         <TilemapGrid
           tileTypes={tileTypes}
           initialGameState={finalInitialState}

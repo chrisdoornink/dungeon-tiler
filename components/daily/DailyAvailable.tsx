@@ -22,6 +22,12 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
     onStart?.();
   };
 
+  const today = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   return (
     <div
       className="min-h-screen py-8 px-4"
@@ -32,70 +38,74 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
       }}
     >
       <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
-          Torch Boy Daily Challenge
+        <h1 className="text-3xl font-bold text-center mb-8 text-blue-400">
+          Torch Boy
         </h1>
+        <div
+          className="w-24 h-24 mx-auto"
+          style={{
+            backgroundImage: "url(/images/hero/hero-front-static.png)",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        />
+        <h2 className="text-xl font-bold text-center mb-8 text-gray-100">
+          Daily Dungeon Challenge
+        </h2>
+        <p className="text-center text-gray-200">{today}</p>
 
         {/* Call to Action */}
-        <div className="text-center mb-8">
+        <div className="text-center mt-16">
+          <div className="mb-6">
+            <p className="text-lg text-gray-200 mb-2">
+              Ready to take on today&apos;s challenge?
+            </p>
+          </div>
+
           <button
             type="button"
             onClick={handleStartGame}
-            className="px-8 py-4 text-xl font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors shadow-lg"
+            className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
           >
             Start
           </button>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          {/* Stats Panel */}
-          <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Your Progress
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Current Streak</span>
-                <span className="font-bold text-lg text-blue-300">
-                  {data.currentStreak}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Total Games</span>
-                <span className="font-semibold text-gray-200">
-                  {data.totalGamesPlayed}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Games Won</span>
-                <span className="font-semibold text-gray-200">
-                  {data.totalGamesWon}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Win Rate</span>
-                <span className="font-semibold text-gray-200">
-                  {data.totalGamesPlayed > 0
-                    ? `${Math.round(
-                        (data.totalGamesWon / data.totalGamesPlayed) * 100
-                      )}%`
-                    : "0%"}
-                </span>
-              </div>
+        {/* Stats Panel */}
+        <div className="bg-black/50 rounded-lg p-6 border border-gray-600 mt-16 mx-16">
+          <h2 className="text-xl font-semibold text-gray-100 mb-4">
+            Your Progress
+          </h2>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Current Streak</span>
+              <span className="font-bold text-lg text-blue-300">
+                {data.currentStreak}
+              </span>
             </div>
-          </div>
-
-          {/* Rules Panel */}
-          <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Daily Challenge Rules
-            </h2>
-            <ul className="text-gray-200 space-y-2 text-sm">
-              <li>• One attempt per day</li>
-              <li>• No replays until tomorrow</li>
-              <li>• Build your streak by winning consecutive days</li>
-              <li>• Losing a game resets your streak</li>
-            </ul>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Total Games</span>
+              <span className="font-semibold text-gray-200">
+                {data.totalGamesPlayed}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Games Won</span>
+              <span className="font-semibold text-gray-200">
+                {data.totalGamesWon}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-gray-300">Win Rate</span>
+              <span className="font-semibold text-gray-200">
+                {data.totalGamesPlayed > 0
+                  ? `${Math.round(
+                      (data.totalGamesWon / data.totalGamesPlayed) * 100
+                    )}%`
+                  : "0%"}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -122,26 +132,6 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
             </div>
           </div>
         )}
-
-        {/* Call to Action */}
-        <div className="text-center">
-          <div className="mb-6">
-            <p className="text-lg text-gray-200 mb-2">
-              Ready to take on today&apos;s challenge?
-            </p>
-            <p className="text-sm text-gray-300">
-              Remember: you only get one shot!
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleStartGame}
-            className="px-8 py-4 text-xl font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors shadow-lg"
-          >
-            Start
-          </button>
-        </div>
       </div>
     </div>
   );

@@ -19,34 +19,32 @@ export default function DailyIntro({ onComplete }: DailyIntroProps) {
     >
       <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
-          Welcome to the Daily Dungeon Challenge
+          Welcome to{" "}
+          <div className="text-blue-400 text-4xl font-bold">Torch Boy</div>{" "}
+          Daily Dungeon Challenge
         </h1>
 
-        <div className="mt-12 mb-12 text-center">
+        <div
+          className="w-36 h-36 mx-auto"
+          style={{
+            backgroundImage: "url(/images/hero/hero-front-static.png)",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        />
+
+        {/* <div className="mt-12 mb-12 text-center">
           <button
             type="button"
             onClick={onComplete}
             className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
           >
-            Begin Your Daily Challenge
+            Thanks! Im Ready!
           </button>
-        </div>
+        </div> */}
 
         <GameInstructions />
-
-        <div className="bg-black/50 border-l-4 border-blue-400 p-4 my-6 rounded">
-          <h3 className="text-lg font-semibold text-blue-300 mb-2">
-            Daily Challenge Rules
-          </h3>
-          <ul className="text-blue-200 space-y-1">
-            <li>
-              • You get <strong>one attempt per day</strong>
-            </li>
-            <li>• Build your streak by winning consecutive days</li>
-            <li>• Losing a game resets your streak</li>
-            <li>• Return tomorrow for a new challenge!</li>
-          </ul>
-        </div>
 
         <div className="mt-12 text-center">
           <button
@@ -54,7 +52,7 @@ export default function DailyIntro({ onComplete }: DailyIntroProps) {
             onClick={onComplete}
             className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
           >
-            Begin Your Daily Challenge
+            I got it, lets play!
           </button>
         </div>
       </div>
