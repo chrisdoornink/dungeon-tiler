@@ -114,8 +114,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD format
     const lines: string[] = [];
 
-    // Header like "Dungeon Tiler 2025-9-2"
-    lines.push(`#DungeonTiler ${today}`);
+    // Header
+    lines.push(`#TorchBoy ${today}`);
 
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
@@ -147,49 +147,43 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Streak
     lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
 
-    // Health visualization (5 tiles showing final health)
-    if (lastGame?.heroHealth !== undefined) {
-      const health = lastGame.heroHealth;
-      const healthTiles = [];
-      for (let i = 1; i <= 5; i++) {
-        if (i <= health) {
-          if (health === 5) healthTiles.push(EMOJI_MAP.health_full);
-          else if (health === 4) healthTiles.push(EMOJI_MAP.health_good);
-          else if (health === 3) healthTiles.push(EMOJI_MAP.health_ok);
-          else if (health === 2) healthTiles.push(EMOJI_MAP.health_low);
-          else if (health === 1) healthTiles.push(EMOJI_MAP.health_critical);
-        } else {
-          healthTiles.push("⬜"); // Empty health
-        }
-      }
-      lines.push(healthTiles.join(""));
-    }
-
-    // Enemies defeated (show actual emoji for each kill)
+    // Kills line (by enemy kind, repeated emoji)
+    const enemyChunks: string[] = [];
     if (lastGame?.stats?.byKind) {
-      const enemyLine: string[] = [];
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         const numCount = typeof count === "number" ? count : 0;
         if (numCount > 0) {
           const emoji =
             EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP.goblin;
-          enemyLine.push(emoji.repeat(numCount));
+          enemyChunks.push(emoji.repeat(numCount));
         }
       });
-      if (enemyLine.length > 0) {
-        lines.push(enemyLine.join(""));
-      }
     }
+    lines.push(`⚔️ kills: ${enemyChunks.join("")}`);
 
-    // Items collected
+    // Inventory line
     const items: string[] = [];
     if (lastGame?.hasKey) items.push(EMOJI_MAP.key);
     if (lastGame?.hasExitKey) items.push(EMOJI_MAP.exitKey);
     if (lastGame?.hasSword) items.push(EMOJI_MAP.sword);
     if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
-    if (items.length > 0) {
-      lines.push(items.join(""));
+    lines.push(`🗃️ inventory: ${items.join("")}`);
+
+    // Health visualization (5 tiles showing final health). Default to empty if unknown.
+    const health = typeof lastGame?.heroHealth === 'number' ? lastGame!.heroHealth : 0;
+    const healthTiles: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      if (i <= health) {
+        if (health === 5) healthTiles.push(EMOJI_MAP.health_full);
+        else if (health === 4) healthTiles.push(EMOJI_MAP.health_good);
+        else if (health === 3) healthTiles.push(EMOJI_MAP.health_ok);
+        else if (health === 2) healthTiles.push(EMOJI_MAP.health_low);
+        else if (health === 1) healthTiles.push(EMOJI_MAP.health_critical);
+      } else {
+        healthTiles.push("⬜"); // Empty health
+      }
     }
+    lines.push(healthTiles.join(""));
 
     return lines.join("\n");
   };

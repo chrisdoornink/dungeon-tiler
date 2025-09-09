@@ -33,8 +33,19 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
     >
       <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
         <h1 className="text-3xl font-bold text-center mb-8 text-gray-100">
-          Today&apos;s Dungeon Challenge
+          Torch Boy Daily Challenge
         </h1>
+
+        {/* Call to Action */}
+        <div className="text-center mb-8">
+          <button
+            type="button"
+            onClick={handleStartGame}
+            className="px-8 py-4 text-xl font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors shadow-lg"
+          >
+            Start
+          </button>
+        </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-8">
           {/* Stats Panel */}
@@ -89,7 +100,7 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
         </div>
 
         {/* Recent History */}
-        {data.streakHistory.length > 0 && (
+        {data.streakHistory.length > 10 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
               Recent History
@@ -128,7 +139,7 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
             onClick={handleStartGame}
             className="px-8 py-4 text-xl font-semibold rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors shadow-lg"
           >
-            Start Today&apos;s Challenge
+            Start
           </button>
         </div>
       </div>

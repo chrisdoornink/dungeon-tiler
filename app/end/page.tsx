@@ -12,6 +12,7 @@ type LastGame = {
   hasShield?: boolean;
   showFullMap?: boolean;
   streak?: number;
+  heroHealth?: number;
   mapData: {
     tiles: number[][];
     subtypes: number[][][];
@@ -106,17 +107,58 @@ export default function EndPage() {
 
   const deathDetails = getDeathDetails();
 
-  // Build a simple shareable summary using emoji/icons we already use
+  // Build shareable summary in the new requested format
   const shareLines: string[] = [];
-  const dateStr = new Date(last.completedAt).toLocaleDateString();
-  shareLines.push(`#Dungeon ${dateStr}`);
-  shareLines.push(last.outcome === 'dead' ? '☠️ You died' : '🚪 Escaped!');
-  if (last.stats) {
-    const base = `🗡️ dmg: ${last.stats.damageDealt}  🛡️ taken: ${last.stats.damageTaken}  👹 x${last.stats.enemiesDefeated}`;
-    const steps = typeof last.stats.steps === 'number' ? `  👣 ${last.stats.steps} steps` : '';
-    shareLines.push(base + steps);
+  const dateStr = new Date(last.completedAt).toLocaleDateString('en-CA');
+  // Header
+  shareLines.push(`#TorchBoy ${dateStr}`);
+  // Stats line: outcome, death cause, steps, damage
+  const outcomeEmoji = last.outcome === 'dead' ? '💀' : '🏆';
+  const deathEmoji = last.outcome === 'dead' && last.deathCause
+    ? (last.deathCause.type === 'faulty_floor'
+        ? '🕳️'
+        : last.deathCause.type === 'enemy'
+        ? (({
+            ghost: '👻',
+            goblin: '👹',
+            'stone-exciter': '🗿',
+          } as Record<string, string>)[last.deathCause.enemyKind || 'goblin'] || '👹')
+        : '')
+    : '';
+  const stepsPart = typeof last.stats?.steps === 'number' ? `👣 ${last.stats!.steps}` : '';
+  const dmgPart = typeof last.stats?.damageDealt === 'number' && typeof last.stats?.damageTaken === 'number'
+    ? `💥 +${last.stats!.damageDealt} -${last.stats!.damageTaken}`
+    : '';
+  shareLines.push([outcomeEmoji, deathEmoji, stepsPart, dmgPart].filter(Boolean).join(' '));
+  // Streak line
+  const streakVal = typeof last.streak === 'number' ? last.streak : 0;
+  shareLines.push(`🔥 streak: ${streakVal}`);
+  // Kills line
+  const enemyChunks: string[] = [];
+  if (last.stats?.byKind) {
+    Object.entries(last.stats.byKind as Record<string, number>).forEach(([enemyType, count]) => {
+      const n = typeof count === 'number' ? count : 0;
+      if (n > 0) {
+        const emoji = ({ ghost: '👻', goblin: '👹', 'stone-exciter': '🗿' } as Record<string, string>)[enemyType] || '👹';
+        enemyChunks.push(emoji.repeat(n));
+      }
+    });
   }
-  // intentionally omit map size from share text
+  shareLines.push(`⚔️ kills: ${enemyChunks.join('')}`);
+  // Inventory line
+  const items: string[] = [];
+  if (last.hasKey) items.push('🔑');
+  if (last.hasExitKey) items.push('🗝️');
+  if (last.hasSword) items.push('🗡️');
+  if (last.hasShield) items.push('🛡️');
+  shareLines.push(`🗃️ inventory: ${items.join('')}`);
+  // Health line (default to empty if unknown)
+  const health = typeof last.heroHealth === 'number' ? last.heroHealth : 0;
+  const healthTiles: string[] = [];
+  for (let i = 1; i <= 5; i++) {
+    healthTiles.push(i <= health ? '🟩' : '⬜');
+  }
+  shareLines.push(healthTiles.join(''));
   const shareText = shareLines.join('\n');
 
   const onShare = async () => {
