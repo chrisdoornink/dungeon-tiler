@@ -5,9 +5,9 @@ import Home from '../../app/page';
 describe('Home Component (daily alias)', () => {
   it('renders the Daily page content', async () => {
     render(<Home />);
-    // Intro or Available both contain this heading
-    const rulesHeading = await screen.findByText(/Daily Challenge Rules/i);
-    expect(rulesHeading).toBeInTheDocument();
+    // Intro and Available both contain this common heading
+    const heading = await screen.findByText(/Daily Dungeon Challenge/i);
+    expect(heading).toBeInTheDocument();
   });
 
   it('mounts without triggering map generation logic', () => {

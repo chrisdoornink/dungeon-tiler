@@ -1424,15 +1424,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           </div>
         </div>
         {/* Close centering wrapper */}
+        {/* Mobile controls */}
+        <MobileControls
+          onMove={handleMobileMove}
+          onThrowRock={handleThrowRock}
+          rockCount={gameState.rockCount ?? 0}
+          onUseRune={handleThrowRune}
+          runeCount={gameState.runeCount ?? 0}
+        />
       </div>
-      {/* Mobile controls */}
-      <MobileControls
-        onMove={handleMobileMove}
-        onThrowRock={handleThrowRock}
-        rockCount={gameState.rockCount ?? 0}
-        onUseRune={handleThrowRune}
-        runeCount={gameState.runeCount ?? 0}
-      />
     </div>
   );
 };

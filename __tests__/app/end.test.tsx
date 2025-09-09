@@ -42,8 +42,9 @@ describe('End Page', () => {
 
     expect(screen.getByText('You escaped the dungeon!')).toBeInTheDocument();
     expect(screen.getByText('Completed at MOCK_DATE')).toBeInTheDocument();
-    // Icons-only pickups: 🔑 should be present, 🗝️ absent
-    expect(screen.getByText('🔑')).toBeInTheDocument();
+    // Icons-only pickups: 🔑 should be present (may appear more than once now with inventory section), 🗝️ absent
+    const keyIcons = screen.getAllByText('🔑');
+    expect(keyIcons.length).toBeGreaterThan(0);
     expect(screen.queryByText('🗝️')).not.toBeInTheDocument();
     // No map size rows anymore
     expect(screen.queryByText('Map Size')).not.toBeInTheDocument();

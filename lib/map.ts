@@ -480,7 +480,16 @@ function canPlaceFaultyFloorSafely(
 ): boolean {
   // Create a temporary grid with the faulty floor treated as a wall
   const testGrid = mapData.tiles.map((row) => [...row]);
-  testGrid[y][x] = WALL; // Temporarily treat faulty floor as wall for connectivity test
+  // Also treat any already-placed faulty floors as walls to validate combined effect
+  for (let yy = 0; yy < mapData.subtypes.length; yy++) {
+    for (let xx = 0; xx < mapData.subtypes[yy].length; xx++) {
+      if (mapData.subtypes[yy][xx].includes(TileSubtype.FAULTY_FLOOR)) {
+        testGrid[yy][xx] = WALL;
+      }
+    }
+  }
+  // Temporarily treat the candidate faulty floor as a wall for connectivity test
+  testGrid[y][x] = WALL;
 
   // Check if all remaining floor tiles are still connected
   return areAllFloorsConnected(testGrid);
