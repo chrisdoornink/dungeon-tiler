@@ -49,6 +49,8 @@ export default function RootLayout({
         <link rel="preload" as="image" href="/images/items/wall-torch-1.png" />
         <link rel="preload" as="image" href="/images/items/wall-torch-2.png" />
         <link rel="preload" as="image" href="/images/items/wall-torch-3.png" />
+        {/* Hero front static used on intro */}
+        <link rel="preload" as="image" href="/images/hero/hero-front-static.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} ${pressStart2P.className} antialiased`}
