@@ -348,20 +348,6 @@ export default function EndPage() {
           </button>
           <button
             type="button"
-            onClick={() => go('/?replayExact=1')}
-            className="px-4 py-2 rounded-md bg-[#1B5E20] text-white hover:bg-[#164c19] transition-colors border-0"
-          >
-            replay exact run
-          </button>
-          <button
-            type="button"
-            onClick={() => go('/?replay=1')}
-            className="px-4 py-2 rounded-md bg-[#4A148C] text-white hover:bg-[#3a0f6e] transition-colors border-0"
-          >
-            replay dungeon
-          </button>
-          <button
-            type="button"
             onClick={onShare}
             className="px-4 py-2 rounded-md bg-[#2E7D32] text-white hover:bg-[#256628] transition-colors border-0"
           >
