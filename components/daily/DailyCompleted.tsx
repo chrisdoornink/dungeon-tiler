@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import { trackDailyChallenge } from "../../lib/posthog_analytics";
+import { ScoreCalculator, type ScoreBreakdown } from "../../lib/score_calculator";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -76,6 +77,21 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   };
 
   const lastGame = getLastGame();
+  // Compute score breakdown using the same logic as end game screen
+  const scoreBreakdown: ScoreBreakdown | null = lastGame?.stats
+    ? ScoreCalculator.calculateScore(
+        isWin ? "win" : "dead",
+        lastGame.heroHealth || 0,
+        lastGame.stats,
+        {
+          hasKey: !!lastGame.hasKey,
+          hasExitKey: !!lastGame.hasExitKey,
+          hasSword: !!lastGame.hasSword,
+          hasShield: !!lastGame.hasShield,
+          showFullMap: !!lastGame.showFullMap,
+        }
+      )
+    : null;
   const getDeathDetails = () => {
     if (
       isWin ||
@@ -141,9 +157,13 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             ] || EMOJI_MAP.goblin
           : ""
         : "";
+    const scorePart = scoreBreakdown
+      ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)`
+      : "";
     const statsLine = [
       `${resultEmoji}`,
       deathEmoji,
+      scorePart,
       lastGame?.stats?.steps
         ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
         : "",
@@ -418,6 +438,19 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                           </ul>
                         );
                       })()}
+                    </div>
+                  </div>
+                )}
+                {scoreBreakdown && (
+                  <div className="mt-4 pt-3 border-t border-gray-600">
+                    <div className="text-sm text-gray-400 mb-2">Final Score</div>
+                    <div className="flex items-baseline justify-between">
+                      <div className="flex items-center gap-2">
+                        <span>{ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)}</span>
+                        <span className="font-bold">{scoreBreakdown.grade}</span>
+                        <span className="text-sm text-gray-400">({scoreBreakdown.percentage}%)</span>
+                      </div>
+                      <div className="font-mono">{scoreBreakdown.totalScore.toLocaleString()}</div>
                     </div>
                   </div>
                 )}
