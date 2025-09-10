@@ -1,5 +1,7 @@
-// Simple GA4 analytics helper. Assumes GA snippet is added (gtag.js).
-// All functions no-op safely when window.gtag is unavailable.
+// Analytics helper that supports both GA4 and PostHog
+// All functions no-op safely when analytics services are unavailable.
+
+import * as posthogAnalytics from './posthog_analytics';
 
 type EventParams = Record<string, unknown>;
 
@@ -34,6 +36,7 @@ export function trackGameStart(params: {
   algorithm?: string;
 }) {
   logEvent("game_start", params);
+  posthogAnalytics.trackGameStart(params);
 }
 
 export function trackGameComplete(params: {
@@ -50,12 +53,15 @@ export function trackGameComplete(params: {
   deathCause?: string;
 }) {
   logEvent("game_complete", params);
+  posthogAnalytics.trackGameComplete(params);
 }
 
 export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "food" | "potion") {
   logEvent("pickup", { item: name });
+  posthogAnalytics.trackPickup(name);
 }
 
 export function trackUse(name: "rock" | "rune" | "food" | "potion") {
   logEvent("use_item", { item: name });
+  posthogAnalytics.trackUse(name);
 }

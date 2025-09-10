@@ -8,6 +8,7 @@ import DailyAvailable from "../../components/daily/DailyAvailable";
 import DailyCompleted from "../../components/daily/DailyCompleted";
 import GameView from "../../components/GameView";
 import BlockingPreloader from "../../components/BlockingPreloader";
+import { trackPageView } from "../../lib/posthog_analytics";
 
 export default function DailyChallengePage() {
   const [assetsReady, setAssetsReady] = useState<boolean>(false);
@@ -18,6 +19,9 @@ export default function DailyChallengePage() {
   const handleAssetsReady = useCallback(() => setAssetsReady(true), []);
 
   useEffect(() => {
+    // Track page view
+    trackPageView('daily_challenge');
+    
     // Load initial state
     const currentState = DailyChallengeFlow.getCurrentState();
     const stateData = DailyChallengeFlow.getStateData();

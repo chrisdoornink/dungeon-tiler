@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
+import { trackDailyChallenge } from "../../lib/posthog_analytics";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -53,6 +54,15 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const todayResult = data.todayResult;
   const isWin = todayResult === "won";
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    trackDailyChallenge('completed', {
+      outcome: isWin ? 'win' : 'loss',
+      streak: data.currentStreak,
+      total_games: data.totalGamesPlayed,
+      win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100)
+    });
+  }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
 
   // Get death details from last game result stored in localStorage
   const getLastGame = () => {

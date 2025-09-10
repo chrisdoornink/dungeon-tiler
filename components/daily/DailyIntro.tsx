@@ -1,13 +1,23 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import GameInstructions from "../GameInstructions";
+import { trackDailyChallenge } from "../../lib/posthog_analytics";
 
 interface DailyIntroProps {
   onComplete: () => void;
 }
 
 export default function DailyIntro({ onComplete }: DailyIntroProps) {
+  useEffect(() => {
+    trackDailyChallenge('intro_viewed');
+  }, []);
+
+  const handleComplete = () => {
+    trackDailyChallenge('started');
+    onComplete();
+  };
+
   return (
     <div
       className="min-h-screen py-8 px-4"
@@ -49,7 +59,7 @@ export default function DailyIntro({ onComplete }: DailyIntroProps) {
         <div className="mt-12 text-center">
           <button
             type="button"
-            onClick={onComplete}
+            onClick={handleComplete}
             className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
           >
             I got it, lets play!
