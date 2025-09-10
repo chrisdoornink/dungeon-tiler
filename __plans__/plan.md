@@ -91,7 +91,7 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] ghosts should be able to travel on walls
 - [x] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
 - [x] Mobile support needs some updates: - [x] Health and inventory shoudl be visible at all times - [x] The entire screen should scale down as a single unit using media queries starting at 650px. All elements should scale down as a single unit. the only exception is the controls at the bottom of the screen.
-- [ ] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
+- [x] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
 
 Future Tickets
 

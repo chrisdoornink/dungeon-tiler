@@ -1,36 +1,128 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Torch Boy - Daily Dungeon Challenge
 
-## Getting Started
+A roguelike dungeon crawler game built with Next.js featuring daily challenges, PostHog analytics, and a retro pixel art aesthetic.
 
-First, run the development server:
+## Features
+
+- **Daily Challenge System**: One dungeon per day, same for all players
+- **Roguelike Mechanics**: Turn-based combat, item collection, procedural dungeons
+- **Analytics Integration**: PostHog for user behavior tracking
+- **Mobile Responsive**: Optimized for both desktop and mobile play
+- **Production Security**: Test routes blocked in production
+
+## Prerequisites
+
+- Node.js 18+ (Note: PostHog requires Node 20+ but works with warnings on 18)
+- npm or yarn
+- PostHog account (for analytics)
+
+## Environment Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd dungeon-tiler
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Configure environment variables**
+   
+   Copy the example environment file:
+   ```bash
+   cp env.example .env.local
+   ```
+   
+   **Required for production:**
+   - `NEXT_PUBLIC_POSTHOG_KEY` - Your PostHog project API key
+   
+   **Optional for development:**
+   - Comment out PostHog variables in `.env.local` to disable analytics locally
+
+## PostHog Analytics Setup
+
+This project uses PostHog for user analytics and behavior tracking.
+
+### Getting Your PostHog API Key
+
+1. Sign up at [PostHog](https://posthog.com)
+2. Create a new project
+3. Go to Project Settings → API Keys
+4. Copy your **Project API Key** (starts with `phc_`)
+
+### Local Development
+
+- **With analytics**: Add your PostHog key to `.env.local`
+- **Without analytics**: Comment out or omit the PostHog key
+
+### Production Deployment
+
+Add the following environment variables to your hosting platform:
+
+- `NEXT_PUBLIC_POSTHOG_KEY` - Your PostHog project API key
+
+## Development
 
 ```bash
+# Start development server
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Run tests
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+
+# Type checking
+npm run typecheck
+
+# Linting
+npm run lint
+
+# Build for production
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Game Routes
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Production Routes (torchboy.com)
+- `/` - Daily challenge (only accessible route in production)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Development/Test Routes (blocked in production)
+- `/test-room` - Basic test room
+- `/test-room-2` - Advanced test room  
+- `/test-room-3` - Combat test room
+- `/test-world` - Full test world with parameters
+- `/intro` - Game instructions
+- `/end` - Game completion screen
 
-## Learn More
+## Architecture
 
-To learn more about Next.js, take a look at the following resources:
+- **Framework**: Next.js 15 with App Router
+- **Styling**: Tailwind CSS v3
+- **Analytics**: PostHog for event tracking and user identification
+- **Testing**: Jest with React Testing Library
+- **Deployment**: Optimized for Vercel
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Key Dependencies
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- **PostHog**: `posthog-js` and `posthog-node` for analytics
+- **Tailwind CSS**: v3.4.0 (downgraded from v4 for production stability)
+- **Next.js**: v15.4.4 with Turbopack for fast development
 
-## Deploy on Vercel
+## Production Considerations
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- Test routes are automatically blocked via middleware
+- Only daily challenge mode is accessible to users
+- PostHog analytics require environment variables to be set
+- Mobile-optimized responsive design
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Contributing
+
+1. Ensure all tests pass: `npm test`
+2. Run type checking: `npm run typecheck`  
+3. Follow the existing code style and patterns
+4. Test on both desktop and mobile viewports
