@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import PreloadImages from "../components/PreloadImages";
+import Script from "next/script";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,6 +34,20 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Google tag (gtag.js) */}
+        <Script
+          id="ga4-src"
+          strategy="afterInteractive"
+          src="https://www.googletagmanager.com/gtag/js?id=G-CJ2HBBQXXC"
+        />
+        <Script id="ga4-init" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'G-CJ2HBBQXXC');
+          `}
+        </Script>
         {/* Critical floor textures */}
         <link rel="preload" as="image" href="/images/floor/floor-try-1.png" />
         <link rel="preload" as="image" href="/images/floor/floor-1000.png" />

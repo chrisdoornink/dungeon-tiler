@@ -120,16 +120,17 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
     // If player died, add emoji for cause of death (enemy kind or faulty floor)
-    const deathEmoji = !isWin && lastGame?.deathCause
-      ? (lastGame.deathCause.type === "faulty_floor"
+    const deathEmoji =
+      !isWin && lastGame?.deathCause
+        ? lastGame.deathCause.type === "faulty_floor"
           ? EMOJI_MAP.faulty_floor
           : lastGame.deathCause.type === "enemy"
-          ? (EMOJI_MAP[
+          ? EMOJI_MAP[
               (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ??
                 "goblin"
-            ] || EMOJI_MAP.goblin)
-          : "")
-      : "";
+            ] || EMOJI_MAP.goblin
+          : ""
+        : "";
     const statsLine = [
       `${resultEmoji}`,
       deathEmoji,
@@ -170,7 +171,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     lines.push(`🗃️ inventory: ${items.join("")}`);
 
     // Health visualization (5 tiles showing final health). Default to empty if unknown.
-    const health = typeof lastGame?.heroHealth === 'number' ? lastGame!.heroHealth : 0;
+    const health =
+      typeof lastGame?.heroHealth === "number" ? lastGame!.heroHealth : 0;
     const healthTiles: string[] = [];
     for (let i = 1; i <= 5; i++) {
       if (i <= health) {
@@ -184,6 +186,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     }
     lines.push(healthTiles.join(""));
+
+    // A link to the game at torchboy.com
+    lines.push("\n#TorchBoy https://torchboy.com");
 
     return lines.join("\n");
   };
@@ -371,21 +376,31 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
                     {/* Inventory Collected moved into Game Statistics */}
                     <div className="mt-4 pt-3 border-t border-gray-600">
-                      <div className="text-sm text-gray-400 mb-2">Inventory collected:</div>
+                      <div className="text-sm text-gray-400 mb-2">
+                        Inventory collected:
+                      </div>
                       {(() => {
-                        const inv: Array<{ emoji: string; label: string }>= [];
-                        if (lastGame?.hasKey) inv.push({ emoji: '🔑', label: 'Key' });
-                        if (lastGame?.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
-                        if (lastGame?.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
-                        if (lastGame?.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
-                        if (lastGame?.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });
+                        const inv: Array<{ emoji: string; label: string }> = [];
+                        if (lastGame?.hasKey)
+                          inv.push({ emoji: "🔑", label: "Key" });
+                        if (lastGame?.hasExitKey)
+                          inv.push({ emoji: "🗝️", label: "Exit Key" });
+                        if (lastGame?.hasSword)
+                          inv.push({ emoji: "🗡️", label: "Sword" });
+                        if (lastGame?.hasShield)
+                          inv.push({ emoji: "🛡️", label: "Shield" });
+                        if (lastGame?.showFullMap)
+                          inv.push({ emoji: "💡", label: "Map Reveal" });
                         if (inv.length === 0) {
                           return <div className="text-gray-400">None</div>;
                         }
                         return (
                           <ul className="grid sm:grid-cols-2 gap-y-2 gap-x-6">
                             {inv.map((i, idx) => (
-                              <li key={idx} className="flex items-center gap-2 text-gray-200">
+                              <li
+                                key={idx}
+                                className="flex items-center gap-2 text-gray-200"
+                              >
                                 <span className="text-lg">{i.emoji}</span>
                                 <span>{i.label}</span>
                               </li>

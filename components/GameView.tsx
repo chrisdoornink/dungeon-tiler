@@ -12,6 +12,8 @@ import {
 import { rehydrateEnemies } from "../lib/enemy";
 import { TilemapGrid } from "./TilemapGrid";
 import { mulberry32, hashStringToSeed, withPatchedMathRandom } from "../lib/rng";
+import { trackGameStart } from "../lib/analytics";
+import { computeMapId } from "../lib/map";
 
 export interface GameViewProps {
   algorithm?: string;
@@ -136,6 +138,17 @@ function GameViewInner({
   }, [replay]);
 
   const finalInitialState = replayState || initialState;
+
+  // Fire analytics for game start once we have an initial state
+  useEffect(() => {
+    try {
+      if (!finalInitialState || !finalInitialState.mapData) return;
+      const mode = isDailyChallenge ? "daily" : "normal";
+      const mapId = computeMapId(finalInitialState.mapData);
+      const dateSeed = isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined;
+      trackGameStart({ mode, mapId, dateSeed, algorithm });
+    } catch {}
+  }, [finalInitialState, isDailyChallenge, algorithm]);
 
   return (
     <div

@@ -21,6 +21,8 @@ import {
 } from "../lib/torch_glow";
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
+import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
+import { computeMapId } from "../lib/map";
 
 // Grid dimensions will be derived from provided map data
 
@@ -110,6 +112,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
+    try { trackUse("rune"); } catch {}
     setGameState((prev) => {
       const count = prev.runeCount ?? 0;
       if (count <= 0) return prev;
@@ -277,6 +280,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
+    try { trackUse("rock"); } catch {}
     setGameState((prev) => {
       const count = prev.rockCount ?? 0;
       if (count <= 0) return prev;
@@ -578,6 +582,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
     if (gameState.win) {
+      try {
+        const mode = isDailyChallenge ? "daily" : "normal";
+        const mapId = computeMapId(gameState.mapData);
+        trackGameComplete({
+          outcome: "win",
+          mode,
+          mapId,
+          dateSeed: isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined,
+          heroHealth: gameState.heroHealth,
+          steps: gameState.stats.steps,
+          enemiesDefeated: gameState.stats.enemiesDefeated,
+          damageDealt: gameState.stats.damageDealt,
+          damageTaken: gameState.stats.damageTaken,
+          byKind: gameState.stats.byKind,
+        });
+      } catch {}
       if (isDailyChallenge) {
         // Handle daily challenge completion
         try {
@@ -684,9 +704,70 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     router,
   ]);
 
+  // Track pickups by diffing inventory/flags
+  useEffect(() => {
+    // Initialize once
+  }, []);
+
+  const [prevInv, setPrevInv] = useState({
+    key: false,
+    exitKey: false,
+    sword: false,
+    shield: false,
+    rocks: 0,
+    runes: 0,
+  });
+
+  useEffect(() => {
+    try {
+      if (!gameState) return;
+      // Keys
+      if (gameState.hasKey && !prevInv.key) trackPickup("key");
+      if (gameState.hasExitKey && !prevInv.exitKey) trackPickup("exit_key");
+      // Equipment
+      if (!!gameState.hasSword && !prevInv.sword) trackPickup("sword");
+      if (!!gameState.hasShield && !prevInv.shield) trackPickup("shield");
+      // Counters
+      if ((gameState.rockCount ?? 0) > prevInv.rocks) trackPickup("rock");
+      if ((gameState.runeCount ?? 0) > prevInv.runes) trackPickup("rune");
+    } catch {}
+    setPrevInv({
+      key: gameState.hasKey,
+      exitKey: gameState.hasExitKey,
+      sword: !!gameState.hasSword,
+      shield: !!gameState.hasShield,
+      rocks: gameState.rockCount ?? 0,
+      runes: gameState.runeCount ?? 0,
+    });
+  }, [
+    gameState.hasKey,
+    gameState.hasExitKey,
+    gameState.hasSword,
+    gameState.hasShield,
+    gameState.rockCount,
+    gameState.runeCount,
+  ]);
+
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth <= 0) {
+      try {
+        const mode = isDailyChallenge ? "daily" : "normal";
+        const mapId = computeMapId(gameState.mapData);
+        trackGameComplete({
+          outcome: "dead",
+          mode,
+          mapId,
+          dateSeed: isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined,
+          heroHealth: 0,
+          steps: gameState.stats.steps,
+          enemiesDefeated: gameState.stats.enemiesDefeated,
+          damageDealt: gameState.stats.damageDealt,
+          damageTaken: gameState.stats.damageTaken,
+          byKind: gameState.stats.byKind,
+          deathCause: gameState.deathCause?.type,
+        });
+      } catch {}
       if (isDailyChallenge) {
         // Handle daily challenge death
         try {
