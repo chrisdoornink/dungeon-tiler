@@ -11,6 +11,7 @@ import {
 } from "../lib/map";
 import { rehydrateEnemies } from "../lib/enemy";
 import { TilemapGrid } from "./TilemapGrid";
+import { mulberry32, hashStringToSeed, withPatchedMathRandom } from "../lib/rng";
 
 export interface GameViewProps {
   algorithm?: string;
@@ -75,12 +76,28 @@ function GameViewInner({
     }
 
     if (!state) {
-      if (algorithm === "default") {
-        generateMap();
-      } else if (algorithm === "complete") {
-        generateCompleteMap();
+      // Deterministic daily seed: UTC date string YYYY-MM-DD
+      if (isDailyChallenge) {
+        const utcToday = new Date().toISOString().slice(0, 10);
+        const seed = hashStringToSeed(utcToday);
+        const rng = mulberry32(seed);
+        state = withPatchedMathRandom(rng, () => {
+          // Preserve existing test expectations by optionally invoking generators
+          if (algorithm === "default") {
+            generateMap();
+          } else if (algorithm === "complete") {
+            generateCompleteMap();
+          }
+          return initializeGameState();
+        });
+      } else {
+        if (algorithm === "default") {
+          generateMap();
+        } else if (algorithm === "complete") {
+          generateCompleteMap();
+        }
+        state = initializeGameState();
       }
-      state = initializeGameState();
       // Persist the exact initial game for reproducibility (single instance)
       if (typeof window !== "undefined" && state && state.mapData) {
         try {
@@ -93,7 +110,7 @@ function GameViewInner({
     }
 
     return state;
-  }, [algorithm, replayExact, mapId]);
+  }, [algorithm, replayExact, mapId, isDailyChallenge]);
 
   // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
   const [replayState, setReplayState] = useState<GameState | undefined>();
