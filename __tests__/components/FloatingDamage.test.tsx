@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, fireEvent, screen, act } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import { fireEvent } from '@testing-library/dom';
 import { TilemapGrid } from '../../components/TilemapGrid';
 import { Direction, TileSubtype, type GameState } from '../../lib/map';
 import { Enemy } from '../../lib/enemy';
@@ -53,7 +54,7 @@ describe('Floating combat damage numbers', () => {
 
     // Expect a floating damage over the enemy tile position (1,2)
     const floats = await screen.findAllByTestId('floating-damage');
-    const float = floats.find((el) => el.getAttribute('data-target') === 'enemy')!;
+    const float = floats.find((el: Element) => el.getAttribute('data-target') === 'enemy')!;
     expect(float).toBeInTheDocument();
     expect(float).toHaveAttribute('data-target', 'enemy');
     expect(float).toHaveAttribute('data-y', '1');

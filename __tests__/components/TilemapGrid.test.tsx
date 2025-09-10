@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act } from '@testing-library/react';
+import { fireEvent } from '@testing-library/dom';
 const pushMock = jest.fn();
 jest.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
