@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
 import "./globals.css";
+import PreloadImages from "../components/PreloadImages";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,9 +32,28 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        {/* Critical floor textures */}
+        <link rel="preload" as="image" href="/images/floor/floor-try-1.png" />
+        <link rel="preload" as="image" href="/images/floor/floor-1000.png" />
+        {/* Critical wall variants commonly used at top-of-screen overlays */}
+        <link rel="preload" as="image" href="/images/wall/wall-0010.png" />
+        <link rel="preload" as="image" href="/images/wall/wall-0110.png" />
+        <link rel="preload" as="image" href="/images/wall/wall-0011.png" />
+        <link rel="preload" as="image" href="/images/wall/wall-0111.png" />
+        {/* Exit and lock assets */}
+        <link rel="preload" as="image" href="/images/door/exit-dark.png" />
+        <link rel="preload" as="image" href="/images/door/exit-transparent.png" />
+        <link rel="preload" as="image" href="/images/door/gold-chain-lock.png" />
+        {/* Torch sprite frames */}
+        <link rel="preload" as="image" href="/images/items/wall-torch-1.png" />
+        <link rel="preload" as="image" href="/images/items/wall-torch-2.png" />
+        <link rel="preload" as="image" href="/images/items/wall-torch-3.png" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} ${pressStart2P.className} antialiased`}
       >
+        <PreloadImages />
         {children}
       </body>
     </html>
