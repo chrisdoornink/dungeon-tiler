@@ -92,6 +92,9 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
 - [x] Mobile support needs some updates: - [x] Health and inventory shoudl be visible at all times - [x] The entire screen should scale down as a single unit using media queries starting at 650px. All elements should scale down as a single unit. the only exception is the controls at the bottom of the screen.
 - [x] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
+      NOTE\*\* - ended up implenenting a daily challenge seed rather than storing
+      a finite set of levels so it will work indefinitely.
+- [ ]
 
 Future Tickets
 
@@ -129,12 +132,6 @@ Dungeon Game To-Do List
       • Replace directional door with a glowing ground portal.
       • Always visible and recognizable from any approach angle.
 
-- [ ] Locked Portal Mechanism
-      • Exit requires both:
-      • Ancient key (pickup).
-      • Lock tile (stone pedestal with runes, recognizable from above).
-      • Lock tile: faint pulsing rune glow when inactive; fully glows when key is inserted.
-
 - [ ] Trapdoors
       • Hazard tiles visible on the map.
       • Both player and enemies fall through if stepped on.
@@ -149,9 +146,7 @@ Dungeon Game To-Do List
 
 - [ ] Additional Enemy Concepts (future tickets)
       • Mimic enemy: disguises as item or debris until approached.
-      • Shadow enemy: slips through walls/floors, reemerges unpredictably.
-      • Light-eater enemy: grows stronger or heals near torches, requiring player to manage lighting.
-      • Beam-attack enemy: charges then fires directional energy wave/shockwave, forcing timing-based dodges.
+      • Beam-attack enemy: charges then fires directional energy wave/shockwave, forcing timing-based dodges. - a snake that lives in a pot and attacks the player when they step on it, poison is applied to the player and they need another item to counteract it. -
 
 ## Daily Challenge System (DT-DAILY)
 

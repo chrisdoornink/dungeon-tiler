@@ -7,6 +7,8 @@ import {
   TileSubtype,
   performThrowRock,
   performThrowRune,
+  performUseFood,
+  performUsePotion,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
@@ -109,6 +111,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     x: number;
     id: string;
   }>(null);
+
+  // Handle using food from inventory
+  const handleUseFood = useCallback(() => {
+    try { trackUse("food"); } catch {}
+    setGameState((prev) => performUseFood(prev));
+  }, []);
+
+  // Handle using potion from inventory
+  const handleUsePotion = useCallback(() => {
+    try { trackUse("potion"); } catch {}
+    setGameState((prev) => performUsePotion(prev));
+  }, []);
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
@@ -1090,6 +1104,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Use a rune
           handleThrowRune();
           return;
+        case "f":
+        case "F":
+          // Use food
+          handleUseFood();
+          return;
+        case "p":
+        case "P":
+          // Use potion
+          handleUsePotion();
+          return;
       }
 
       if (direction !== null) {
@@ -1101,7 +1125,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [gameState, handlePlayerMove, handleThrowRock, handleThrowRune]);
+  }, [gameState, handlePlayerMove, handleThrowRock, handleThrowRune, handleUseFood, handleUsePotion]);
 
   return (
     <div
@@ -1115,8 +1139,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           <div
             className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
           >
-            {/* Status (health + visible enemies) */}
-            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white basis-1/2">
+            {/* Status (health + visible enemies) - Left side */}
+            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white" style={{flex: "0 0 auto", minWidth: "200px", maxWidth: "300px"}}>
               <div className="text-xs font-medium mb-1">Status</div>
               <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
               {playerPosition &&
@@ -1169,8 +1193,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   );
                 })()}
             </div>
-            {/* Inventory: always render to reserve half the width */}
-            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white basis-1/2">
+            {/* Inventory - Right side, grows with content */}
+            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white" style={{flex: "1 1 auto", minWidth: "300px"}}>
               <h3 className="text-xs font-medium mb-1">Inventory</h3>
               <div className="flex flex-wrap gap-1">
                 {gameState.hasKey && (
@@ -1291,7 +1315,56 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     </span>
                   </button>
                 )}
-                {/* If nothing in inventory, leave the container empty to preserve layout */}
+                {(gameState.foodCount ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleUseFood}
+                    className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                    title={`Use food (${gameState.foodCount}) — tap or press F`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: "inline-block",
+                        width: 32,
+                        height: 32,
+                        backgroundImage: "url(/images/items/food-1.png)",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                      }}
+                    />
+                    <span>Food x{gameState.foodCount}</span>
+                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                      (tap or F)
+                    </span>
+                  </button>
+                )}
+                {(gameState.potionCount ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleUsePotion}
+                    className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                    title={`Use potion (${gameState.potionCount}) — tap or press P`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        display: "inline-block",
+                        width: 32,
+                        height: 32,
+                        backgroundImage: "url(/images/items/meds-1.png)",
+                        backgroundSize: "contain",
+                        backgroundRepeat: "no-repeat",
+                        backgroundPosition: "center",
+                      }}
+                    />
+                    <span>Potion x{gameState.potionCount}</span>
+                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                      (tap or P)
+                    </span>
+                  </button>
+                )}
               </div>
             </div>
           </div>

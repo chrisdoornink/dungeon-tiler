@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { go } from "../../lib/navigation";
 import { getEnemyIcon, enemyKinds, createEmptyByKind, type EnemyKind } from "../../lib/enemies/registry";
+import { ScoreCalculator, type ScoreBreakdown } from "../../lib/score_calculator";
 
 type LastGame = {
   completedAt: string;
@@ -34,13 +35,32 @@ type LastGame = {
 export default function EndPage() {
   const [last, setLast] = useState<LastGame | null>(null);
   const [copied, setCopied] = useState(false);
+  const [scoreBreakdown, setScoreBreakdown] = useState<ScoreBreakdown | null>(null);
 
   useEffect(() => {
     try {
       if (typeof window !== "undefined") {
         const raw = window.localStorage.getItem("lastGame");
         if (raw) {
-          setLast(JSON.parse(raw));
+          const gameData = JSON.parse(raw);
+          setLast(gameData);
+          
+          // Calculate score breakdown
+          if (gameData.stats) {
+            const score = ScoreCalculator.calculateScore(
+              gameData.outcome || 'dead',
+              gameData.heroHealth || 0,
+              gameData.stats,
+              {
+                hasKey: gameData.hasKey,
+                hasExitKey: gameData.hasExitKey,
+                hasSword: gameData.hasSword,
+                hasShield: gameData.hasShield,
+                showFullMap: gameData.showFullMap,
+              }
+            );
+            setScoreBreakdown(score);
+          }
         }
       }
     } catch {
@@ -112,7 +132,7 @@ export default function EndPage() {
   const dateStr = new Date(last.completedAt).toLocaleDateString('en-CA');
   // Header
   shareLines.push(`#TorchBoy ${dateStr}`);
-  // Stats line: outcome, death cause, steps, damage
+  // Stats line: outcome, death cause, steps, damage, score
   const outcomeEmoji = last.outcome === 'dead' ? '💀' : '🏆';
   const deathEmoji = last.outcome === 'dead' && last.deathCause
     ? (last.deathCause.type === 'faulty_floor'
@@ -129,7 +149,8 @@ export default function EndPage() {
   const dmgPart = typeof last.stats?.damageDealt === 'number' && typeof last.stats?.damageTaken === 'number'
     ? `💥 +${last.stats!.damageDealt} -${last.stats!.damageTaken}`
     : '';
-  shareLines.push([outcomeEmoji, deathEmoji, stepsPart, dmgPart].filter(Boolean).join(' '));
+  const scorePart = scoreBreakdown ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)` : '';
+  shareLines.push([outcomeEmoji, deathEmoji, scorePart, stepsPart, dmgPart].filter(Boolean).join(' '));
   // Streak line
   const streakVal = typeof last.streak === 'number' ? last.streak : 0;
   shareLines.push(`🔥 streak: ${streakVal}`);
@@ -309,6 +330,22 @@ export default function EndPage() {
                 })()}
               </div>
             </>
+          )}
+          {scoreBreakdown && (
+            <div className="border-t border-gray-700 pt-3 mt-3">
+              <div className="flex items-baseline justify-between mb-2">
+                <div className="font-medium">Final Score</div>
+                <div className="flex items-center gap-2">
+                  <span>{ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)}</span>
+                  <span className="font-bold">{scoreBreakdown.grade}</span>
+                  <span className="text-sm text-gray-400">({scoreBreakdown.percentage}%)</span>
+                </div>
+              </div>
+              <div className="flex items-baseline justify-between text-sm">
+                <div>Total Points</div>
+                <div className="font-mono">{scoreBreakdown.totalScore.toLocaleString()}</div>
+              </div>
+            </div>
           )}
         </div>
 

@@ -904,6 +904,127 @@ export function findPlayerPosition(mapData: MapData): [number, number] | null {
 }
 
 /**
+ * Use food from inventory to heal 1 HP (costs a move like throwing rocks/runes)
+ */
+export function performUseFood(gameState: GameState): GameState {
+  const count = gameState.foodCount || 0;
+  if (count <= 0) return gameState;
+
+  // Enemies act first relative to current player position
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const pos = findPlayerPosition(preTickState.mapData);
+    if (pos) {
+      const [py, px] = pos;
+      const damage = updateEnemies(
+        preTickState.mapData.tiles,
+        preTickState.mapData.subtypes,
+        preTickState.enemies,
+        { y: py, x: px },
+        {
+          rng: preTickState.combatRng ?? Math.random,
+          defense: preTickState.hasShield ? 1 : 0,
+          playerTorchLit: preTickState.heroTorchLit ?? true,
+          setPlayerTorchLit: (lit: boolean) => {
+            preTickState.heroTorchLit = lit;
+          },
+        }
+      );
+
+      if (damage > 0) {
+        const applied = Math.max(0, damage - (preTickState.hasShield ? 1 : 0));
+        preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+        preTickState.stats.damageTaken += applied;
+
+        // If player dies from enemy damage, track which enemy killed them
+        if (preTickState.heroHealth === 0) {
+          const killerEnemy = preTickState.enemies.find(
+            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
+          );
+          if (killerEnemy) {
+            preTickState.deathCause = {
+              type: "enemy",
+              enemyKind: killerEnemy.kind,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Use the food: heal 1 HP (capped at 5) and consume 1 food
+  const newGameState = { ...preTickState };
+  newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 1);
+  newGameState.foodCount = count - 1;
+  newGameState.stats.steps += 1;
+
+  console.log(`Used food! Healed 1 HP. Remaining food: ${newGameState.foodCount}`);
+  
+  return newGameState;
+}
+
+/**
+ * Use potion from inventory to heal 2 HP (costs a move like throwing rocks/runes)
+ */
+export function performUsePotion(gameState: GameState): GameState {
+  const count = gameState.potionCount || 0;
+  if (count <= 0) return gameState;
+
+  // Enemies act first relative to current player position
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const pos = findPlayerPosition(preTickState.mapData);
+    if (pos) {
+      const [py, px] = pos;
+      const damage = updateEnemies(
+        preTickState.mapData.tiles,
+        preTickState.mapData.subtypes,
+        preTickState.enemies,
+        { y: py, x: px },
+        {
+          rng: preTickState.combatRng ?? Math.random,
+          defense: preTickState.hasShield ? 1 : 0,
+          playerTorchLit: preTickState.heroTorchLit ?? true,
+          setPlayerTorchLit: (lit: boolean) => {
+            preTickState.heroTorchLit = lit;
+          },
+        }
+      );
+
+      if (damage > 0) {
+        const applied = Math.max(0, damage - (preTickState.hasShield ? 1 : 0));
+        preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+        preTickState.stats.damageTaken += applied;
+
+        if (preTickState.heroHealth === 0) {
+          const killerEnemy = preTickState.enemies.find(
+            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
+          );
+          if (killerEnemy) {
+            preTickState.deathCause = {
+              type: "enemy",
+              enemyKind: killerEnemy.kind,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Use the potion: heal 2 HP (capped at 5) and consume 1 potion
+  const newGameState = { ...preTickState };
+  newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 2);
+  newGameState.potionCount = count - 1;
+  newGameState.stats.steps += 1;
+
+  console.log(`Used potion! Healed 2 HP. Remaining potions: ${newGameState.potionCount}`);
+  
+  return newGameState;
+}
+
+/**
  * Throw a rock up to 4 tiles in the player's facing direction.
  * Minimal slice: if inventory has a rock and there is a clear 4-tile floor path,
  * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
@@ -1086,10 +1207,25 @@ export function performThrowRune(gameState: GameState): GameState {
   const count = gameState.runeCount ?? 0;
   if (count <= 0) return gameState;
 
-  // Enemies act relative to current player position
+  // Direction vector to determine rune target
+  let vx = 0, vy = 0;
+  switch (gameState.playerDirection) {
+    case Direction.UP: vy = -1; break;
+    case Direction.RIGHT: vx = 1; break;
+    case Direction.DOWN: vy = 1; break;
+    case Direction.LEFT: vx = -1; break;
+  }
+
+  // Check if there's an adjacent enemy in the throwing direction
+  const adjacentTargetY = py + vy;
+  const adjacentTargetX = px + vx;
+  const enemies = gameState.enemies ?? [];
+  const hasAdjacentTarget = enemies.some(e => e.y === adjacentTargetY && e.x === adjacentTargetX);
+
+  // Enemies act relative to current player position, but NOT if throwing at adjacent enemy
   const preTickState: GameState = { ...gameState };
   preTickState.recentDeaths = [];
-  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+  if (!hasAdjacentTarget && preTickState.enemies && Array.isArray(preTickState.enemies)) {
     const damage = updateEnemies(
       preTickState.mapData.tiles,
       preTickState.mapData.subtypes,
@@ -1114,24 +1250,6 @@ export function performThrowRune(gameState: GameState): GameState {
         damageTaken: preTickState.stats.damageTaken + applied,
       };
     }
-  }
-
-  // Direction vector
-  let vx = 0,
-    vy = 0;
-  switch (preTickState.playerDirection) {
-    case Direction.UP:
-      vy = -1;
-      break;
-    case Direction.RIGHT:
-      vx = 1;
-      break;
-    case Direction.DOWN:
-      vy = 1;
-      break;
-    case Direction.LEFT:
-      vx = -1;
-      break;
   }
 
   const newMapData = JSON.parse(
@@ -1304,6 +1422,8 @@ export interface GameState {
   // Inventory
   rockCount?: number; // Count of collected rocks
   runeCount?: number; // Count of collected runes
+  foodCount?: number; // Count of collected food items
+  potionCount?: number; // Count of collected +2 potions
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -1690,14 +1810,31 @@ export function movePlayer(
       return newGameState;
     }
 
-    // If it's FOOD or MED, apply healing (capped at 5) and proceed to move
+    // If it's FOOD or MED, handle based on current health
     if (
       subtype.includes(TileSubtype.FOOD) ||
       subtype.includes(TileSubtype.MED)
     ) {
       const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
-      newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
-      // Movement/clearing of the item happens below in the generic move logic
+      
+      if (subtype.includes(TileSubtype.FOOD)) {
+        // Food: auto-heal when health < 5, inventory when health = 5
+        if (newGameState.heroHealth < 5) {
+          newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
+        } else {
+          newGameState.foodCount = (newGameState.foodCount || 0) + 1;
+          console.log("Food added to inventory! Total food:", newGameState.foodCount);
+        }
+      } else {
+        // MED/Potion: auto-heal when health <= 3, inventory when health > 3
+        if (newGameState.heroHealth <= 3) {
+          newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
+        } else {
+          newGameState.potionCount = (newGameState.potionCount || 0) + 1;
+          console.log("Potion added to inventory! Total potions:", newGameState.potionCount);
+        }
+      }
+      moved = true;
     }
 
     // If it's a RUNE, pick it up and clear the tile
