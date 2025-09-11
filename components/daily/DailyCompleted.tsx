@@ -133,8 +133,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
   const deathDetails = getDeathDetails();
 
-  console.log("deathDetails", deathDetails);
-
   // Generate shareable text in Wordle/Rogule style
   const generateShareText = () => {
     const today = new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD format

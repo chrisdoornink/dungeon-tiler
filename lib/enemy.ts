@@ -443,13 +443,7 @@ export function updateEnemies(
         }
       }
       const effective = Math.max(0, base + variance - defense);
-      // Debug: per-enemy attack breakdown
-      try {
-        console.log(
-          "[EnemyAttack]",
-          JSON.stringify({ kind: e.kind, base, r: rVal, variance, defense, effective })
-        );
-      } catch {}
+      // debug log removed
       totalDamage += effective;
     }
 

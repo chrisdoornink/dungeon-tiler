@@ -642,15 +642,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
           };
           if (typeof window !== "undefined") {
-            console.log(
-              "Storing daily challenge win to localStorage:",
-              payload
-            );
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log(
-              "Stored successfully, checking:",
-              window.localStorage.getItem("lastGame")
-            );
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -690,12 +682,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
           };
           if (typeof window !== "undefined") {
-            console.log("Storing win game to localStorage:", payload);
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log(
-              "Stored successfully, checking:",
-              window.localStorage.getItem("lastGame")
-            );
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -800,15 +787,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: 0, // Always 0 for deaths
           } as const;
           if (typeof window !== "undefined") {
-            console.log(
-              "Storing daily challenge death to localStorage:",
-              payload
-            );
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log(
-              "Stored successfully, checking:",
-              window.localStorage.getItem("lastGame")
-            );
           }
         } catch {
           // ignore storage errors
@@ -836,12 +815,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: 0, // Always 0 for deaths
           } as const;
           if (typeof window !== "undefined") {
-            console.log("Storing death game to localStorage:", payload);
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            console.log(
-              "Stored successfully, checking:",
-              window.localStorage.getItem("lastGame")
-            );
           }
         } catch {
           // ignore storage errors

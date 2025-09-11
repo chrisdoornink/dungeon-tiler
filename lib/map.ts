@@ -362,7 +362,6 @@ export function addLightswitchToMap(mapData: MapData): MapData {
 
     // Set the lightswitch
     newMapData.subtypes[lightswitchY][lightswitchX] = [TileSubtype.LIGHTSWITCH];
-    console.log(`Placed lightswitch at [${lightswitchY}, ${lightswitchX}]`);
   } else {
     console.warn(
       "Could not place lightswitch - no eligible floor tiles available"
@@ -664,7 +663,7 @@ export function addExitKeyToMap(mapData: MapData): MapData {
     const choice = farthest[Math.floor(Math.random() * farthest.length)];
     const [ey, ex] = choice;
     newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
-    // console.log(`Placed exit key at [${ey}, ${ex}] (d=${maxD})`);
+    // debug: placed exit key
     return newMapData;
   }
 
@@ -726,11 +725,7 @@ export function addChestsToMap(mapData: MapData): MapData {
     if (locked) sub.push(TileSubtype.LOCK);
     newMapData.subtypes[cy][cx] = sub;
     const contentName = content === TileSubtype.SWORD ? "SWORD" : "SHIELD";
-    console.log(
-      `Placed chest at [${cy}, ${cx}] content:${contentName} locked:${
-        locked ? "YES" : "NO"
-      }`
-    );
+    // debug: placed chest
   }
 
   return newMapData;
@@ -801,8 +796,7 @@ export function addWallTorchesToMap(mapData: MapData): MapData {
   for (let i = 0; i < toPlace; i++) {
     const [ty, tx] = eligible[i];
     newMapData.subtypes[ty][tx] = [TileSubtype.WALL_TORCH];
-    // Optional: log for debugging
-    // console.log(`Placed wall torch at [${ty}, ${tx}]`);
+    // debug: placed wall torch
   }
 
   return newMapData;
@@ -878,7 +872,6 @@ export function addPlayerToMap(mapData: MapData): MapData {
 
     // Place the player
     newMapData.subtypes[playerY][playerX] = [TileSubtype.PLAYER];
-    console.log(`Placed player at [${playerY}, ${playerX}]`);
   } else {
     console.warn("Could not place player - no eligible floor tiles available");
   }
@@ -959,7 +952,7 @@ export function performUseFood(gameState: GameState): GameState {
   newGameState.foodCount = count - 1;
   newGameState.stats.steps += 1;
 
-  console.log(`Used food! Healed 1 HP. Remaining food: ${newGameState.foodCount}`);
+  // debug: used food
   
   return newGameState;
 }
@@ -1019,7 +1012,7 @@ export function performUsePotion(gameState: GameState): GameState {
   newGameState.potionCount = count - 1;
   newGameState.stats.steps += 1;
 
-  console.log(`Used potion! Healed 2 HP. Remaining potions: ${newGameState.potionCount}`);
+  // debug: used potion
   
   return newGameState;
 }
@@ -1489,14 +1482,7 @@ export function initializeGameState(): GameState {
   // After enemies are assigned, place one rune pot per stone-exciter
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
 
-  if (enemies.length > 0) {
-    console.log(
-      `Placed ${enemies.length} enemies:`,
-      enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
-    );
-  } else {
-    console.log("No enemies placed.");
-  }
+  // debug: enemies placed
 
   return {
     hasKey: false,
@@ -1675,16 +1661,7 @@ export function movePlayer(
     );
     if (damage > 0) {
       const applied = Math.min(2, damage);
-      try {
-        console.log(
-          "[EnemyDamageTick]",
-          JSON.stringify({
-            raw: damage,
-            applied,
-            shield: newGameState.hasShield,
-          })
-        );
-      } catch {}
+      try { /* debug log removed */ } catch {}
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
 
@@ -1702,10 +1679,7 @@ export function movePlayer(
         }
       }
     }
-    // console.log(
-    //   "Enemies updated:",
-    //   newGameState.enemies.map((e) => `[${e.y}, ${e.x}]`).join(", ")
-    // );
+    // debug: enemies updated
 
     // Ghost effect: any ghost ending adjacent snuffs torch and vanishes with death effect
     const adjacentGhosts = newGameState.enemies.filter(
@@ -1810,7 +1784,7 @@ export function movePlayer(
         moved = true;
 
         // Here you would typically trigger a win condition
-        console.log("Player opened the exit!");
+        // debug: player opened exit
       }
       // If no exit key, blocked by exit wall
     }
@@ -1848,7 +1822,6 @@ export function movePlayer(
           newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
         } else {
           newGameState.foodCount = (newGameState.foodCount || 0) + 1;
-          console.log("Food added to inventory! Total food:", newGameState.foodCount);
         }
       } else {
         // MED/Potion: auto-heal when health <= 3, inventory when health > 3
@@ -1856,7 +1829,6 @@ export function movePlayer(
           newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
         } else {
           newGameState.potionCount = (newGameState.potionCount || 0) + 1;
-          console.log("Potion added to inventory! Total potions:", newGameState.potionCount);
         }
       }
       moved = true;
@@ -1866,10 +1838,7 @@ export function movePlayer(
     if (subtype.includes(TileSubtype.RUNE)) {
       newGameState.runeCount = (newGameState.runeCount || 0) + 1;
       newMapData.subtypes[newY][newX] = [];
-      console.log(
-        "Player picked up a rune! Total runes:",
-        newGameState.runeCount
-      );
+      // debug: rune picked up
     }
 
     // If it's a FAULTY_FLOOR, trigger the trap
@@ -1881,9 +1850,7 @@ export function movePlayer(
       ];
       newGameState.heroHealth = 0;
       newGameState.deathCause = { type: "faulty_floor" };
-      console.log(
-        "Player stepped on a faulty floor! The ground collapses and they fall into darkness!"
-      );
+      // debug: faulty floor death
     }
 
     // If it's an EXIT (floor overlay)
@@ -1895,7 +1862,7 @@ export function movePlayer(
         // With key: stepping onto EXIT triggers win. Do NOT remove EXIT from map.
         newGameState.hasExitKey = false;
         newGameState.win = true;
-        console.log("Player reached the exit with the key! You win.");
+        // debug: player won
         // Continue to generic movement below so the player moves onto the tile this tick
       }
     }
@@ -1909,11 +1876,9 @@ export function movePlayer(
     ) {
       if (subtype.includes(TileSubtype.SWORD)) {
         newGameState.hasSword = true;
-        console.log("Player obtained a SWORD!");
       }
       if (subtype.includes(TileSubtype.SHIELD)) {
         newGameState.hasShield = true;
-        console.log("Player obtained a SHIELD!");
       }
       // Clearing of item happens below when we set dest tile subtypes
     }
@@ -1922,10 +1887,7 @@ export function movePlayer(
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
       newMapData.subtypes[newY][newX] = [];
-      console.log(
-        "Player picked up a rock! Total rocks:",
-        newGameState.rockCount
-      );
+      // debug: rock picked up
     }
 
     // Combat: if an enemy occupies the destination, resolve attack
@@ -1947,18 +1909,7 @@ export function movePlayer(
           swordBonus,
           variance,
         });
-        try {
-          console.log(
-            "[HeroAttack]",
-            JSON.stringify({
-              kind: enemy.kind,
-              heroAttack: newGameState.heroAttack,
-              swordBonus,
-              variance,
-              damage: heroDamage,
-            })
-          );
-        } catch {}
+        try { /* debug log removed */ } catch {}
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
 
@@ -1992,25 +1943,18 @@ export function movePlayer(
       // Universal generic key: once picked up, always available for generic locks
       newGameState.hasKey = true;
       newMapData.subtypes[newY][newX] = [];
-      console.log("Player picked up a key!");
     }
 
     // If it's an exit key, pick it up
     if (subtype.includes(TileSubtype.EXITKEY)) {
       newGameState.hasExitKey = true;
       newMapData.subtypes[newY][newX] = [];
-      console.log("Player picked up the exit key!");
     }
 
     // If it's a lightswitch, toggle full map visibility
     if (subtype.includes(TileSubtype.LIGHTSWITCH)) {
       // Toggle the showFullMap flag
       newGameState.showFullMap = !newGameState.showFullMap;
-      console.log(
-        `Player toggled light switch! Full map visibility: ${
-          newGameState.showFullMap ? "ON" : "OFF"
-        }`
-      );
 
       // Keep the lightswitch on the tile (don't remove it)
       // Player and lightswitch will coexist on the same tile
@@ -2021,7 +1965,6 @@ export function movePlayer(
       const isLocked = subtype.includes(TileSubtype.LOCK);
       // If locked and no key: allow stepping onto the chest tile, but do NOT open.
       if (isLocked && !newGameState.hasKey) {
-        console.log("Chest is locked. Need a key.");
         // Fall through to normal movement logic below. The coexist rules will
         // allow PLAYER to share the tile with CHEST+LOCK, leaving it closed.
       } else {
