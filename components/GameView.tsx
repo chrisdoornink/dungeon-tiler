@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, Suspense } from "react";
 import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
-import { rehydrateEnemies } from "../lib/enemy";
+import { rehydrateEnemies, type PlainEnemy } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
 import { DateUtils } from "../lib/date_utils";
 import { CurrentGameStorage } from "../lib/current_game_storage";
@@ -47,7 +47,7 @@ function GameViewInner({
       if (savedGame) {
         // Rehydrate enemies into class instances so methods exist
         if (Array.isArray(savedGame.enemies)) {
-          savedGame.enemies = rehydrateEnemies(savedGame.enemies as any);
+          savedGame.enemies = rehydrateEnemies(savedGame.enemies as unknown as PlainEnemy[]);
         }
         state = savedGame as GameState;
       }

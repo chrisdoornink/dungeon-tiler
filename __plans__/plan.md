@@ -112,7 +112,7 @@ BUGS
       Enemy spawning system creating duplicates
       Interaction between enemy movement updates and kill tracking
       Next steps if you want to pursue this:
-      Add debug logging to track exactly when stone-exciter kills are recorded
+      - [ ] Add debug logging to track exactly when stone-exciter kills are recorded
 
 ---
 

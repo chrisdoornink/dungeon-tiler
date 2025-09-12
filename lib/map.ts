@@ -724,7 +724,7 @@ export function addChestsToMap(mapData: MapData): MapData {
     const sub: number[] = [TileSubtype.CHEST, content];
     if (locked) sub.push(TileSubtype.LOCK);
     newMapData.subtypes[cy][cx] = sub;
-    const contentName = content === TileSubtype.SWORD ? "SWORD" : "SHIELD";
+    // const contentName = content === TileSubtype.SWORD ? "SWORD" : "SHIELD";
     // debug: placed chest
   }
 

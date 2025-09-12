@@ -29,7 +29,7 @@ export class CurrentGameStorage {
       
       const key = isDailyChallenge ? DAILY_GAME_KEY : CURRENT_GAME_KEY;
       window.localStorage.setItem(key, JSON.stringify(storedState));
-    } catch (error) {
+    } catch {
       // Ignore storage errors (quota exceeded, etc.)
     }
   }
@@ -53,7 +53,7 @@ export class CurrentGameStorage {
       }
       
       return parsed;
-    } catch (error) {
+    } catch {
       return null;
     }
   }
