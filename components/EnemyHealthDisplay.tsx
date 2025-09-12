@@ -18,11 +18,21 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
   for (let i = 0; i < maxHealth; i++) {
     if (i < clampedHealth) {
       hearts.push(
-        <span key={i} className="text-red-500">❤️</span>
+        <img 
+          key={i} 
+          src="/images/presentational/heart-moss-red.png" 
+          alt="❤️" 
+          className="w-3 h-3"
+        />
       );
     } else {
       hearts.push(
-        <span key={i} className="text-gray-400">🤍</span>
+        <img 
+          key={i} 
+          src="/images/presentational/heart-moss-green.png" 
+          alt="🤍" 
+          className="w-3 h-3"
+        />
       );
     }
   }

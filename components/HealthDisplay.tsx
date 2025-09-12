@@ -18,11 +18,21 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
   for (let i = 0; i < maxHealth; i++) {
     if (i < clampedHealth) {
       hearts.push(
-        <span key={i} className="text-red-500">❤️</span>
+        <img 
+          key={i} 
+          src="/images/presentational/heart-red.png" 
+          alt="❤️" 
+          className="w-4 h-4"
+        />
       );
     } else {
       hearts.push(
-        <span key={i} className="text-gray-400">🤍</span>
+        <img 
+          key={i} 
+          src="/images/presentational/heart-empty.png" 
+          alt="🤍" 
+          className="w-4 h-4"
+        />
       );
     }
   }

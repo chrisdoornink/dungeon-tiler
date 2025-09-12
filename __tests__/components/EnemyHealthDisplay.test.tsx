@@ -6,39 +6,39 @@ describe('EnemyHealthDisplay', () => {
   it('should render 2 filled hearts for enemy with 2 health', () => {
     render(<EnemyHealthDisplay health={2} maxHealth={2} />);
     
-    const hearts = screen.getAllByText('❤️');
+    const hearts = screen.getAllByAltText('❤️');
     expect(hearts).toHaveLength(2);
   });
 
   it('should render 1 filled heart for enemy with 1 health', () => {
     render(<EnemyHealthDisplay health={1} maxHealth={1} />);
     
-    const hearts = screen.getAllByText('❤️');
+    const hearts = screen.getAllByAltText('❤️');
     expect(hearts).toHaveLength(1);
   });
 
   it('should render no hearts for enemy with 0 health', () => {
     render(<EnemyHealthDisplay health={0} maxHealth={2} />);
     
-    const hearts = screen.queryAllByText('❤️');
+    const hearts = screen.queryAllByAltText('❤️');
     expect(hearts).toHaveLength(0);
-    const emptyHearts = screen.getAllByText('🤍');
+    const emptyHearts = screen.getAllByAltText('🤍');
     expect(emptyHearts).toHaveLength(2);
   });
 
   it('should handle high health values by showing correct number of hearts', () => {
     render(<EnemyHealthDisplay health={5} maxHealth={5} />);
     
-    const hearts = screen.getAllByText('❤️');
+    const hearts = screen.getAllByAltText('❤️');
     expect(hearts).toHaveLength(5);
   });
 
   it('should handle negative health by showing no hearts', () => {
     render(<EnemyHealthDisplay health={-1} maxHealth={2} />);
     
-    const hearts = screen.queryAllByText('❤️');
+    const hearts = screen.queryAllByAltText('❤️');
     expect(hearts).toHaveLength(0);
-    const emptyHearts = screen.getAllByText('🤍');
+    const emptyHearts = screen.getAllByAltText('🤍');
     expect(emptyHearts).toHaveLength(2);
   });
 

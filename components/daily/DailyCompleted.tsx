@@ -203,19 +203,15 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
     lines.push(`🗃️ inventory: ${items.join("")}`);
 
-    // Health visualization (5 tiles showing final health). Default to empty if unknown.
+    // Health visualization (5 hearts showing final health). Default to empty if unknown.
     const health =
       typeof lastGame?.heroHealth === "number" ? lastGame!.heroHealth : 0;
     const healthTiles: string[] = [];
     for (let i = 1; i <= 5; i++) {
       if (i <= health) {
-        if (health === 5) healthTiles.push(EMOJI_MAP.health_full);
-        else if (health === 4) healthTiles.push(EMOJI_MAP.health_good);
-        else if (health === 3) healthTiles.push(EMOJI_MAP.health_ok);
-        else if (health === 2) healthTiles.push(EMOJI_MAP.health_low);
-        else if (health === 1) healthTiles.push(EMOJI_MAP.health_critical);
+        healthTiles.push("❤️"); // Filled heart for remaining health
       } else {
-        healthTiles.push("⬜"); // Empty health
+        healthTiles.push("🤍"); // Empty heart for lost health
       }
     }
     lines.push(healthTiles.join(""));
