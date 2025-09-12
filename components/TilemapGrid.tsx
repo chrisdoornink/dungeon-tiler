@@ -1216,18 +1216,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   ]);
 
   return (
-    <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
-      <div
-        className="relative flex justify-center"
-        data-testid="tilemap-grid-wrapper"
-      >
-      {/* Vertically center the entire game UI within the viewport */}
-      <div className="w-full mt-12 flex items-center justify-center">
-        <div className="game-scale" data-testid="game-scale">
-          {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
-          <div
-            className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
-          >
+    <div className="relative">
+      <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
+        <div
+          className="relative flex justify-center"
+          data-testid="tilemap-grid-wrapper"
+        >
+        {/* Vertically center the entire game UI within the viewport */}
+        <div className="w-full mt-12 flex items-center justify-center">
+          <div className="game-scale" data-testid="game-scale">
+            {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
+            <div
+              className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
+            >
             {/* Health + visible enemies - Left side */}
             <div
               className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white"
@@ -1676,27 +1677,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           </div>
         </div>
         {/* Close centering wrapper */}
-        {/* Mobile controls */}
-        <MobileControls
-          onMove={handleMobileMove}
-          onThrowRock={handleThrowRock}
-          rockCount={gameState.rockCount ?? 0}
-          onUseRune={handleThrowRune}
-          runeCount={gameState.runeCount ?? 0}
-        />
+        </div>
       </div>
-    </div>
-    
-    {/* Item pickup animations */}
-    {itemPickupAnimations.map((animation) => (
-      <ItemPickupAnimation
-        key={animation.id}
-        isTriggered={true}
-        itemType={animation.itemType}
-        onAnimationComplete={() => handleItemPickupComplete(animation.id)}
+      
+      {/* Item pickup animations */}
+      {itemPickupAnimations.map((animation) => (
+        <ItemPickupAnimation
+          key={animation.id}
+          isTriggered={true}
+          itemType={animation.itemType}
+          onAnimationComplete={() => handleItemPickupComplete(animation.id)}
+        />
+      ))}
+      </ScreenShake>
+      
+      {/* Mobile controls - Outside ScreenShake to prevent displacement */}
+      <MobileControls
+        onMove={handleMobileMove}
+        onThrowRock={handleThrowRock}
+        rockCount={gameState.rockCount ?? 0}
+        onUseRune={handleThrowRune}
+        runeCount={gameState.runeCount ?? 0}
       />
-    ))}
-    </ScreenShake>
+    </div>
   );
 };
 
