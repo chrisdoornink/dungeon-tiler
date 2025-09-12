@@ -106,7 +106,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
   },
   "stone-exciter": {
     kind: "stone-exciter",
-    displayName: "Stone Exciter",
+    displayName: "Stone Guardian",
     assets: {
       front: "/images/enemies/stone-exciter-front.png",
       left: "/images/enemies/stone-exciter-right.png", // placeholder until left art exists
