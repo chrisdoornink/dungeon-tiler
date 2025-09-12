@@ -56,7 +56,7 @@ describe('HUD: Enemies in sight shows correct stone-exciter front sprite', () =>
     expect(bg).toContain('stone-exciter-front.png');
 
     // Should show 8 heart icons for enemy health
-    const hearts = screen.getAllByText('❤️');
+    const hearts = screen.getAllByAltText('❤️');
     expect(hearts.length).toBeGreaterThanOrEqual(8);
   });
 });
