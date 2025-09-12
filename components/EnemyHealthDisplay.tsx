@@ -2,21 +2,29 @@ import React from 'react';
 
 interface EnemyHealthDisplayProps {
   health: number;
+  maxHealth: number;
   className?: string;
 }
 
 const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({ 
   health, 
+  maxHealth,
   className = '' 
 }) => {
-  // Only show hearts for positive health values
-  const clampedHealth = Math.max(0, health);
+  // Clamp health between 0 and maxHealth
+  const clampedHealth = Math.max(0, Math.min(maxHealth, health));
   
   const hearts = [];
-  for (let i = 0; i < clampedHealth; i++) {
-    hearts.push(
-      <span key={i} className="text-red-500">❤️</span>
-    );
+  for (let i = 0; i < maxHealth; i++) {
+    if (i < clampedHealth) {
+      hearts.push(
+        <span key={i} className="text-red-500">❤️</span>
+      );
+    } else {
+      hearts.push(
+        <span key={i} className="text-gray-400">🤍</span>
+      );
+    }
   }
 
   return (

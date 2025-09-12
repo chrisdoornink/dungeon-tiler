@@ -13,7 +13,11 @@ import {
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
-import { getEnemyIcon, createEmptyByKind } from "../lib/enemies/registry";
+import {
+  getEnemyIcon,
+  createEmptyByKind,
+  EnemyRegistry,
+} from "../lib/enemies/registry";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
 import {
@@ -118,7 +122,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
-    try { trackUse("food"); } catch {}
+    try {
+      trackUse("food");
+    } catch {}
     setGameState((prev) => {
       const newState = performUseFood(prev);
       CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
@@ -128,7 +134,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
-    try { trackUse("potion"); } catch {}
+    try {
+      trackUse("potion");
+    } catch {}
     setGameState((prev) => {
       const newState = performUsePotion(prev);
       CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
@@ -138,7 +146,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
-    try { trackUse("rune"); } catch {}
+    try {
+      trackUse("rune");
+    } catch {}
     setGameState((prev) => {
       const count = prev.runeCount ?? 0;
       if (count <= 0) return prev;
@@ -308,7 +318,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
-    try { trackUse("rock"); } catch {}
+    try {
+      trackUse("rock");
+    } catch {}
     setGameState((prev) => {
       const count = prev.rockCount ?? 0;
       if (count <= 0) return prev;
@@ -1125,7 +1137,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [gameState, handlePlayerMove, handleThrowRock, handleThrowRune, handleUseFood, handleUsePotion]);
+  }, [
+    gameState,
+    handlePlayerMove,
+    handleThrowRock,
+    handleThrowRune,
+    handleUseFood,
+    handleUsePotion,
+  ]);
 
   return (
     <div
@@ -1140,7 +1159,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
           >
             {/* Health + visible enemies - Left side */}
-            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white" style={{flex: "0 0 auto", minWidth: "200px", maxWidth: "300px"}}>
+            <div
+              className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white"
+              style={{ flex: "1" }}
+            >
               <div className="text-xs font-medium mb-1">Health</div>
               <HealthDisplay health={gameState.heroHealth} className="mb-2" />
               {playerPosition &&
@@ -1185,7 +1207,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                               }}
                               aria-hidden="true"
                             />
-                            <EnemyHealthDisplay health={e.health} />
+                            <EnemyHealthDisplay
+                              health={e.health}
+                              maxHealth={EnemyRegistry[e.kind].base.health}
+                            />
                           </li>
                         ))}
                       </ul>
@@ -1194,7 +1219,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 })()}
             </div>
             {/* Inventory - Right side, grows with content */}
-            <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white" style={{flex: "1 1 auto", minWidth: "300px"}}>
+            <div
+              className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white"
+              style={{ flex: "1" }}
+            >
               <h3 className="text-xs font-medium mb-1">Inventory</h3>
               <div className="flex flex-wrap gap-1">
                 {gameState.hasKey && (
