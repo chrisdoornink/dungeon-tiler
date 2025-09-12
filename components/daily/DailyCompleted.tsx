@@ -186,13 +186,13 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     if (lastGame?.stats?.byKind) {
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         let numCount = typeof count === "number" ? count : 0;
-        
+
         // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
         // This addresses a known bug where stone-exciter kills can be double-counted
-        if (enemyType === "stone-exciter" && numCount > 2) {
-          numCount = 2;
+        if (enemyType === "stone-exciter" && numCount >= 2) {
+          numCount = numCount / 2;
         }
-        
+
         if (numCount > 0) {
           const emoji =
             EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP.goblin;
@@ -265,7 +265,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               style={{
                 backgroundImage: isWin
                   ? "url(/images/presentational/game-over-win-1.png)"
-                  : `url(/images/presentational/game-over-loss-${Math.random() < 0.5 ? '1' : '2'}.png)`,
+                  : `url(/images/presentational/game-over-loss-${
+                      Math.random() < 0.5 ? "1" : "2"
+                    }.png)`,
                 backgroundSize: "contain",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -343,13 +345,16 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                           ([enemyType, count]) => {
                             let numCount =
                               typeof count === "number" ? count : 0;
-                            
+
                             // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
                             // This addresses a known bug where stone-exciter kills can be double-counted
-                            if (enemyType === "stone-exciter" && numCount > 2) {
-                              numCount = 2;
+                            if (
+                              enemyType === "stone-exciter" &&
+                              numCount >= 2
+                            ) {
+                              numCount = numCount / 2;
                             }
-                            
+
                             const enemies: React.ReactElement[] = [];
                             for (let i = 0; i < numCount; i++) {
                               enemies.push(
@@ -386,15 +391,30 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                       {(() => {
                         const inv: Array<{ asset: string; alt: string }> = [];
                         if (lastGame?.hasKey)
-                          inv.push({ asset: "/images/items/key.png", alt: "Key" });
+                          inv.push({
+                            asset: "/images/items/key.png",
+                            alt: "Key",
+                          });
                         if (lastGame?.hasExitKey)
-                          inv.push({ asset: "/images/items/exit-key.png", alt: "Exit Key" });
+                          inv.push({
+                            asset: "/images/items/exit-key.png",
+                            alt: "Exit Key",
+                          });
                         if (lastGame?.hasSword)
-                          inv.push({ asset: "/images/items/sword.png", alt: "Sword" });
+                          inv.push({
+                            asset: "/images/items/sword.png",
+                            alt: "Sword",
+                          });
                         if (lastGame?.hasShield)
-                          inv.push({ asset: "/images/items/shield.png", alt: "Shield" });
+                          inv.push({
+                            asset: "/images/items/shield.png",
+                            alt: "Shield",
+                          });
                         if (lastGame?.showFullMap)
-                          inv.push({ asset: "/images/items/map-reveal.png", alt: "Map Reveal" });
+                          inv.push({
+                            asset: "/images/items/map-reveal.png",
+                            alt: "Map Reveal",
+                          });
                         if (inv.length === 0) {
                           return <span className="text-gray-400">None</span>;
                         }
