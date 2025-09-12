@@ -34,26 +34,19 @@ export class ScoreCalculator {
     // Combat scoring
     DAMAGE_DEALT: 10,        // 10 points per damage dealt
     ENEMY_DEFEATED: 25,      // 25 points per enemy defeated
-    GHOST_BONUS: 15,         // Extra 15 points for ghosts (harder)
-    STONE_EXCITER_BONUS: 20, // Extra 20 points for stone exciters (hardest)
     
     // Survival scoring
     HEALTH_REMAINING: 30,    // 30 points per health point remaining
     DAMAGE_PENALTY: -5,      // -5 points per damage taken
     
-    // Efficiency scoring
-    STEP_EFFICIENCY: 2,      // Bonus for fewer steps (calculated dynamically)
+    // Efficiency scoring (penalty only)
+    STEP_PENALTY: -0.2,      // -0.2 points per step over 50
     
     // Item collection
     KEY_BONUS: 50,           // 50 points for key
     EXIT_KEY_BONUS: 75,      // 75 points for exit key
-    SWORD_BONUS: 100,        // 100 points for sword
-    SHIELD_BONUS: 100,       // 100 points for shield
-    MAP_REVEAL_BONUS: 75,    // 75 points for map reveal
-    
-    // Perfect game bonuses
-    NO_DAMAGE_BONUS: 200,    // 200 points for taking no damage
-    ALL_ITEMS_BONUS: 150,    // 150 points for collecting all items
+    SWORD_BONUS: 50,         // 50 points for sword
+    SHIELD_BONUS: 50,        // 50 points for shield
   };
 
   // Grade thresholds (percentage-based) - more forgiving for winning games
@@ -71,56 +64,38 @@ export class ScoreCalculator {
   ];
 
   /**
-   * Calculate the maximum possible score for a given game scenario
+   * Calculate the maximum possible score based on actual enemy count
+   * Accounts for speed run strategy vs combat strategy
    */
-  private static calculateMaxScore(stats: GameStats): number {
+  private static calculateMaxScore(enemyCount: number): number {
     const { WEIGHTS } = ScoreCalculator;
     
-    // Use more realistic assumptions for max score calculation
-    const maxDamageDealt = Math.max(stats.damageDealt, stats.enemiesDefeated * 1.5); // At least 1.5 damage per enemy
-    const maxEnemiesDefeated = stats.enemiesDefeated;
-    const maxHealthRemaining = 5; // Full health
-    const minDamageTaken = Math.max(0, Math.floor(stats.damageTaken * 0.5)); // Allow taking half the damage
-    const maxSteps = Math.max(80, (stats.steps || 150) * 0.85); // 15% more efficient, reasonable baseline
+    // Calculate two scenarios and take the higher one
     
-    let maxScore = 0;
+    // Scenario 1: Speed run (minimal combat, under 50 steps)
+    let speedRunScore = 0;
+    // Assume killing 1-2 enemies max for keys/exit access
+    const speedRunEnemies = Math.min(2, enemyCount);
+    const speedRunDamage = speedRunEnemies * 2;
+    speedRunScore += speedRunDamage * WEIGHTS.DAMAGE_DEALT;
+    speedRunScore += speedRunEnemies * WEIGHTS.ENEMY_DEFEATED;
+    speedRunScore += 5 * WEIGHTS.HEALTH_REMAINING;  // Full health
+    speedRunScore += WEIGHTS.KEY_BONUS + WEIGHTS.EXIT_KEY_BONUS; // Essential items only
+    // No step penalty (under 50 steps)
     
-    // Combat scoring (base) - use actual enemy composition if available
-    maxScore += maxDamageDealt * WEIGHTS.DAMAGE_DEALT;
-    maxScore += maxEnemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
+    // Scenario 2: Combat run (kill most enemies, accept step penalty)
+    let combatScore = 0;
+    const averageDamagePerEnemy = 2;
+    const maxDamage = enemyCount * averageDamagePerEnemy;
+    combatScore += maxDamage * WEIGHTS.DAMAGE_DEALT;
+    combatScore += enemyCount * WEIGHTS.ENEMY_DEFEATED;
+    combatScore += 4 * WEIGHTS.HEALTH_REMAINING;  // Slightly damaged from combat
+    combatScore += WEIGHTS.KEY_BONUS + WEIGHTS.EXIT_KEY_BONUS + WEIGHTS.SWORD_BONUS + WEIGHTS.SHIELD_BONUS;
+    // Assume ~80 steps for thorough exploration (30 step penalty)
+    combatScore += 30 * WEIGHTS.STEP_PENALTY;
     
-    // Use actual enemy types if available, otherwise estimate conservatively
-    if (stats.byKind) {
-      maxScore += (stats.byKind.ghost || 0) * WEIGHTS.GHOST_BONUS;
-      maxScore += (stats.byKind['stone-exciter'] || 0) * WEIGHTS.STONE_EXCITER_BONUS;
-    } else {
-      // Conservative estimates
-      const estimatedGhosts = Math.floor(maxEnemiesDefeated * 0.2);
-      const estimatedStoneExciters = Math.floor(maxEnemiesDefeated * 0.15);
-      maxScore += estimatedGhosts * WEIGHTS.GHOST_BONUS;
-      maxScore += estimatedStoneExciters * WEIGHTS.STONE_EXCITER_BONUS;
-    }
-    
-    // Survival scoring (realistic perfect)
-    maxScore += maxHealthRemaining * WEIGHTS.HEALTH_REMAINING;
-    maxScore += minDamageTaken * WEIGHTS.DAMAGE_PENALTY;
-    
-    // Efficiency (more achievable bonus)
-    const efficiencyBonus = Math.max(0, (maxSteps * 1.5 - (stats.steps || 100)) * WEIGHTS.STEP_EFFICIENCY);
-    maxScore += efficiencyBonus;
-    
-    // Items - only count actually collectible items (3 total: key, sword, shield)
-    // Exit key is consumed when used, lightswitch is map reveal (not collectible)
-    maxScore += WEIGHTS.KEY_BONUS;
-    maxScore += WEIGHTS.SWORD_BONUS;
-    maxScore += WEIGHTS.SHIELD_BONUS;
-    
-    // Perfect bonuses - only no damage bonus for realistic max
-    if (minDamageTaken === 0) {
-      maxScore += WEIGHTS.NO_DAMAGE_BONUS;
-    }
-    
-    return Math.max(maxScore, 800); // More reasonable minimum max score
+    // Return the higher of the two strategies
+    return Math.max(speedRunScore, combatScore);
   }
 
   /**
@@ -142,11 +117,7 @@ export class ScoreCalculator {
     combatBonus += stats.damageDealt * WEIGHTS.DAMAGE_DEALT;
     combatBonus += stats.enemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
     
-    // Enemy type bonuses
-    if (stats.byKind) {
-      combatBonus += (stats.byKind.ghost || 0) * WEIGHTS.GHOST_BONUS;
-      combatBonus += (stats.byKind['stone-exciter'] || 0) * WEIGHTS.STONE_EXCITER_BONUS;
-    }
+    // No enemy type bonuses - all enemies worth same base amount
     
     // Survival scoring
     let survivalBonus = 0;
@@ -154,12 +125,11 @@ export class ScoreCalculator {
     survivalBonus += healthRemaining * WEIGHTS.HEALTH_REMAINING;
     survivalBonus += stats.damageTaken * WEIGHTS.DAMAGE_PENALTY;
     
-    // Efficiency scoring (fewer steps = higher bonus)
+    // Efficiency scoring (penalty only for excessive steps)
     let efficiencyBonus = 0;
-    if (stats.steps) {
-      // Bonus for completing in fewer steps (diminishing returns after 150 steps)
-      const stepEfficiency = Math.max(0, (200 - stats.steps) * WEIGHTS.STEP_EFFICIENCY);
-      efficiencyBonus += stepEfficiency;
+    if (stats.steps && stats.steps > 50) {
+      // Penalty for taking more than 50 steps
+      efficiencyBonus += (stats.steps - 50) * WEIGHTS.STEP_PENALTY;
     }
     
     // Item collection scoring
@@ -168,20 +138,9 @@ export class ScoreCalculator {
     if (inventory.hasExitKey) itemBonus += WEIGHTS.EXIT_KEY_BONUS;
     if (inventory.hasSword) itemBonus += WEIGHTS.SWORD_BONUS;
     if (inventory.hasShield) itemBonus += WEIGHTS.SHIELD_BONUS;
-    if (inventory.showFullMap) itemBonus += WEIGHTS.MAP_REVEAL_BONUS;
     
-    // Perfect game bonuses
-    let perfectBonus = 0;
-    if (stats.damageTaken === 0 && outcome === 'win') {
-      perfectBonus += WEIGHTS.NO_DAMAGE_BONUS;
-    }
-    
-    // Check if all collectible items obtained (key, sword, shield)
-    // Exit key is consumed when used, showFullMap is from lightswitch activation
-    const allItemsCollected = inventory.hasKey && inventory.hasSword && inventory.hasShield;
-    if (allItemsCollected) {
-      perfectBonus += WEIGHTS.ALL_ITEMS_BONUS;
-    }
+    // No perfect bonuses - keep scoring simple
+    const perfectBonus = 0;
     
     // Base score is combat + survival
     const baseScore = Math.round((combatBonus + survivalBonus) * deathPenalty);
@@ -194,8 +153,8 @@ export class ScoreCalculator {
     // Calculate total score
     const totalScore = Math.max(0, baseScore + adjustedEfficiencyBonus + adjustedItemBonus + adjustedPerfectBonus);
     
-    // Calculate percentage based on theoretical maximum
-    const maxPossibleScore = ScoreCalculator.calculateMaxScore(stats);
+    // Calculate percentage based on actual enemy count
+    const maxPossibleScore = ScoreCalculator.calculateMaxScore(stats.enemiesDefeated);
     const percentage = Math.min(100, Math.round((totalScore / maxPossibleScore) * 100));
     
     // Determine grade
@@ -207,7 +166,7 @@ export class ScoreCalculator {
       survivalBonus: Math.round(survivalBonus * deathPenalty),
       efficiencyBonus: adjustedEfficiencyBonus,
       itemBonus: adjustedItemBonus,
-      perfectBonus: adjustedPerfectBonus,
+      perfectBonus: 0, // No perfect bonuses
       totalScore,
       grade,
       percentage,

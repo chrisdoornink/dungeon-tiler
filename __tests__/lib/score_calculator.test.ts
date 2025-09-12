@@ -5,7 +5,7 @@ describe('ScoreCalculator', () => {
     damageDealt: 10,
     damageTaken: 2,
     enemiesDefeated: 5,
-    steps: 150,
+    steps: 80, // Updated for new step penalty threshold
     byKind: {
       goblin: 3,
       ghost: 1,
@@ -38,22 +38,22 @@ describe('ScoreCalculator', () => {
       expect(deathScore.totalScore).toBeLessThan(winScore.totalScore);
     });
 
-    it('should reward perfect games with no damage', () => {
+    it('should reward better health preservation', () => {
       const perfectStats = { ...mockStats, damageTaken: 0 };
       const perfectScore = ScoreCalculator.calculateScore('win', 5, perfectStats, mockInventory);
       const normalScore = ScoreCalculator.calculateScore('win', 4, mockStats, mockInventory);
       
       expect(perfectScore.totalScore).toBeGreaterThan(normalScore.totalScore);
-      expect(perfectScore.perfectBonus).toBeGreaterThan(0);
+      expect(perfectScore.perfectBonus).toBe(0); // No perfect bonuses in new system
     });
 
-    it('should give bonus for collecting all items', () => {
+    it('should give bonus for collecting more items', () => {
       const allItemsInventory: GameInventory = {
         hasKey: true,
         hasExitKey: true,
         hasSword: true,
         hasShield: true,
-        showFullMap: true,
+        showFullMap: false, // No map reveal bonus in new system
       };
       
       const allItemsScore = ScoreCalculator.calculateScore('win', 4, mockStats, allItemsInventory);
@@ -62,39 +62,40 @@ describe('ScoreCalculator', () => {
       expect(allItemsScore.totalScore).toBeGreaterThan(partialItemsScore.totalScore);
     });
 
-    it('should give higher scores for defeating harder enemies', () => {
-      const easyStats = {
+    it('should treat all enemy types equally', () => {
+      const goblinStats = {
         ...mockStats,
         byKind: { goblin: 5, ghost: 0, 'stone-exciter': 0 },
       };
       
-      const hardStats = {
+      const mixedStats = {
         ...mockStats,
         byKind: { goblin: 2, ghost: 2, 'stone-exciter': 1 },
       };
       
-      const easyScore = ScoreCalculator.calculateScore('win', 4, easyStats, mockInventory);
-      const hardScore = ScoreCalculator.calculateScore('win', 4, hardStats, mockInventory);
+      const goblinScore = ScoreCalculator.calculateScore('win', 4, goblinStats, mockInventory);
+      const mixedScore = ScoreCalculator.calculateScore('win', 4, mixedStats, mockInventory);
       
-      expect(hardScore.combatBonus).toBeGreaterThan(easyScore.combatBonus);
+      // Same number of enemies and damage should give same combat bonus
+      expect(goblinScore.combatBonus).toBe(mixedScore.combatBonus);
     });
 
     it('should assign appropriate grades', () => {
-      // Test perfect game
-      const perfectStats = { ...mockStats, damageTaken: 0, steps: 50 };
-      const perfectInventory: GameInventory = {
+      // Test good game (under 50 steps)
+      const goodStats = { ...mockStats, damageTaken: 0, steps: 45 };
+      const goodInventory: GameInventory = {
         hasKey: true,
         hasExitKey: true,
         hasSword: true,
         hasShield: true,
-        showFullMap: true,
+        showFullMap: false,
       };
       
-      const perfectScore = ScoreCalculator.calculateScore('win', 5, perfectStats, perfectInventory);
-      expect(['S+', 'S', 'A+', 'A']).toContain(perfectScore.grade);
+      const goodScore = ScoreCalculator.calculateScore('win', 5, goodStats, goodInventory);
+      expect(['S+', 'S', 'A+', 'A']).toContain(goodScore.grade);
       
       // Test poor performance
-      const poorStats = { ...mockStats, damageTaken: 10, steps: 300, enemiesDefeated: 1 };
+      const poorStats = { ...mockStats, damageTaken: 10, steps: 150, enemiesDefeated: 1 };
       const poorInventory: GameInventory = {
         hasKey: false,
         hasExitKey: false,
@@ -124,6 +125,136 @@ describe('ScoreCalculator', () => {
       expect(ScoreCalculator.getScoreEmoji('A')).toBe('🥈');
       expect(ScoreCalculator.getScoreEmoji('B')).toBe('🥉');
       expect(ScoreCalculator.getScoreEmoji('F')).toBe('💪');
+    });
+  });
+
+  describe('Speed Run vs Combat Strategy', () => {
+    it('should reward speed runs with minimal combat', () => {
+      // Speed run: Kill 2 enemies, get keys, exit in 40 steps
+      const speedRunStats: GameStats = {
+        damageDealt: 4,
+        damageTaken: 0,
+        enemiesDefeated: 2,
+        steps: 40,
+        byKind: { goblin: 2, ghost: 0, 'stone-exciter': 0 },
+      };
+      
+      const speedRunInventory: GameInventory = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: false,
+        hasShield: false,
+        showFullMap: false,
+      };
+      
+      const speedScore = ScoreCalculator.calculateScore('win', 5, speedRunStats, speedRunInventory);
+      
+      // Should get good score despite minimal combat
+      expect(speedScore.percentage).toBeGreaterThan(70);
+      expect(speedScore.efficiencyBonus).toBe(0); // No step penalty
+    });
+
+    it('should allow combat runs to compete despite step penalty', () => {
+      // Combat run: Kill 6 enemies, get all items, 90 steps
+      const combatStats: GameStats = {
+        damageDealt: 12,
+        damageTaken: 1,
+        enemiesDefeated: 6,
+        steps: 90,
+        byKind: { goblin: 4, ghost: 1, 'stone-exciter': 1 },
+      };
+      
+      const combatInventory: GameInventory = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: true,
+        hasShield: true,
+        showFullMap: false,
+      };
+      
+      const combatScore = ScoreCalculator.calculateScore('win', 4, combatStats, combatInventory);
+      
+      // Should get good score despite step penalty
+      expect(combatScore.percentage).toBeGreaterThan(70);
+      expect(combatScore.efficiencyBonus).toBeLessThan(0); // Step penalty applied
+    });
+
+    it('should compare speed run vs combat strategies fairly', () => {
+      // Speed run scenario
+      const speedStats: GameStats = {
+        damageDealt: 4,
+        damageTaken: 0,
+        enemiesDefeated: 2,
+        steps: 35,
+        byKind: { goblin: 2, ghost: 0, 'stone-exciter': 0 },
+      };
+      
+      const speedInventory: GameInventory = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: false,
+        hasShield: false,
+        showFullMap: false,
+      };
+      
+      // Combat scenario
+      const combatStats: GameStats = {
+        damageDealt: 14,
+        damageTaken: 1,
+        enemiesDefeated: 7,
+        steps: 85,
+        byKind: { goblin: 5, ghost: 1, 'stone-exciter': 1 },
+      };
+      
+      const combatInventory: GameInventory = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: true,
+        hasShield: true,
+        showFullMap: false,
+      };
+      
+      const speedScore = ScoreCalculator.calculateScore('win', 5, speedStats, speedInventory);
+      const combatScore = ScoreCalculator.calculateScore('win', 4, combatStats, combatInventory);
+      
+      // Both strategies should be viable (within 15% of each other)
+      const scoreDiff = Math.abs(speedScore.percentage - combatScore.percentage);
+      expect(scoreDiff).toBeLessThan(15);
+      
+      // Both should achieve decent grades
+      expect(['S+', 'S', 'A+', 'A', 'B+', 'B', 'C+']).toContain(speedScore.grade);
+      expect(['S+', 'S', 'A+', 'A', 'B+', 'B', 'C+']).toContain(combatScore.grade);
+    });
+
+    it('should heavily penalize excessive steps', () => {
+      const slowStats: GameStats = {
+        damageDealt: 10,
+        damageTaken: 2,
+        enemiesDefeated: 5,
+        steps: 200, // Way too many steps
+        byKind: { goblin: 5, ghost: 0, 'stone-exciter': 0 },
+      };
+      
+      const fastStats: GameStats = {
+        ...slowStats,
+        steps: 60, // Reasonable step count
+      };
+      
+      const inventory: GameInventory = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: true,
+        hasShield: false,
+        showFullMap: false,
+      };
+      
+      const slowScore = ScoreCalculator.calculateScore('win', 3, slowStats, inventory);
+      const fastScore = ScoreCalculator.calculateScore('win', 3, fastStats, inventory);
+      
+      // Slow run should be significantly penalized
+      expect(slowScore.efficiencyBonus).toBeLessThan(-20); // Heavy penalty (-30 points for 150 extra steps)
+      expect(fastScore.efficiencyBonus).toBeLessThan(0); // Light penalty (-2 points for 10 extra steps)
+      expect(fastScore.totalScore).toBeGreaterThan(slowScore.totalScore + 20);
     });
   });
 });
