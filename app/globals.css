@@ -154,6 +154,50 @@ body {
   animation: spiritFlip 1400ms steps(2, end) infinite;
 }
 
+/* Heart pop animation for health loss */
+@keyframes heartPop {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  25% {
+    transform: scale(1.5) translateY(-10px);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.2) translateY(-20px);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(0.8) translateY(-40px);
+    opacity: 0;
+  }
+}
+
+.animate-heart-pop {
+  animation: heartPop 600ms ease-out forwards;
+}
+
+/* Item pickup animation - center screen scale up and fade */
+@keyframes itemPickupCenter {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(2.5);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(3);
+    opacity: 0;
+  }
+}
+
+.animate-item-pickup-center {
+  animation: itemPickupCenter 1000ms ease-out forwards;
+}
+
 /* Responsive scaling: scale all game UI (except bottom controls) as a single unit below 650px */
 
 /* Scale the entire game UI (excluding MobileControls) from a 600px baseline */

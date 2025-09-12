@@ -33,6 +33,8 @@ import { computeMapId } from "../lib/map";
 import { CurrentGameStorage } from "../lib/current_game_storage";
 import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
+import { ScreenShake } from "./ScreenShake";
+import ItemPickupAnimation from "./ItemPickupAnimation";
 
 // Grid dimensions will be derived from provided map data
 
@@ -119,6 +121,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     x: number;
     id: string;
   }>(null);
+
+  // Screen shake state
+  const [isShaking, setIsShaking] = useState(false);
+
+  // Item pickup animation state
+  const [itemPickupAnimations, setItemPickupAnimations] = useState<Array<{
+    id: string;
+    itemType: string;
+  }>>([]);
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
@@ -249,6 +260,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               src: `/images/items/bam${bamIdx}.png`,
             });
             setTimeout(() => setBamEffect(null), 300);
+            triggerScreenShake();
           }, bamDelay);
         }
 
@@ -427,6 +439,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               src: `/images/items/bam${bamIdx}.png`,
             });
             setTimeout(() => setBamEffect(null), 300);
+            triggerScreenShake();
           }, bamDelay);
         }
 
@@ -750,20 +763,63 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     shield: false,
     rocks: 0,
     runes: 0,
+    food: 0,
   });
+
+  // Helper function to trigger item pickup animation
+  const triggerItemPickupAnimation = (itemType: string) => {
+    const animationId = `${itemType}-${Date.now()}`;
+    setItemPickupAnimations(prev => [...prev, {
+      id: animationId,
+      itemType
+    }]);
+  };
+
+  // Handle item pickup animation completion
+  const handleItemPickupComplete = (animationId: string) => {
+    setItemPickupAnimations(prev => prev.filter(anim => anim.id !== animationId));
+  };
+
+  // Helper function to trigger screen shake
+  const triggerScreenShake = (duration = 200) => {
+    setIsShaking(true);
+    setTimeout(() => setIsShaking(false), duration);
+  };
 
   useEffect(() => {
     try {
       if (!gameState) return;
       // Keys
-      if (gameState.hasKey && !prevInv.key) trackPickup("key");
-      if (gameState.hasExitKey && !prevInv.exitKey) trackPickup("exit_key");
+      if (gameState.hasKey && !prevInv.key) {
+        trackPickup("key");
+        triggerItemPickupAnimation("key");
+      }
+      if (gameState.hasExitKey && !prevInv.exitKey) {
+        trackPickup("exit_key");
+        triggerItemPickupAnimation("exitKey");
+      }
       // Equipment
-      if (!!gameState.hasSword && !prevInv.sword) trackPickup("sword");
-      if (!!gameState.hasShield && !prevInv.shield) trackPickup("shield");
+      if (!!gameState.hasSword && !prevInv.sword) {
+        trackPickup("sword");
+        triggerItemPickupAnimation("sword");
+      }
+      if (!!gameState.hasShield && !prevInv.shield) {
+        trackPickup("shield");
+        triggerItemPickupAnimation("shield");
+      }
       // Counters
-      if ((gameState.rockCount ?? 0) > prevInv.rocks) trackPickup("rock");
-      if ((gameState.runeCount ?? 0) > prevInv.runes) trackPickup("rune");
+      if ((gameState.rockCount ?? 0) > prevInv.rocks) {
+        trackPickup("rock");
+        triggerItemPickupAnimation("rock");
+      }
+      if ((gameState.runeCount ?? 0) > prevInv.runes) {
+        trackPickup("rune");
+        triggerItemPickupAnimation("rune");
+      }
+      if ((gameState.foodCount ?? 0) > prevInv.food) {
+        trackPickup("food");
+        triggerItemPickupAnimation("food");
+      }
     } catch {}
     setPrevInv({
       key: gameState.hasKey,
@@ -772,6 +828,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       shield: !!gameState.hasShield,
       rocks: gameState.rockCount ?? 0,
       runes: gameState.runeCount ?? 0,
+      food: gameState.foodCount ?? 0,
     });
   }, [
     gameState.hasKey,
@@ -780,11 +837,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.hasShield,
     gameState.rockCount,
     gameState.runeCount,
+    gameState.foodCount,
+    playerPosition,
   ]);
 
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth <= 0) {
+      // Trigger screen shake on death
+      triggerScreenShake(400);
       try {
         const mode = isDailyChallenge ? "daily" : "normal";
         const mapId = computeMapId(gameState.mapData);
@@ -985,6 +1046,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           gameState.heroHealth - newGameState.heroHealth
         );
         if (heroDmg > 0) {
+          // Trigger screen shake when taking damage
+          setIsShaking(true);
+          setTimeout(() => setIsShaking(false), 300);
+          
           const now = Date.now();
           const id = `fd-hero-${prePlayerY},${prePlayerX}-${now}-${Math.random()
             .toString(36)
@@ -1045,6 +1110,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Spawn spirits only for actual deaths reported by the engine this tick
       const died = newGameState.recentDeaths || [];
       if (died.length > 0) {
+        // Trigger screen shake when killing enemies
+        setIsShaking(true);
+        setTimeout(() => setIsShaking(false), 200);
+        
         const now = Date.now();
         setSpirits((prev) => {
           const next = [...prev];
@@ -1147,10 +1216,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   ]);
 
   return (
-    <div
-      className="relative flex justify-center"
-      data-testid="tilemap-grid-wrapper"
-    >
+    <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
+      <div
+        className="relative flex justify-center"
+        data-testid="tilemap-grid-wrapper"
+      >
       {/* Vertically center the entire game UI within the viewport */}
       <div className="w-full mt-12 flex items-center justify-center">
         <div className="game-scale" data-testid="game-scale">
@@ -1616,6 +1686,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         />
       </div>
     </div>
+    
+    {/* Item pickup animations */}
+    {itemPickupAnimations.map((animation) => (
+      <ItemPickupAnimation
+        key={animation.id}
+        isTriggered={true}
+        itemType={animation.itemType}
+        onAnimationComplete={() => handleItemPickupComplete(animation.id)}
+      />
+    ))}
+    </ScreenShake>
   );
 };
 

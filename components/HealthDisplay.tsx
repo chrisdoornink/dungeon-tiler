@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import HeartPopAnimation from './HeartPopAnimation';
 
 interface HealthDisplayProps {
   health: number;
@@ -11,8 +12,24 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
   maxHealth = 5, 
   className = '' 
 }) => {
+  const [previousHealth, setPreviousHealth] = useState(health);
+  const [heartPopTrigger, setHeartPopTrigger] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Clamp health between 0 and maxHealth
   const clampedHealth = Math.max(0, Math.min(maxHealth, health));
+
+  // Detect health loss and trigger heart pop animation
+  useEffect(() => {
+    if (health < previousHealth) {
+      setHeartPopTrigger(true);
+    }
+    setPreviousHealth(health);
+  }, [health, previousHealth]);
+
+  const handleAnimationComplete = () => {
+    setHeartPopTrigger(false);
+  };
   
   const hearts = [];
   for (let i = 0; i < maxHealth; i++) {
@@ -38,8 +55,16 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
   }
 
   return (
-    <div className={`flex gap-1 ${className}`}>
+    <div ref={containerRef} className={`relative flex gap-1 ${className}`}>
       {hearts}
+      {heartPopTrigger && (
+        <HeartPopAnimation
+          isTriggered={heartPopTrigger}
+          onAnimationComplete={handleAnimationComplete}
+          className="top-0"
+          style={{ left: `${clampedHealth * 20}px` }}
+        />
+      )}
     </div>
   );
 };
