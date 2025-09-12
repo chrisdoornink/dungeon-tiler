@@ -1,3 +1,4 @@
+// TEST ROOM VERSION - This is the end screen for the test room, not the daily challenge
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -205,7 +206,9 @@ export default function EndPage() {
         backgroundSize: "auto"
       }}
     >
-      <div className="rounded-lg shadow-xl p-6 max-w-md w-full text-center">
+      <div className="w-full max-w-4xl space-y-6">
+        {/* Main Game Statistics Box - Centered and Larger */}
+        <div data-testid="game-statistics-box" className="rounded-lg shadow-xl p-8 max-w-2xl mx-auto text-center">
         <h1 className="text-2xl font-semibold mb-2 text-gray-100">{title}</h1>
         <p className="text-gray-200 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
 
@@ -246,12 +249,6 @@ export default function EndPage() {
         </div>
 
         <div className="text-left text-sm space-y-2 text-gray-200">
-          {typeof last.streak === 'number' && (
-            <div className="flex items-baseline justify-between">
-              <div className="font-medium">Streak</div>
-              <div>{last.streak}</div>
-            </div>
-          )}
           {last.stats && (
             <>
               <div className="flex items-baseline justify-between">
@@ -375,7 +372,8 @@ export default function EndPage() {
           })()}
         </div>
 
-        <div className="my-4 flex items-center justify-center gap-2">
+        {/* Share Results button inside Game Statistics box */}
+        <div className="mt-6 flex items-center justify-center gap-2">
           <button
             type="button"
             onClick={() => go('/')}
@@ -390,6 +388,20 @@ export default function EndPage() {
           >
             {copied ? 'copied!' : 'share'}
           </button>
+        </div>
+        </div>
+
+        {/* Individual Stats List - Simple list below Game Statistics box */}
+        <div data-testid="individual-stats-list" className="max-w-2xl mx-auto">
+          <div className="text-left text-sm space-y-3 text-gray-200">
+            {typeof last.streak === 'number' && (
+              <div className="flex items-baseline justify-between py-2 border-b border-gray-700">
+                <div className="font-medium">Current Streak</div>
+                <div className="text-lg">{last.streak}</div>
+              </div>
+            )}
+            {/* Add more individual stats here as needed */}
+          </div>
         </div>
       </div>
     </div>

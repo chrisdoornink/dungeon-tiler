@@ -3,7 +3,10 @@
 import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import { trackDailyChallenge } from "../../lib/posthog_analytics";
-import { ScoreCalculator, type ScoreBreakdown } from "../../lib/score_calculator";
+import {
+  ScoreCalculator,
+  type ScoreBreakdown,
+} from "../../lib/score_calculator";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -57,11 +60,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    trackDailyChallenge('completed', {
-      outcome: isWin ? 'win' : 'loss',
+    trackDailyChallenge("completed", {
+      outcome: isWin ? "win" : "loss",
       streak: data.currentStreak,
       total_games: data.totalGamesPlayed,
-      win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100)
+      win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100),
     });
   }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
 
@@ -156,7 +159,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           : ""
         : "";
     const scorePart = scoreBreakdown
-      ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)`
+      ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${
+          scoreBreakdown.grade
+        } (${scoreBreakdown.percentage}%)`
       : "";
     const statsLine = [
       `${resultEmoji}`,
@@ -243,107 +248,68 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         backgroundSize: "auto",
       }}
     >
-      <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
-        {/* Result Header */}
-        <div className="text-center mb-8">
-          <div
-            className={`text-6xl mb-4 ${
-              isWin ? "text-green-500" : "text-red-500"
-            }`}
-          >
-            {isWin ? "🎉" : "💀"}
-          </div>
-          <h1
-            className={`text-3xl font-bold text-center mb-8 ${
-              isWin ? "text-green-300" : "text-red-300"
-            }`}
-          >
-            {isWin ? "Victory!" : "Defeat!"}
-          </h1>
-          <p className="text-lg text-gray-200">
-            {isWin
-              ? `You escaped the dungeon! The realm celebrates your victory.`
-              : `The dungeon has claimed another victim. Your adventure ends here.`}
-          </p>
-          {/* Death cause specific details */}
-          {deathDetails && (
-            <div className="flex items-center justify-center gap-3 mt-4 p-3 rounded-lg border border-red-400">
-              <div
-                className="w-12 h-12 flex-shrink-0"
-                style={{
-                  backgroundImage: `url(${deathDetails.image})`,
-                  backgroundSize: "contain",
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "center",
-                }}
-                aria-label={deathDetails.alt}
-              />
-              <p className="text-red-300 text-sm font-medium">
-                {deathDetails.message}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Share Button */}
-        <div className="text-center mb-4">
-          <button
-            type="button"
-            onClick={onShare}
-            className="px-6 py-3 rounded-md bg-[#2E7D32] text-white hover:bg-[#256628] transition-colors border-0 font-semibold"
-          >
-            {copied ? "Copied!" : "Share Results"}
-          </button>
-        </div>
-
-        {/* Stats Update */}
-        <div className="grid md:grid-cols-2 gap-8 mb-8">
-          <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Updated Stats
-            </h2>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Current Streak:</span>
-                <span
-                  className={`text-2xl font-bold ${
-                    isWin ? "text-green-300" : "text-red-300"
-                  }`}
-                >
-                  {data.currentStreak}
-                  {isWin && data.currentStreak > 1 && (
-                    <span className="text-sm text-green-400 ml-1">🔥</span>
-                  )}
-                </span>
+      <div className="w-full max-w-4xl mx-auto space-y-6">
+        {/* Main Game Statistics Box - Centered and Larger */}
+        <div
+          data-testid="game-statistics-box"
+          className="rounded-lg shadow-xl p-8 max-w-2xl mx-auto"
+        >
+          {/* Result Header */}
+          <div className="text-center mb-8">
+            <div
+              data-testid={isWin ? "victory-asset" : "defeat-asset"}
+              className={`w-24 h-24 mx-auto mb-4`}
+              style={{
+                backgroundImage: isWin
+                  ? "url(/images/presentational/game-over-win-1.png)"
+                  : `url(/images/presentational/game-over-loss-${Math.random() < 0.5 ? '1' : '2'}.png)`,
+                backgroundSize: "contain",
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "center",
+              }}
+              aria-label={isWin ? "Victory trophy" : "Defeat skull"}
+            />
+            <h1
+              className={`text-3xl font-bold text-center mb-8 ${
+                isWin ? "text-green-300" : "text-red-300"
+              }`}
+            >
+              {isWin ? "Victory!" : "Defeat!"}
+            </h1>
+            <p className="text-lg text-gray-200">
+              {isWin
+                ? `You escaped the dungeon! The realm celebrates your victory.`
+                : `The dungeon has claimed another victim. Your adventure ends here.`}
+            </p>
+            <p className="text-sm text-gray-300 text-center mt-4">
+              Return tomorrow for a new dungeon challenge!
+            </p>
+            {/* Death cause specific details */}
+            {deathDetails && (
+              <div className="flex items-center justify-center gap-3 mt-4 p-3 rounded-lg border border-red-400">
+                <div
+                  className="w-12 h-12 flex-shrink-0"
+                  style={{
+                    backgroundImage: `url(${deathDetails.image})`,
+                    backgroundSize: "contain",
+                    backgroundRepeat: "no-repeat",
+                    backgroundPosition: "center",
+                  }}
+                  aria-label={deathDetails.alt}
+                />
+                <p className="text-red-300 text-sm font-medium">
+                  {deathDetails.message}
+                </p>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Total Games:</span>
-                <span className="text-lg font-semibold text-gray-200">
-                  {data.totalGamesPlayed}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Games Won:</span>
-                <span className="text-lg font-semibold text-green-300">
-                  {data.totalGamesWon}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-300">Win Rate:</span>
-                <span className="text-lg font-semibold text-purple-300">
-                  {Math.round(
-                    (data.totalGamesWon / data.totalGamesPlayed) * 100
-                  )}
-                  %
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
+          {/* Game Statistics Section */}
           <div className="bg-black/50 rounded-lg p-6 border border-gray-600">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
+            {/* <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
               Game Statistics
-            </h2>
+            </h2> */}
+
             {lastGame && lastGame.stats ? (
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
@@ -366,89 +332,101 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                 </div>
                 {/* Removed numeric Enemies Defeated row per request */}
                 {lastGame.stats.byKind && (
-                  <div className="mt-4 pt-3 border-t border-gray-600">
-                    <div className="text-sm text-gray-400 mb-2">
-                      Enemies defeated:
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">Enemies defeated:</span>
+                      <span className="flex flex-wrap gap-1">
+                        {Object.entries(lastGame.stats.byKind).map(
+                          ([enemyType, count]) => {
+                            const numCount =
+                              typeof count === "number" ? count : 0;
+                            const enemies: React.ReactElement[] = [];
+                            for (let i = 0; i < numCount; i++) {
+                              enemies.push(
+                                <div
+                                  key={`${enemyType}-${i}`}
+                                  className="w-6 h-6"
+                                  style={{
+                                    backgroundImage: `url(/images/enemies/${
+                                      enemyType === "stone-exciter"
+                                        ? "stone-exciter-front"
+                                        : enemyType === "ghost"
+                                        ? "lantern-wisp"
+                                        : "fire-goblin/fire-goblin-front"
+                                    }.png)`,
+                                    backgroundSize: "contain",
+                                    backgroundRepeat: "no-repeat",
+                                    backgroundPosition: "center",
+                                  }}
+                                  title={enemyType}
+                                />
+                              );
+                            }
+                            return enemies;
+                          }
+                        )}
+                      </span>
                     </div>
-                    <div className="flex flex-wrap gap-1">
-                      {Object.entries(lastGame.stats.byKind).map(
-                        ([enemyType, count]) => {
-                          const numCount =
-                            typeof count === "number" ? count : 0;
-                          const enemies: React.ReactElement[] = [];
-                          for (let i = 0; i < numCount; i++) {
-                            enemies.push(
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-300">
+                        Inventory collected:
+                      </span>
+                      {/* Inventory Collected moved into Game Statistics */}
+
+                      {(() => {
+                        const inv: Array<{ asset: string; alt: string }> = [];
+                        if (lastGame?.hasKey)
+                          inv.push({ asset: "/images/items/key.png", alt: "Key" });
+                        if (lastGame?.hasExitKey)
+                          inv.push({ asset: "/images/items/exit-key.png", alt: "Exit Key" });
+                        if (lastGame?.hasSword)
+                          inv.push({ asset: "/images/items/sword.png", alt: "Sword" });
+                        if (lastGame?.hasShield)
+                          inv.push({ asset: "/images/items/shield.png", alt: "Shield" });
+                        if (lastGame?.showFullMap)
+                          inv.push({ asset: "/images/items/map-reveal.png", alt: "Map Reveal" });
+                        if (inv.length === 0) {
+                          return <span className="text-gray-400">None</span>;
+                        }
+                        return (
+                          <span className="flex items-center gap-2">
+                            {inv.map((i, idx) => (
                               <div
-                                key={`${enemyType}-${i}`}
+                                key={idx}
                                 className="w-6 h-6"
                                 style={{
-                                  backgroundImage: `url(/images/enemies/${
-                                    enemyType === "stone-exciter"
-                                      ? "stone-exciter-front"
-                                      : enemyType === "ghost"
-                                      ? "lantern-wisp"
-                                      : "fire-goblin/fire-goblin-front"
-                                  }.png)`,
+                                  backgroundImage: `url(${i.asset})`,
                                   backgroundSize: "contain",
                                   backgroundRepeat: "no-repeat",
                                   backgroundPosition: "center",
                                 }}
-                                title={enemyType}
+                                title={i.alt}
+                                aria-label={i.alt}
                               />
-                            );
-                          }
-                          return enemies;
-                        }
-                      )}
-                    </div>
-
-                    {/* Inventory Collected moved into Game Statistics */}
-                    <div className="mt-4 pt-3 border-t border-gray-600">
-                      <div className="text-sm text-gray-400 mb-2">
-                        Inventory collected:
-                      </div>
-                      {(() => {
-                        const inv: Array<{ emoji: string; label: string }> = [];
-                        if (lastGame?.hasKey)
-                          inv.push({ emoji: "🔑", label: "Key" });
-                        if (lastGame?.hasExitKey)
-                          inv.push({ emoji: "🗝️", label: "Exit Key" });
-                        if (lastGame?.hasSword)
-                          inv.push({ emoji: "🗡️", label: "Sword" });
-                        if (lastGame?.hasShield)
-                          inv.push({ emoji: "🛡️", label: "Shield" });
-                        if (lastGame?.showFullMap)
-                          inv.push({ emoji: "💡", label: "Map Reveal" });
-                        if (inv.length === 0) {
-                          return <div className="text-gray-400">None</div>;
-                        }
-                        return (
-                          <ul className="grid sm:grid-cols-2 gap-y-2 gap-x-6">
-                            {inv.map((i, idx) => (
-                              <li
-                                key={idx}
-                                className="flex items-center gap-2 text-gray-200"
-                              >
-                                <span className="text-lg">{i.emoji}</span>
-                                <span>{i.label}</span>
-                              </li>
                             ))}
-                          </ul>
+                          </span>
                         );
                       })()}
                     </div>
-                  </div>
+                  </>
                 )}
                 {scoreBreakdown && (
-                  <div className="mt-4 pt-3 border-t border-gray-600">
-                    <div className="text-sm text-gray-400 mb-2">Final Score</div>
+                  <div className="mt-4 pt-3 border-t border-gray-600 flex justify-between items-center">
+                    <span className="text-sm text-gray-400 mb-2">
+                      Final Score
+                    </span>
                     <div className="flex items-baseline justify-between">
                       <div className="flex items-center gap-2">
-                        <span>{ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)}</span>
-                        <span className="font-bold">{scoreBreakdown.grade}</span>
-                        <span className="text-sm text-gray-400">({scoreBreakdown.percentage}%)</span>
+                        {/* <span>
+                          {ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)}
+                        </span> */}
+                        <span className="font-bold">
+                          {scoreBreakdown.grade}
+                        </span>
+                        <span className="text-sm text-gray-400">
+                          ({scoreBreakdown.percentage}%)
+                        </span>
                       </div>
-                      <div className="font-mono">{scoreBreakdown.totalScore.toLocaleString()}</div>
                     </div>
                   </div>
                 )}
@@ -456,12 +434,66 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             ) : (
               <p className="text-gray-400">No game statistics available</p>
             )}
+            {/* Share Results button inside Game Statistics box */}
+            <div className="text-center my-4">
+              <button
+                type="button"
+                onClick={onShare}
+                className="px-6 py-3 rounded-md bg-[#2E7D32] text-white hover:bg-[#256628] transition-colors border-0 font-semibold"
+              >
+                {copied ? "Copied!" : "Share Results"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Individual Stats List - Simple list below Game Statistics box */}
+        <div data-testid="individual-stats-list" className="max-w-lg mx-auto">
+          <div className="">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                <span className="text-gray-300 font-medium">
+                  Current Streak:
+                </span>
+                <span
+                  className={`text-2xl font-bold ${
+                    isWin ? "text-green-300" : "text-red-300"
+                  }`}
+                >
+                  {data.currentStreak}
+                  {isWin && data.currentStreak > 1 && (
+                    <span className="text-sm text-green-400 ml-1">🔥</span>
+                  )}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                <span className="text-gray-300 font-medium">Total Games:</span>
+                <span className="text-lg font-semibold text-gray-200">
+                  {data.totalGamesPlayed}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                <span className="text-gray-300 font-medium">Games Won:</span>
+                <span className="text-lg font-semibold text-green-300">
+                  {data.totalGamesWon}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-2">
+                <span className="text-gray-300 font-medium">Win Rate:</span>
+                <span className="text-lg font-semibold text-purple-300">
+                  {Math.round(
+                    (data.totalGamesWon / data.totalGamesPlayed) * 100
+                  )}
+                  %
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Streak Celebration */}
         {isWin && data.currentStreak > 1 && (
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg p-6 mb-8 text-white">
+          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg p-6 mb-8 text-white max-w-2xl mx-auto">
             <div className="text-center">
               <h3 className="text-2xl font-bold mb-2">
                 🔥 {data.currentStreak} Day Streak! 🔥
@@ -479,7 +511,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
         {/* Recent History */}
         {data.streakHistory.length > 0 && data.totalGamesPlayed > 5 && (
-          <div className="mb-8">
+          <div className="mb-8 max-w-2xl mx-auto">
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
               Your Journey
             </h2>
@@ -502,7 +534,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         )}
 
         {/* Motivational Message */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-8 max-w-2xl mx-auto">
           <div className="rounded-lg p-6 border border-gray-600">
             {isWin ? (
               <>
@@ -532,10 +564,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             )}
           </div>
         </div>
-
-        <p className="text-sm text-gray-300 text-center">
-          Return tomorrow for a new dungeon challenge!
-        </p>
       </div>
     </div>
   );

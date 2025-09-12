@@ -92,25 +92,18 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
 - [x] Mobile support needs some updates: - [x] Health and inventory should be visible at all times - [x] The entire screen should scale down as a single unit using media queries starting at 650px. All elements should scale down as a single unit. the only exception is the controls at the bottom of the screen.
 - [x] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
-      NOTE** - ended up implenenting a daily challenge seed rather than storing
+      NOTE\*\* - ended up implenenting a daily challenge seed rather than storing
       a finite set of levels so it will work indefinitely.
 - [x] Daily reset time → Make it consistent at midnight local time instead of offset/confusing reset. First investigate and report to me how it currently wroks. I have my suspicions and I want to make sure we are not going to break it. I dont necessarily want to tackle this issue now depending on how we want to handle it.
 - [x] Health display → Replace “Status: 5” with 5 heart icons (filled/unfilled). Enemies should also use hearts instead of numbers.
 - [x] Potion healing → Using from inventory should heal 2 (not 1) to match pickup behavior. (recently justed saw this working correctly though so maybe we already did this?)
-- [x] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
-- [x] Layout and Box Adjustments
-      • Game Statistics Box
-      • Move it to the center and make it the main, larger box.
-      • Move the Share Results button inside this box (likely below the listed statistics).
-      • Updated Stats Section
-      • Remove the title “Updated Stats” entirely.
-      • The individual items (e.g. current streak, total games, etc.) should be displayed as a simple list immediately below the Game Statistics box, not inside any box.
-- [ ]
+- [x] Daily Play - End Game screen - Layout and Box Adjustments
+      • Game Statistics Box - [x] Move it to the center and make it the main, larger box. - [x] Move the Share Results button inside this box (likely below the listed statistics). - [x] Remove the title "Updated Stats" entirely. - [x] The individual items (e.g. current streak, total games, etc.) should be displayed as a simple list immediately below the Game Statistics box, not inside any box. - [x] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
+- [ ] New enemy - snake - [ ] assign a new enemy type to the snake (Health: 2, Damage: 1) - [ ] assign a new condition type of poison. It will work like this: a snake will poison you if it attacks you. The poison will deal 1 damage per 8 steps/turns. - [ ] The snake will start inside a pot and will attack once you open the pot. - [ ] Use a placeholder tag as the snake icon in the tilemap for now. - [ ] A snake will be generated in 33% of the rooms. It will start inside a pot 50% of that time. - [ ] Taking the potion will cure the poison. When a player is poisoned, they will have a green aura around them and the tile grid will have a poisoned effect and the health bar will be green. - [ ] The snake will move on the floor once freed from the pot. It will not chase the player, but inside move away from it when possible. If the snake doesn't start in the pot it will move around randomly until it sees the player and moves away. - [ ] Being poisioned doesn't affect your final score or grade. Killing snakes doesn't affect your final score or grade. Snakes present as enemies doesn't raise the max score but does raise the max damage dealt and is included in the kill count.
 
-Future Tickets
+---
 
-- [ ] Here’s a consolidated and detailed list of all the items that I'm considering but having solidly planned yet. Do not start these without approval.
-
+Future Possible Tickets - DOnt tackle these unless we have a clear direction for the game.
 Dungeon Game To-Do List
 
 - [ ] Repurpose Switch Functionality
