@@ -40,6 +40,7 @@ describe('DailyChallengeStorage', () => {
         todayCompleted: false,
         todayResult: null,
         streakHistory: [],
+        migratedToLocalTime: true,
       });
     });
   });
@@ -68,7 +69,10 @@ describe('DailyChallengeStorage', () => {
       localStorageMock.setItem('dailyChallenge', JSON.stringify(storedData));
       
       const data = DailyChallengeStorage.loadData();
-      expect(data).toEqual(storedData);
+      expect(data).toEqual({
+        ...storedData,
+        migratedToLocalTime: true,
+      });
     });
 
     it('should return default data when localStorage has invalid JSON', () => {

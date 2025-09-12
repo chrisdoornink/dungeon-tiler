@@ -1,10 +1,27 @@
 import { DateUtils } from '../../lib/date_utils';
 
 describe('DateUtils', () => {
+  describe('convertUTCToLocal', () => {
+    it('should convert UTC date to local date', () => {
+      // Test with a known UTC date
+      const utcDate = '2025-08-30';
+      const result = DateUtils.convertUTCToLocal(utcDate);
+      
+      // Result should be a valid date string
+      expect(result).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('should return empty string for empty input', () => {
+      expect(DateUtils.convertUTCToLocal('')).toBe('');
+    });
+  });
   describe('getTodayString', () => {
-    it('should return today in YYYY-MM-DD format', () => {
-      const today = new Date();
-      const expected = today.toISOString().split('T')[0];
+    it('should return today in YYYY-MM-DD format in local timezone', () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const expected = `${year}-${month}-${day}`;
       
       expect(DateUtils.getTodayString()).toBe(expected);
     });
@@ -28,14 +45,17 @@ describe('DateUtils', () => {
 
   describe('isToday', () => {
     it('should return true for today\'s date', () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = DateUtils.getTodayString();
       expect(DateUtils.isToday(today)).toBe(true);
     });
 
     it('should return false for yesterday', () => {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayString = yesterday.toISOString().split('T')[0];
+      const year = yesterday.getFullYear();
+      const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+      const day = String(yesterday.getDate()).padStart(2, '0');
+      const yesterdayString = `${year}-${month}-${day}`;
       
       expect(DateUtils.isToday(yesterdayString)).toBe(false);
     });

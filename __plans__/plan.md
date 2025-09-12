@@ -94,9 +94,9 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
       NOTE\*\* - ended up implenenting a daily challenge seed rather than storing
       a finite set of levels so it will work indefinitely.
-- [ ] Daily reset time → Make it consistent at midnight local time instead of offset/confusing reset. First investigate and report to me how it currently wroks. I have my suspicions and I want to make sure we are not going to break it. I dont necessarily want to tackle this issue now depending on how we want to handle it.
+- [x] Daily reset time → Make it consistent at midnight local time instead of offset/confusing reset. First investigate and report to me how it currently wroks. I have my suspicions and I want to make sure we are not going to break it. I dont necessarily want to tackle this issue now depending on how we want to handle it.
 - [ ] Health display → Replace “Status: 5” with 5 heart icons (filled/unfilled). Enemies should also use hearts instead of numbers.
-- [ ] Potion healing → Using from inventory should heal 2 (not 1) to match pickup behavior.
+- [ ] Potion healing → Using from inventory should heal 2 (not 1) to match pickup behavior. (recently justed saw this working correctly though so maybe we already did this?)
 - [ ] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
 - [ ] Layout and Box Adjustments
       • Game Statistics Box

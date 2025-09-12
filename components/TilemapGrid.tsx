@@ -24,6 +24,7 @@ import {
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
+import { DateUtils } from "../lib/date_utils";
 import { computeMapId } from "../lib/map";
 import { CurrentGameStorage } from "../lib/current_game_storage";
 
@@ -619,7 +620,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           outcome: "win",
           mode,
           mapId,
-          dateSeed: isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined,
+          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
           heroHealth: gameState.heroHealth,
           steps: gameState.stats.steps,
           enemiesDefeated: gameState.stats.enemiesDefeated,
@@ -777,7 +778,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           outcome: "dead",
           mode,
           mapId,
-          dateSeed: isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined,
+          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
           heroHealth: 0,
           steps: gameState.stats.steps,
           enemiesDefeated: gameState.stats.enemiesDefeated,

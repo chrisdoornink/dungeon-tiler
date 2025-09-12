@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState, Suspense } from "react";
 import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
+import { DateUtils } from "../lib/date_utils";
 import { CurrentGameStorage } from "../lib/current_game_storage";
 import { trackGameStart } from "../lib/analytics";
 import { computeMapId } from "../lib/map";
@@ -84,10 +85,10 @@ function GameViewInner({
     }
 
     if (!state) {
-      // Deterministic daily seed: UTC date string YYYY-MM-DD
+      // Deterministic daily seed: Local date string YYYY-MM-DD
       if (isDailyChallenge) {
-        const utcToday = new Date().toISOString().slice(0, 10);
-        const seed = hashStringToSeed(utcToday);
+        const localToday = DateUtils.getTodayString();
+        const seed = hashStringToSeed(localToday);
         const rng = mulberry32(seed);
         state = withPatchedMathRandom(rng, () => {
           // Preserve existing test expectations by optionally invoking generators
@@ -153,7 +154,7 @@ function GameViewInner({
       if (!finalInitialState || !finalInitialState.mapData) return;
       const mode = isDailyChallenge ? "daily" : "normal";
       const mapId = computeMapId(finalInitialState.mapData);
-      const dateSeed = isDailyChallenge ? new Date().toISOString().slice(0, 10) : undefined;
+      const dateSeed = isDailyChallenge ? DateUtils.getTodayString() : undefined;
       trackGameStart({ mode, mapId, dateSeed, algorithm });
     } catch {}
   }, [finalInitialState, isDailyChallenge, algorithm]);

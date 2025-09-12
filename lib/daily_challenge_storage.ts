@@ -6,7 +6,7 @@ export interface DailyChallengeData {
   totalGamesWon: number;
   
   // Daily tracking
-  lastPlayedDate: string; // ISO date string (YYYY-MM-DD)
+  lastPlayedDate: string; // ISO date string (YYYY-MM-DD) in local timezone
   todayCompleted: boolean;
   todayResult: 'won' | 'lost' | null;
   
@@ -16,6 +16,9 @@ export interface DailyChallengeData {
     result: 'won' | 'lost';
     streak: number;
   }>;
+  
+  // Migration tracking
+  migratedToLocalTime?: boolean;
 }
 
 const STORAGE_KEY = 'dailyChallenge';
@@ -31,6 +34,7 @@ export class DailyChallengeStorage {
       todayCompleted: false,
       todayResult: null,
       streakHistory: [],
+      migratedToLocalTime: true,
     };
   }
 
@@ -46,7 +50,14 @@ export class DailyChallengeStorage {
       }
       
       const parsed = JSON.parse(stored);
-      return { ...this.getDefaultData(), ...parsed };
+      let data = { ...this.getDefaultData(), ...parsed };
+      
+      // Migrate UTC dates to local timezone if needed
+      if (!data.migratedToLocalTime) {
+        data = this.migrateToLocalTime(data);
+      }
+      
+      return data;
     } catch {
       return this.getDefaultData();
     }
@@ -119,8 +130,44 @@ export class DailyChallengeStorage {
   }
 
   private static getPreviousDate(dateString: string): string {
-    const date = new Date(dateString);
+    const date = new Date(dateString + 'T00:00:00'); // Ensure local timezone interpretation
     date.setDate(date.getDate() - 1);
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  private static migrateToLocalTime(data: DailyChallengeData): DailyChallengeData {
+    // Convert UTC date string to local date string inline to avoid circular dependency
+    const convertUTCToLocal = (utcDateString: string): string => {
+      if (!utcDateString) return utcDateString;
+      
+      // Parse UTC date and convert to local timezone
+      const utcDate = new Date(utcDateString + 'T00:00:00Z');
+      const year = utcDate.getFullYear();
+      const month = String(utcDate.getMonth() + 1).padStart(2, '0');
+      const day = String(utcDate.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+    
+    // Migrate lastPlayedDate
+    if (data.lastPlayedDate) {
+      data.lastPlayedDate = convertUTCToLocal(data.lastPlayedDate);
+    }
+    
+    // Migrate streakHistory dates
+    data.streakHistory = data.streakHistory.map(entry => ({
+      ...entry,
+      date: convertUTCToLocal(entry.date)
+    }));
+    
+    // Mark as migrated
+    data.migratedToLocalTime = true;
+    
+    // Save the migrated data
+    this.saveData(data);
+    
+    return data;
   }
 }
