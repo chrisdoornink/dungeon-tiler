@@ -27,6 +27,8 @@ import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { computeMapId } from "../lib/map";
 import { CurrentGameStorage } from "../lib/current_game_storage";
+import HealthDisplay from "./HealthDisplay";
+import EnemyHealthDisplay from "./EnemyHealthDisplay";
 
 // Grid dimensions will be derived from provided map data
 
@@ -1137,10 +1139,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           <div
             className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
           >
-            {/* Status (health + visible enemies) - Left side */}
+            {/* Health + visible enemies - Left side */}
             <div className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white" style={{flex: "0 0 auto", minWidth: "200px", maxWidth: "300px"}}>
-              <div className="text-xs font-medium mb-1">Status</div>
-              <div className="text-sm">❤️ Health: {gameState.heroHealth}</div>
+              <div className="text-xs font-medium mb-1">Health</div>
+              <HealthDisplay health={gameState.heroHealth} className="mb-2" />
               {playerPosition &&
                 gameState.enemies &&
                 gameState.enemies.length > 0 &&
@@ -1183,7 +1185,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                               }}
                               aria-hidden="true"
                             />
-                            <span>HP {e.health}</span>
+                            <EnemyHealthDisplay health={e.health} />
                           </li>
                         ))}
                       </ul>

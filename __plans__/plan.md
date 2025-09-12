@@ -90,15 +90,15 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
 - [x] ghosts should be able to travel on faulty floor tiles, other future enemies may be able to as well
 - [x] ghosts should be able to travel on walls
 - [x] I just bought the domain torchboy.com that this will live on, by defualt, the daily page should be what is displayed when a user hits the site on that domain, what are our options for enforcing this? Can it be domain level magic that uses /daily as the index? or do we need more levers to pull based on environment?
-- [x] Mobile support needs some updates: - [x] Health and inventory shoudl be visible at all times - [x] The entire screen should scale down as a single unit using media queries starting at 650px. All elements should scale down as a single unit. the only exception is the controls at the bottom of the screen.
+- [x] Mobile support needs some updates: - [x] Health and inventory should be visible at all times - [x] The entire screen should scale down as a single unit using media queries starting at 650px. All elements should scale down as a single unit. the only exception is the controls at the bottom of the screen.
 - [x] I want the daily challenge to be the same for everyone who plays it, so we need to create a random seed for the daily challenge and store it in localStorage, if its that simple, but dpeending on how the levels are generated, we may need to make a script that generates levels and stores them per day, and we can test them out before we deploy them.
-      NOTE\*\* - ended up implenenting a daily challenge seed rather than storing
+      NOTE** - ended up implenenting a daily challenge seed rather than storing
       a finite set of levels so it will work indefinitely.
 - [x] Daily reset time → Make it consistent at midnight local time instead of offset/confusing reset. First investigate and report to me how it currently wroks. I have my suspicions and I want to make sure we are not going to break it. I dont necessarily want to tackle this issue now depending on how we want to handle it.
-- [ ] Health display → Replace “Status: 5” with 5 heart icons (filled/unfilled). Enemies should also use hearts instead of numbers.
-- [ ] Potion healing → Using from inventory should heal 2 (not 1) to match pickup behavior. (recently justed saw this working correctly though so maybe we already did this?)
-- [ ] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
-- [ ] Layout and Box Adjustments
+- [x] Health display → Replace “Status: 5” with 5 heart icons (filled/unfilled). Enemies should also use hearts instead of numbers.
+- [x] Potion healing → Using from inventory should heal 2 (not 1) to match pickup behavior. (recently justed saw this working correctly though so maybe we already did this?)
+- [x] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
+- [x] Layout and Box Adjustments
       • Game Statistics Box
       • Move it to the center and make it the main, larger box.
       • Move the Share Results button inside this box (likely below the listed statistics).

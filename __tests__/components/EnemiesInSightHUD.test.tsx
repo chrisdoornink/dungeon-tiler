@@ -55,7 +55,8 @@ describe('HUD: Enemies in sight shows correct stone-exciter front sprite', () =>
     const bg = (iconSpans[0] as HTMLElement).style.backgroundImage;
     expect(bg).toContain('stone-exciter-front.png');
 
-    // HP text should reflect the enemy's HP (default 8 after kind set)
-    expect(screen.getByText(/HP\s*8/)).toBeInTheDocument();
+    // Should show 8 heart icons for enemy health
+    const hearts = screen.getAllByText('❤️');
+    expect(hearts.length).toBeGreaterThanOrEqual(8);
   });
 });
