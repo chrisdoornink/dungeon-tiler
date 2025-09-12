@@ -101,6 +101,19 @@ Refer to the coding methodology in `__plans__/coding_methodology.md` before taki
       • Game Statistics Box - [x] Move it to the center and make it the main, larger box. - [x] Move the Share Results button inside this box (likely below the listed statistics). - [x] Remove the title "Updated Stats" entirely. - [x] The individual items (e.g. current streak, total games, etc.) should be displayed as a simple list immediately below the Game Statistics box, not inside any box. - [x] End game screen emojis → Replace emojis (victory/defeat, etc.) with proper assets.
 - [ ] New enemy - snake - [ ] assign a new enemy type to the snake (Health: 2, Damage: 1) - [ ] assign a new condition type of poison. It will work like this: a snake will poison you if it attacks you. The poison will deal 1 damage per 8 steps/turns. - [ ] The snake will start inside a pot and will attack once you open the pot. - [ ] Use a placeholder tag as the snake icon in the tilemap for now. - [ ] A snake will be generated in 33% of the rooms. It will start inside a pot 50% of that time. - [ ] Taking the potion will cure the poison. When a player is poisoned, they will have a green aura around them and the tile grid will have a poisoned effect and the health bar will be green. - [ ] The snake will move on the floor once freed from the pot. It will not chase the player, but inside move away from it when possible. If the snake doesn't start in the pot it will move around randomly until it sees the player and moves away. - [ ] Being poisioned doesn't affect your final score or grade. Killing snakes doesn't affect your final score or grade. Snakes present as enemies doesn't raise the max score but does raise the max damage dealt and is included in the kill count.
 
+BUGS
+
+- [ ] Stone-Exciter Kill Count Issue:
+
+      For the stone-exciter kill count discrepancy (showing 4 kills when only 2 existed), I have a few theories but no definitive fix yet:
+
+      Potential causes:
+      Stats merging/accumulation bug somewhere in the codebase
+      Enemy spawning system creating duplicates
+      Interaction between enemy movement updates and kill tracking
+      Next steps if you want to pursue this:
+      Add debug logging to track exactly when stone-exciter kills are recorded
+
 ---
 
 Future Possible Tickets - DOnt tackle these unless we have a clear direction for the game.
