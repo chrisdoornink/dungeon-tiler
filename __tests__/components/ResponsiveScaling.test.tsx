@@ -27,7 +27,12 @@ describe('Responsive scaling wrapper', () => {
     const scaleWrapper = screen.getByTestId('game-scale');
     const controls = screen.getByTestId('mobile-controls');
 
-    // Both should share the same parent (root wrapper), meaning controls are not nested in scale wrapper
-    expect(scaleWrapper.parentElement).toBe(controls.parentElement);
+    // MobileControls should be outside the ScreenShake wrapper (which contains game-scale)
+    // This ensures controls don't get displaced during screen shake
+    expect(controls).toBeInTheDocument();
+    expect(scaleWrapper).toBeInTheDocument();
+    
+    // Controls should not be a descendant of the game-scale wrapper
+    expect(scaleWrapper).not.toContainElement(controls);
   });
 });
