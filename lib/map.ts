@@ -1283,87 +1283,28 @@ export function performThrowRune(gameState: GameState): GameState {
     const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
-      const target: Enemy = newEnemies[hitIdx];
-      if (target.kind === "stone-exciter") {
-        // Instant kill, rune consumed
-        const removed = newEnemies.splice(hitIdx, 1)[0];
-        const dealt = removed.health ?? 2;
-        const newStats = {
-          ...preTickState.stats,
-          damageDealt: preTickState.stats.damageDealt + dealt,
-          enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
-        };
-        const byKind = newStats.byKind || createEmptyByKind();
-        const k = removed.kind as EnemyKind;
-        byKind[k] = (byKind[k] ?? 0) + 1;
-        newStats.byKind = byKind;
-        const newRecent = (
-          preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
-        ).concat([[removed.y, removed.x] as [number, number]]);
-        return {
-          ...preTickState,
-          enemies: newEnemies,
-          stats: newStats,
-          recentDeaths: newRecent,
-          runeCount: count - 1,
-        };
-      } else {
-        // Non-stone: deal 2 damage. If enemy dies, consume rune; else drop rune on last traversed floor tile.
-        const prevHealth = target.health ?? 1;
-        const newHealth = prevHealth - 2;
-        if (newHealth <= 0) {
-          const removed = newEnemies.splice(hitIdx, 1)[0];
-          const newStats = {
-            ...preTickState.stats,
-            damageDealt: preTickState.stats.damageDealt + Math.min(2, prevHealth),
-            enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
-          };
-          const byKind = newStats.byKind || createEmptyByKind();
-          const k = removed.kind as EnemyKind;
-          byKind[k] = (byKind[k] ?? 0) + 1;
-          newStats.byKind = byKind;
-          const newRecent = (
-            preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
-          ).concat([[removed.y, removed.x] as [number, number]]);
-          return {
-            ...preTickState,
-            enemies: newEnemies,
-            stats: newStats,
-            recentDeaths: newRecent,
-            runeCount: count - 1,
-          };
-        } else {
-          // Enemy survives
-          target.health = newHealth;
-          newEnemies[hitIdx] = target;
-          // Drop rune on last traversed floor tile, if valid
-          if (
-            !(lastFloorY === py && lastFloorX === px) &&
-            newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
-          ) {
-            newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-            return {
-              ...preTickState,
-              enemies: newEnemies,
-              mapData: newMapData,
-              stats: {
-                ...preTickState.stats,
-                damageDealt: preTickState.stats.damageDealt + 2,
-              },
-              runeCount: count - 1,
-            };
-          }
-          // No valid drop tile; keep inventory unchanged but still apply damageDealt
-          return {
-            ...preTickState,
-            enemies: newEnemies,
-            stats: {
-              ...preTickState.stats,
-              damageDealt: preTickState.stats.damageDealt + 2,
-            },
-          };
-        }
-      }
+      // Runes instantly kill ALL enemies, rune consumed
+      const removed = newEnemies.splice(hitIdx, 1)[0];
+      const dealt = removed.health ?? 2;
+      const newStats = {
+        ...preTickState.stats,
+        damageDealt: preTickState.stats.damageDealt + dealt,
+        enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+      };
+      const byKind = newStats.byKind || createEmptyByKind();
+      const k = removed.kind as EnemyKind;
+      byKind[k] = (byKind[k] ?? 0) + 1;
+      newStats.byKind = byKind;
+      const newRecent = (
+        preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
+      ).concat([[removed.y, removed.x] as [number, number]]);
+      return {
+        ...preTickState,
+        enemies: newEnemies,
+        stats: newStats,
+        recentDeaths: newRecent,
+        runeCount: count - 1,
+      };
     }
 
     // Wall/obstacle -> drop on last floor tile
