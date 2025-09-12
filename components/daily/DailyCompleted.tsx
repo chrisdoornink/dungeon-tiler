@@ -185,7 +185,14 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     const enemyChunks: string[] = [];
     if (lastGame?.stats?.byKind) {
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
-        const numCount = typeof count === "number" ? count : 0;
+        let numCount = typeof count === "number" ? count : 0;
+        
+        // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
+        // This addresses a known bug where stone-exciter kills can be double-counted
+        if (enemyType === "stone-exciter" && numCount > 2) {
+          numCount = 2;
+        }
+        
         if (numCount > 0) {
           const emoji =
             EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP.goblin;
@@ -334,8 +341,15 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                       <span className="flex flex-wrap gap-1">
                         {Object.entries(lastGame.stats.byKind).map(
                           ([enemyType, count]) => {
-                            const numCount =
+                            let numCount =
                               typeof count === "number" ? count : 0;
+                            
+                            // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
+                            // This addresses a known bug where stone-exciter kills can be double-counted
+                            if (enemyType === "stone-exciter" && numCount > 2) {
+                              numCount = 2;
+                            }
+                            
                             const enemies: React.ReactElement[] = [];
                             for (let i = 0; i < numCount; i++) {
                               enemies.push(
