@@ -112,10 +112,30 @@ export class ScoreCalculator {
     // If player died, reduce scoring potential but not too harshly
     const deathPenalty = outcome === 'dead' ? 0.6 : 1.0;
     
+    // PATCH: Fix stone-exciter double counting bug
+    // If stone-exciter count seems doubled compared to other enemies, halve it
+    let adjustedEnemiesDefeated = stats.enemiesDefeated;
+    if (stats.byKind && stats.byKind['stone-exciter'] > 0) {
+      const stoneCount = stats.byKind['stone-exciter'];
+      const otherCount = (stats.byKind.goblin || 0) + (stats.byKind.ghost || 0);
+      
+      // If stone-exciter count is suspiciously high compared to others, likely doubled
+      if (stoneCount > 0 && (stoneCount >= otherCount * 2 || stoneCount > 4)) {
+        const correctedStoneCount = Math.ceil(stoneCount / 2);
+        const reduction = stoneCount - correctedStoneCount;
+        adjustedEnemiesDefeated = Math.max(0, stats.enemiesDefeated - reduction);
+        
+        // Log the correction for debugging
+        try {
+          console.log(`Stone-exciter double count detected: ${stoneCount} -> ${correctedStoneCount}, total enemies: ${stats.enemiesDefeated} -> ${adjustedEnemiesDefeated}`);
+        } catch {}
+      }
+    }
+    
     // Base combat scoring
     let combatBonus = 0;
     combatBonus += stats.damageDealt * WEIGHTS.DAMAGE_DEALT;
-    combatBonus += stats.enemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
+    combatBonus += adjustedEnemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
     
     // No enemy type bonuses - all enemies worth same base amount
     
@@ -153,8 +173,8 @@ export class ScoreCalculator {
     // Calculate total score
     const totalScore = Math.max(0, baseScore + adjustedEfficiencyBonus + adjustedItemBonus + adjustedPerfectBonus);
     
-    // Calculate percentage based on actual enemy count
-    const maxPossibleScore = ScoreCalculator.calculateMaxScore(stats.enemiesDefeated);
+    // Calculate percentage based on actual enemy count (use adjusted count)
+    const maxPossibleScore = ScoreCalculator.calculateMaxScore(adjustedEnemiesDefeated);
     const percentage = Math.min(100, Math.round((totalScore / maxPossibleScore) * 100));
     
     // Determine grade
