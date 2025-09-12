@@ -2,6 +2,16 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import Home from '../../app/page';
 
+// Mock the BlockingPreloader to avoid asset loading in tests
+jest.mock('../../components/BlockingPreloader', () => {
+  return function MockBlockingPreloader({ onReady }: { onReady: () => void }) {
+    React.useEffect(() => {
+      onReady();
+    }, [onReady]);
+    return <div>Assets Ready</div>;
+  };
+});
+
 describe('Home Component (daily alias)', () => {
   it('renders the Daily page content', async () => {
     render(<Home />);

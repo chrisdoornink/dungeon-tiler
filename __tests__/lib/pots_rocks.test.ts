@@ -73,7 +73,7 @@ describe('TileSubtype additions for Pots and Rocks', () => {
       win: false,
       playerDirection: Direction.RIGHT,
       enemies: [],
-      heroHealth: 4,
+      heroHealth: 3,
       heroAttack: 1,
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
       recentDeaths: [],

@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import {
-  tileTypes,
-  initializeGameState,
-  initializeGameStateFromMap,
-  generateMap,
-  generateCompleteMap,
-  type GameState,
-} from "../lib/map";
+import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies } from "../lib/enemy";
-import { TilemapGrid } from "./TilemapGrid";
-import { mulberry32, hashStringToSeed, withPatchedMathRandom } from "../lib/rng";
+import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
+import { CurrentGameStorage } from "../lib/current_game_storage";
 import { trackGameStart } from "../lib/analytics";
 import { computeMapId } from "../lib/map";
+import { TilemapGrid } from "./TilemapGrid";
 
 export interface GameViewProps {
   algorithm?: string;
@@ -46,8 +40,20 @@ function GameViewInner({
   const initialState = useMemo(() => {
     let state: GameState | undefined;
 
-    // If loading exact state, try localStorage first and avoid regenerating
-    if ((replayExact || mapId) && typeof window !== "undefined") {
+    // First priority: check for current game in progress (auto-save/restore)
+    if (!replayExact && !mapId && typeof window !== "undefined") {
+      const savedGame = CurrentGameStorage.loadCurrentGame(isDailyChallenge);
+      if (savedGame) {
+        // Rehydrate enemies into class instances so methods exist
+        if (Array.isArray(savedGame.enemies)) {
+          savedGame.enemies = rehydrateEnemies(savedGame.enemies as any);
+        }
+        state = savedGame as GameState;
+      }
+    }
+
+    // Second priority: if loading exact state, try localStorage and avoid regenerating
+    if (!state && (replayExact || mapId) && typeof window !== "undefined") {
       try {
         // For map-specific loading, try the map-specific key first, then fallback to generic
         const keys = mapId
@@ -105,6 +111,8 @@ function GameViewInner({
         try {
           // Use single key, replace previous game data
           window.localStorage.setItem("initialGame", JSON.stringify(state));
+          // Also save as current game for auto-save/restore functionality
+          CurrentGameStorage.saveCurrentGame(state, isDailyChallenge);
         } catch {
           // ignore storage errors
         }
@@ -165,7 +173,9 @@ function GameViewInner({
           Torch Boy
         </h1>
         <TilemapGrid
+          tilemap={finalInitialState.mapData.tiles}
           tileTypes={tileTypes}
+          subtypes={finalInitialState.mapData.subtypes}
           initialGameState={finalInitialState}
           forceDaylight={daylight}
           isDailyChallenge={!!isDailyChallenge}

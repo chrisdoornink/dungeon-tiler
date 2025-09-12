@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
 import { computeMapId } from "../lib/map";
+import { CurrentGameStorage } from "../lib/current_game_storage";
 
 // Grid dimensions will be derived from provided map data
 
@@ -115,14 +116,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
     try { trackUse("food"); } catch {}
-    setGameState((prev) => performUseFood(prev));
-  }, []);
+    setGameState((prev) => {
+      const newState = performUseFood(prev);
+      CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
+      return newState;
+    });
+  }, [isDailyChallenge]);
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
     try { trackUse("potion"); } catch {}
-    setGameState((prev) => performUsePotion(prev));
-  }, []);
+    setGameState((prev) => {
+      const newState = performUsePotion(prev);
+      CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
+      return newState;
+    });
+  }, [isDailyChallenge]);
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
@@ -235,6 +244,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           setTimeout(() => {
             setGameState((p2) => {
               const next = performThrowRune(p2);
+              CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
               try {
                 const died = next.recentDeaths || [];
                 if (died.length > 0) {
@@ -266,6 +276,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       // Apply game logic immediately for collisions or early stops
       const next = performThrowRune(prev);
+      CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
       try {
         const died = next.recentDeaths || [];
         if (died.length > 0) {
@@ -407,7 +418,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         // If clear path (no impact and path reached 4), delay applying game logic until animation completes
         if (!impact && path.length === 4) {
           setTimeout(() => {
-            setGameState((p2) => performThrowRock(p2));
+            setGameState((p2) => {
+              const next = performThrowRock(p2);
+              CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
+              return next;
+            });
           }, path.length * stepMs + 10);
           // Return previous state for now so the rock doesn't appear early
           return prev;
@@ -426,6 +441,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
       const next = performThrowRock(prev);
+      CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
       try {
         // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
         if (preEnemyAtImpact && impact) {
@@ -683,6 +699,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           };
           if (typeof window !== "undefined") {
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            // Clear current game since it's completed
+            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -788,6 +806,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           } as const;
           if (typeof window !== "undefined") {
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            // Clear current game since it's completed
+            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
           }
         } catch {
           // ignore storage errors
@@ -816,6 +836,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           } as const;
           if (typeof window !== "undefined") {
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
+            // Clear current game since it's completed
+            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
           }
         } catch {
           // ignore storage errors
@@ -888,6 +910,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       const newGameState = movePlayer(gameState, direction);
+      CurrentGameStorage.saveCurrentGame(newGameState, isDailyChallenge);
       // Compute floating damage numbers based on differences
       // 1) Enemy damage taken when attacking into enemy tile
       if (
@@ -1026,7 +1049,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       setGameState(newGameState);
     },
-    [gameState, playerPosition]
+    [gameState, playerPosition, isDailyChallenge]
   );
 
   // Handle mobile control button clicks

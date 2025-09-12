@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { DailyChallengeFlow, DailyChallengeState } from "../../lib/daily_challenge_flow";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
+import { CurrentGameStorage } from "../../lib/current_game_storage";
 import DailyIntro from "../../components/daily/DailyIntro";
 import DailyAvailable from "../../components/daily/DailyAvailable";
 import DailyCompleted from "../../components/daily/DailyCompleted";
@@ -29,6 +30,14 @@ export default function DailyChallengePage() {
     setState(currentState);
     setData(stateData.data);
     setToday(stateData.today);
+    
+    // Check if there's an active game in progress and we should show it directly
+    if (currentState === DailyChallengeState.DAILY_AVAILABLE) {
+      const hasActiveGame = CurrentGameStorage.hasCurrentGame(true); // true for daily challenge
+      if (hasActiveGame) {
+        setShowGame(true);
+      }
+    }
   }, []);
 
   const handleIntroComplete = () => {
