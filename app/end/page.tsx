@@ -3,8 +3,8 @@
 
 import React, { useEffect, useState } from "react";
 import { go } from "../../lib/navigation";
-import { getEnemyIcon, enemyKinds, createEmptyByKind, type EnemyKind } from "../../lib/enemies/registry";
-import { ScoreCalculator, type ScoreBreakdown } from "../../lib/score_calculator";
+import { getEnemyIcon, enemyKinds, createEmptyByKind, EnemyRegistry, EnemyKind } from "../../lib/enemies/registry";
+import { ScoreCalculator, ScoreBreakdown } from '../../lib/score_calculator';
 
 type LastGame = {
   completedAt: string;
@@ -104,17 +104,10 @@ export default function EndPage() {
           alt: "Floor crack"
         };
       case 'enemy':
-        const enemyKind = last.deathCause.enemyKind || 'goblin';
-        let enemyImage = "/images/enemies/fire-goblin/fire-goblin-front.png";
-        let enemyName = "a goblin";
-        
-        if (enemyKind === 'ghost') {
-          enemyImage = "/images/enemies/ghost/ghost-front.png";
-          enemyName = "a ghost";
-        } else if (enemyKind === 'stone-exciter') {
-          enemyImage = "/images/enemies/stone-exciter/stone-exciter-front.png";
-          enemyName = "a stone exciter";
-        }
+        const enemyKind = (last.deathCause.enemyKind || 'goblin') as EnemyKind;
+        const enemyConfig = EnemyRegistry[enemyKind];
+        const enemyImage = getEnemyIcon(enemyKind);
+        const enemyName = `a ${enemyConfig.displayName}`;
         
         return {
           message: `You were slain by ${enemyName}`,

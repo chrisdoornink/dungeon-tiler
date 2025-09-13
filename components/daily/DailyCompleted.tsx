@@ -1,12 +1,10 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { DailyChallengeData } from "../../lib/daily_challenge_storage";
+import { DailyChallengeStorage, DailyChallengeData } from "../../lib/daily_challenge_storage";
+import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import { trackDailyChallenge } from "../../lib/posthog_analytics";
-import {
-  ScoreCalculator,
-  type ScoreBreakdown,
-} from "../../lib/score_calculator";
+import { EnemyRegistry, EnemyKind, getEnemyIcon } from "../../lib/enemies/registry";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -112,17 +110,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           alt: "Floor crack",
         };
       case "enemy":
-        const enemyKind = lastGame.deathCause.enemyKind || "goblin";
-        let enemyImage = "/images/enemies/fire-goblin/fire-goblin-front.png";
-        let enemyName = "a goblin";
-
-        if (enemyKind === "ghost") {
-          enemyImage = "/images/enemies/lantern-wisp.png";
-          enemyName = "a ghost";
-        } else if (enemyKind === "stone-exciter") {
-          enemyImage = "/images/enemies/stone-exciter-front.png";
-          enemyName = "a stone exciter";
-        }
+        const enemyKind = (lastGame.deathCause.enemyKind || "goblin") as EnemyKind;
+        const enemyConfig = EnemyRegistry[enemyKind];
+        const enemyImage = getEnemyIcon(enemyKind);
+        const enemyName = `a ${enemyConfig.displayName}`;
 
         return {
           message: `You were slain by ${enemyName}`,

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { EnemyRegistry } from "../lib/enemies/registry";
 
 export default function GameInstructions() {
   return (
@@ -41,7 +42,7 @@ export default function GameInstructions() {
         <p>
           Beware of the vicious
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>goblins</strong>
+            <strong>{EnemyRegistry.goblin.displayName}s</strong>
             <div
               className="w-10 h-10"
               style={{
@@ -68,7 +69,7 @@ export default function GameInstructions() {
           </span>
           , fearsome
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>stone exciters</strong>
+            <strong>{EnemyRegistry["stone-exciter"].displayName}s</strong>
             <div
               className="w-10 h-10"
               style={{
@@ -132,7 +133,7 @@ export default function GameInstructions() {
           to protect yourself from enemy attacks. These treasures may be
           locked away in{" "}
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>chests</strong>
+            <strong>{EnemyRegistry.ghost.displayName}s</strong>
             <div
               className="w-10 h-10"
               style={{
