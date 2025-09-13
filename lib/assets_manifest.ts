@@ -1,38 +1,55 @@
 // Centralized image manifest for blocking preloader
 // Keep this list curated; include critical floors/walls/door, items, enemy sprites, hero poses
 
-export const ASSET_URLS: string[] = [
-  // Floors
+// Critical assets only - load the minimum needed to start the game
+export const CRITICAL_ASSETS: string[] = [
+  // Essential floors and walls
   "/images/floor/floor-try-1.png",
   "/images/floor/floor-1000.png",
+  "/images/wall/wall-0010.png",
+  "/images/wall/wall-0110.png",
+  "/images/wall/wall-0011.png",
+  "/images/wall/wall-0111.png",
+
+  // Exit and key items
+  "/images/door/exit-dark.png",
+  "/images/items/key.png",
+  "/images/items/exit-key.png",
+
+  // Essential hero poses
+  "/images/hero/hero-front-static.png",
+  "/images/hero/hero-right-static.png",
+
+  // One enemy for immediate gameplay
+  "/images/enemies/fire-goblin/fire-goblin-front.png",
+];
+
+// Full asset list for background loading after game starts
+export const ASSET_URLS: string[] = [
+  ...CRITICAL_ASSETS,
+  
+  // Additional floors
   "/images/floor/floor-1001.png",
   "/images/floor/floor-0001.png",
 
-  // Walls (8 variants)
+  // Remaining walls
   "/images/wall/wall-0000.png",
   "/images/wall/wall-0001.png",
-  "/images/wall/wall-0010.png",
-  "/images/wall/wall-0011.png",
   "/images/wall/wall-0100.png",
   "/images/wall/wall-0101.png",
-  "/images/wall/wall-0110.png",
-  "/images/wall/wall-0111.png",
 
-  // Exit & lock
-  "/images/door/exit-dark.png",
-  "/images/door/exit-transparent.png",
+  // Lock (large file - load later)
   "/images/door/gold-chain-lock.png",
 
-  // Torch frames
+  // Torch frames (large files - load later)
   "/images/items/wall-torch-1.png",
   "/images/items/wall-torch-2.png",
   "/images/items/wall-torch-3.png",
 
-  // Items
+  // Remaining items
+  "/images/door/exit-transparent.png",
   "/images/items/closed-chest.png",
   "/images/items/opened-chest.png",
-  "/images/items/key.png",
-  "/images/items/exit-key.png",
   "/images/items/switch.png",
   "/images/items/sword.png",
   "/images/items/shield.png",
@@ -47,8 +64,7 @@ export const ASSET_URLS: string[] = [
   "/images/items/meds-1.png",
   "/images/items/rune1.png",
 
-  // Enemies
-  "/images/enemies/fire-goblin/fire-goblin-front.png",
+  // Remaining enemies (large files - load later)
   "/images/enemies/fire-goblin/fire-goblin-right.png",
   "/images/enemies/fire-goblin/fire-goblin-back.png",
   "/images/enemies/lantern-wisp.png",
@@ -56,9 +72,7 @@ export const ASSET_URLS: string[] = [
   "/images/enemies/stone-exciter-right.png",
   "/images/enemies/stone-exciter-back.png",
 
-  // Hero key poses
-  "/images/hero/hero-front-static.png",
-  "/images/hero/hero-right-static.png",
+  // Remaining hero poses
   "/images/hero/hero-back-static.png",
   "/images/hero/hero-front-sword-static.png",
   "/images/hero/hero-right-sword-static.png",

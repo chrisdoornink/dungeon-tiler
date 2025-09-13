@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { DailyChallengeFlow, DailyChallengeState } from "../../lib/daily_challenge_flow";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
+import BackgroundAssetLoader from "../../lib/background_asset_loader";
 import DailyIntro from "../../components/daily/DailyIntro";
 import DailyAvailable from "../../components/daily/DailyAvailable";
 import DailyCompleted from "../../components/daily/DailyCompleted";
@@ -17,7 +18,11 @@ export default function DailyChallengePage() {
   const [data, setData] = useState<DailyChallengeData | null>(null);
   const [today, setToday] = useState<string>("");
   const [showGame, setShowGame] = useState<boolean>(false);
-  const handleAssetsReady = useCallback(() => setAssetsReady(true), []);
+  const handleAssetsReady = useCallback(() => {
+    setAssetsReady(true);
+    // Start loading remaining assets in background after critical ones are done
+    BackgroundAssetLoader.getInstance().startBackgroundLoading();
+  }, []);
 
   useEffect(() => {
     // Track page view

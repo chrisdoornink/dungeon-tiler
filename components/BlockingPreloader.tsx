@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { ASSET_URLS } from "../lib/assets_manifest";
+import { CRITICAL_ASSETS } from "../lib/assets_manifest";
 
 interface BlockingPreloaderProps {
   onReady: () => void;
@@ -13,7 +13,7 @@ interface BlockingPreloaderProps {
  * Calls onReady() once all assets are successfully cached (or attempted).
  */
 const BlockingPreloader: React.FC<BlockingPreloaderProps> = ({ onReady }) => {
-  const manifest = useMemo(() => ASSET_URLS.slice(), []);
+  const manifest = useMemo(() => CRITICAL_ASSETS.slice(), []);
   const [loaded, setLoaded] = useState<number>(0);
   const [failed, setFailed] = useState<number>(0);
   const [thumbs, setThumbs] = useState<string[]>([]);
@@ -106,7 +106,7 @@ const BlockingPreloader: React.FC<BlockingPreloaderProps> = ({ onReady }) => {
           ))}
         </div>
         <div className="mt-4 text-sm text-gray-400">
-          Tip: assets are cached by your browser and the CDN. Future loads will be much faster.
+          Loading only critical assets first. Additional sprites load in the background.
         </div>
       </div>
     </div>
