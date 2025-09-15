@@ -109,6 +109,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     null
   );
 
+  // Track if game completion has already been processed to prevent duplicate saves
+  const [gameCompletionProcessed, setGameCompletionProcessed] = useState(false);
+
   // Transient moving rock effect
   const [rockEffect, setRockEffect] = useState<null | {
     y: number;
@@ -639,7 +642,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
-    if (gameState.win) {
+    if (gameState.win && !gameCompletionProcessed) {
+      setGameCompletionProcessed(true);
       try {
         const mode = isDailyChallenge ? "daily" : "normal";
         const mapId = computeMapId(gameState.mapData);
@@ -738,6 +742,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [
     gameState.win,
+    gameCompletionProcessed,
     gameState.heroHealth,
     gameState.hasKey,
     gameState.hasExitKey,
@@ -843,7 +848,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
-    if (gameState.heroHealth <= 0) {
+    if (gameState.heroHealth <= 0 && !gameCompletionProcessed) {
+      setGameCompletionProcessed(true);
       // Trigger screen shake on death
       triggerScreenShake(400);
       try {
@@ -923,6 +929,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [
     gameState.heroHealth,
+    gameCompletionProcessed,
     gameState.hasKey,
     gameState.hasExitKey,
     gameState.hasSword,
