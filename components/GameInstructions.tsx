@@ -56,7 +56,7 @@ export default function GameInstructions() {
           </span>
           , ethereal
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>ghosts</strong>
+            <strong>{EnemyRegistry.ghost.displayName}s</strong>
             <div
               className="w-10 h-10"
               style={{
@@ -73,8 +73,7 @@ export default function GameInstructions() {
             <div
               className="w-10 h-10"
               style={{
-                backgroundImage:
-                  "url(/images/enemies/stone-exciter-front.png)",
+                backgroundImage: "url(/images/enemies/stone-exciter-front.png)",
                 backgroundSize: "contain",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -99,8 +98,8 @@ export default function GameInstructions() {
               }}
             />
           </span>
-          that will send you plummeting into the abyss if stepped upon.
-          Watch your footing, brave adventurer!
+          that will send you plummeting into the abyss if stepped upon. Watch
+          your footing, brave adventurer!
         </p>
 
         <p>
@@ -130,10 +129,10 @@ export default function GameInstructions() {
               }}
             />
           </span>
-          to protect yourself from enemy attacks. These treasures may be
-          locked away in{" "}
+          to protect yourself from enemy attacks. These treasures may be locked
+          away in{" "}
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>{EnemyRegistry.ghost.displayName}s</strong>
+            <strong>chests</strong>
             <div
               className="w-10 h-10"
               style={{
