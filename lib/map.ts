@@ -642,26 +642,50 @@ export function addExitKeyToMap(mapData: MapData): MapData {
     return newMapData;
   }
 
-  // If we know where the exit is, choose farthest eligible by Manhattan distance.
-  // Enforce minimum distance of 13 when possible.
+  // If we know where the exit is, choose from a varied distance range.
+  // Enforce minimum distance of 10 but allow variety beyond that.
   if (exitPos) {
     const dist = (p: [number, number]) =>
       Math.abs(p[0] - exitPos![0]) + Math.abs(p[1] - exitPos![1]);
 
-    // Prefer tiles meeting the minimum distance
-    const MIN_D = 13;
+    // Filter by minimum distance requirement
+    const MIN_D = 10;
     const farEnough = eligibleTiles.filter((p) => dist(p) >= MIN_D);
-    const candidates = farEnough.length > 0 ? farEnough : eligibleTiles;
+    
+    if (farEnough.length === 0) {
+      // Fallback to any eligible tile if none meet minimum distance
+      const choice = eligibleTiles[Math.floor(Math.random() * eligibleTiles.length)];
+      const [ey, ex] = choice;
+      newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
+      return newMapData;
+    }
 
-    // Find max distance among candidates
+    // Find max distance among valid candidates
     let maxD = -1;
-    for (const p of candidates) {
+    for (const p of farEnough) {
       const d = dist(p);
       if (d > maxD) maxD = d;
     }
-    const farthest = candidates.filter((p) => dist(p) === maxD);
-    const choice = farthest[Math.floor(Math.random() * farthest.length)];
-    const [ey, ex] = choice;
+
+    // Create a range from 70% to 100% of max distance for variety
+    const minRangeD = Math.max(MIN_D, Math.floor(maxD * 0.7));
+    const rangedCandidates = farEnough.filter((p) => dist(p) >= minRangeD);
+    
+    // Add some weighted randomness - farther tiles get slightly higher chance
+    const weightedCandidates = rangedCandidates.map(pos => ({
+      pos,
+      distance: dist(pos),
+      weight: 1 + Math.random() * 0.5 // Random weight between 1.0 and 1.5
+    }));
+    
+    // Sort by combined distance + random weight for selection variety
+    weightedCandidates.sort((a, b) => (b.distance + b.weight) - (a.distance + a.weight));
+    
+    // Pick from top 30% of weighted candidates to maintain distance preference but add variety
+    const topCandidates = weightedCandidates.slice(0, Math.max(1, Math.floor(weightedCandidates.length * 0.3)));
+    const choice = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+    
+    const [ey, ex] = choice.pos;
     newMapData.subtypes[ey][ex] = [TileSubtype.EXITKEY];
     // debug: placed exit key
     return newMapData;

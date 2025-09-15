@@ -33,7 +33,7 @@ function allEligibleFloors(mapData: MapData): Array<[number, number]> {
 }
 
 describe('Exit key placement distance constraints', () => {
-  test('exit key is at least 13 tiles away from the exit (Manhattan) across many generated maps', () => {
+  test('exit key is at least 10 tiles away from the exit (Manhattan) across many generated maps', () => {
     const trials = 25;
     for (let i = 0; i < trials; i++) {
       const map = generateCompleteMap();
@@ -43,13 +43,13 @@ describe('Exit key placement distance constraints', () => {
       expect(keyPos).not.toBeNull();
       if (exitPos && keyPos) {
         const d = manhattan(exitPos, keyPos);
-        expect(d).toBeGreaterThanOrEqual(13);
+        expect(d).toBeGreaterThanOrEqual(10);
       }
     }
   });
 
-  test('exit key leans far: placed at one of the farthest eligible floor tiles from the exit', () => {
-    // Build a base with just exit to measure bias of addExitKeyToMap
+  test('exit key placement has variety: not always at maximum distance', () => {
+    // Build a base with just exit to test the new varied placement logic
     const base = generateMapWithExit(generateMapWithSubtypes());
     const exitPos = findSubtype(base, TileSubtype.EXIT);
     expect(exitPos).not.toBeNull();
@@ -63,17 +63,28 @@ describe('Exit key placement distance constraints', () => {
       ...eligible.map((p) => manhattan(p, exitPos as [number, number]))
     );
 
-    const withKey = addExitKeyToMap(base);
-    const keyPos = findSubtype(withKey, TileSubtype.EXITKEY);
-    expect(keyPos).not.toBeNull();
-    if (!keyPos) return;
+    // Test multiple placements to ensure variety
+    const distances: number[] = [];
+    for (let i = 0; i < 10; i++) {
+      const withKey = addExitKeyToMap(base);
+      const keyPos = findSubtype(withKey, TileSubtype.EXITKEY);
+      expect(keyPos).not.toBeNull();
+      if (!keyPos) continue;
 
-    const d = manhattan(keyPos, exitPos as [number, number]);
+      const d = manhattan(keyPos, exitPos as [number, number]);
+      distances.push(d);
 
-    // Expect placement to choose a farthest tile (strong bias)
-    expect(d).toBeGreaterThanOrEqual(maxDist - 0); // equal to max
+      // Should still respect minimum distance
+      expect(d).toBeGreaterThanOrEqual(10);
+    }
 
-    // And still respect the minimum distance rule
-    expect(d).toBeGreaterThanOrEqual(13);
+    // Should have some variety - not all placements at max distance
+    const uniqueDistances = new Set(distances);
+    expect(uniqueDistances.size).toBeGreaterThan(1);
+
+    // Should still favor farther distances (70% of max or better)
+    const minExpectedDistance = Math.floor(maxDist * 0.7);
+    const farDistances = distances.filter(d => d >= minExpectedDistance);
+    expect(farDistances.length).toBeGreaterThan(distances.length * 0.5); // At least half should be far
   });
 });
