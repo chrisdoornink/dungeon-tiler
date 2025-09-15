@@ -161,9 +161,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       lastGame?.stats?.steps
         ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
         : "",
-      lastGame?.stats?.damageDealt
-        ? `💥 +${lastGame.stats.damageDealt} -${lastGame.stats.damageTaken}`
-        : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -312,18 +309,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                   <span className="text-gray-300">Steps Taken:</span>
                   <span className="text-lg font-semibold text-gray-200">
                     {lastGame.stats.steps || 0}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Damage Dealt:</span>
-                  <span className="text-lg font-semibold text-green-300">
-                    {lastGame.stats.damageDealt}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Damage Taken:</span>
-                  <span className="text-lg font-semibold text-red-300">
-                    {lastGame.stats.damageTaken}
                   </span>
                 </div>
                 {/* Removed numeric Enemies Defeated row per request */}

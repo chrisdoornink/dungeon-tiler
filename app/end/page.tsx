@@ -140,11 +140,8 @@ export default function EndPage() {
         : '')
     : '';
   const stepsPart = typeof last.stats?.steps === 'number' ? `👣 ${last.stats!.steps}` : '';
-  const dmgPart = typeof last.stats?.damageDealt === 'number' && typeof last.stats?.damageTaken === 'number'
-    ? `💥 +${last.stats!.damageDealt} -${last.stats!.damageTaken}`
-    : '';
   const scorePart = scoreBreakdown ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)` : '';
-  shareLines.push([outcomeEmoji, deathEmoji, scorePart, stepsPart, dmgPart].filter(Boolean).join(' '));
+  shareLines.push([outcomeEmoji, deathEmoji, scorePart, stepsPart].filter(Boolean).join(' '));
   // Streak line
   const streakVal = typeof last.streak === 'number' ? last.streak : 0;
   shareLines.push(`🔥 streak: ${streakVal}`);
@@ -244,14 +241,6 @@ export default function EndPage() {
         <div className="text-left text-sm space-y-2 text-gray-200">
           {last.stats && (
             <>
-              <div className="flex items-baseline justify-between">
-                <div className="font-medium">Damage Dealt</div>
-                <div>{last.stats.damageDealt}</div>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <div className="font-medium">Damage Taken</div>
-                <div>{last.stats.damageTaken}</div>
-              </div>
               {typeof last.stats.steps === 'number' && (
                 <div className="flex items-baseline justify-between">
                   <div className="font-medium">Steps</div>
