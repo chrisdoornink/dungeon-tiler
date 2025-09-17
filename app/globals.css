@@ -154,6 +154,58 @@ body {
   animation: spiritFlip 1400ms steps(2, end) infinite;
 }
 
+/* Poison visual effects */
+@keyframes poisonStenchRise {
+  0% {
+    opacity: 0.0;
+    transform: translateY(8px) scale(0.9);
+    filter: blur(2px);
+  }
+  40% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0.0;
+    transform: translateY(-18px) scale(1.05);
+    filter: blur(3px);
+  }
+}
+
+.hero-poison-glow {
+  position: absolute;
+  inset: 8px; /* increase inset so effect stays well within tile bounds */
+  border-radius: 6px;
+  /* Use only an inset shadow to avoid spilling outside tile (prevents clipping) */
+  box-shadow: 0 0 14px 8px rgba(50, 220, 120, 0.18) inset;
+  pointer-events: none;
+}
+
+.poison-stench {
+  position: absolute;
+  bottom: 6px;
+  left: 50%;
+  width: 14px;
+  height: 18px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(120, 255, 160, 0.35) 0%, rgba(120, 255, 160, 0.25) 40%, rgba(120, 255, 160, 0.12) 70%, rgba(120, 255, 160, 0.0) 100%);
+  animation: poisonStenchRise 1400ms ease-in-out infinite;
+  pointer-events: none;
+}
+
+.poison-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Greenish edge vignette: minimal center, stronger at edges */
+  background: radial-gradient(circle at center,
+    rgba(0,0,0,0) 55%,
+    rgba(40, 160, 90, 0.08) 70%,
+    rgba(30, 140, 80, 0.12) 82%,
+    rgba(20, 120, 70, 0.16) 92%,
+    rgba(10, 90, 50, 0.20) 100%
+  );
+}
+
 /* Heart pop animation for health loss */
 @keyframes heartPop {
   0% {

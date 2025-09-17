@@ -1,5 +1,6 @@
 // Centralized enemy registry: assets and behaviors
-export type EnemyKind = "goblin" | "ghost" | "stone-exciter";
+import { canSee } from "../line_of_sight";
+export type EnemyKind = "goblin" | "ghost" | "stone-exciter" | "snake";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -118,6 +119,104 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     base: { health: 8, attack: 5 },
     // Takes exactly 1 melee damage regardless of sword/variance
     calcMeleeDamage: () => 1,
+  },
+  snake: {
+    kind: "snake",
+    displayName: "Snake",
+    assets: {
+      front: "/images/enemies/snake-coiled-right.png", // coiled when not moving
+      left: "/images/enemies/snake-moving-left.png", // moving asset
+      right: "/images/enemies/snake-coiled-right.png", // coiled when not moving
+      back: "/images/enemies/snake-coiled-right.png", // coiled when not moving
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
+    base: { health: 2, attack: 1 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      // Move away from player when visible; wander otherwise
+      customUpdate: (ctx) => {
+        const grid = ctx.grid;
+        const e = ctx.enemy; // contains mutable y,x,facing,memory
+        const py = ctx.player.y;
+        const px = ctx.player.x;
+
+        // If adjacent, attack
+        const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
+        if (manhattan === 1) {
+          // Face the player
+          if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
+            e.facing = px > e.x ? "RIGHT" : "LEFT";
+          } else {
+            e.facing = py > e.y ? "DOWN" : "UP";
+          }
+          return ctx.enemy.attack; // deal base attack; engine applies variance/defense
+        }
+
+        // Helper: bounds & floor
+        const H = grid.length;
+        const W = grid[0].length;
+        const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
+        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+
+        // If can see player, step away along dominant axis, else secondary
+        const sees = canSee(grid, [e.y, e.x], [py, px]);
+        if (sees) {
+          const dy = py - e.y;
+          const dx = px - e.x;
+          const tryMoves: Array<[number, number]> = [];
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            // Move opposite x first, then opposite y
+            if (dx !== 0) tryMoves.push([0, dx > 0 ? -1 : 1]);
+            if (dy !== 0) tryMoves.push([dy > 0 ? -1 : 1, 0]);
+          } else {
+            if (dy !== 0) tryMoves.push([dy > 0 ? -1 : 1, 0]);
+            if (dx !== 0) tryMoves.push([0, dx > 0 ? -1 : 1]);
+          }
+          for (const [my, mx] of tryMoves) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (isFloor(ny, nx)) {
+              // Face direction of movement (opposite of player)
+              if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
+              else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
+              e.y = ny; e.x = nx;
+              // Flag moved for UI sprite logic
+              e.memory.moved = true;
+              return 0;
+            }
+          }
+          // If cannot step away due to walls, stay coiled
+          return 0;
+        }
+
+        // Wander randomly: try up to 4 shuffled directions
+        const dirs: Array<[number, number, 'UP'|'RIGHT'|'DOWN'|'LEFT']> = [
+          [-1, 0, 'UP'],
+          [0, 1, 'RIGHT'],
+          [1, 0, 'DOWN'],
+          [0, -1, 'LEFT'],
+        ];
+        // Shuffle
+        for (let i = dirs.length - 1; i > 0; i--) {
+          const j = Math.floor((ctx.rng?.() ?? Math.random()) * (i + 1));
+          [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+        }
+        for (const [my, mx, face] of dirs) {
+          const ny = e.y + my;
+          const nx = e.x + mx;
+          if (isFloor(ny, nx)) {
+            e.facing = face;
+            e.y = ny; e.x = nx;
+            // Flag moved for UI sprite logic
+            e.memory.moved = true;
+            break;
+          }
+        }
+        return 0;
+      },
+    },
   },
 };
 

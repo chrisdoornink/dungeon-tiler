@@ -1242,7 +1242,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               style={{ flex: "1" }}
             >
               <div className="text-xs font-medium mb-1">Health</div>
-              <HealthDisplay health={gameState.heroHealth} className="mb-2" />
+              <HealthDisplay
+                health={gameState.heroHealth}
+                className="mb-2"
+                isPoisoned={Boolean(gameState.conditions?.poisoned?.active)}
+              />
               {playerPosition &&
                 gameState.enemies &&
                 gameState.enemies.length > 0 &&
@@ -1653,9 +1657,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   className={styles.gridContainer}
                   style={{
                     gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
-                    gridTemplateColumns: `repeat(${
-                      gameState.mapData.tiles[0]?.length ?? 0
-                    }, 40px)`,
+                    gridTemplateColumns: `repeat(${(gameState.mapData.tiles[0]?.length ?? 0)}, 40px)`,
                     // When the hero's torch is OFF, force a pure black background behind tiles
                     // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                     // the transparent center of the vignette.
@@ -1676,7 +1678,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.hasSword,
                     gameState.hasShield,
                     gameState.heroTorchLit ?? true,
-                    gameState.hasExitKey
+                    gameState.hasExitKey,
+                    Boolean(gameState.conditions?.poisoned?.active)
                   )}
                 </div>
               </div>
@@ -1798,7 +1801,8 @@ function renderTileGrid(
   hasSword?: boolean,
   hasShield?: boolean,
   heroTorchLit: boolean = true,
-  hasExitKey?: boolean
+  hasExitKey?: boolean,
+  heroPoisoned: boolean = false
 ) {
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
@@ -1854,6 +1858,8 @@ function renderTileGrid(
   if (enemies) {
     for (const e of enemies) enemyMap.set(`${e.y},${e.x}`, e);
   }
+
+  // Poison status passed in by caller
 
   const tiles = grid.flatMap((row, rowIndex) =>
     row.map((tileId, colIndex) => {
@@ -1915,6 +1921,7 @@ function renderTileGrid(
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
+            heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
@@ -1923,8 +1930,10 @@ function renderTileGrid(
                 | "goblin"
                 | "ghost"
                 | "stone-exciter"
+                | "snake"
                 | undefined
             }
+            enemyMoved={Boolean((enemyAtTile as any)?.behaviorMemory?.moved)}
             enemyAura={(() => {
               if (!enemyAtTile) return false;
               if (enemyAtTile.kind !== "stone-exciter") return false;
@@ -2016,6 +2025,16 @@ function renderTileGrid(
           key="fov-radial-overlay"
           className="pointer-events-none absolute inset-0"
           style={{ backgroundImage: gradient, zIndex: 10000 }}
+        />
+      );
+    }
+    // Add a subtle green vignette when poisoned to suggest corrupted vision
+    if (heroPoisoned) {
+      tiles.push(
+        <div
+          key="poison-vignette"
+          className="poison-vignette"
+          style={{ zIndex: 10020 }}
         />
       );
     }

@@ -44,6 +44,53 @@ type Room = {
   height: number;
 };
 
+// Keep track of last generated rooms for testing/placement passes
+let LAST_ROOMS: Room[] = [];
+export function getLastRooms(): Room[] {
+  return LAST_ROOMS.map(r => ({ ...r }));
+}
+
+/**
+ * Place exactly 2 snakes in each room (testing mode).
+ * Chooses empty floor tiles inside each room rectangle, avoiding player tile,
+ * avoiding existing enemies, and avoiding tiles with any subtypes.
+ */
+export function addTwoSnakesPerRoom(
+  mapData: MapData,
+  enemies: Enemy[],
+  opts?: { rng?: () => number }
+): Enemy[] {
+  const rng = opts?.rng ?? Math.random;
+  const rooms = getLastRooms();
+  const taken = new Set(enemies.map((e) => `${e.y},${e.x}`));
+  // Also avoid player
+  const playerPos = findPlayerPosition(mapData);
+  if (playerPos) taken.add(`${playerPos[0]},${playerPos[1]}`);
+  const out = enemies.slice();
+  for (const r of rooms) {
+    const candidates: Array<[number, number]> = [];
+    for (let y = r.y; y < r.y + r.height; y++) {
+      for (let x = r.x; x < r.x + r.width; x++) {
+        if (mapData.tiles[y][x] !== FLOOR) continue;
+        const subs = mapData.subtypes[y][x] || [];
+        if (subs.length > 0) continue;
+        const key = `${y},${x}`;
+        if (taken.has(key)) continue;
+        candidates.push([y, x]);
+      }
+    }
+    for (let k = 0; k < 6 && candidates.length > 0; k++) {
+      const idx = Math.floor(rng() * candidates.length);
+      const [sy, sx] = candidates.splice(idx, 1)[0];
+      const sn = new Enemy({ y: sy, x: sx });
+      sn.kind = 'snake';
+      out.push(sn);
+      taken.add(`${sy},${sx}`);
+    }
+  }
+  return out;
+}
+
 /**
  * Generate a random 25x25 dungeon map with rooms and connected walls
  * Following the requirements:
@@ -63,7 +110,6 @@ export function generateMap(): number[][] {
     for (let x = 0; x < GRID_SIZE; x++) {
       row.push(WALL);
     }
-
     grid.push(row);
   }
   // Create 2-4 rooms
@@ -125,6 +171,8 @@ export function generateMap(): number[][] {
   // Ensure all floor tiles are connected
   ensureFloorsConnected(grid);
 
+  // Save last rooms for downstream placement passes
+  LAST_ROOMS = rooms.map(r => ({ ...r }));
   return grid;
 }
 
@@ -179,6 +227,7 @@ export enum TileSubtype {
   RUNE = 17,
   FAULTY_FLOOR = 18,
   DARKNESS = 19,
+  SNAKE = 20,
 }
 
 export interface MapData {
@@ -934,7 +983,7 @@ export function performUseFood(gameState: GameState): GameState {
     const pos = findPlayerPosition(preTickState.mapData);
     if (pos) {
       const [py, px] = pos;
-      const damage = updateEnemies(
+      const result = updateEnemies(
         preTickState.mapData.tiles,
         preTickState.mapData.subtypes,
         preTickState.enemies,
@@ -949,8 +998,8 @@ export function performUseFood(gameState: GameState): GameState {
         }
       );
 
-      if (damage > 0) {
-        const applied = Math.max(0, damage - (preTickState.hasShield ? 1 : 0));
+      if (result.damage > 0) {
+        const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
         preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
         preTickState.stats.damageTaken += applied;
 
@@ -995,7 +1044,7 @@ export function performUsePotion(gameState: GameState): GameState {
     const pos = findPlayerPosition(preTickState.mapData);
     if (pos) {
       const [py, px] = pos;
-      const damage = updateEnemies(
+      const result = updateEnemies(
         preTickState.mapData.tiles,
         preTickState.mapData.subtypes,
         preTickState.enemies,
@@ -1010,8 +1059,8 @@ export function performUsePotion(gameState: GameState): GameState {
         }
       );
 
-      if (damage > 0) {
-        const applied = Math.max(0, damage - (preTickState.hasShield ? 1 : 0));
+      if (result.damage > 0) {
+        const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
         preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
         preTickState.stats.damageTaken += applied;
 
@@ -1036,6 +1085,11 @@ export function performUsePotion(gameState: GameState): GameState {
   newGameState.potionCount = count - 1;
   newGameState.stats.steps += 1;
 
+  // Cure poison condition
+  if (newGameState.conditions?.poisoned?.active) {
+    newGameState.conditions.poisoned.active = false;
+  }
+
   // debug: used potion
   
   return newGameState;
@@ -1058,7 +1112,7 @@ export function performThrowRock(gameState: GameState): GameState {
   // Reset transient deaths for this tick
   preTickState.recentDeaths = [];
   if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
-    const damage = updateEnemies(
+    const result = updateEnemies(
       preTickState.mapData.tiles,
       preTickState.mapData.subtypes,
       preTickState.enemies,
@@ -1075,8 +1129,8 @@ export function performThrowRock(gameState: GameState): GameState {
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
       }
     );
-    if (damage > 0) {
-      const applied = Math.min(2, damage);
+    if (result.damage > 0) {
+      const applied = Math.min(2, result.damage);
       preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
       preTickState.stats = {
         ...preTickState.stats,
@@ -1250,7 +1304,7 @@ export function performThrowRune(gameState: GameState): GameState {
   const preTickState: GameState = { ...gameState };
   preTickState.recentDeaths = [];
   if (!hasAdjacentTarget && preTickState.enemies && Array.isArray(preTickState.enemies)) {
-    const damage = updateEnemies(
+    const result = updateEnemies(
       preTickState.mapData.tiles,
       preTickState.mapData.subtypes,
       preTickState.enemies,
@@ -1266,8 +1320,8 @@ export function performThrowRune(gameState: GameState): GameState {
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
       }
     );
-    if (damage > 0) {
-      const applied = Math.min(2, damage);
+    if (result.damage > 0) {
+      const applied = Math.min(2, result.damage);
       preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
       preTickState.stats = {
         ...preTickState.stats,
@@ -1420,8 +1474,17 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor";
+    type: "enemy" | "faulty_floor" | "poison";
     enemyKind?: string;
+  };
+  // Status conditions affecting the player
+  conditions?: {
+    poisoned?: {
+      active: boolean;
+      stepsSinceLastDamage: number;
+      damagePerInterval: number;
+      stepInterval: number;
+    };
   };
 }
 
@@ -1447,6 +1510,9 @@ export function initializeGameState(): GameState {
   // After enemies are assigned, place one rune pot per stone-exciter
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
 
+  // For testing: add exactly 2 snakes per room
+  const snakesAdded = addTwoSnakesPerRoom(withRunes, enemies);
+
   // debug: enemies placed
 
   return {
@@ -1458,7 +1524,7 @@ export function initializeGameState(): GameState {
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN, // Default facing down/front
-    enemies,
+    enemies: snakesAdded,
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
@@ -1498,6 +1564,8 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     : [];
 
   enemyTypeAssignement(enemies);
+  // For testing: add exactly 2 snakes per room
+  const snakesAdded = addTwoSnakesPerRoom(ensured, enemies);
 
   return {
     hasKey: false,
@@ -1508,7 +1576,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN,
-    enemies,
+    enemies: snakesAdded,
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
@@ -1543,6 +1611,34 @@ export function computeMapId(mapData: MapData): string {
     // Fallback: random id
     return Math.random().toString(36).slice(2, 10);
   }
+}
+
+/**
+ * Convert some snakes to start inside pots. For each enemy of kind 'snake', roll rng();
+ * if < 0.5, remove the enemy and place [POT, SNAKE] at its position.
+ * Returns new mapData and enemies array.
+ */
+export function addSnakePots(
+  mapData: MapData,
+  enemies: Enemy[],
+  opts?: { rng?: () => number }
+): { mapData: MapData; enemies: Enemy[] } {
+  const rng = opts?.rng ?? Math.random;
+  const newMap = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const kept: Enemy[] = [];
+  for (const e of enemies) {
+    if (e.kind === 'snake' && rng() < 0.5) {
+      const subs = newMap.subtypes[e.y][e.x] || [];
+      if (!subs.includes(TileSubtype.POT)) {
+        newMap.subtypes[e.y][e.x] = [TileSubtype.POT, TileSubtype.SNAKE];
+      } else if (!subs.includes(TileSubtype.SNAKE)) {
+        newMap.subtypes[e.y][e.x].push(TileSubtype.SNAKE);
+      }
+    } else {
+      kept.push(e);
+    }
+  }
+  return { mapData: newMap, enemies: kept };
 }
 
 /**
@@ -1599,7 +1695,7 @@ export function movePlayer(
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
-    const damage = updateEnemies(
+    const result = updateEnemies(
       newMapData.tiles,
       newMapData.subtypes,
       newGameState.enemies,
@@ -1624,11 +1720,29 @@ export function movePlayer(
         },
       }
     );
-    if (damage > 0) {
-      const applied = Math.min(2, damage);
+    if (result.damage > 0) {
+      const applied = Math.min(2, result.damage);
       try { /* debug log removed */ } catch {}
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
+
+      // Apply poison condition if snake attacked
+      const snakeAttacked = result.attackingEnemies.some(enemy => enemy.kind === 'snake');
+      if (snakeAttacked) {
+        if (!newGameState.conditions) {
+          newGameState.conditions = {};
+        }
+        if (!newGameState.conditions.poisoned) {
+          newGameState.conditions.poisoned = {
+            active: true,
+            stepsSinceLastDamage: 0,
+            damagePerInterval: 1,
+            stepInterval: 8
+          };
+        } else {
+          newGameState.conditions.poisoned.active = true;
+        }
+      }
 
       // If player dies from enemy damage, track which enemy killed them
       if (newGameState.heroHealth === 0) {
@@ -1662,7 +1776,7 @@ export function movePlayer(
       newGameState.stats.enemiesDefeated += adjacentGhosts.length;
       // Track type-specific defeats (all ghosts here)
       if (!newGameState.stats.byKind)
-        newGameState.stats.byKind = { goblin: 0, ghost: 0, "stone-exciter": 0 };
+        newGameState.stats.byKind = createEmptyByKind();
       newGameState.stats.byKind.ghost += adjacentGhosts.length;
       // Remove adjacent ghosts from active enemies
       newGameState.enemies = newGameState.enemies.filter(
@@ -1764,6 +1878,56 @@ export function movePlayer(
 
     // If it's a POT, reveal content without moving
     if (subtype.includes(TileSubtype.POT)) {
+      // Special case: snake pot spawns a snake and triggers immediate attack/poison
+      if (subtype.includes(TileSubtype.SNAKE)) {
+        // Remove the pot and snake tag from the tile
+        newMapData.subtypes[newY][newX] = subtype.filter(
+          (t) => t !== TileSubtype.POT && t !== TileSubtype.SNAKE
+        );
+        // Spawn a snake enemy at this tile
+        if (!newGameState.enemies) newGameState.enemies = [];
+        const snake = new Enemy({ y: newY, x: newX });
+        snake.kind = 'snake';
+        newGameState.enemies.push(snake);
+
+        // Immediate enemy resolution relative to current player position
+        const posNow = [currentY, currentX] as [number, number];
+        const result = updateEnemies(
+          newMapData.tiles,
+          newMapData.subtypes,
+          newGameState.enemies,
+          { y: posNow[0], x: posNow[1] },
+          {
+            rng: newGameState.combatRng ?? Math.random,
+            defense: newGameState.hasShield ? 1 : 0,
+            playerTorchLit: newGameState.heroTorchLit ?? true,
+            setPlayerTorchLit: (lit: boolean) => {
+              newGameState.heroTorchLit = lit;
+            },
+          }
+        );
+        // Guarantee at least 1 immediate damage from an ambush
+        const dmgNow = Math.max(1, result.damage);
+        if (dmgNow > 0) {
+          const applied = Math.min(2, dmgNow);
+          newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
+          newGameState.stats.damageTaken += applied;
+        }
+        // Always apply poison on a snake ambush from a pot
+        if (!newGameState.conditions) newGameState.conditions = {};
+        if (!newGameState.conditions.poisoned) {
+          newGameState.conditions.poisoned = {
+            active: true,
+            stepsSinceLastDamage: 0,
+            damagePerInterval: 1,
+            stepInterval: 8,
+          };
+        } else {
+          newGameState.conditions.poisoned.active = true;
+        }
+        return newGameState;
+      }
+
       // If this pot is tagged with RUNE, reveal the rune; otherwise reveal FOOD/MED 50/50
       if (subtype.includes(TileSubtype.RUNE)) {
         newMapData.subtypes[newY][newX] = [TileSubtype.RUNE];
@@ -1792,6 +1956,10 @@ export function movePlayer(
         // MED/Potion: auto-heal when health <= 3, inventory when health > 3
         if (newGameState.heroHealth <= 3) {
           newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
+          // Also cure poison when potion auto-heals on pickup
+          if (newGameState.conditions?.poisoned?.active) {
+            newGameState.conditions.poisoned.active = false;
+          }
         } else {
           newGameState.potionCount = (newGameState.potionCount || 0) + 1;
         }
@@ -2019,6 +2187,27 @@ export function movePlayer(
   // Increment steps if a move occurred
   if (moved) {
     newGameState.stats.steps += 1;
+  }
+
+  // Handle poison damage over time
+  if (newGameState.conditions?.poisoned?.active && moved) {
+    const poison = newGameState.conditions.poisoned;
+    poison.stepsSinceLastDamage += 1;
+    
+    if (poison.stepsSinceLastDamage >= poison.stepInterval) {
+      // Apply poison damage
+      const poisonDamage = poison.damagePerInterval;
+      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - poisonDamage);
+      newGameState.stats.damageTaken += poisonDamage;
+      poison.stepsSinceLastDamage = 0;
+      
+      // Set death cause if poison kills the player
+      if (newGameState.heroHealth === 0) {
+        newGameState.deathCause = {
+          type: "poison",
+        };
+      }
+    }
   }
 
   return newGameState;

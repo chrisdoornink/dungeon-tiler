@@ -5,12 +5,14 @@ interface HealthDisplayProps {
   health: number;
   maxHealth?: number;
   className?: string;
+  isPoisoned?: boolean; // when true, tint filled hearts to indicate poison
 }
 
 const HealthDisplay: React.FC<HealthDisplayProps> = ({ 
   health, 
   maxHealth = 5, 
-  className = '' 
+  className = '',
+  isPoisoned = false,
 }) => {
   const [previousHealth, setPreviousHealth] = useState(health);
   const [heartPopTrigger, setHeartPopTrigger] = useState(false);
@@ -37,8 +39,8 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
       hearts.push(
         <img 
           key={i} 
-          src="/images/presentational/heart-red.png" 
-          alt="❤️" 
+          src={isPoisoned ? "/images/presentational/heart-poison-green.png" : "/images/presentational/heart-red.png"}
+          alt={isPoisoned ? "💚" : "❤️"}
           className="w-4 h-4"
         />
       );

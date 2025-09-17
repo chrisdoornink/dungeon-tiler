@@ -22,10 +22,12 @@ interface TileProps {
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
+  heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'goblin' | 'ghost' | 'stone-exciter';
+  enemyKind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
+  enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemyAura?: boolean; // show eerie green glow when close to hero
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
@@ -44,10 +46,12 @@ export const Tile: React.FC<TileProps> = ({
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
+  heroPoisoned = false,
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
   enemyKind,
+  enemyMoved,
   enemyAura,
   hasSword,
   hasShield,
@@ -651,6 +655,15 @@ export const Tile: React.FC<TileProps> = ({
               }}
             />
           )}
+          {/* Hero poison visuals: glow + stench wisps */}
+          {isPlayerTile && heroPoisoned && (
+            <>
+              {/* multiple wisps with slight offsets for variety */}
+              <div className="poison-stench" style={{ left: '42%' }} aria-hidden="true" />
+              <div className="poison-stench" style={{ left: '58%', animationDelay: '200ms' }} aria-hidden="true" />
+              <div className="poison-stench" style={{ left: '50%', animationDelay: '400ms', width: '10px' }} aria-hidden="true" />
+            </>
+          )}
 
           {/* Enemy rendering: sprite (when visible) */}
           {hasEnemy && (
@@ -681,6 +694,17 @@ export const Tile: React.FC<TileProps> = ({
                         }
                       };
                       const kind: EnemyKind = (enemyKind ?? 'goblin');
+                      // For snakes: use moving sprite when enemyMoved, else coiled
+                      if (kind === 'snake') {
+                        const f = enemyFacing;
+                        // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
+                        const useMoving = !!enemyMoved;
+                        if (useMoving) {
+                          return getEnemyIcon('snake', 'left');
+                        }
+                        // coiled sprite follows facing (front/back/right are coiled)
+                        return getEnemyIcon('snake', toFacing(f));
+                      }
                       const facing: Facing = toFacing(enemyFacing);
                       return getEnemyIcon(kind, facing);
                     })()})`,
@@ -688,7 +712,19 @@ export const Tile: React.FC<TileProps> = ({
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'center',
                     zIndex: 10500, // above fog (10000), below wall tops (12000)
-                    transform: enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none'),
+                    transform: (() => {
+                      // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
+                      if (enemyKind !== 'snake') {
+                        return enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none');
+                      }
+                      // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
+                      const baseScale = 'scale(0.5)';
+                      const moved = !!enemyMoved;
+                      if (moved && enemyFacing === 'RIGHT') {
+                        return 'scaleX(-1) ' + baseScale;
+                      }
+                      return baseScale;
+                    })(),
                   }}
                   data-testid="enemy-sprite"
                 />

@@ -28,13 +28,13 @@ export class Enemy {
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
-  // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter
-  private _kind: 'goblin' | 'ghost' | 'stone-exciter' = 'goblin';
+  // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons
+  private _kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' = 'goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'goblin' | 'ghost' | 'stone-exciter' { return this._kind; }
-  set kind(k: 'goblin' | 'ghost' | 'stone-exciter') {
+  get kind(): 'goblin' | 'ghost' | 'stone-exciter' | 'snake' { return this._kind; }
+  set kind(k: 'goblin' | 'ghost' | 'stone-exciter' | 'snake') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -46,6 +46,10 @@ export class Enemy {
       this.attack = 5;
       // Stone-exciter durability tuning: 8 HP baseline
       this.health = 8;
+    } else if (k === 'snake') {
+      // Snake baseline per registry: low HP, light attack
+      if (this.health > 2) this.health = 2;
+      this.attack = 1;
     }
   }
   // Pursuit memory: how many ticks to keep chasing after losing LOS
@@ -62,6 +66,8 @@ export class Enemy {
     const { grid, subtypes, player } = ctx;
     // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
     this.state = EnemyState.IDLE;
+    // Reset moved flag each tick; UI may use this for sprite selection
+    try { (this.behaviorMemory as any).moved = false; } catch {}
     // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
     const distManhattan = Math.abs(player.y - this.y) + Math.abs(player.x - this.x);
     const withinRange = distManhattan <= ENEMY_VISION_RADIUS;
@@ -148,6 +154,7 @@ export class Enemy {
           this.y = ny;
           this.x = nx;
           moved = true;
+          try { (this.behaviorMemory as any).moved = true; } catch {}
           break;
         }
         // Ghosts can phase through walls: continue along axis until next floor tile
@@ -181,6 +188,7 @@ export class Enemy {
               this.x = tx;
               // moved successfully through walls
               moved = true;
+              try { (this.behaviorMemory as any).moved = true; } catch {}
               break;
             }
             // continue stepping through walls
@@ -232,7 +240,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'goblin' | 'ghost' | 'stone-exciter'
+  kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake'
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
   if (kind === 'ghost') {
@@ -293,8 +301,8 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export type PlainEnemy = {
   y: number;
   x: number;
-  kind?: 'goblin' | 'ghost' | 'stone-exciter';
-  _kind?: 'goblin' | 'ghost' | 'stone-exciter';
+  kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
+  _kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -309,7 +317,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
     // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
     const k = d?.kind ?? d?._kind;
-    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin') {
+    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin' || k === 'snake') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
@@ -332,6 +340,32 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
   });
 }
 
+// Overloads for better type inference at call sites
+export function updateEnemies(
+  grid: number[][],
+  enemies: Enemy[],
+  player: { y: number; x: number },
+  opts?: {
+    rng?: () => number;
+    defense?: number;
+    suppress?: (e: Enemy) => boolean;
+    playerTorchLit?: boolean;
+    setPlayerTorchLit?: (lit: boolean) => void;
+  }
+): number;
+export function updateEnemies(
+  grid: number[][],
+  subtypes: number[][][],
+  enemies: Enemy[],
+  player: { y: number; x: number },
+  opts?: {
+    rng?: () => number;
+    defense?: number;
+    suppress?: (e: Enemy) => boolean;
+    playerTorchLit?: boolean;
+    setPlayerTorchLit?: (lit: boolean) => void;
+  }
+): { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> };
 export function updateEnemies(
   grid: number[][],
   subtypesOrEnemies: number[][][] | Enemy[],
@@ -350,14 +384,15 @@ export function updateEnemies(
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
   }
-): number {
+): number | { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> } {
   // Handle backward compatibility: old signature was (grid, enemies, player, opts)
   let subtypes: number[][][] | undefined;
   let enemies: Enemy[];
   let player: { y: number; x: number };
   let finalOpts: typeof opts;
 
-  if (Array.isArray(subtypesOrEnemies) && subtypesOrEnemies.length > 0 && 'y' in subtypesOrEnemies[0]) {
+  const usingOldSignature = Array.isArray(subtypesOrEnemies) && subtypesOrEnemies.length > 0 && 'y' in subtypesOrEnemies[0];
+  if (usingOldSignature) {
     // Old signature: updateEnemies(grid, enemies, player, opts)
     subtypes = undefined;
     enemies = subtypesOrEnemies as Enemy[];
@@ -374,6 +409,7 @@ export function updateEnemies(
   const defense = finalOpts?.defense ?? 0;
   const suppress = finalOpts?.suppress;
   let totalDamage = 0;
+  const attackingEnemies: Array<{ kind: string; damage: number }> = [];
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
@@ -445,6 +481,11 @@ export function updateEnemies(
       const effective = Math.max(0, base + variance - defense);
       // debug log removed
       totalDamage += effective;
+      
+      // Track attacking enemies for condition application
+      if (effective > 0) {
+        attackingEnemies.push({ kind: e.kind, damage: effective });
+      }
     }
 
     // Proximity behavior hook (e.g., ghost snuff torch) based on post-move adjacency
@@ -474,5 +515,10 @@ export function updateEnemies(
       opts.setPlayerTorchLit(false);
     }
   }
-  return totalDamage;
+
+  // Backward-compatible return: if called with old signature, return the damage number
+  if (usingOldSignature) {
+    return totalDamage;
+  }
+  return { damage: totalDamage, attackingEnemies };
 }
