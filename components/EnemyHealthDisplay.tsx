@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 interface EnemyHealthDisplayProps {
   health: number;
@@ -18,20 +19,26 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
   for (let i = 0; i < maxHealth; i++) {
     if (i < clampedHealth) {
       hearts.push(
-        <img 
-          key={i} 
-          src="/images/presentational/heart-moss-red.png" 
-          alt="❤️" 
+        <Image
+          key={i}
+          src="/images/presentational/heart-moss-red.png"
+          alt="❤️"
+          width={12}
+          height={12}
           className="w-3 h-3"
+          sizes="12px"
         />
       );
     } else {
       hearts.push(
-        <img 
-          key={i} 
-          src="/images/presentational/heart-moss-green.png" 
-          alt="🤍" 
+        <Image
+          key={i}
+          src="/images/presentational/heart-moss-green.png"
+          alt="🤍"
+          width={12}
+          height={12}
           className="w-3 h-3"
+          sizes="12px"
         />
       );
     }

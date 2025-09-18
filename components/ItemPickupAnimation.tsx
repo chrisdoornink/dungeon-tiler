@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 
 interface ItemPickupAnimationProps {
   isTriggered: boolean;
@@ -51,10 +52,13 @@ const ItemPickupAnimation: React.FC<ItemPickupAnimationProps> = ({
 
   return (
     <div className="fixed inset-0 pointer-events-none z-50 flex items-center justify-center">
-      <img
+      <Image
         src={getItemImage(itemType)}
         alt={itemType}
+        width={32}
+        height={32}
         className="w-8 h-8 animate-item-pickup-center"
+        sizes="32px"
       />
     </div>
   );

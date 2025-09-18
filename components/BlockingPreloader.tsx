@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import NextImage from "next/image";
 import { CRITICAL_ASSETS } from "../lib/assets_manifest";
 
 interface BlockingPreloaderProps {
@@ -95,12 +96,14 @@ const BlockingPreloader: React.FC<BlockingPreloaderProps> = ({ onReady }) => {
         <div className="grid grid-cols-8 gap-2 max-h-48 overflow-auto rounded border border-gray-700 p-2 bg-black/40">
           {thumbs.map((src) => (
             <div key={src} className="w-12 h-12 bg-gray-800 rounded overflow-hidden">
-              <img
+              <NextImage
                 src={src}
                 alt="asset"
+                width={48}
+                height={48}
                 className="w-full h-full object-contain"
-                loading="eager"
-                decoding="async"
+                priority
+                sizes="48px"
               />
             </div>
           ))}

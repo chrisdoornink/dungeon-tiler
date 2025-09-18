@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import Image from 'next/image';
 import HeartPopAnimation from './HeartPopAnimation';
 
 interface HealthDisplayProps {
@@ -37,20 +38,26 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
   for (let i = 0; i < maxHealth; i++) {
     if (i < clampedHealth) {
       hearts.push(
-        <img 
-          key={i} 
+        <Image
+          key={i}
           src={isPoisoned ? "/images/presentational/heart-poison-green.png" : "/images/presentational/heart-red.png"}
           alt={isPoisoned ? "💚" : "❤️"}
+          width={16}
+          height={16}
           className="w-4 h-4"
+          sizes="16px"
         />
       );
     } else {
       hearts.push(
-        <img 
-          key={i} 
-          src="/images/presentational/heart-empty.png" 
-          alt="🤍" 
+        <Image
+          key={i}
+          src="/images/presentational/heart-empty.png"
+          alt="🤍"
+          width={16}
+          height={16}
           className="w-4 h-4"
+          sizes="16px"
         />
       );
     }

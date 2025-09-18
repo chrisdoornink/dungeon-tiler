@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 interface HeartPopAnimationProps {
   isTriggered: boolean;
@@ -31,10 +32,13 @@ const HeartPopAnimation: React.FC<HeartPopAnimationProps> = ({
 
   return (
     <div className={`absolute pointer-events-none ${className}`} style={style}>
-      <img 
-        src="/images/presentational/heart-red.png" 
-        alt="❤️" 
+      <Image
+        src="/images/presentational/heart-red.png"
+        alt="❤️"
+        width={16}
+        height={16}
         className="w-4 h-4 animate-heart-pop"
+        sizes="16px"
       />
     </div>
   );
