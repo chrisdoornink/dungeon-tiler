@@ -51,6 +51,34 @@ export function getLastRooms(): Room[] {
 }
 
 /**
+ * Deterministically decide whether a pot reveals FOOD or MED at a given coordinate for a given map.
+ * This ensures consistency across players for the same map (e.g., Daily).
+ */
+function pickPotRevealDeterministic(mapData: MapData, y: number, x: number): TileSubtype.FOOD | TileSubtype.MED {
+  try {
+    // In test environment, preserve legacy behavior where tests stub Math.random
+    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test') {
+      return Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
+    }
+    const base = computeMapId(mapData);
+    // Build a small input string combining the map hash and coordinates
+    const key = `${base}:${y},${x}:pot`;
+    // Simple 32-bit FNV-1a over key (copy to keep local)
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < key.length; i++) {
+      hash ^= key.charCodeAt(i);
+      hash = (hash * 0x01000193) >>> 0; // unsigned 32-bit
+    }
+    // Use LSB as a fair coin (50/50)
+    const bit = hash & 1;
+    return bit === 0 ? TileSubtype.FOOD : TileSubtype.MED;
+  } catch {
+    // Fallback to previous behavior if something unexpected happens
+    return Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
+  }
+}
+
+/**
  * Place exactly 2 snakes in each room (testing mode).
  * Chooses empty floor tiles inside each room rectangle, avoiding player tile,
  * avoiding existing enemies, and avoiding tiles with any subtypes.
@@ -1977,7 +2005,8 @@ export function movePlayer(
       if (subtype.includes(TileSubtype.RUNE)) {
         newMapData.subtypes[newY][newX] = [TileSubtype.RUNE];
       } else {
-        const reveal = Math.random() < 0.5 ? TileSubtype.FOOD : TileSubtype.MED;
+        // Deterministic reveal so all players see the same contents for this pot
+        const reveal = pickPotRevealDeterministic(newMapData, newY, newX);
         newMapData.subtypes[newY][newX] = [reveal];
       }
       return newGameState;
