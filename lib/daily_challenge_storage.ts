@@ -1,3 +1,5 @@
+import { DateUtils } from './date_utils';
+
 export interface DailyChallengeData {
   // User progression
   hasSeenIntro: boolean;
@@ -56,6 +58,16 @@ export class DailyChallengeStorage {
       if (!data.migratedToLocalTime) {
         data = this.migrateToLocalTime(data);
       }
+
+      // Normalize: if completion flag is from a previous day, clear it on load
+      try {
+        const isToday = DateUtils.isToday(data.lastPlayedDate);
+        if (data.todayCompleted && !isToday) {
+          data.todayCompleted = false;
+          data.todayResult = null;
+          this.saveData(data);
+        }
+      } catch {}
       
       return data;
     } catch {
