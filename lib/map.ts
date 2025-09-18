@@ -55,39 +55,82 @@ export function getLastRooms(): Room[] {
  * Chooses empty floor tiles inside each room rectangle, avoiding player tile,
  * avoiding existing enemies, and avoiding tiles with any subtypes.
  */
-export function addTwoSnakesPerRoom(
+export function addSnakesPerRules(
   mapData: MapData,
   enemies: Enemy[],
   opts?: { rng?: () => number }
 ): Enemy[] {
   const rng = opts?.rng ?? Math.random;
   const rooms = getLastRooms();
-  const taken = new Set(enemies.map((e) => `${e.y},${e.x}`));
-  // Also avoid player
+  const out = enemies.slice();
+  const taken = new Set(out.map((e) => `${e.y},${e.x}`));
   const playerPos = findPlayerPosition(mapData);
   if (playerPos) taken.add(`${playerPos[0]},${playerPos[1]}`);
-  const out = enemies.slice();
+
+  // Determine counts
+  const roomCount = Math.max(1, rooms.length);
+  const targetSnakes = Math.min(4, Math.max(2, Math.round(roomCount * 0.33)));
+  const potCount = Math.min(1, Math.floor(targetSnakes * 0.25)); // 25% capped at 1
+  const floorCount = Math.max(0, targetSnakes - potCount);
+
+  // Build global candidate list across rooms for diverse placement
+  const floorCandidates: Array<[number, number]> = [];
+  const potCandidates: Array<[number, number]> = [];
   for (const r of rooms) {
-    const candidates: Array<[number, number]> = [];
     for (let y = r.y; y < r.y + r.height; y++) {
       for (let x = r.x; x < r.x + r.width; x++) {
         if (mapData.tiles[y][x] !== FLOOR) continue;
         const subs = mapData.subtypes[y][x] || [];
-        if (subs.length > 0) continue;
         const key = `${y},${x}`;
         if (taken.has(key)) continue;
-        candidates.push([y, x]);
+        if (subs.length === 0 || subs.includes(TileSubtype.NONE)) {
+          // Usable for either
+          floorCandidates.push([y, x]);
+          potCandidates.push([y, x]);
+        }
       }
     }
-    for (let k = 0; k < 6 && candidates.length > 0; k++) {
-      const idx = Math.floor(rng() * candidates.length);
-      const [sy, sx] = candidates.splice(idx, 1)[0];
-      const sn = new Enemy({ y: sy, x: sx });
-      sn.kind = 'snake';
-      out.push(sn);
-      taken.add(`${sy},${sx}`);
-    }
   }
+
+  // Shuffle helper
+  const shuffle = <T,>(arr: T[]) => {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  };
+
+  shuffle(floorCandidates);
+  shuffle(potCandidates);
+
+  // Place pot snakes: mark tile as [POT, SNAKE]
+  let potsPlaced = 0;
+  for (let i = 0; i < potCandidates.length && potsPlaced < potCount; i++) {
+    const [y, x] = potCandidates[i];
+    const key = `${y},${x}`;
+    // Double-check no enemy currently there and no other subtype
+    if (taken.has(key)) continue;
+    if ((mapData.subtypes[y][x] ?? []).length > 0) continue;
+    mapData.subtypes[y][x] = [TileSubtype.POT, TileSubtype.SNAKE];
+    potsPlaced++;
+    taken.add(key);
+  }
+
+  // Place free snakes on floor
+  let floorsPlaced = 0;
+  for (let i = 0; i < floorCandidates.length && floorsPlaced < floorCount; i++) {
+    const [y, x] = floorCandidates[i];
+    const key = `${y},${x}`;
+    if (taken.has(key)) continue;
+    // Only place on tiles without subtypes
+    if ((mapData.subtypes[y][x] ?? []).length > 0) continue;
+    const sn = new Enemy({ y, x });
+    sn.kind = 'snake';
+    out.push(sn);
+    taken.add(key);
+    floorsPlaced++;
+  }
+
   return out;
 }
 
@@ -1510,8 +1553,8 @@ export function initializeGameState(): GameState {
   // After enemies are assigned, place one rune pot per stone-exciter
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
 
-  // For testing: add exactly 2 snakes per room
-  const snakesAdded = addTwoSnakesPerRoom(withRunes, enemies);
+  // Snakes: normal generation rules
+  const snakesAdded = addSnakesPerRules(withRunes, enemies);
 
   // debug: enemies placed
 
@@ -1564,8 +1607,8 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     : [];
 
   enemyTypeAssignement(enemies);
-  // For testing: add exactly 2 snakes per room
-  const snakesAdded = addTwoSnakesPerRoom(ensured, enemies);
+  // Snakes: normal generation rules
+  const snakesAdded = addSnakesPerRules(ensured, enemies);
 
   return {
     hasKey: false,
@@ -1716,6 +1759,8 @@ export function movePlayer(
           const movingAway =
             (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
             (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
+          // Do not suppress snakes; they should bite if adjacent
+          if (e.kind === 'snake') return false;
           return adj && movingAway;
         },
       }

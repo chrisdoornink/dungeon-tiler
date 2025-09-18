@@ -160,25 +160,27 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
         const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
 
-        // If can see player, step away along dominant axis, else secondary
+        // If can see player, decide each tick: 33% approach, 67% avoid (move away)
         const sees = canSee(grid, [e.y, e.x], [py, px]);
         if (sees) {
           const dy = py - e.y;
           const dx = px - e.x;
+          const goToward = (ctx.rng?.() ?? Math.random()) < 0.33;
           const tryMoves: Array<[number, number]> = [];
           if (Math.abs(dx) >= Math.abs(dy)) {
-            // Move opposite x first, then opposite y
-            if (dx !== 0) tryMoves.push([0, dx > 0 ? -1 : 1]);
-            if (dy !== 0) tryMoves.push([dy > 0 ? -1 : 1, 0]);
+            // Favor X axis first
+            if (dx !== 0) tryMoves.push([0, goToward ? (dx > 0 ? 1 : -1) : (dx > 0 ? -1 : 1)]);
+            if (dy !== 0) tryMoves.push([goToward ? (dy > 0 ? 1 : -1) : (dy > 0 ? -1 : 1), 0]);
           } else {
-            if (dy !== 0) tryMoves.push([dy > 0 ? -1 : 1, 0]);
-            if (dx !== 0) tryMoves.push([0, dx > 0 ? -1 : 1]);
+            // Favor Y axis first
+            if (dy !== 0) tryMoves.push([goToward ? (dy > 0 ? 1 : -1) : (dy > 0 ? -1 : 1), 0]);
+            if (dx !== 0) tryMoves.push([0, goToward ? (dx > 0 ? 1 : -1) : (dx > 0 ? -1 : 1)]);
           }
           for (const [my, mx] of tryMoves) {
             const ny = e.y + my;
             const nx = e.x + mx;
             if (isFloor(ny, nx)) {
-              // Face direction of movement (opposite of player)
+              // Face direction of movement
               if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
               else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
               e.y = ny; e.x = nx;
@@ -187,10 +189,19 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
               return 0;
             }
           }
-          // If cannot step away due to walls, stay coiled
+          // If cannot step due to walls, stay coiled
           return 0;
         }
 
+        // If far from player (>5 tiles) and not seeing them, only move ~25% of the time (inclined to stay coiled)
+        const farThreshold = 5;
+        if (manhattan > farThreshold) {
+          const r = (ctx.rng?.() ?? Math.random());
+          if (r >= 0.25) {
+            // Stay coiled this tick (no movement)
+            return 0;
+          }
+        }
         // Wander randomly: try up to 4 shuffled directions
         const dirs: Array<[number, number, 'UP'|'RIGHT'|'DOWN'|'LEFT']> = [
           [-1, 0, 'UP'],

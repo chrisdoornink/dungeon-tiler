@@ -187,6 +187,7 @@ body {
   width: 14px;
   height: 18px;
   transform: translateX(-50%);
+  margin-left: -3px; /* nudge left a few pixels to better center over hero */
   background: radial-gradient(ellipse at center, rgba(120, 255, 160, 0.35) 0%, rgba(120, 255, 160, 0.25) 40%, rgba(120, 255, 160, 0.12) 70%, rgba(120, 255, 160, 0.0) 100%);
   animation: poisonStenchRise 1400ms ease-in-out infinite;
   pointer-events: none;
