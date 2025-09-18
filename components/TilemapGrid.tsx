@@ -329,7 +329,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       return next;
     });
-  }, [playerPosition]);
+  }, [playerPosition, isDailyChallenge]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -835,16 +835,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       runes: gameState.runeCount ?? 0,
       food: gameState.foodCount ?? 0,
     });
-  }, [
-    gameState.hasKey,
-    gameState.hasExitKey,
-    gameState.hasSword,
-    gameState.hasShield,
-    gameState.rockCount,
-    gameState.runeCount,
-    gameState.foodCount,
-    playerPosition,
-  ]);
+  }, [gameState, prevInv]);
 
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
@@ -1933,7 +1924,11 @@ function renderTileGrid(
                 | "snake"
                 | undefined
             }
-            enemyMoved={Boolean((enemyAtTile as any)?.behaviorMemory?.moved)}
+            enemyMoved={Boolean(
+              (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.[
+                "moved"
+              ]
+            )}
             enemyAura={(() => {
               if (!enemyAtTile) return false;
               if (enemyAtTile.kind !== "stone-exciter") return false;

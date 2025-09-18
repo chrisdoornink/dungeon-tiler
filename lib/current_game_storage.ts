@@ -67,7 +67,7 @@ export class CurrentGameStorage {
     try {
       const key = isDailyChallenge ? DAILY_GAME_KEY : CURRENT_GAME_KEY;
       window.localStorage.removeItem(key);
-    } catch (error) {
+    } catch {
       // Ignore errors
     }
   }

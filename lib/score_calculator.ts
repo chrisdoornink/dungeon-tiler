@@ -5,7 +5,7 @@ export interface GameStats {
   damageTaken: number;
   enemiesDefeated: number;
   steps?: number;
-  byKind?: Record<EnemyKind, number>;
+  byKind?: Partial<Record<EnemyKind, number>>;
 }
 
 export interface GameInventory {
@@ -115,9 +115,9 @@ export class ScoreCalculator {
     // PATCH: Fix stone-exciter double counting bug
     // If stone-exciter count seems doubled compared to other enemies, halve it
     let adjustedEnemiesDefeated = stats.enemiesDefeated;
-    if (stats.byKind && stats.byKind['stone-exciter'] > 0) {
-      const stoneCount = stats.byKind['stone-exciter'];
-      const otherCount = (stats.byKind.goblin || 0) + (stats.byKind.ghost || 0);
+    if (stats.byKind) {
+      const stoneCount = (stats.byKind['stone-exciter'] ?? 0);
+      const otherCount = (stats.byKind.goblin ?? 0) + (stats.byKind.ghost ?? 0);
       
       // If stone-exciter count is suspiciously high compared to others, likely doubled
       if (stoneCount > 0 && (stoneCount >= otherCount * 2 || stoneCount > 4)) {

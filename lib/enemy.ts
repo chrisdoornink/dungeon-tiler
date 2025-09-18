@@ -67,7 +67,7 @@ export class Enemy {
     // Default to IDLE this tick; we'll promote to HUNTING if we see/move/attack
     this.state = EnemyState.IDLE;
     // Reset moved flag each tick; UI may use this for sprite selection
-    try { (this.behaviorMemory as any).moved = false; } catch {}
+    try { (this.behaviorMemory as Record<string, unknown>)["moved"] = false; } catch {}
     // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
     const distManhattan = Math.abs(player.y - this.y) + Math.abs(player.x - this.x);
     const withinRange = distManhattan <= ENEMY_VISION_RADIUS;
@@ -154,7 +154,7 @@ export class Enemy {
           this.y = ny;
           this.x = nx;
           moved = true;
-          try { (this.behaviorMemory as any).moved = true; } catch {}
+          try { (this.behaviorMemory as Record<string, unknown>)["moved"] = true; } catch {}
           break;
         }
         // Ghosts can phase through walls: continue along axis until next floor tile
@@ -188,7 +188,7 @@ export class Enemy {
               this.x = tx;
               // moved successfully through walls
               moved = true;
-              try { (this.behaviorMemory as any).moved = true; } catch {}
+              try { (this.behaviorMemory as Record<string, unknown>)["moved"] = true; } catch {}
               break;
             }
             // continue stepping through walls

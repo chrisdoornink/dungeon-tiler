@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { DailyChallengeStorage, DailyChallengeData } from "../../lib/daily_challenge_storage";
+import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
-import { trackDailyChallenge } from "../../lib/posthog_analytics";
+import * as Analytics from "../../lib/posthog_analytics";
 import { EnemyRegistry, EnemyKind, getEnemyIcon } from "../../lib/enemies/registry";
 // Using localStorage directly instead of separate module
 
@@ -58,12 +58,14 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    trackDailyChallenge("completed", {
-      outcome: isWin ? "win" : "loss",
-      streak: data.currentStreak,
-      total_games: data.totalGamesPlayed,
-      win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100),
-    });
+    try {
+      Analytics.trackDailyChallenge?.("completed", {
+        outcome: isWin ? "win" : "loss",
+        streak: data.currentStreak,
+        total_games: data.totalGamesPlayed,
+        win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100),
+      });
+    } catch {}
   }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
 
   // Get death details from last game result stored in localStorage
