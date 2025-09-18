@@ -4,7 +4,11 @@ import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
-import { EnemyRegistry, EnemyKind, getEnemyIcon } from "../../lib/enemies/registry";
+import {
+  EnemyRegistry,
+  EnemyKind,
+  getEnemyIcon,
+} from "../../lib/enemies/registry";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -24,6 +28,7 @@ const EMOJI_MAP = {
   goblin: "👹",
   ghost: "👻",
   "stone-exciter": "🗿",
+  snake: "🐍",
 
   // Stats
   damage: "⚔️",
@@ -63,7 +68,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         outcome: isWin ? "win" : "loss",
         streak: data.currentStreak,
         total_games: data.totalGamesPlayed,
-        win_rate: Math.round((data.totalGamesWon / data.totalGamesPlayed) * 100),
+        win_rate: Math.round(
+          (data.totalGamesWon / data.totalGamesPlayed) * 100
+        ),
       });
     } catch {}
   }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
@@ -112,7 +119,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           alt: "Floor crack",
         };
       case "enemy":
-        const enemyKind = (lastGame.deathCause.enemyKind || "goblin") as EnemyKind;
+        const enemyKind = (lastGame.deathCause.enemyKind ||
+          "goblin") as EnemyKind;
         const enemyConfig = EnemyRegistry[enemyKind];
         const enemyImage = getEnemyIcon(enemyKind);
         const enemyName = `a ${enemyConfig.displayName}`;
@@ -498,48 +506,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             </div>
           </div>
         </div>
-
-        {/* Streak Celebration */}
-        {isWin && data.currentStreak > 1 && (
-          <div className="bg-gradient-to-r from-yellow-400 to-orange-500 rounded-lg p-6 mb-8 text-white max-w-2xl mx-auto">
-            <div className="text-center">
-              <h3 className="text-2xl font-bold mb-2">
-                🔥 {data.currentStreak} Day Streak! 🔥
-              </h3>
-              <p className="text-lg">
-                {data.currentStreak < 5
-                  ? "You're on fire! Keep it going!"
-                  : data.currentStreak < 10
-                  ? "Incredible dedication! You're a dungeon master!"
-                  : "Legendary! You've achieved dungeon mastery!"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Recent History */}
-        {data.streakHistory.length > 0 && data.totalGamesPlayed > 5 && (
-          <div className="mb-8 max-w-2xl mx-auto">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Your Journey
-            </h2>
-            <div className="bg-black/50 rounded-lg p-4 border border-gray-600">
-              <div className="flex gap-2 overflow-x-auto">
-                {data.streakHistory.slice(-10).map((entry, index) => (
-                  <div
-                    key={index}
-                    className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold ${
-                      entry.result === "won" ? "bg-green-500" : "bg-red-500"
-                    }`}
-                    title={`${entry.date}: ${entry.result} (streak: ${entry.streak})`}
-                  >
-                    {entry.result === "won" ? "✓" : "✗"}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Motivational Message */}
         <div className="text-center mb-8 max-w-2xl mx-auto">
