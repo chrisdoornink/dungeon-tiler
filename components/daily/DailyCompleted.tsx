@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
-import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
+// import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
 import {
   EnemyRegistry,
@@ -18,8 +18,8 @@ const EMOJI_MAP = {
   death: "💀",
 
   // Items/pickups
-  key: "🔑",
-  exitKey: "🗝️",
+  key: "🗝️",
+  exitKey: "🔑",
   sword: "🗡️",
   shield: "🛡️",
   map: "🗺️",
@@ -34,6 +34,7 @@ const EMOJI_MAP = {
   damage: "⚔️",
   health: "❤️",
   steps: "👣",
+  poison: "☠️",
 
   // Health visualization
   health_full: "🟩", // 5 health
@@ -87,21 +88,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   };
 
   const lastGame = getLastGame();
-  // Compute score breakdown using the same logic as end game screen
-  const scoreBreakdown: ScoreBreakdown | null = lastGame?.stats
-    ? ScoreCalculator.calculateScore(
-        isWin ? "win" : "dead",
-        lastGame.heroHealth || 0,
-        lastGame.stats,
-        {
-          hasKey: !!lastGame.hasKey,
-          hasExitKey: !!lastGame.hasExitKey,
-          hasSword: !!lastGame.hasSword,
-          hasShield: !!lastGame.hasShield,
-          showFullMap: !!lastGame.showFullMap,
-        }
-      )
-    : null;
   const getDeathDetails = () => {
     if (
       isWin ||
@@ -117,6 +103,12 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           message: "You stepped on a crack and fell into the abyss",
           image: "/images/floor/crack3.png",
           alt: "Floor crack",
+        };
+      case "poison":
+        return {
+          message: "You succumbed to poison from a snake bite",
+          image: "/images/enemies/snake-coiled-right.png",
+          alt: "Poisoned by snake",
         };
       case "enemy":
         const enemyKind = (lastGame.deathCause.enemyKind ||
@@ -148,26 +140,23 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
     // If player died, add emoji for cause of death (enemy kind or faulty floor)
-    const deathEmoji =
-      !isWin && lastGame?.deathCause
-        ? lastGame.deathCause.type === "faulty_floor"
-          ? EMOJI_MAP.faulty_floor
-          : lastGame.deathCause.type === "enemy"
-          ? EMOJI_MAP[
-              (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ??
-                "goblin"
-            ] || EMOJI_MAP.goblin
-          : ""
-        : "";
-    const scorePart = scoreBreakdown
-      ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${
-          scoreBreakdown.grade
-        } (${scoreBreakdown.percentage}%)`
-      : "";
+    // Death cause emojis (can be multiple, e.g., poison + snake)
+    const deathEmojis: string[] = [];
+    if (!isWin && lastGame?.deathCause) {
+      if (lastGame.deathCause.type === "faulty_floor") {
+        deathEmojis.push(EMOJI_MAP.faulty_floor);
+      } else if (lastGame.deathCause.type === "enemy") {
+        const e = (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ?? "goblin";
+        deathEmojis.push(EMOJI_MAP[e] || EMOJI_MAP.goblin);
+      } else if (lastGame.deathCause.type === "poison") {
+        deathEmojis.push(EMOJI_MAP.poison);
+        // include snake indicator if known or by convention
+        deathEmojis.push(EMOJI_MAP.snake);
+      }
+    }
     const statsLine = [
       `${resultEmoji}`,
-      deathEmoji,
-      scorePart,
+      deathEmojis.join(" "),
       lastGame?.stats?.steps
         ? `${EMOJI_MAP.steps} ${lastGame.stats.steps}`
         : "",
@@ -198,15 +187,16 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         }
       });
     }
-    lines.push(`⚔️ kills: ${enemyChunks.join("")}`);
+    // Remove the word 'kills' per request; keep the swords icon as a section marker
+    lines.push(`⚔️ ${enemyChunks.join("")}`);
 
-    // Inventory line
+    // Inventory line (no label word)
     const items: string[] = [];
     if (lastGame?.hasKey) items.push(EMOJI_MAP.key);
     if (lastGame?.hasExitKey) items.push(EMOJI_MAP.exitKey);
     if (lastGame?.hasSword) items.push(EMOJI_MAP.sword);
     if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
-    lines.push(`🗃️ inventory: ${items.join("")}`);
+    lines.push(`🗃️ ${items.join("")}`);
 
     // Health visualization (5 hearts showing final health). Default to empty if unknown.
     const health =
@@ -220,6 +210,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     }
     lines.push(healthTiles.join(""));
+
+    // Grade (moved below hearts), intentionally commented out for now until accuracy is improved
+    // if (scoreBreakdown) {
+    //   lines.push(`Grade: ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)`);
+    // }
 
     // A link to the game at torchboy.com
     lines.push("\n#TorchBoy https://torchboy.com");
@@ -315,32 +310,66 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
             {lastGame && lastGame.stats ? (
               <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-300">Steps Taken:</span>
-                  <span className="text-lg font-semibold text-gray-200">
-                    {lastGame.stats.steps || 0}
-                  </span>
-                </div>
-                {/* Removed numeric Enemies Defeated row per request */}
-                {lastGame.stats.byKind && (
-                  <>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">Enemies defeated:</span>
-                      <span className="flex flex-wrap gap-1">
-                        {Object.entries(lastGame.stats.byKind).map(
+                {/* Share-style Preview using real assets */}
+                <div className="text-center text-gray-100 mb-2">
+                  <div className="pixel-text text-sm">
+                    {/* Header */}
+                    <div className="mb-1">
+                      #TorchBoy {new Date().toLocaleDateString("en-CA")}
+                    </div>
+                    {/* Result + steps */}
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      <div
+                        className="w-6 h-6"
+                        style={{
+                          backgroundImage: `url(${
+                            isWin
+                              ? "/images/presentational/game-over-win-1.png"
+                              : "/images/presentational/game-over-loss-1.png"
+                          })`,
+                          backgroundSize: "contain",
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "center",
+                        }}
+                        aria-label={isWin ? "Victory" : "Defeat"}
+                      />
+                      {/* If dead, show cause */}
+                      {!isWin && deathDetails && (
+                        <div
+                          className="w-6 h-6"
+                          style={{
+                            backgroundImage: `url(${deathDetails.image})`,
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                          aria-label={deathDetails.alt}
+                        />
+                      )}
+                      {/* Poison badge when relevant */}
+                      {!isWin && lastGame?.deathCause?.type === 'poison' && (
+                        <span className="text-base">{EMOJI_MAP.poison}</span>
+                      )}
+                      <div className="text-sm text-gray-300">
+                        👣 {lastGame.stats.steps || 0}
+                      </div>
+                    </div>
+                    {/* Streak */}
+                    <div className="mb-2">streak: {data.currentStreak}</div>
+                    {/* Enemies row (no label) */}
+                    {lastGame.stats.byKind && (
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <span className="mr-1">⚔️</span>
+                        {Object.entries(lastGame.stats.byKind).flatMap(
                           ([enemyType, count]) => {
                             let numCount =
                               typeof count === "number" ? count : 0;
-
-                            // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
-                            // This addresses a known bug where stone-exciter kills can be double-counted
                             if (
                               enemyType === "stone-exciter" &&
                               numCount >= 2
                             ) {
                               numCount = numCount / 2;
                             }
-
                             const enemies: React.ReactElement[] = [];
                             for (let i = 0; i < numCount; i++) {
                               enemies.push(
@@ -353,6 +382,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                                         ? "stone-exciter-front"
                                         : enemyType === "ghost"
                                         ? "lantern-wisp"
+                                        : enemyType === "snake"
+                                        ? "snake-coiled-right"
                                         : "fire-goblin/fire-goblin-front"
                                     }.png)`,
                                     backgroundSize: "contain",
@@ -366,14 +397,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                             return enemies;
                           }
                         )}
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-300">
-                        Inventory collected:
-                      </span>
-                      {/* Inventory Collected moved into Game Statistics */}
-
+                      </div>
+                    )}
+                    {/* Inventory row (no label) */}
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <span>🗃️</span>
                       {(() => {
                         const inv: Array<{ asset: string; alt: string }> = [];
                         if (lastGame?.hasKey)
@@ -396,56 +424,62 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                             asset: "/images/items/shield.png",
                             alt: "Shield",
                           });
-                        if (lastGame?.showFullMap)
-                          inv.push({
-                            asset: "/images/items/map-reveal.png",
-                            alt: "Map Reveal",
-                          });
-                        if (inv.length === 0) {
-                          return <span className="text-gray-400">None</span>;
-                        }
-                        return (
-                          <span className="flex items-center gap-2">
-                            {inv.map((i, idx) => (
-                              <div
-                                key={idx}
-                                className="w-6 h-6"
-                                style={{
-                                  backgroundImage: `url(${i.asset})`,
-                                  backgroundSize: "contain",
-                                  backgroundRepeat: "no-repeat",
-                                  backgroundPosition: "center",
-                                }}
-                                title={i.alt}
-                                aria-label={i.alt}
-                              />
-                            ))}
-                          </span>
-                        );
+                        if (inv.length === 0) return null;
+                        return inv.map((i, idx) => (
+                          <div
+                            key={idx}
+                            className="w-6 h-6"
+                            style={{
+                              backgroundImage: `url(${i.asset})`,
+                              backgroundSize: "contain",
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: "center",
+                            }}
+                            title={i.alt}
+                            aria-label={i.alt}
+                          />
+                        ));
                       })()}
                     </div>
-                  </>
-                )}
-                {scoreBreakdown && (
-                  <div className="mt-4 pt-3 border-t border-gray-600 flex justify-between items-center">
-                    <span className="text-sm text-gray-400 mb-2">
-                      Final Score
-                    </span>
-                    <div className="flex items-baseline justify-between">
-                      <div className="flex items-center gap-2">
-                        {/* <span>
-                          {ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)}
-                        </span> */}
-                        <span className="font-bold">
-                          {scoreBreakdown.grade}
-                        </span>
-                        <span className="text-sm text-gray-400">
-                          ({scoreBreakdown.percentage}%)
-                        </span>
-                      </div>
+                    {/* Hearts */}
+                    <div className="flex items-center justify-center gap-1">
+                      {(() => {
+                        const health =
+                          typeof lastGame?.heroHealth === "number"
+                            ? lastGame!.heroHealth
+                            : 0;
+                        const tiles: React.ReactElement[] = [];
+                        for (let i = 1; i <= 5; i++) {
+                          const filled = i <= health;
+                          tiles.push(
+                            <div
+                              key={i}
+                              className="w-5 h-5"
+                              style={{
+                                backgroundImage: `url(${
+                                  filled
+                                    ? "/images/presentational/heart-red.png"
+                                    : "/images/presentational/heart-empty.png"
+                                })`,
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                              }}
+                              aria-label={filled ? "Heart" : "Empty Heart"}
+                            />
+                          );
+                        }
+                        return tiles;
+                      })()}
                     </div>
+                    {/* Grade moved below hearts; hidden for now until accuracy is improved.
+                        When re-enabling, render something like:
+                        <div className="mt-2 text-sm text-gray-300">
+                          Grade: {scoreBreakdown.grade} ({scoreBreakdown.percentage}%)
+                        </div>
+                    */}
                   </div>
-                )}
+                </div>
               </div>
             ) : (
               <p className="text-gray-400">No game statistics available</p>

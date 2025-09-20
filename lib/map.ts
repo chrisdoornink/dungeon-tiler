@@ -1986,6 +1986,11 @@ export function movePlayer(
           newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
           newGameState.stats.damageTaken += applied;
         }
+        // If the ambush was lethal, mark death cause as enemy snake
+        if (newGameState.heroHealth === 0) {
+          newGameState.deathCause = { type: "enemy", enemyKind: "snake" };
+          return newGameState;
+        }
         // Always apply poison on a snake ambush from a pot
         if (!newGameState.conditions) newGameState.conditions = {};
         if (!newGameState.conditions.poisoned) {
@@ -2279,6 +2284,7 @@ export function movePlayer(
       if (newGameState.heroHealth === 0) {
         newGameState.deathCause = {
           type: "poison",
+          enemyKind: "snake",
         };
       }
     }
