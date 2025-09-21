@@ -155,6 +155,8 @@ export const Tile: React.FC<TileProps> = ({
           return "OPEN_CHEST";
         case TileSubtype.NONE:
           return "NONE";
+        case TileSubtype.ROOM_TRANSITION:
+          return "ROOM_TRANSITION";
         default:
           return String(s);
       }
@@ -186,6 +188,8 @@ export const Tile: React.FC<TileProps> = ({
         return "bg-blue-700";
       case TileSubtype.OPEN_CHEST:
         return "bg-amber-400";
+      case TileSubtype.ROOM_TRANSITION:
+        return "bg-indigo-500";
       default:
         return "bg-gray-400";
     }
@@ -216,6 +220,8 @@ export const Tile: React.FC<TileProps> = ({
         return "";
       case TileSubtype.OPEN_CHEST:
         return "O";
+      case TileSubtype.ROOM_TRANSITION:
+        return "⇆";
       default:
         return "?";
     }

@@ -24,6 +24,10 @@ export const tileTypes: Record<number, TileType> = {
 const FLOOR = 0;
 const WALL = 1;
 
+const DEFAULT_ROOM_ID = "__base__";
+
+export type RoomId = string;
+
 // Direction vectors for adjacent cells (up, right, down, left)
 const dx = [0, 1, 0, -1];
 const dy = [-1, 0, 1, 0];
@@ -299,11 +303,41 @@ export enum TileSubtype {
   FAULTY_FLOOR = 18,
   DARKNESS = 19,
   SNAKE = 20,
+  ROOM_TRANSITION = 21,
+}
+
+function removePlayerFromMapData(mapData: MapData): MapData {
+  const clone = cloneMapData(mapData);
+  for (let y = 0; y < clone.subtypes.length; y++) {
+    for (let x = 0; x < clone.subtypes[y].length; x++) {
+      const cell = clone.subtypes[y][x];
+      if (Array.isArray(cell) && cell.includes(TileSubtype.PLAYER)) {
+        clone.subtypes[y][x] = cell.filter((t) => t !== TileSubtype.PLAYER);
+      }
+    }
+  }
+  return clone;
 }
 
 export interface MapData {
   tiles: number[][];
   subtypes: number[][][];
+}
+
+function cloneMapData(mapData: MapData): MapData {
+  return JSON.parse(JSON.stringify(mapData)) as MapData;
+}
+
+export interface RoomSnapshot {
+  mapData: MapData;
+  entryPoint: [number, number];
+}
+
+export interface RoomTransition {
+  from: RoomId;
+  to: RoomId;
+  position: [number, number];
+  targetEntryPoint?: [number, number];
 }
 
 function getMapHeight(mapData: MapData): number {
@@ -1576,6 +1610,9 @@ export interface GameState {
       stepInterval: number;
     };
   };
+  rooms?: Record<RoomId, RoomSnapshot>;
+  currentRoomId?: RoomId;
+  roomTransitions?: RoomTransition[];
 }
 
 /**
@@ -1737,6 +1774,101 @@ export function addSnakePots(
  * @param direction Direction to move
  * @returns Updated game state after movement attempt
  */
+function getActiveRoomId(state: GameState): RoomId {
+  return state.currentRoomId ?? DEFAULT_ROOM_ID;
+}
+
+function findRoomTransitionForPosition(
+  state: GameState,
+  position: [number, number]
+): RoomTransition | null {
+  if (!state.roomTransitions || state.roomTransitions.length === 0) {
+    return null;
+  }
+  const [y, x] = position;
+  const activeRoom = getActiveRoomId(state);
+  for (const transition of state.roomTransitions) {
+    if (
+      transition.from === activeRoom &&
+      transition.position[0] === y &&
+      transition.position[1] === x
+    ) {
+      return transition;
+    }
+  }
+  return null;
+}
+
+function applyRoomTransition(
+  state: GameState,
+  transition: RoomTransition
+): GameState {
+  if (!state.rooms || Object.keys(state.rooms).length === 0) {
+    return state;
+  }
+
+  const fromId = transition.from;
+  const toId = transition.to;
+  const sourceRooms = state.rooms;
+  const targetRoom = sourceRooms[toId];
+
+  if (!targetRoom) {
+    return state;
+  }
+
+  const updatedRooms: Record<RoomId, RoomSnapshot> = { ...sourceRooms };
+
+  if (sourceRooms[fromId]) {
+    updatedRooms[fromId] = {
+      ...sourceRooms[fromId],
+      mapData: removePlayerFromMapData(state.mapData),
+    };
+  }
+
+  const sanitizedTarget = removePlayerFromMapData(targetRoom.mapData);
+  updatedRooms[toId] = {
+    ...targetRoom,
+    mapData: sanitizedTarget,
+  };
+
+  let entry: [number, number] =
+    transition.targetEntryPoint ?? targetRoom.entryPoint;
+
+  if (
+    !entry ||
+    !isWithinBounds(sanitizedTarget, entry[0], entry[1]) ||
+    sanitizedTarget.tiles[entry[0]]?.[entry[1]] !== FLOOR
+  ) {
+    let fallback: [number, number] | null = null;
+    for (let y = 0; y < sanitizedTarget.tiles.length; y++) {
+      for (let x = 0; x < sanitizedTarget.tiles[y].length; x++) {
+        if (sanitizedTarget.tiles[y][x] === FLOOR) {
+          fallback = [y, x];
+          break;
+        }
+      }
+      if (fallback) break;
+    }
+    entry = fallback ?? [0, 0];
+  }
+
+  const nextMapData = cloneMapData(sanitizedTarget);
+  const [entryY, entryX] = entry;
+  const dest = nextMapData.subtypes[entryY][entryX] || [];
+  const filtered = dest.filter((t) => t !== TileSubtype.PLAYER);
+  if (!filtered.includes(TileSubtype.PLAYER)) {
+    filtered.push(TileSubtype.PLAYER);
+  }
+  nextMapData.subtypes[entryY][entryX] = filtered;
+
+  return {
+    ...state,
+    mapData: nextMapData,
+    currentRoomId: toId,
+    rooms: updatedRooms,
+  };
+}
+
 export function movePlayer(
   gameState: GameState,
   direction: Direction
@@ -1779,7 +1911,7 @@ export function movePlayer(
   // Deep clone the map data to avoid modifying the original
   const newMapData = JSON.parse(JSON.stringify(gameState.mapData)) as MapData;
   // Always update the player direction regardless of whether movement succeeds
-  const newGameState = {
+  let newGameState = {
     ...gameState,
     mapData: newMapData,
     playerDirection: direction,
@@ -2238,7 +2370,8 @@ export function movePlayer(
     if (
       destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
-      destSubtypes.includes(TileSubtype.CHEST)
+      destSubtypes.includes(TileSubtype.CHEST) ||
+      destSubtypes.includes(TileSubtype.ROOM_TRANSITION)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
@@ -2286,6 +2419,10 @@ export function movePlayer(
   // Increment steps if a move occurred
   if (moved) {
     newGameState.stats.steps += 1;
+    const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
+    if (transition) {
+      newGameState = applyRoomTransition(newGameState, transition);
+    }
   }
 
   // Handle poison damage over time
