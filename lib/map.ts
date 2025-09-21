@@ -7,7 +7,14 @@ export type TileType = {
 };
 
 // Enemy integration
-import { Enemy, placeEnemies, updateEnemies } from "./enemy";
+import {
+  Enemy,
+  placeEnemies,
+  updateEnemies,
+  rehydrateEnemies,
+  type PlainEnemy,
+} from "./enemy";
+import { EnemyState } from "./enemy";
 import { EnemyRegistry, createEmptyByKind } from "./enemies/registry";
 import type { EnemyKind } from "./enemies/registry";
 import { enemyTypeAssignement } from "./enemy_assignment";
@@ -328,9 +335,52 @@ function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
 }
 
+function clonePlainEnemies(enemies?: PlainEnemy[]): PlainEnemy[] | undefined {
+  if (!enemies) return undefined;
+  return enemies.map((enemy) => {
+    const behavior = enemy.behaviorMemory ?? enemy._behaviorMem;
+    const behaviorClone = behavior ? { ...behavior } : undefined;
+    return {
+      ...enemy,
+      behaviorMemory: behaviorClone,
+      _behaviorMem: behaviorClone,
+    };
+  });
+}
+
+function enemyToPlain(enemy: Enemy): PlainEnemy {
+  const behavior = enemy.behaviorMemory;
+  const behaviorClone = behavior ? { ...behavior } : undefined;
+  return {
+    y: enemy.y,
+    x: enemy.x,
+    kind: enemy.kind,
+    health: enemy.health,
+    attack: enemy.attack,
+    facing: enemy.facing,
+    state: enemy.state ?? EnemyState.IDLE,
+    behaviorMemory: behaviorClone,
+    _behaviorMem: behaviorClone,
+  };
+}
+
+function serializeEnemies(enemies?: Enemy[]): PlainEnemy[] | undefined {
+  if (!enemies) return undefined;
+  return enemies.map((enemy) => enemyToPlain(enemy));
+}
+
+function clonePotOverrides(
+  overrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>
+): Record<string, TileSubtype.FOOD | TileSubtype.MED> | undefined {
+  if (!overrides) return undefined;
+  return { ...overrides };
+}
+
 export interface RoomSnapshot {
   mapData: MapData;
   entryPoint: [number, number];
+  enemies?: PlainEnemy[];
+  potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
 }
 
 export interface RoomTransition {
@@ -1613,6 +1663,7 @@ export interface GameState {
   rooms?: Record<RoomId, RoomSnapshot>;
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
+  potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
 }
 
 /**
@@ -1822,13 +1873,18 @@ function applyRoomTransition(
     updatedRooms[fromId] = {
       ...sourceRooms[fromId],
       mapData: removePlayerFromMapData(state.mapData),
+      enemies: serializeEnemies(state.enemies),
+      potOverrides: clonePotOverrides(state.potOverrides),
     };
   }
 
   const sanitizedTarget = removePlayerFromMapData(targetRoom.mapData);
+  const targetEnemiesPlain = clonePlainEnemies(targetRoom.enemies) ?? [];
   updatedRooms[toId] = {
     ...targetRoom,
     mapData: sanitizedTarget,
+    enemies: targetEnemiesPlain,
+    potOverrides: clonePotOverrides(targetRoom.potOverrides),
   };
 
   let entry: [number, number] =
@@ -1861,11 +1917,16 @@ function applyRoomTransition(
   }
   nextMapData.subtypes[entryY][entryX] = filtered;
 
+  const nextEnemies = rehydrateEnemies(targetEnemiesPlain);
+  const nextPotOverrides = clonePotOverrides(targetRoom.potOverrides);
+
   return {
     ...state,
     mapData: nextMapData,
     currentRoomId: toId,
     rooms: updatedRooms,
+    enemies: nextEnemies,
+    potOverrides: nextPotOverrides,
   };
 }
 
@@ -2165,9 +2226,23 @@ export function movePlayer(
       if (subtype.includes(TileSubtype.RUNE)) {
         newMapData.subtypes[newY][newX] = [TileSubtype.RUNE];
       } else {
-        // Deterministic reveal so all players see the same contents for this pot
-        const reveal = pickPotRevealDeterministic(newMapData, newY, newX);
-        newMapData.subtypes[newY][newX] = [reveal];
+        const key = `${newY},${newX}`;
+        const overrides = newGameState.potOverrides;
+        const overrideReveal = overrides?.[key];
+        if (overrideReveal) {
+          newMapData.subtypes[newY][newX] = [overrideReveal];
+          if (overrides) {
+            const nextOverrides = { ...overrides };
+            delete nextOverrides[key];
+            newGameState.potOverrides = Object.keys(nextOverrides).length
+              ? nextOverrides
+              : undefined;
+          }
+        } else {
+          // Deterministic reveal so all players see the same contents for this pot
+          const reveal = pickPotRevealDeterministic(newMapData, newY, newX);
+          newMapData.subtypes[newY][newX] = [reveal];
+        }
       }
       return newGameState;
     }
