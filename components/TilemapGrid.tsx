@@ -9,6 +9,7 @@ import {
   performThrowRune,
   performUseFood,
   performUsePotion,
+  reviveFromLastCheckpoint,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
@@ -839,87 +840,99 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
-    if (gameState.heroHealth <= 0 && !gameCompletionProcessed) {
-      setGameCompletionProcessed(true);
-      // Trigger screen shake on death
+    if (gameState.heroHealth > 0 || gameCompletionProcessed) {
+      return;
+    }
+
+    const revivedState = reviveFromLastCheckpoint(gameState);
+    if (revivedState) {
       triggerScreenShake(400);
+      setGameState(revivedState);
+      CurrentGameStorage.saveCurrentGame(revivedState, isDailyChallenge);
+      return;
+    }
+
+    setGameCompletionProcessed(true);
+    // Trigger screen shake on death
+    triggerScreenShake(400);
+    try {
+      const mode = isDailyChallenge ? "daily" : "normal";
+      const mapId = computeMapId(gameState.mapData);
+      trackGameComplete({
+        outcome: "dead",
+        mode,
+        mapId,
+        dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+        heroHealth: 0,
+        steps: gameState.stats.steps,
+        enemiesDefeated: gameState.stats.enemiesDefeated,
+        damageDealt: gameState.stats.damageDealt,
+        damageTaken: gameState.stats.damageTaken,
+        byKind: gameState.stats.byKind,
+        deathCause: gameState.deathCause?.type,
+      });
+    } catch {}
+
+    if (isDailyChallenge) {
+      // Handle daily challenge death
       try {
-        const mode = isDailyChallenge ? "daily" : "normal";
-        const mapId = computeMapId(gameState.mapData);
-        trackGameComplete({
+        const payload = {
+          completedAt: new Date().toISOString(),
+          hasKey: gameState.hasKey,
+          hasExitKey: gameState.hasExitKey,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          showFullMap: !!gameState.showFullMap,
+          mapData: gameState.mapData,
+          stats: gameState.stats,
           outcome: "dead",
-          mode,
-          mapId,
-          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
-          heroHealth: 0,
-          steps: gameState.stats.steps,
-          enemiesDefeated: gameState.stats.enemiesDefeated,
-          damageDealt: gameState.stats.damageDealt,
-          damageTaken: gameState.stats.damageTaken,
-          byKind: gameState.stats.byKind,
-          deathCause: gameState.deathCause?.type,
-        });
-      } catch {}
-      if (isDailyChallenge) {
-        // Handle daily challenge death
-        try {
-          const payload = {
-            completedAt: new Date().toISOString(),
-            hasKey: gameState.hasKey,
-            hasExitKey: gameState.hasExitKey,
-            hasSword: !!gameState.hasSword,
-            hasShield: !!gameState.hasShield,
-            showFullMap: !!gameState.showFullMap,
-            mapData: gameState.mapData,
-            stats: gameState.stats,
-            outcome: "dead",
-            streak: 0,
-            deathCause: gameState.deathCause,
-            heroHealth: 0, // Always 0 for deaths
-          } as const;
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            // Clear current game since it's completed
-            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
-          }
-        } catch {
-          // ignore storage errors
+          streak: 0,
+          deathCause: gameState.deathCause,
+          heroHealth: 0, // Always 0 for deaths
+        } as const;
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("lastGame", JSON.stringify(payload));
+          // Clear current game since it's completed
+          CurrentGameStorage.clearCurrentGame(isDailyChallenge);
         }
-        if (onDailyComplete) {
-          onDailyComplete("lost");
-        } else {
-          router.push("/daily");
-        }
-      } else {
-        // Handle regular game death
-        try {
-          const payload = {
-            completedAt: new Date().toISOString(),
-            hasKey: gameState.hasKey,
-            hasExitKey: gameState.hasExitKey,
-            hasSword: !!gameState.hasSword,
-            hasShield: !!gameState.hasShield,
-            showFullMap: !!gameState.showFullMap,
-            mapData: gameState.mapData,
-            stats: gameState.stats,
-            outcome: "dead",
-            streak: 0,
-            deathCause: gameState.deathCause,
-            heroHealth: 0, // Always 0 for deaths
-          } as const;
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            // Clear current game since it's completed
-            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
-          }
-        } catch {
-          // ignore storage errors
-        }
-        router.push("/end");
+      } catch {
+        // ignore storage errors
       }
+      if (onDailyComplete) {
+        onDailyComplete("lost");
+      } else {
+        router.push("/daily");
+      }
+    } else {
+      // Handle regular game death
+      try {
+        const payload = {
+          completedAt: new Date().toISOString(),
+          hasKey: gameState.hasKey,
+          hasExitKey: gameState.hasExitKey,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          showFullMap: !!gameState.showFullMap,
+          mapData: gameState.mapData,
+          stats: gameState.stats,
+          outcome: "dead",
+          streak: 0,
+          deathCause: gameState.deathCause,
+          heroHealth: 0, // Always 0 for deaths
+        } as const;
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("lastGame", JSON.stringify(payload));
+          // Clear current game since it's completed
+          CurrentGameStorage.clearCurrentGame(isDailyChallenge);
+        }
+      } catch {
+        // ignore storage errors
+      }
+      router.push("/end");
     }
   }, [
     gameState.heroHealth,
+    gameState.lastCheckpoint,
     gameCompletionProcessed,
     gameState.hasKey,
     gameState.hasExitKey,

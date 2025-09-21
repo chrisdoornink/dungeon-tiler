@@ -311,6 +311,7 @@ export enum TileSubtype {
   DARKNESS = 19,
   SNAKE = 20,
   ROOM_TRANSITION = 21,
+  CHECKPOINT = 22,
 }
 
 function removePlayerFromMapData(mapData: MapData): MapData {
@@ -1664,6 +1665,54 @@ export interface GameState {
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
+  lastCheckpoint?: CheckpointSnapshot;
+}
+
+export type CheckpointSnapshot =
+  Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies"> & {
+    enemies?: PlainEnemy[];
+  };
+
+function cloneCheckpointSnapshot(
+  snapshot?: CheckpointSnapshot
+): CheckpointSnapshot | undefined {
+  if (!snapshot) return undefined;
+  return JSON.parse(JSON.stringify(snapshot)) as CheckpointSnapshot;
+}
+
+export function createCheckpointSnapshot(
+  state: GameState
+): CheckpointSnapshot {
+  const { combatRng: _rng, lastCheckpoint: _prev, enemies, ...rest } = state;
+  const base = JSON.parse(
+    JSON.stringify(rest)
+  ) as Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies">;
+  return {
+    ...base,
+    enemies: serializeEnemies(enemies),
+  };
+}
+
+export function reviveFromLastCheckpoint(
+  state: GameState
+): GameState | null {
+  if (!state.lastCheckpoint) return null;
+  const snapshot = cloneCheckpointSnapshot(state.lastCheckpoint);
+  if (!snapshot) return null;
+
+  const { enemies: snapshotEnemies, ...rest } = snapshot;
+  const restoredEnemies = snapshotEnemies
+    ? rehydrateEnemies(snapshotEnemies)
+    : undefined;
+
+  const restored: GameState = {
+    ...rest,
+    enemies: restoredEnemies,
+    combatRng: state.combatRng,
+    lastCheckpoint: cloneCheckpointSnapshot(snapshot),
+  };
+
+  return restored;
 }
 
 /**
@@ -1981,6 +2030,7 @@ export function movePlayer(
   newGameState.recentDeaths = [];
   // Track if player actually changed tiles this turn
   let moved = false;
+  let checkpointTouched = false;
 
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
@@ -2164,6 +2214,7 @@ export function movePlayer(
   // If the new position is a floor tile
   if (newMapData.tiles[newY][newX] === FLOOR) {
     const subtype = newMapData.subtypes[newY][newX];
+    const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
 
     // If it's a POT, reveal content without moving
     if (subtype.includes(TileSubtype.POT)) {
@@ -2446,7 +2497,8 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
       destSubtypes.includes(TileSubtype.CHEST) ||
-      destSubtypes.includes(TileSubtype.ROOM_TRANSITION)
+      destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||
+      destSubtypes.includes(TileSubtype.CHECKPOINT)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
@@ -2471,6 +2523,10 @@ export function movePlayer(
       return true;
     });
     moved = true;
+
+    if (triggeredCheckpoint) {
+      checkpointTouched = true;
+    }
 
     // Relight hero torch if adjacent to any wall torch after normal movement
     const adj2: Array<[number, number]> = [
@@ -2498,6 +2554,10 @@ export function movePlayer(
     if (transition) {
       newGameState = applyRoomTransition(newGameState, transition);
     }
+  }
+
+  if (checkpointTouched) {
+    newGameState.lastCheckpoint = createCheckpointSnapshot(newGameState);
   }
 
   // Handle poison damage over time
