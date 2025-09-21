@@ -29,6 +29,7 @@ const EMOJI_MAP = {
   ghost: "👻",
   "stone-exciter": "🗿",
   snake: "🐍",
+  mimic: "📦",
 
   // Stats
   damage: "⚔️",

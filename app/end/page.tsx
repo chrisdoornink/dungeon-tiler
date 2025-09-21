@@ -29,7 +29,7 @@ type LastGame = {
     damageTaken: number;
     enemiesDefeated: number;
     steps?: number;
-    byKind?: { goblin: number; ghost: number; 'stone-exciter': number };
+    byKind?: Partial<Record<EnemyKind, number>>;
   };
 };
 
@@ -151,7 +151,15 @@ export default function EndPage() {
     Object.entries(last.stats.byKind as Record<string, number>).forEach(([enemyType, count]) => {
       const n = typeof count === 'number' ? count : 0;
       if (n > 0) {
-        const emoji = ({ ghost: '👻', goblin: '👹', 'stone-exciter': '🗿' } as Record<string, string>)[enemyType] || '👹';
+        const emoji = (
+          {
+            ghost: '👻',
+            goblin: '👹',
+            'stone-exciter': '🗿',
+            snake: '🐍',
+            mimic: '📦',
+          } as Record<string, string>
+        )[enemyType] || '👹';
         enemyChunks.push(emoji.repeat(n));
       }
     });
