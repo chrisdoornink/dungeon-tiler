@@ -306,6 +306,20 @@ export interface MapData {
   subtypes: number[][][];
 }
 
+function getMapHeight(mapData: MapData): number {
+  return mapData.tiles.length;
+}
+
+function getMapWidth(mapData: MapData): number {
+  return mapData.tiles[0]?.length ?? 0;
+}
+
+function isWithinBounds(mapData: MapData, y: number, x: number): boolean {
+  const height = getMapHeight(mapData);
+  const width = getMapWidth(mapData);
+  return y >= 0 && y < height && x >= 0 && x < width;
+}
+
 /**
  * Generate a map with subtypes - all subtypes initialized to 0
  * @returns MapData object containing both tiles and subtypes arrays
@@ -1029,10 +1043,15 @@ export function addPlayerToMap(mapData: MapData): MapData {
  * @returns The [y, x] coordinates of the player or null if not found
  */
 export function findPlayerPosition(mapData: MapData): [number, number] | null {
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      // Check if the PLAYER subtype is in the array
-      if (mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
+  const height = mapData.subtypes.length;
+  if (height === 0) return null;
+
+  for (let y = 0; y < height; y++) {
+    const row = mapData.subtypes[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const cell = row[x];
+      if (Array.isArray(cell) && cell.includes(TileSubtype.PLAYER)) {
         return [y, x];
       }
     }
@@ -1238,7 +1257,7 @@ export function performThrowRock(gameState: GameState): GameState {
   for (let step = 1; step <= 4; step++) {
     ty += vy;
     tx += vx;
-    if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
+    if (!isWithinBounds(preTickState.mapData, ty, tx)) {
       // Early stop: consume a rock, no placement (future: collide/bam)
       return { ...preTickState, rockCount: count - 1 };
     }
@@ -1415,7 +1434,7 @@ export function performThrowRune(gameState: GameState): GameState {
     tx += vx;
 
     // Out of bounds -> drop on last traversed floor tile
-    if (ty < 0 || ty >= GRID_SIZE || tx < 0 || tx >= GRID_SIZE) {
+    if (!isWithinBounds(preTickState.mapData, ty, tx)) {
       if (
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
@@ -1729,16 +1748,23 @@ export function movePlayer(
   let newY = currentY;
   let newX = currentX;
 
+  const height = getMapHeight(gameState.mapData);
+  const width = getMapWidth(gameState.mapData);
+
+  if (height === 0 || width === 0) {
+    return { ...gameState, playerDirection: direction };
+  }
+
   // Calculate new position based on direction
   switch (direction) {
     case Direction.UP:
       newY = Math.max(0, currentY - 1);
       break;
     case Direction.RIGHT:
-      newX = Math.min(GRID_SIZE - 1, currentX + 1);
+      newX = Math.min(width - 1, currentX + 1);
       break;
     case Direction.DOWN:
-      newY = Math.min(GRID_SIZE - 1, currentY + 1);
+      newY = Math.min(height - 1, currentY + 1);
       break;
     case Direction.LEFT:
       newX = Math.max(0, currentX - 1);
@@ -1891,11 +1917,8 @@ export function movePlayer(
       ];
       for (const [ay, ax] of adj) {
         if (
-          ay >= 0 &&
-          ay < GRID_SIZE &&
-          ax >= 0 &&
-          ax < GRID_SIZE &&
-          newMapData.subtypes[ay][ax]?.includes(TileSubtype.WALL_TORCH)
+          isWithinBounds(newMapData, ay, ax) &&
+          newMapData.subtypes[ay]?.[ax]?.includes(TileSubtype.WALL_TORCH)
         ) {
           newGameState.heroTorchLit = true;
           break;
@@ -2250,11 +2273,8 @@ export function movePlayer(
     ];
     for (const [ay, ax] of adj2) {
       if (
-        ay >= 0 &&
-        ay < GRID_SIZE &&
-        ax >= 0 &&
-        ax < GRID_SIZE &&
-        newMapData.subtypes[ay][ax]?.includes(TileSubtype.WALL_TORCH)
+        isWithinBounds(newMapData, ay, ax) &&
+        newMapData.subtypes[ay]?.[ax]?.includes(TileSubtype.WALL_TORCH)
       ) {
         newGameState.heroTorchLit = true;
         break;
