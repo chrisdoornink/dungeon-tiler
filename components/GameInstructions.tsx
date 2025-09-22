@@ -13,7 +13,7 @@ export default function GameInstructions() {
           <strong>arrow keys</strong> to find the{" "}
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>exit key</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/items/exit-key.png)",
@@ -26,7 +26,7 @@ export default function GameInstructions() {
           and reach the{" "}
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>exit</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/door/exit-dark.png)",
@@ -43,7 +43,7 @@ export default function GameInstructions() {
           Beware of the vicious
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>{EnemyRegistry.goblin.displayName}s</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage:
@@ -57,7 +57,7 @@ export default function GameInstructions() {
           , ethereal
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>{EnemyRegistry.ghost.displayName}s</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/enemies/lantern-wisp.png)",
@@ -70,7 +70,7 @@ export default function GameInstructions() {
           , fearsome
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>{EnemyRegistry["stone-exciter"].displayName}s</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/enemies/stone-exciter-front.png)",
@@ -88,7 +88,7 @@ export default function GameInstructions() {
           The ancient dungeon floor is riddled with
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>deadly cracks</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/floor/crack3.png)",
@@ -106,7 +106,7 @@ export default function GameInstructions() {
           Seek out the legendary
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>sword</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/items/sword.png)",
@@ -119,7 +119,7 @@ export default function GameInstructions() {
           to increase your battle prowess and the enchanted
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>shield</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/items/shield.png)",
@@ -133,7 +133,7 @@ export default function GameInstructions() {
           away in{" "}
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>chests</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/items/closed-chest.png)",
@@ -146,7 +146,7 @@ export default function GameInstructions() {
           that require a
           <span className="inline-flex items-center gap-1 mx-1">
             <strong>key</strong>
-            <div
+            <span
               className="w-10 h-10"
               style={{
                 backgroundImage: "url(/images/items/key.png)",
