@@ -1,12 +1,46 @@
 "use client";
 
-import React, { Suspense, useMemo } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
-import { tileTypes } from "../../lib/map";
+import { tileTypes, type GameState } from "../../lib/map";
 import { buildStoryModeState } from "../../lib/story/story_mode";
+import { CurrentGameStorage } from "../../lib/current_game_storage";
+import { rehydrateEnemies, type PlainEnemy } from "../../lib/enemy";
 
 function StoryModeInner() {
-  const initialState = useMemo(() => buildStoryModeState(), []);
+  const [initialState, setInitialState] = useState<GameState | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (typeof window === "undefined") return undefined;
+
+    const saved = CurrentGameStorage.loadCurrentGame("story");
+    if (saved) {
+      if (Array.isArray(saved.enemies)) {
+        saved.enemies = rehydrateEnemies(saved.enemies as unknown as PlainEnemy[]);
+      }
+      const restored = saved as GameState;
+      restored.mode = "story";
+      restored.allowCheckpoints = true;
+      if (!cancelled) setInitialState(restored);
+    } else {
+      const fresh = buildStoryModeState();
+      CurrentGameStorage.saveCurrentGame(fresh, "story");
+      if (!cancelled) setInitialState(fresh);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!initialState) {
+    return (
+      <div className="min-h-screen flex items-center justify-center text-white">
+        Loading story...
+      </div>
+    );
+  }
 
   return (
     <div
@@ -26,6 +60,7 @@ function StoryModeInner() {
           tileTypes={tileTypes}
           initialGameState={initialState}
           forceDaylight={false}
+          storageSlot="story"
         />
       </div>
     </div>

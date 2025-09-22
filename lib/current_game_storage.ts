@@ -7,6 +7,20 @@ import type { GameState } from './map';
 
 const CURRENT_GAME_KEY = 'currentGame';
 const DAILY_GAME_KEY = 'currentDailyGame';
+const STORY_GAME_KEY = 'currentStoryGame';
+
+export type GameStorageSlot = 'default' | 'daily' | 'story';
+
+function keyForSlot(slot: GameStorageSlot): string {
+  switch (slot) {
+    case 'daily':
+      return DAILY_GAME_KEY;
+    case 'story':
+      return STORY_GAME_KEY;
+    default:
+      return CURRENT_GAME_KEY;
+  }
+}
 
 export interface StoredGameState extends GameState {
   lastSaved: number; // timestamp
@@ -17,17 +31,19 @@ export class CurrentGameStorage {
   /**
    * Save current game state to localStorage
    */
-  static saveCurrentGame(gameState: GameState, isDailyChallenge = false): void {
+  static saveCurrentGame(
+    gameState: GameState,
+    slot: GameStorageSlot = 'default'
+  ): void {
     if (typeof window === 'undefined') return;
     
     try {
       const storedState: StoredGameState = {
         ...gameState,
         lastSaved: Date.now(),
-        isDailyChallenge,
+        isDailyChallenge: slot === 'daily',
       };
-      
-      const key = isDailyChallenge ? DAILY_GAME_KEY : CURRENT_GAME_KEY;
+      const key = keyForSlot(slot);
       window.localStorage.setItem(key, JSON.stringify(storedState));
     } catch {
       // Ignore storage errors (quota exceeded, etc.)
@@ -37,11 +53,11 @@ export class CurrentGameStorage {
   /**
    * Load current game state from localStorage
    */
-  static loadCurrentGame(isDailyChallenge = false): StoredGameState | null {
+  static loadCurrentGame(slot: GameStorageSlot = 'default'): StoredGameState | null {
     if (typeof window === 'undefined') return null;
     
     try {
-      const key = isDailyChallenge ? DAILY_GAME_KEY : CURRENT_GAME_KEY;
+      const key = keyForSlot(slot);
       const raw = window.localStorage.getItem(key);
       if (!raw) return null;
       
@@ -61,11 +77,11 @@ export class CurrentGameStorage {
   /**
    * Clear current game state (when game ends)
    */
-  static clearCurrentGame(isDailyChallenge = false): void {
+  static clearCurrentGame(slot: GameStorageSlot = 'default'): void {
     if (typeof window === 'undefined') return;
     
     try {
-      const key = isDailyChallenge ? DAILY_GAME_KEY : CURRENT_GAME_KEY;
+      const key = keyForSlot(slot);
       window.localStorage.removeItem(key);
     } catch {
       // Ignore errors
@@ -75,15 +91,15 @@ export class CurrentGameStorage {
   /**
    * Check if a current game exists
    */
-  static hasCurrentGame(isDailyChallenge = false): boolean {
-    return this.loadCurrentGame(isDailyChallenge) !== null;
+  static hasCurrentGame(slot: GameStorageSlot = 'default'): boolean {
+    return this.loadCurrentGame(slot) !== null;
   }
 
   /**
    * Get the age of the saved game in milliseconds
    */
-  static getGameAge(isDailyChallenge = false): number | null {
-    const saved = this.loadCurrentGame(isDailyChallenge);
+  static getGameAge(slot: GameStorageSlot = 'default'): number | null {
+    const saved = this.loadCurrentGame(slot);
     if (!saved) return null;
     
     return Date.now() - saved.lastSaved;

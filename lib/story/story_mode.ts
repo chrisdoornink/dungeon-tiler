@@ -227,6 +227,12 @@ function buildSanctum(): StoryRoom {
     }
   }
 
+  const checkpointY = entryY - 4;
+  const checkpointX = entryX;
+  if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
+    subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
+  }
+
   const snakes: Enemy[] = [];
   const snakeA = new Enemy({ y: entryY - 3, x: entryX - 2 });
   snakeA.kind = "snake";
@@ -319,6 +325,8 @@ export function buildStoryModeState(): GameState {
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
+    mode: 'story',
+    allowCheckpoints: true,
     mapData: startingMap,
     showFullMap: false,
     win: false,

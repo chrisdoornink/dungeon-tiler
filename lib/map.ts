@@ -1622,6 +1622,8 @@ export interface GameState {
   hasExitKey: boolean;
   hasSword?: boolean;
   hasShield?: boolean;
+  mode?: 'normal' | 'daily' | 'story';
+  allowCheckpoints?: boolean;
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
@@ -1747,6 +1749,8 @@ export function initializeGameState(): GameState {
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
+    mode: 'normal',
+    allowCheckpoints: false,
     mapData: withRunes,
     showFullMap: false,
     win: false,
@@ -2524,7 +2528,7 @@ export function movePlayer(
     });
     moved = true;
 
-    if (triggeredCheckpoint) {
+    if (triggeredCheckpoint && newGameState.allowCheckpoints) {
       checkpointTouched = true;
     }
 

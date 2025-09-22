@@ -38,7 +38,7 @@ export default function DailyChallengePage() {
     
     // Check if there's an active game in progress and we should show it directly
     if (currentState === DailyChallengeState.DAILY_AVAILABLE) {
-      const hasActiveGame = CurrentGameStorage.hasCurrentGame(true); // true for daily challenge
+      const hasActiveGame = CurrentGameStorage.hasCurrentGame('daily');
       if (hasActiveGame) {
         setShowGame(true);
       }

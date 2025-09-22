@@ -42,8 +42,10 @@ function GameViewInner({
     let state: GameState | undefined;
 
     // First priority: check for current game in progress (auto-save/restore)
+    const storageSlot = isDailyChallenge ? 'daily' : 'default';
+
     if (!replayExact && !mapId && typeof window !== "undefined") {
-      const savedGame = CurrentGameStorage.loadCurrentGame(isDailyChallenge);
+      const savedGame = CurrentGameStorage.loadCurrentGame(storageSlot);
       if (savedGame) {
         // Rehydrate enemies into class instances so methods exist
         if (Array.isArray(savedGame.enemies)) {
@@ -99,6 +101,10 @@ function GameViewInner({
           }
           return initializeGameState();
         });
+        if (state) {
+          state.mode = 'daily';
+          state.allowCheckpoints = false;
+        }
       } else {
         if (algorithm === "default") {
           generateMap();
@@ -106,6 +112,10 @@ function GameViewInner({
           generateCompleteMap();
         }
         state = initializeGameState();
+        if (state) {
+          state.mode = 'normal';
+          state.allowCheckpoints = state.allowCheckpoints ?? false;
+        }
       }
       // Persist the exact initial game for reproducibility (single instance)
       if (typeof window !== "undefined" && state && state.mapData) {
@@ -113,10 +123,20 @@ function GameViewInner({
           // Use single key, replace previous game data
           window.localStorage.setItem("initialGame", JSON.stringify(state));
           // Also save as current game for auto-save/restore functionality
-          CurrentGameStorage.saveCurrentGame(state, isDailyChallenge);
+          CurrentGameStorage.saveCurrentGame(state, storageSlot);
         } catch {
           // ignore storage errors
         }
+      }
+    }
+
+    if (state) {
+      if (isDailyChallenge) {
+        state.mode = 'daily';
+        state.allowCheckpoints = false;
+      } else {
+        state.mode = state.mode ?? 'normal';
+        state.allowCheckpoints = state.allowCheckpoints ?? false;
       }
     }
 

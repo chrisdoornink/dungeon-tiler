@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   TileType,
   GameState,
@@ -31,7 +31,7 @@ import { useRouter } from "next/navigation";
 import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { computeMapId } from "../lib/map";
-import { CurrentGameStorage } from "../lib/current_game_storage";
+import { CurrentGameStorage, type GameStorageSlot } from "../lib/current_game_storage";
 import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
@@ -47,6 +47,7 @@ interface TilemapGridProps {
   forceDaylight?: boolean; // when true, override lighting to full visibility
   isDailyChallenge?: boolean; // when true, handle daily challenge completion
   onDailyComplete?: (result: "won" | "lost") => void; // when daily, signal result instead of routing
+  storageSlot?: GameStorageSlot;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -57,8 +58,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   forceDaylight = process.env.NODE_ENV !== "test",
   isDailyChallenge = false,
   onDailyComplete,
+  storageSlot,
 }) => {
   const router = useRouter();
+
+  const resolvedStorageSlot: GameStorageSlot = storageSlot
+    ? storageSlot
+    : isDailyChallenge
+    ? 'daily'
+    : 'default';
 
   // Router removed; daily flow handled via onDailyComplete callback
 
@@ -142,7 +150,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
     setGameState((prev) => {
       const newState = performUseFood(prev);
-      CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
   }, [isDailyChallenge]);
@@ -154,7 +162,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
     setGameState((prev) => {
       const newState = performUsePotion(prev);
-      CurrentGameStorage.saveCurrentGame(newState, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
   }, [isDailyChallenge]);
@@ -273,7 +281,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           setTimeout(() => {
             setGameState((p2) => {
               const next = performThrowRune(p2);
-              CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
+              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
               try {
                 const died = next.recentDeaths || [];
                 if (died.length > 0) {
@@ -305,7 +313,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       // Apply game logic immediately for collisions or early stops
       const next = performThrowRune(prev);
-      CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       try {
         const died = next.recentDeaths || [];
         if (died.length > 0) {
@@ -452,7 +460,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           setTimeout(() => {
             setGameState((p2) => {
               const next = performThrowRock(p2);
-              CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
+              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
               return next;
             });
           }, path.length * stepMs + 10);
@@ -473,7 +481,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
       const next = performThrowRock(prev);
-      CurrentGameStorage.saveCurrentGame(next, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       try {
         // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
         if (preEnemyAtImpact && impact) {
@@ -583,6 +591,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       createdAt: number;
     }>
   >([]);
+  const lastCheckpointSignature = useRef<string | null>(null);
+  const [checkpointFlash, setCheckpointFlash] = useState<number | null>(null);
 
   useEffect(() => {
     // Find player position whenever gameState changes
@@ -733,7 +743,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (typeof window !== "undefined") {
             window.localStorage.setItem("lastGame", JSON.stringify(payload));
             // Clear current game since it's completed
-            CurrentGameStorage.clearCurrentGame(isDailyChallenge);
+            CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
           }
         } catch {
           // no-op – storage may be unavailable in some environments
@@ -838,6 +848,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     });
   }, [gameState, prevInv]);
 
+  useEffect(() => {
+    const snapshot = gameState.lastCheckpoint;
+    if (!snapshot) return;
+    const roomId = snapshot.currentRoomId ?? "base";
+    const steps = snapshot.stats?.steps ?? 0;
+    const hp = snapshot.heroHealth ?? 0;
+    const signature = `${roomId}:${steps}:${hp}`;
+    if (lastCheckpointSignature.current === signature) return;
+    lastCheckpointSignature.current = signature;
+    setCheckpointFlash(Date.now());
+  }, [gameState.lastCheckpoint]);
+
+  useEffect(() => {
+    if (checkpointFlash === null) return;
+    const timer = setTimeout(() => setCheckpointFlash(null), 2200);
+    return () => clearTimeout(timer);
+  }, [checkpointFlash]);
+
   // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth > 0 || gameCompletionProcessed) {
@@ -848,7 +876,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     if (revivedState) {
       triggerScreenShake(400);
       setGameState(revivedState);
-      CurrentGameStorage.saveCurrentGame(revivedState, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(revivedState, resolvedStorageSlot);
       return;
     }
 
@@ -893,7 +921,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
           // Clear current game since it's completed
-          CurrentGameStorage.clearCurrentGame(isDailyChallenge);
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
         }
       } catch {
         // ignore storage errors
@@ -923,7 +951,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
           // Clear current game since it's completed
-          CurrentGameStorage.clearCurrentGame(isDailyChallenge);
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
         }
       } catch {
         // ignore storage errors
@@ -997,7 +1025,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       const newGameState = movePlayer(gameState, direction);
-      CurrentGameStorage.saveCurrentGame(newGameState, isDailyChallenge);
+      CurrentGameStorage.saveCurrentGame(newGameState, resolvedStorageSlot);
       // Compute floating damage numbers based on differences
       // 1) Enemy damage taken when attacking into enemy tile
       if (
@@ -1233,6 +1261,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           className="relative flex justify-center"
           data-testid="tilemap-grid-wrapper"
         >
+        {checkpointFlash && (
+          <div className="absolute top-4 right-4 z-50">
+            <div className="rounded-md bg-emerald-600/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/50">
+              Checkpoint reached
+            </div>
+          </div>
+        )}
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 flex items-center justify-center">
           <div className="game-scale" data-testid="game-scale">
