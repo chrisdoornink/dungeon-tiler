@@ -78,7 +78,7 @@ type StoryRoom = {
 };
 
 function buildEntranceHall(): StoryRoom {
-  const HALL_LENGTH = 50;
+  const HALL_LENGTH = 20;
   const HALL_WIDTH = 3;
   const height = HALL_WIDTH + 2;
   const width = HALL_LENGTH + 2;
@@ -119,7 +119,7 @@ function buildEntranceHall(): StoryRoom {
 
   return {
     id: "story-hall-entrance",
-    mapData: { tiles, subtypes } as MapData,
+    mapData: { tiles, subtypes, environment: 'cave' },
     entryPoint,
     returnEntryPoint,
     transitionToNext,
@@ -127,7 +127,7 @@ function buildEntranceHall(): StoryRoom {
 }
 
 function buildAscentCorridor(): StoryRoom {
-  const VERTICAL_STEPS = 20;
+  const VERTICAL_STEPS = 10;
   const CORRIDOR_WIDTH = 3;
   const height = VERTICAL_STEPS + 4;
   const width = CORRIDOR_WIDTH + 4;
@@ -179,7 +179,7 @@ function buildAscentCorridor(): StoryRoom {
 
   return {
     id: "story-ascent",
-    mapData: { tiles, subtypes } as MapData,
+    mapData: { tiles, subtypes, environment: 'cave' },
     entryPoint,
     returnEntryPoint: [entryRow, 4],
     entryFromNext,
@@ -227,6 +227,20 @@ function buildSanctum(): StoryRoom {
     }
   }
 
+  const topRowY = 1;
+  const transitionToNext: [number, number] = [topRowY, entryX];
+  for (let x = 1; x <= INNER_SIZE; x++) {
+    if (x === entryX) {
+      subtypes[topRowY][x] = [TileSubtype.ROOM_TRANSITION];
+      continue;
+    }
+    subtypes[topRowY][x] = [TileSubtype.POT];
+    potOverrides[`${topRowY},${x}`] = TileSubtype.FOOD;
+  }
+  tiles[0][entryX] = FLOOR;
+
+  const entryFromNext: [number, number] = [topRowY + 1, entryX];
+
   const checkpointY = entryY - 4;
   const checkpointX = entryX;
   if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
@@ -252,12 +266,123 @@ function buildSanctum(): StoryRoom {
 
   return {
     id: "story-sanctum",
-    mapData: { tiles, subtypes } as MapData,
+    mapData: { tiles, subtypes, environment: 'cave' },
     entryPoint,
     transitionToPrevious,
-    entryFromNext: [entryY - 1, entryX],
+    entryFromNext,
+    transitionToNext,
     enemies: snakes,
     potOverrides,
+  };
+}
+
+function buildOutdoorWorld(): StoryRoom {
+  const OUTER_WIDTH = 12;
+  const OUTER_HEIGHT = 20;
+  const width = OUTER_WIDTH + 2;
+  const height = OUTER_HEIGHT + 2;
+
+  const tiles: number[][] = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => WALL)
+  );
+  const subtypes: number[][][] = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => [] as number[])
+  );
+
+  for (let y = 1; y <= OUTER_HEIGHT; y++) {
+    for (let x = 1; x <= OUTER_WIDTH; x++) {
+      tiles[y][x] = FLOOR;
+    }
+  }
+
+  const entryX = 1 + Math.floor((OUTER_WIDTH - 1) / 2);
+  const entryY = height - 4;
+  const entryPoint: [number, number] = [entryY, entryX];
+  const transitionToPrevious: [number, number] = [entryY + 1, entryX];
+  subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
+    TileSubtype.ROOM_TRANSITION,
+  ];
+
+  // Add small clusters of rocks to give the outdoor space some structure
+  const featureSpots: Array<[number, number, number[]]> = [
+    [entryY - 4, entryX - 4, [TileSubtype.ROCK]],
+    [entryY - 6, entryX + 3, [TileSubtype.ROCK]],
+    [entryY + 2, entryX - 3, [TileSubtype.ROCK]],
+  ];
+  for (const [fy, fx, values] of featureSpots) {
+    if (tiles[fy]?.[fx] === FLOOR && subtypes[fy][fx].length === 0) {
+      subtypes[fy][fx] = values.slice();
+    }
+  }
+
+  const houseTopY = entryY - 12;
+  const houseHeight = 3;
+  const houseLeftX = OUTER_WIDTH - 1;
+
+  for (let y = 0; y < houseHeight; y++) {
+    const row = houseTopY + y;
+    for (let x = 0; x < 3; x++) {
+      const col = houseLeftX + x;
+      if (tiles[row]?.[col] !== undefined) {
+        tiles[row][col] = WALL;
+        subtypes[row][col] = [];
+      }
+    }
+  }
+
+  const doorY = houseTopY + houseHeight - 1;
+  const doorX = houseLeftX + 1;
+  tiles[doorY][doorX] = WALL;
+  subtypes[doorY][doorX] = [TileSubtype.DOOR, TileSubtype.ROOM_TRANSITION];
+
+  return {
+    id: "story-outdoor-clearing",
+    mapData: { tiles, subtypes, environment: 'outdoor' },
+    entryPoint,
+    transitionToPrevious,
+    entryFromNext: [doorY, doorX],
+    transitionToNext: [doorY, doorX],
+  };
+}
+
+function buildOutdoorHouse(): StoryRoom {
+  const SIZE = 6;
+  const tiles: number[][] = Array.from({ length: SIZE + 2 }, () =>
+    Array.from({ length: SIZE + 2 }, () => WALL)
+  );
+  const subtypes: number[][][] = Array.from({ length: SIZE + 2 }, () =>
+    Array.from({ length: SIZE + 2 }, () => [] as number[])
+  );
+
+  for (let y = 1; y <= SIZE; y++) {
+    for (let x = 1; x <= SIZE; x++) {
+      tiles[y][x] = FLOOR;
+    }
+  }
+
+  const doorCol = Math.floor(SIZE / 2) + 1;
+  const entryPoint: [number, number] = [SIZE - 2, doorCol];
+  const transitionToPrevious: [number, number] = [SIZE, doorCol];
+  subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
+    TileSubtype.DOOR,
+    TileSubtype.ROOM_TRANSITION,
+  ];
+  const entryFromNext: [number, number] = [entryPoint[0] - 1, entryPoint[1]];
+
+  const windowCols = [2, SIZE - 1];
+  for (const col of windowCols) {
+    const wallCol = col;
+    if (tiles[0]?.[wallCol] === WALL) {
+      subtypes[0][wallCol] = [TileSubtype.WINDOW];
+    }
+  }
+
+  return {
+    id: 'story-outdoor-house',
+    mapData: { tiles, subtypes, environment: 'house' },
+    entryPoint,
+    transitionToPrevious,
+    entryFromNext,
   };
 }
 
@@ -265,6 +390,8 @@ export function buildStoryModeState(): GameState {
   const entrance = buildEntranceHall();
   const ascent = buildAscentCorridor();
   const sanctum = buildSanctum();
+  const outdoor = buildOutdoorWorld();
+  const outdoorHouse = buildOutdoorHouse();
 
   const transitions: RoomTransition[] = [
     {
@@ -291,6 +418,29 @@ export function buildStoryModeState(): GameState {
       position: sanctum.transitionToPrevious!,
       targetEntryPoint: ascent.entryFromNext ?? ascent.entryPoint,
     },
+    {
+      from: sanctum.id,
+      to: outdoor.id,
+      position: sanctum.transitionToNext!,
+      targetEntryPoint: outdoor.entryPoint,
+    },
+    {
+      from: outdoor.id,
+      to: sanctum.id,
+      position: outdoor.transitionToPrevious!,
+      targetEntryPoint: sanctum.entryFromNext ?? sanctum.entryPoint,
+    },
+    {
+      from: outdoor.id,
+      to: outdoorHouse.id,
+      position: outdoor.transitionToNext!,
+    },
+    {
+      from: outdoorHouse.id,
+      to: outdoor.id,
+      position: outdoorHouse.transitionToPrevious!,
+      targetEntryPoint: outdoor.entryFromNext ?? outdoor.entryPoint,
+    },
   ];
 
   const roomSnapshots: GameState["rooms"] = {
@@ -311,6 +461,18 @@ export function buildStoryModeState(): GameState {
       entryPoint: sanctum.entryPoint,
       enemies: serializeEnemies(sanctum.enemies),
       potOverrides: sanctum.potOverrides,
+    },
+    [outdoor.id]: {
+      mapData: withoutPlayer(outdoor.mapData),
+      entryPoint: outdoor.entryPoint,
+      enemies: serializeEnemies(outdoor.enemies),
+      potOverrides: outdoor.potOverrides,
+    },
+    [outdoorHouse.id]: {
+      mapData: withoutPlayer(outdoorHouse.mapData),
+      entryPoint: outdoorHouse.entryPoint,
+      enemies: serializeEnemies(outdoorHouse.enemies),
+      potOverrides: outdoorHouse.potOverrides,
     },
   };
 

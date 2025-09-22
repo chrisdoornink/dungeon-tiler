@@ -3,6 +3,7 @@ import {
   DailyChallengeData,
 } from "./daily_challenge_storage";
 import { DateUtils } from "./date_utils";
+import { CurrentGameStorage } from "./current_game_storage";
 
 export enum DailyChallengeState {
   FIRST_TIME = "FIRST_TIME",
@@ -76,6 +77,11 @@ export class DailyChallengeFlow {
    */
   static handleGameComplete(result: "won" | "lost"): DailyChallengeData {
     const today = DateUtils.getTodayString();
+    try {
+      if (typeof window !== "undefined") {
+        CurrentGameStorage.clearCurrentGame("daily");
+      }
+    } catch {}
     return DailyChallengeStorage.recordGameResult(result, today);
   }
 

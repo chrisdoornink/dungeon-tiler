@@ -32,6 +32,11 @@ import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { computeMapId } from "../lib/map";
 import { CurrentGameStorage, type GameStorageSlot } from "../lib/current_game_storage";
+import {
+  DEFAULT_ENVIRONMENT,
+  type EnvironmentId,
+  getEnvironmentConfig,
+} from "../lib/environment";
 import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
@@ -153,7 +158,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [isDailyChallenge]);
+  }, [resolvedStorageSlot]);
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
@@ -165,7 +170,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [isDailyChallenge]);
+  }, [resolvedStorageSlot]);
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
@@ -338,7 +343,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       return next;
     });
-  }, [playerPosition, isDailyChallenge]);
+  }, [playerPosition, resolvedStorageSlot]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -563,7 +568,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       return next;
     });
-  }, [playerPosition]);
+  }, [playerPosition, resolvedStorageSlot]);
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
@@ -593,6 +598,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   >([]);
   const lastCheckpointSignature = useRef<string | null>(null);
   const [checkpointFlash, setCheckpointFlash] = useState<number | null>(null);
+  const environment: EnvironmentId =
+    (gameState.mapData.environment as EnvironmentId | undefined) ??
+    DEFAULT_ENVIRONMENT;
+  const environmentConfig = getEnvironmentConfig(environment);
+  const environmentDaylight = environmentConfig.daylight;
+  const effectiveForceDaylight = forceDaylight || environmentDaylight;
+  const lastCheckpoint = gameState.lastCheckpoint;
 
   useEffect(() => {
     // Find player position whenever gameState changes
@@ -642,14 +654,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Auto-disable full map visibility after 3 seconds
   useEffect(() => {
-    if (forceDaylight) return; // do not auto-disable when daylight override is on
+    if (effectiveForceDaylight) return; // do not auto-disable when daylight override is on
     if (gameState.showFullMap) {
       const timer = setTimeout(() => {
         setGameState((prev) => ({ ...prev, showFullMap: false }));
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.showFullMap, forceDaylight]);
+  }, [gameState.showFullMap, effectiveForceDaylight]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
@@ -700,13 +712,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             streak: nextStreak,
             heroHealth: gameState.heroHealth,
           };
-          if (typeof window !== "undefined") {
-            window.localStorage.setItem("lastGame", JSON.stringify(payload));
-          }
-        } catch {
-          // no-op – storage may be unavailable in some environments
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem("lastGame", JSON.stringify(payload));
         }
-        if (onDailyComplete) {
+      } catch {
+        // no-op – storage may be unavailable in some environments
+      }
+      if (onDailyComplete) {
           onDailyComplete("won");
         } else {
           router.push("/daily");
@@ -741,13 +753,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
           };
           if (typeof window !== "undefined") {
-            window.localStorage.setItem("lastGame", JSON.stringify(payload));
-            // Clear current game since it's completed
-            CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
-          }
-        } catch {
-          // no-op – storage may be unavailable in some environments
+          window.localStorage.setItem("lastGame", JSON.stringify(payload));
+          // Clear current game since it's completed
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
         }
+      } catch {
+        // no-op – storage may be unavailable in some environments
+      }
         router.push("/end");
       }
     }
@@ -765,6 +777,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     isDailyChallenge,
     onDailyComplete,
     router,
+    resolvedStorageSlot,
   ]);
 
   // Track pickups by diffing inventory/flags
@@ -849,7 +862,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [gameState, prevInv]);
 
   useEffect(() => {
-    const snapshot = gameState.lastCheckpoint;
+    const snapshot = lastCheckpoint;
     if (!snapshot) return;
     const roomId = snapshot.currentRoomId ?? "base";
     const steps = snapshot.stats?.steps ?? 0;
@@ -858,7 +871,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     if (lastCheckpointSignature.current === signature) return;
     lastCheckpointSignature.current = signature;
     setCheckpointFlash(Date.now());
-  }, [gameState.lastCheckpoint]);
+  }, [lastCheckpoint]);
 
   useEffect(() => {
     if (checkpointFlash === null) return;
@@ -959,6 +972,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       router.push("/end");
     }
   }, [
+    gameState,
     gameState.heroHealth,
     gameState.lastCheckpoint,
     gameCompletionProcessed,
@@ -973,6 +987,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     isDailyChallenge,
     onDailyComplete,
     router,
+    resolvedStorageSlot,
   ]);
 
   // Handle player movement
@@ -1172,7 +1187,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       setGameState(newGameState);
     },
-    [gameState, playerPosition, isDailyChallenge]
+    [gameState, playerPosition, resolvedStorageSlot]
   );
 
   // Handle mobile control button clicks
@@ -1700,7 +1715,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // When the hero's torch is OFF, force a pure black background behind tiles
                     // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                     // the transparent center of the vignette.
-                    backgroundColor: gameState.heroTorchLit
+                    backgroundColor: gameState.heroTorchLit || environmentDaylight
                       ? undefined
                       : "#000",
                   }}
@@ -1710,7 +1725,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.mapData.tiles,
                     tileTypes,
                     gameState.mapData.subtypes,
+                    environment,
                     gameState.showFullMap ||
+                      environmentDaylight ||
                       (forceDaylight && (gameState.heroTorchLit ?? true)),
                     gameState.playerDirection,
                     gameState.enemies,
@@ -1834,6 +1851,7 @@ function renderTileGrid(
   grid: number[][],
   tileTypes: Record<number, TileType>,
   subtypes: number[][][] | undefined,
+  environment: EnvironmentId | undefined,
   showFullMap: boolean = false,
   playerDirection: Direction = Direction.DOWN,
   enemies?: Enemy[],
@@ -1843,6 +1861,7 @@ function renderTileGrid(
   hasExitKey?: boolean,
   heroPoisoned: boolean = false
 ) {
+  const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
 
@@ -1996,6 +2015,7 @@ function renderTileGrid(
                 : undefined
             }
             playerHasExitKey={hasExitKey}
+            environment={resolvedEnvironment}
           />
         </div>
       );

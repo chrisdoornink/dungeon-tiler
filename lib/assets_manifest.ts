@@ -31,12 +31,28 @@ export const ASSET_URLS: string[] = [
   // Additional floors
   "/images/floor/floor-1001.png",
   "/images/floor/floor-0001.png",
+  "/images/floor/outdoor-floor-0000.png",
+  "/images/floor/outdoor-floor-1000.png",
+  "/images/floor/in-house-floor-0000.png",
+  "/images/floor/in-house-floor-1000.png",
 
   // Remaining walls
   "/images/wall/wall-0000.png",
   "/images/wall/wall-0001.png",
   "/images/wall/wall-0100.png",
   "/images/wall/wall-0101.png",
+  "/images/wall/wall-0010.png",
+  "/images/wall/wall-0011.png",
+  "/images/wall/wall-0110.png",
+  "/images/wall/wall-0111.png",
+  "/images/wall/outdoor-wall-0000.png",
+  "/images/wall/outdoor-wall-0001.png",
+  "/images/wall/outdoor-wall-0010.png",
+  "/images/wall/outdoor-wall-0011.png",
+  "/images/wall/outdoor-wall-0100.png",
+  "/images/wall/outdoor-wall-0101.png",
+  "/images/wall/outdoor-wall-0110.png",
+  "/images/wall/outdoor-wall-0111.png",
 
   // Lock (large file - load later)
   "/images/door/gold-chain-lock.png",
@@ -48,6 +64,7 @@ export const ASSET_URLS: string[] = [
 
   // Remaining items
   "/images/door/exit-transparent.png",
+  "/images/door/house-door.png",
   "/images/items/closed-chest.png",
   "/images/items/opened-chest.png",
   "/images/items/switch.png",
@@ -63,6 +80,7 @@ export const ASSET_URLS: string[] = [
   "/images/items/food-3.png",
   "/images/items/meds-1.png",
   "/images/items/rune1.png",
+  "/images/window.png",
 
   // Remaining enemies (large files - load later)
   "/images/enemies/fire-goblin/fire-goblin-right.png",

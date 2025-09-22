@@ -3,6 +3,13 @@ import { TileType, TileSubtype, Direction } from "../lib/map";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import styles from "./Tile.module.css";
+import {
+  DEFAULT_ENVIRONMENT,
+  type EnvironmentId,
+  getEnvironmentConfig,
+  getFloorAsset,
+  getWallAsset,
+} from "../lib/environment";
 
 type NeighborInfo = {
   top: number | null;
@@ -33,6 +40,7 @@ interface TileProps {
   hasShield?: boolean; // Whether player holds a shield (for sprite)
   invisibleClassName?: string; // Optional class override for invisible tiles
   playerHasExitKey?: boolean; // Player holds the exit key for conditional exit rendering
+  environment?: EnvironmentId;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -57,7 +65,9 @@ export const Tile: React.FC<TileProps> = ({
   hasShield,
   invisibleClassName,
   playerHasExitKey,
+  environment = DEFAULT_ENVIRONMENT,
 }) => {
+  const environmentConfig = getEnvironmentConfig(environment);
   // Per-instance randomized torch animation interval (200–300ms)
   const torchDuration = React.useMemo(() => {
     // Stable-ish per tile via coords seed
@@ -159,6 +169,8 @@ export const Tile: React.FC<TileProps> = ({
           return "ROOM_TRANSITION";
         case TileSubtype.CHECKPOINT:
           return "CHECKPOINT";
+        case TileSubtype.WINDOW:
+          return "WINDOW";
         default:
           return String(s);
       }
@@ -194,6 +206,8 @@ export const Tile: React.FC<TileProps> = ({
         return "bg-indigo-500";
       case TileSubtype.CHECKPOINT:
         return "bg-cyan-500";
+      case TileSubtype.WINDOW:
+        return "bg-sky-500";
       default:
         return "bg-gray-400";
     }
@@ -228,6 +242,8 @@ export const Tile: React.FC<TileProps> = ({
         return "⇆";
       case TileSubtype.CHECKPOINT:
         return "⛳";
+      case TileSubtype.WINDOW:
+        return "≋";
       default:
         return "?";
     }
@@ -346,7 +362,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.WALL_TORCH &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.DARKNESS &&
-        subtype !== TileSubtype.PLAYER // Filter out player subtype as it's rendered as hero image
+        subtype !== TileSubtype.DOOR &&
+        subtype !== TileSubtype.ROOM_TRANSITION &&
+        subtype !== TileSubtype.PLAYER &&
+        subtype !== TileSubtype.WINDOW // Filter out player/window subtypes from icon overlay
     );
   };
 
@@ -604,24 +623,17 @@ export const Tile: React.FC<TileProps> = ({
       const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : styles.floor} ${tierClass}`;
 
       // Map floor variant to NESW asset filename based on neighbors
-      let floorAsset = "/images/floor/floor-try-1.png"; // Default floor
-      
-      // For tests, we need to ensure we're using the expected image
-      // In production, we'd use the neighbor-based logic
-      if (process.env.NODE_ENV === 'test') {
-        floorAsset = "/images/floor/floor-try-1.png";
-      } else if (!topNeighbor) {
-        floorAsset = "/images/floor/floor-1000.png";
-      } else {
-        floorAsset = "/images/floor/floor-try-1.png";
-      }
+      const floorAsset =
+        process.env.NODE_ENV === 'test'
+          ? environmentConfig.floorDefault
+          : getFloorAsset(environment, { hasNorthNeighbor: Boolean(topNeighbor) });
 
       // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
       const hasWallBelow = neighbors.bottom === 1;
       
       // Determine which wall image to use for the overlay based on neighboring walls
-      let wallTopImage = '/images/wall/wall-0111.png'; // Default wall image
-      
+      let wallPattern = '0111';
+
       if (hasWallBelow) {
         // Check if there are walls to the left and right
         const hasWallLeft = neighbors.left === 1;
@@ -629,18 +641,19 @@ export const Tile: React.FC<TileProps> = ({
         
         if (!hasWallLeft && !hasWallRight) {
           // No walls on sides, use wall-0010.png (just top wall)
-          wallTopImage = '/images/wall/wall-0010.png';
+          wallPattern = '0010';
         } else if (hasWallLeft && !hasWallRight) {
           // Wall on left only
-          wallTopImage = '/images/wall/wall-0110.png';
+          wallPattern = '0110';
         } else if (!hasWallLeft && hasWallRight) {
           // Wall on right only
-          wallTopImage = '/images/wall/wall-0011.png';
+          wallPattern = '0011';
         } else {
           // Walls on both sides
-          wallTopImage = '/images/wall/wall-0111.png';
+          wallPattern = '0111';
         }
       }
+      const wallTopImage = getWallAsset(environment, wallPattern);
 
       return (
         <div
@@ -814,43 +827,46 @@ export const Tile: React.FC<TileProps> = ({
 
       // Map wall variant to NESW asset filename
       // N is always 0 since we don't care about the north direction
+      let wallPattern = '0111';
       let wallAsset = "";
 
       if (variantName === "wall_pillar") {
         wallClasses += ` ${styles.wallPillar}`;
-        wallAsset = "/images/wall/wall-0000.png"; // Isolated wall
+        wallPattern = '0000';
       }
       // Apply helper classes for other variants and map to NESW wall assets
       if (variantName === "wall_end_e") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeR}`;
-        wallAsset = "/images/wall/wall-0001.png"; // Wall to the west only (0001)
+        wallPattern = '0001';
       } else if (variantName === "wall_end_w") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL}`;
-        wallAsset = "/images/wall/wall-0100.png"; // Wall to the east only (0100)
+        wallPattern = '0100';
       } else if (variantName === "wall_end_n") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
-        wallAsset = "/images/wall/wall-0010.png"; // Wall to the south only (0010)
+        wallPattern = '0010';
       } else if (variantName === "wall_corner_ne") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         // Corner NE shows left face in our simplified CSS
         wallClasses += ` ${styles.wallEdgeL}`;
-        wallAsset = "/images/wall/wall-0011.png"; // Walls to south and west (0011)
+        wallPattern = '0011';
       } else if (variantName === "wall_corner_nw") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         // Corner NW shows right face
         wallClasses += ` ${styles.wallEdgeR}`;
-        wallAsset = "/images/wall/wall-0110.png"; // Walls to east and south (0110)
+        wallPattern = '0110';
       } else if (variantName === "wall_horiz") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
-        wallAsset = "/images/wall/wall-0101.png"; // Walls to east and west (0101)
+        wallPattern = '0101';
       } else if (variantName === "wall_t_n") {
         if (isFloorBelow) wallClasses += ` ${styles.wallBase70}`;
         wallClasses += ` ${styles.wallEdgeL} ${styles.wallEdgeR}`;
-        wallAsset = "/images/wall/wall-0111.png"; // Walls to east, south, and west (0111)
+        wallPattern = '0111';
       }
+
+      wallAsset = getWallAsset(environment, wallPattern);
 
       // For wall tiles with assets, use a simplified class without borders and extra styling
       // But keep the border-b-8 class for tests if there's a floor below
@@ -880,6 +896,23 @@ export const Tile: React.FC<TileProps> = ({
         >
           {/* Wall details - inner texture or pattern (only shown if no wall asset) */}
           {!wallAsset && <div className={styles.wallInsetTexture}></div>}
+
+          {subtype.includes(TileSubtype.DOOR) &&
+            (environment === "outdoor" || environment === "house") && (
+              <div
+                className={styles.wallDoorOverlay}
+                style={{ backgroundImage: "url(/images/door/house-door.png)" }}
+                aria-hidden="true"
+              />
+            )}
+
+          {subtype.includes(TileSubtype.WINDOW) && (
+            <div
+              className={styles.wallWindowOverlay}
+              style={{ backgroundImage: "url(/images/window.png)" }}
+              aria-hidden="true"
+            />
+          )}
 
           {/* Exaggerated base shadow when standing in front of floor */}
           {isFloorBelow && (

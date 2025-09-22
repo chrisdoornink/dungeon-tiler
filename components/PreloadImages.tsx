@@ -14,6 +14,10 @@ export default function PreloadImages() {
       "/images/floor/floor-1000.png",
       "/images/floor/floor-1001.png",
       "/images/floor/floor-0001.png",
+      "/images/floor/outdoor-floor-0000.png",
+      "/images/floor/outdoor-floor-1000.png",
+      "/images/floor/in-house-floor-0000.png",
+      "/images/floor/in-house-floor-1000.png",
 
       // Walls (all 8 NESW variants implemented)
       "/images/wall/wall-0000.png",
@@ -24,10 +28,19 @@ export default function PreloadImages() {
       "/images/wall/wall-0101.png",
       "/images/wall/wall-0110.png",
       "/images/wall/wall-0111.png",
+      "/images/wall/outdoor-wall-0000.png",
+      "/images/wall/outdoor-wall-0001.png",
+      "/images/wall/outdoor-wall-0010.png",
+      "/images/wall/outdoor-wall-0011.png",
+      "/images/wall/outdoor-wall-0100.png",
+      "/images/wall/outdoor-wall-0101.png",
+      "/images/wall/outdoor-wall-0110.png",
+      "/images/wall/outdoor-wall-0111.png",
 
       // Exit + lock
       "/images/door/exit-dark.png",
       "/images/door/exit-transparent.png",
+      "/images/door/house-door.png",
       "/images/door/gold-chain-lock.png",
 
       // Items seen early
@@ -48,6 +61,7 @@ export default function PreloadImages() {
       "/images/items/food-3.png",
       "/images/items/meds-1.png",
       "/images/items/rune1.png",
+      "/images/window.png",
       "/images/items/wall-torch-1.png",
       "/images/items/wall-torch-2.png",
       "/images/items/wall-torch-3.png",

@@ -79,12 +79,10 @@
   background-repeat: no-repeat;
   background-position: center;
   position: relative;
-  /* Add a subtle blend to integrate with the forest theme */
-  box-shadow: inset 0 0 10px rgba(26, 42, 32, 0.4);
 }
 
 /* Add subtle moss overlay to floor tiles */
-.floor::after {
+/* .floor::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -100,7 +98,7 @@
     );
   mix-blend-mode: overlay;
   pointer-events: none;
-}
+} */
 
 .wall {
   background-color: var(--wall-top);
@@ -131,6 +129,30 @@
       rgba(77, 99, 86, 0.03) 4px,
       rgba(77, 99, 86, 0.03) 5px
     );
+}
+
+.wallWindowOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background-position: center 72%;
+  background-repeat: no-repeat;
+  background-size: 60% 60%;
+}
+
+.wallDoorOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 80% 90%;
 }
 
 /* Subtype icons container */

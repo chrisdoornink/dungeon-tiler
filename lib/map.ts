@@ -18,6 +18,7 @@ import { EnemyState } from "./enemy";
 import { EnemyRegistry, createEmptyByKind } from "./enemies/registry";
 import type { EnemyKind } from "./enemies/registry";
 import { enemyTypeAssignement } from "./enemy_assignment";
+import { DEFAULT_ENVIRONMENT, type EnvironmentId } from "./environment";
 
 // Map of tile types by ID
 export const tileTypes: Record<number, TileType> = {
@@ -312,6 +313,7 @@ export enum TileSubtype {
   SNAKE = 20,
   ROOM_TRANSITION = 21,
   CHECKPOINT = 22,
+  WINDOW = 23,
 }
 
 function removePlayerFromMapData(mapData: MapData): MapData {
@@ -330,6 +332,7 @@ function removePlayerFromMapData(mapData: MapData): MapData {
 export interface MapData {
   tiles: number[][];
   subtypes: number[][][];
+  environment?: EnvironmentId;
 }
 
 function cloneMapData(mapData: MapData): MapData {
@@ -423,6 +426,7 @@ export function generateMapWithSubtypes(): MapData {
   return {
     tiles,
     subtypes,
+    environment: DEFAULT_ENVIRONMENT,
   };
 }
 
@@ -1685,7 +1689,9 @@ function cloneCheckpointSnapshot(
 export function createCheckpointSnapshot(
   state: GameState
 ): CheckpointSnapshot {
-  const { combatRng: _rng, lastCheckpoint: _prev, enemies, ...rest } = state;
+  const { combatRng, lastCheckpoint, enemies, ...rest } = state;
+  void combatRng;
+  void lastCheckpoint;
   const base = JSON.parse(
     JSON.stringify(rest)
   ) as Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies">;
@@ -2212,6 +2218,13 @@ export function movePlayer(
     }
 
     // For regular walls, do nothing - player cannot move there
+    if (moved) {
+      newGameState.stats.steps += 1;
+      const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
+      if (transition) {
+        newGameState = applyRoomTransition(newGameState, transition);
+      }
+    }
     return newGameState;
   }
 
