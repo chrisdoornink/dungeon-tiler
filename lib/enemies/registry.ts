@@ -1,6 +1,6 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
-export type EnemyKind = "goblin" | "ghost" | "stone-exciter" | "snake";
+export type EnemyKind = "goblin" | "ghost" | "stone-exciter" | "snake" | "mimic";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -225,6 +225,134 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             break;
           }
         }
+        return 0;
+      },
+    },
+  },
+  mimic: {
+    kind: "mimic",
+    displayName: "Mimic Chest",
+    assets: {
+      // Use existing chest art as a lightweight placeholder until bespoke mimic sprites land
+      front: "/images/items/closed-chest.png",
+      left: "/images/items/closed-chest.png",
+      right: "/images/items/opened-chest.png",
+      back: "/images/items/opened-chest.png",
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
+    base: { health: 4, attack: 2 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: (ctx) => {
+        const grid = ctx.grid;
+        const e = ctx.enemy;
+        const py = ctx.player.y;
+        const px = ctx.player.x;
+        const mem = (e.memory as { awakened?: boolean; cooldown?: number; moved?: boolean });
+
+        if (!mem.awakened) mem.awakened = false;
+        if (typeof mem.cooldown === "number" && mem.cooldown > 0) {
+          mem.cooldown -= 1;
+        }
+
+        const orientToward = (dy: number, dx: number) => {
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            if (dx > 0) e.facing = "RIGHT";
+            else if (dx < 0) e.facing = "LEFT";
+            else if (dy > 0) e.facing = "DOWN";
+            else if (dy < 0) e.facing = "UP";
+          } else {
+            if (dy > 0) e.facing = "DOWN";
+            else if (dy < 0) e.facing = "UP";
+            else if (dx > 0) e.facing = "RIGHT";
+            else if (dx < 0) e.facing = "LEFT";
+          }
+        };
+
+        const dist = Math.abs(e.y - py) + Math.abs(e.x - px);
+        if (!mem.awakened) {
+          const sees = canSee(grid, [e.y, e.x], [py, px]);
+          if (sees && dist <= 2) {
+            mem.awakened = true;
+            mem.cooldown = 0;
+            orientToward(py - e.y, px - e.x);
+          } else {
+            e.facing = "DOWN"; // keep chest closed toward camera
+            return 0;
+          }
+        }
+
+        if (dist === 1) {
+          orientToward(py - e.y, px - e.x);
+          return ctx.enemy.attack;
+        }
+
+        const inBounds = (y: number, x: number) =>
+          y >= 0 && y < grid.length && x >= 0 && x < grid[0].length;
+        const isFloor = (y: number, x: number) => inBounds(y, x) && grid[y][x] === 0;
+
+        // Dash in a straight line up to 2 tiles when aligned with the hero
+        if ((mem.cooldown ?? 0) === 0 && (e.y === py || e.x === px) && !(e.y === py && e.x === px)) {
+          const stepY = py === e.y ? 0 : py > e.y ? 1 : -1;
+          const stepX = px === e.x ? 0 : px > e.x ? 1 : -1;
+          let ny = e.y;
+          let nx = e.x;
+          let blocked = false;
+          for (let i = 0; i < 2; i++) {
+            const ty = ny + stepY;
+            const tx = nx + stepX;
+            if (ty === py && tx === px) {
+              orientToward(stepY, stepX);
+              mem.cooldown = 2;
+              return ctx.enemy.attack;
+            }
+            if (!isFloor(ty, tx)) {
+              blocked = true;
+              break;
+            }
+            ny = ty;
+            nx = tx;
+          }
+          if (!blocked && (ny !== e.y || nx !== e.x)) {
+            e.y = ny;
+            e.x = nx;
+            orientToward(py - e.y, px - e.x);
+            mem.cooldown = 2;
+            mem.moved = true;
+            return 0;
+          }
+        }
+
+        const tryMoves: Array<[number, number]> = [];
+        const dy = py - e.y;
+        const dx = px - e.x;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          if (dx !== 0) tryMoves.push([0, dx > 0 ? 1 : -1]);
+          if (dy !== 0) tryMoves.push([dy > 0 ? 1 : -1, 0]);
+        } else {
+          if (dy !== 0) tryMoves.push([dy > 0 ? 1 : -1, 0]);
+          if (dx !== 0) tryMoves.push([0, dx > 0 ? 1 : -1]);
+        }
+
+        for (const [my, mx] of tryMoves) {
+          const ny = e.y + my;
+          const nx = e.x + mx;
+          if (ny === py && nx === px) {
+            orientToward(my, mx);
+            return ctx.enemy.attack;
+          }
+          if (isFloor(ny, nx)) {
+            e.y = ny;
+            e.x = nx;
+            orientToward(py - e.y, px - e.x);
+            mem.moved = true;
+            return 0;
+          }
+        }
+
+        orientToward(py - e.y, px - e.x);
         return 0;
       },
     },

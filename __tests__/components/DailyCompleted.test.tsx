@@ -38,12 +38,12 @@ describe('DailyCompleted Layout and Box Adjustments', () => {
     hasShield: true,
     heroHealth: 3,
     outcome: 'win' as const,
-    stats: { 
-      damageDealt: 15, 
-      damageTaken: 2, 
-      enemiesDefeated: 3, 
+    stats: {
+      damageDealt: 15,
+      damageTaken: 2,
+      enemiesDefeated: 3,
       steps: 45,
-      byKind: { goblin: 2, ghost: 1, 'stone-exciter': 0 }
+      byKind: { goblin: 2, ghost: 1, 'stone-exciter': 0, snake: 0, mimic: 0 }
     },
     mapData: {
       tiles: Array(5).fill(0).map(() => Array(7).fill(0)),

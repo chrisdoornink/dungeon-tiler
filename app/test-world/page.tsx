@@ -8,9 +8,10 @@ import {
   generateMap,
   generateCompleteMap,
   type GameState,
+  findPlayerPosition,
 } from "../../lib/map";
 import { useSearchParams } from "next/navigation";
-import { rehydrateEnemies } from "../../lib/enemy";
+import { Enemy, rehydrateEnemies } from "../../lib/enemy";
 import { TilemapGrid } from "../../components/TilemapGrid";
 // import { deleteSavedMap, loadSavedMaps, upsertSavedMap, type SavedMapEntry } from "../../lib/saved_maps";
 
@@ -106,7 +107,63 @@ function HomeInner() {
   }, [replay]);
 
   // Use replay state if available, otherwise use initial state
-  const finalInitialState = replayState || initialState;
+  const baseInitialState = replayState || initialState;
+
+  const finalInitialState = useMemo(() => {
+    const state = baseInitialState;
+    if (!state) return state;
+    const cloned: GameState = {
+      ...state,
+      enemies: [...(state.enemies ?? [])],
+    };
+    const playerPos = findPlayerPosition(cloned.mapData);
+    if (!playerPos) return cloned;
+
+    const [py, px] = playerPos;
+    const occupied = new Set<string>();
+    cloned.enemies?.forEach((enemy) => {
+      occupied.add(`${enemy.y},${enemy.x}`);
+    });
+    occupied.add(`${py},${px}`);
+
+    const grid = cloned.mapData.tiles;
+    const H = grid.length;
+    const W = grid[0]?.length ?? 0;
+    const candidates: Array<{ y: number; x: number }> = [];
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        if (grid[y][x] !== 0) continue;
+        const key = `${y},${x}`;
+        if (occupied.has(key)) continue;
+        const dist = Math.abs(y - py) + Math.abs(x - px);
+        if (dist <= 1) continue;
+        candidates.push({ y, x });
+      }
+    }
+
+    for (let i = candidates.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+    }
+
+    const extra: Enemy[] = [];
+    for (const cand of candidates) {
+      if (extra.length >= 10) break;
+      const key = `${cand.y},${cand.x}`;
+      if (occupied.has(key)) continue;
+      const enemy = new Enemy({ y: cand.y, x: cand.x });
+      enemy.kind = "mimic";
+      enemy.facing = "DOWN";
+      extra.push(enemy);
+      occupied.add(key);
+    }
+
+    if (extra.length > 0) {
+      cloned.enemies = [...(cloned.enemies ?? []), ...extra];
+    }
+
+    return cloned;
+  }, [baseInitialState]);
 
   // Saved maps UI state - hidden
   // const [savedMaps, setSavedMaps] = useState<SavedMapEntry[]>([]);

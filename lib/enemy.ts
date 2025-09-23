@@ -28,13 +28,13 @@ export class Enemy {
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
-  // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons
-  private _kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' = 'goblin';
+  // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons; 'mimic' disguises
+  private _kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic' = 'goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'goblin' | 'ghost' | 'stone-exciter' | 'snake' { return this._kind; }
-  set kind(k: 'goblin' | 'ghost' | 'stone-exciter' | 'snake') {
+  get kind(): 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic' { return this._kind; }
+  set kind(k: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -50,6 +50,10 @@ export class Enemy {
       // Snake baseline per registry: low HP, light attack
       if (this.health > 2) this.health = 2;
       this.attack = 1;
+    } else if (k === 'mimic') {
+      // Mimics are sturdy ambushers with heavier hits
+      this.health = 4;
+      this.attack = 2;
     }
   }
   // Pursuit memory: how many ticks to keep chasing after losing LOS
@@ -240,7 +244,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake'
+  kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic'
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
   if (kind === 'ghost') {
@@ -301,8 +305,8 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export type PlainEnemy = {
   y: number;
   x: number;
-  kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
-  _kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
+  kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic';
+  _kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' | 'mimic';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -317,7 +321,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
     // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
     const k = d?.kind ?? d?._kind;
-    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin' || k === 'snake') {
+    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin' || k === 'snake' || k === 'mimic') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
