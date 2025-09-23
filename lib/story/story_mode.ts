@@ -5,6 +5,9 @@ import {
   Direction,
   type RoomTransition,
   type RoomId,
+  createCheckpointSnapshot,
+  findPlayerPosition,
+  isWithinBounds,
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
 import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
@@ -382,12 +385,6 @@ function buildSanctum(): StoryRoom {
 
   const entryFromNext: [number, number] = [transitionToNext[0] + 1, entryX];
 
-  const checkpointY = entryY - 4;
-  const checkpointX = entryX;
-  if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
-    subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
-  }
-
   const snakes: Enemy[] = [];
   const snakeA = new Enemy({ y: entryY - 3, x: entryX - 2 });
   snakeA.kind = "snake";
@@ -445,6 +442,12 @@ function buildOutdoorWorld(): StoryRoom {
 
   const entryPoint: [number, number] = [bottomOpeningY - 1, entryX];
   const transitionToPrevious: [number, number] = [bottomOpeningY, entryX];
+
+  const checkpointY = Math.max(1, entryPoint[0] - 2);
+  const checkpointX = entryPoint[1];
+  if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
+    subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
+  }
 
   // Add small clusters of rocks to give the outdoor space some structure
   const featureSpots: Array<[number, number, number[]]> = [
@@ -780,4 +783,190 @@ export function buildStoryModeState(): GameState {
   };
 
   return gameState;
+}
+
+const STORY_ROOM_LABELS: Partial<Record<RoomId, string>> = {
+  "story-hall-entrance": "Entrance Hall",
+  "story-ascent": "Ascent Corridor",
+  "story-sanctum": "Sanctum",
+  "story-outdoor-clearing": "Outdoor Clearing",
+  "story-outdoor-house": "Caretaker's House",
+};
+
+function findSubtypePositions(
+  mapData: MapData,
+  subtype: TileSubtype
+): Array<[number, number]> {
+  const positions: Array<[number, number]> = [];
+  for (let y = 0; y < mapData.subtypes.length; y++) {
+    const row = mapData.subtypes[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const cell = row[x];
+      if (Array.isArray(cell) && cell.includes(subtype)) {
+        positions.push([y, x]);
+      }
+    }
+  }
+  return positions;
+}
+
+export interface StoryCheckpointOption {
+  id: string;
+  roomId: RoomId;
+  position: [number, number];
+  label: string;
+  kind: "entry" | "checkpoint";
+}
+
+export function collectStoryCheckpointOptions(
+  state: GameState
+): StoryCheckpointOption[] {
+  const options: StoryCheckpointOption[] = [];
+  const seen = new Set<string>();
+  const rooms = state.rooms ?? {};
+
+  const pushOption = (
+    roomId: RoomId,
+    position: [number, number],
+    kind: "entry" | "checkpoint",
+    index = 0
+  ) => {
+    const key = `${roomId}:${position[0]}:${position[1]}:${kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const baseLabel = STORY_ROOM_LABELS[roomId] ?? roomId;
+    const suffix = kind === "checkpoint" && index > 0 ? ` ${index + 1}` : "";
+    const label =
+      kind === "entry"
+        ? `${baseLabel} — Entry`
+        : `${baseLabel} — Checkpoint${suffix}`;
+    options.push({ id: key, roomId, position, label, kind });
+  };
+
+  for (const [roomIdRaw, snapshot] of Object.entries(rooms)) {
+    const roomId = roomIdRaw as RoomId;
+    if (snapshot.entryPoint) {
+      pushOption(roomId, snapshot.entryPoint, "entry");
+    }
+    const checkpoints = findSubtypePositions(
+      snapshot.mapData,
+      TileSubtype.CHECKPOINT
+    );
+    checkpoints.forEach((pos, idx) => pushOption(roomId, pos, "checkpoint", idx));
+  }
+
+  // Ensure the current player position is represented even if not in rooms map yet
+  const activeRoomId = state.currentRoomId;
+  if (activeRoomId) {
+    const playerPos = findPlayerPosition(state.mapData);
+    if (playerPos) {
+      pushOption(activeRoomId, playerPos, "entry");
+    }
+  }
+
+  const order: Record<StoryCheckpointOption["kind"], number> = {
+    checkpoint: 0,
+    entry: 1,
+  };
+
+  return options.sort((a, b) => {
+    const kindDelta = order[a.kind] - order[b.kind];
+    if (kindDelta !== 0) return kindDelta;
+    if (a.roomId === b.roomId) {
+      return a.label.localeCompare(b.label);
+    }
+    return a.roomId.localeCompare(b.roomId);
+  });
+}
+
+export interface StoryResetConfig {
+  targetRoomId: RoomId;
+  targetPosition: [number, number];
+  heroHealth: number;
+  heroTorchLit: boolean;
+  hasSword: boolean;
+  hasShield: boolean;
+  hasKey: boolean;
+  hasExitKey: boolean;
+  rockCount: number;
+  runeCount: number;
+  foodCount: number;
+  potionCount: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function applyStoryResetConfig(
+  state: GameState,
+  config: StoryResetConfig
+): void {
+  const rooms = state.rooms ?? {};
+  const { targetRoomId, targetPosition } = config;
+  const targetSnapshot = rooms[targetRoomId];
+  if (!targetSnapshot) {
+    throw new Error(`Unknown story room: ${targetRoomId}`);
+  }
+
+  const [ty, tx] = targetPosition;
+  if (!isWithinBounds(targetSnapshot.mapData, ty, tx)) {
+    throw new Error(`Invalid checkpoint position for ${targetRoomId}`);
+  }
+  if (targetSnapshot.mapData.tiles[ty]?.[tx] !== FLOOR) {
+    throw new Error(`Target position for ${targetRoomId} is not walkable`);
+  }
+
+  const activeRoomId = state.currentRoomId ?? targetRoomId;
+  const activeSnapshot = rooms[activeRoomId];
+  if (activeSnapshot) {
+    rooms[activeRoomId] = {
+      ...activeSnapshot,
+      mapData: withoutPlayer(state.mapData),
+      enemies: serializeEnemies(state.enemies),
+      npcs: serializeNPCs(state.npcs),
+      potOverrides: state.potOverrides ? { ...state.potOverrides } : undefined,
+    };
+  }
+
+  state.mapData = addPlayer(targetSnapshot.mapData, targetPosition);
+  state.currentRoomId = targetRoomId;
+  state.enemies = targetSnapshot.enemies
+    ? rehydrateEnemies(targetSnapshot.enemies)
+    : undefined;
+  state.npcs = targetSnapshot.npcs
+    ? rehydrateNPCs(targetSnapshot.npcs)
+    : undefined;
+  state.potOverrides = targetSnapshot.potOverrides
+    ? { ...targetSnapshot.potOverrides }
+    : undefined;
+
+  state.heroHealth = clamp(Math.floor(config.heroHealth), 1, 6);
+  state.heroTorchLit = config.heroTorchLit;
+  state.hasSword = config.hasSword;
+  state.hasShield = config.hasShield;
+  state.hasKey = config.hasKey;
+  state.hasExitKey = config.hasExitKey;
+  state.rockCount = clamp(Math.floor(config.rockCount), 0, 99);
+  state.runeCount = clamp(Math.floor(config.runeCount), 0, 99);
+  state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
+  state.potionCount = clamp(Math.floor(config.potionCount), 0, 99);
+
+  state.stats = {
+    ...state.stats,
+    steps: 0,
+  };
+  state.recentDeaths = [];
+  state.npcInteractionQueue = [];
+  state.deathCause = undefined;
+  state.conditions = undefined;
+}
+
+export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
+  const state = buildStoryModeState();
+  applyStoryResetConfig(state, config);
+  state.lastCheckpoint = createCheckpointSnapshot(state);
+  return state;
 }

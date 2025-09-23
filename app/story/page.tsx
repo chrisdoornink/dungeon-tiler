@@ -2,24 +2,59 @@
 
 import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
-import { tileTypes, type GameState } from "../../lib/map";
-import { buildStoryModeState } from "../../lib/story/story_mode";
+import {
+  tileTypes,
+  type GameState,
+  type RoomId,
+  findPlayerPosition,
+} from "../../lib/map";
+import {
+  buildStoryModeState,
+  buildStoryStateFromConfig,
+  collectStoryCheckpointOptions,
+  type StoryCheckpointOption,
+  type StoryResetConfig,
+} from "../../lib/story/story_mode";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { rehydrateEnemies, type PlainEnemy } from "../../lib/enemy";
 import { rehydrateNPCs, type PlainNPC } from "../../lib/npc";
+import StoryResetModal from "../../components/StoryResetModal";
+
+function createDefaultResetConfig(
+  state: GameState,
+  options: StoryCheckpointOption[]
+): StoryResetConfig {
+  const preferred =
+    options.find((opt) => opt.kind === "checkpoint") ?? options[0] ?? null;
+  const fallbackRoom: RoomId =
+    preferred?.roomId ??
+    state.currentRoomId ??
+    ((options[0]?.roomId ?? "story-hall-entrance") as RoomId);
+  const fallbackPosition =
+    preferred?.position ?? findPlayerPosition(state.mapData) ?? ([0, 0] as [number, number]);
+
+  return {
+    targetRoomId: fallbackRoom,
+    targetPosition: fallbackPosition,
+    heroHealth: state.heroHealth,
+    heroTorchLit: state.heroTorchLit ?? true,
+    hasSword: !!state.hasSword,
+    hasShield: !!state.hasShield,
+    hasKey: !!state.hasKey,
+    hasExitKey: !!state.hasExitKey,
+    rockCount: state.rockCount ?? 0,
+    runeCount: state.runeCount ?? 0,
+    foodCount: state.foodCount ?? 0,
+    potionCount: state.potionCount ?? 0,
+  };
+}
 
 function StoryModeInner() {
   const [initialState, setInitialState] = useState<GameState | null>(null);
-
-  const handleReset = useCallback(() => {
-    if (typeof window === "undefined") return;
-    try {
-      CurrentGameStorage.clearCurrentGame("story");
-    } catch {
-      // ignore storage errors and still reload below
-    }
-    window.location.reload();
-  }, []);
+  const [checkpointOptions, setCheckpointOptions] = useState<StoryCheckpointOption[]>([]);
+  const [resetConfig, setResetConfig] = useState<StoryResetConfig | null>(null);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [tilemapKey, setTilemapKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,6 +83,48 @@ function StoryModeInner() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!initialState) return;
+    const options = collectStoryCheckpointOptions(initialState);
+    setCheckpointOptions(options);
+    setResetConfig((prev) => {
+      if (prev) {
+        const hasMatch = options.some(
+          (opt) =>
+            opt.roomId === prev.targetRoomId &&
+            opt.position[0] === prev.targetPosition[0] &&
+            opt.position[1] === prev.targetPosition[1]
+        );
+        if (hasMatch) {
+          return prev;
+        }
+      }
+      return createDefaultResetConfig(initialState, options);
+    });
+  }, [collectStoryCheckpointOptions, initialState]);
+
+  const handleResetApply = useCallback(
+    (config: StoryResetConfig) => {
+      const nextState = buildStoryStateFromConfig(config);
+      try {
+        CurrentGameStorage.saveCurrentGame(nextState, "story");
+      } catch {}
+      setInitialState(nextState);
+      setResetConfig(config);
+      setCheckpointOptions(collectStoryCheckpointOptions(nextState));
+      setTilemapKey((key) => key + 1);
+      setShowResetModal(false);
+    },
+    [
+      buildStoryStateFromConfig,
+      collectStoryCheckpointOptions,
+      setCheckpointOptions,
+      setInitialState,
+      setResetConfig,
+      setTilemapKey,
+    ]
+  );
+
   if (!initialState) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
@@ -69,7 +146,7 @@ function StoryModeInner() {
       <div className="relative z-10 flex flex-col items-center gap-4">
         <button
           type="button"
-          onClick={handleReset}
+          onClick={() => resetConfig && setShowResetModal(true)}
           className="self-end rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
         >
           Reset Story
@@ -78,12 +155,22 @@ function StoryModeInner() {
           Story Mode Prototype
         </h1>
         <TilemapGrid
+          key={tilemapKey}
           tileTypes={tileTypes}
           initialGameState={initialState}
           forceDaylight={false}
           storageSlot="story"
         />
       </div>
+      {resetConfig && (
+        <StoryResetModal
+          open={showResetModal}
+          options={checkpointOptions}
+          initialConfig={resetConfig}
+          onCancel={() => setShowResetModal(false)}
+          onConfirm={handleResetApply}
+        />
+      )}
     </div>
   );
 }
