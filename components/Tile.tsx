@@ -2,6 +2,7 @@ import React from "react";
 import { TileType, TileSubtype, Direction } from "../lib/map";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
+import type { NPC } from "../lib/npc";
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -36,6 +37,9 @@ interface TileProps {
   enemyKind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemyAura?: boolean; // show eerie green glow when close to hero
+  npc?: NPC;
+  npcVisible?: boolean;
+  npcInteractable?: boolean;
   hasSword?: boolean; // Whether player holds a sword (for sprite)
   hasShield?: boolean; // Whether player holds a shield (for sprite)
   invisibleClassName?: string; // Optional class override for invisible tiles
@@ -61,6 +65,9 @@ export const Tile: React.FC<TileProps> = ({
   enemyKind,
   enemyMoved,
   enemyAura,
+  npc,
+  npcVisible = undefined,
+  npcInteractable = false,
   hasSword,
   hasShield,
   invisibleClassName,
@@ -617,6 +624,35 @@ export const Tile: React.FC<TileProps> = ({
   // Determine if we need to flip the hero image for left-facing direction
   const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
 
+  const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
+  const npcTransform = (() => {
+    if (!npc) return 'none';
+    const transforms: string[] = [];
+    switch (npc.facing) {
+      case Direction.LEFT:
+        transforms.push('scaleX(-1)');
+        break;
+      case Direction.UP:
+        transforms.push('rotate(-90deg)');
+        break;
+      case Direction.RIGHT:
+      case Direction.DOWN:
+      default:
+        break;
+    }
+    return transforms.join(' ');
+  })();
+  const npcTransformOrigin = (() => {
+    if (!npc) return '50% 100%';
+    switch (npc.facing) {
+      case Direction.UP:
+        return '50% 60%';
+      default:
+        return '50% 100%';
+    }
+  })();
+  const showNpcPrompt = shouldShowNpc && npcInteractable;
+
   // If this is a floor tile
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
@@ -691,6 +727,24 @@ export const Tile: React.FC<TileProps> = ({
               <div className="poison-stench" style={{ left: '58%', animationDelay: '200ms' }} aria-hidden="true" />
               <div className="poison-stench" style={{ left: '50%', animationDelay: '400ms', width: '10px' }} aria-hidden="true" />
             </>
+          )}
+
+          {shouldShowNpc && npc && (
+            <div
+              className={styles.npcImage}
+              style={{
+                backgroundImage: `url(${npc.sprite})`,
+                transform: npcTransform,
+                transformOrigin: npcTransformOrigin,
+              }}
+              aria-hidden="true"
+              data-testid="npc-sprite"
+            />
+          )}
+          {showNpcPrompt && (
+            <div className={styles.npcDialogueIcon} aria-hidden="true">
+              💬
+            </div>
           )}
 
           {/* Enemy rendering: sprite (when visible) */}

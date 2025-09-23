@@ -2,6 +2,12 @@ import type { PlainEnemy } from "../enemy";
 import { Enemy, EnemyState } from "../enemy";
 import type { MapData } from "./types";
 import { TileSubtype } from "./constants";
+import {
+  clonePlainNPCs as clonePlainNPCsUtil,
+  type PlainNPC,
+  type NPC,
+  serializeNPCs as serializeNPCsUtil,
+} from "../npc";
 
 export function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -43,6 +49,16 @@ export function serializeEnemies(
 ): PlainEnemy[] | undefined {
   if (!enemies) return undefined;
   return enemies.map((enemy) => enemyToPlain(enemy));
+}
+
+export function serializeNPCs(npcs?: NPC[]): PlainNPC[] | undefined {
+  return serializeNPCsUtil(npcs);
+}
+
+export function clonePlainNPCs(
+  npcs?: PlainNPC[]
+): PlainNPC[] | undefined {
+  return clonePlainNPCsUtil(npcs);
 }
 
 export function clonePotOverrides(

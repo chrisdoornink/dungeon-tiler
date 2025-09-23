@@ -1,5 +1,6 @@
 import type { TileSubtype, RoomId } from "./constants";
 import type { PlainEnemy } from "../enemy";
+import type { PlainNPC } from "../npc";
 import type { EnvironmentId } from "../environment";
 
 export interface MapData {
@@ -12,6 +13,7 @@ export interface RoomSnapshot {
   mapData: MapData;
   entryPoint: [number, number];
   enemies?: PlainEnemy[];
+  npcs?: PlainNPC[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
 }
 

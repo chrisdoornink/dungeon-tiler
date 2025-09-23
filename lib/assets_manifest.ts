@@ -101,4 +101,14 @@ export const ASSET_URLS: string[] = [
   "/images/hero/hero-front-shield-sword-static.png",
   "/images/hero/hero-right-shield-sword-static.png",
   "/images/hero/hero-back-shield-sword-static.png",
+
+  // NPC sprites
+  "/images/npcs/boy-1.png",
+  "/images/npcs/boy-2.png",
+  "/images/npcs/boy-3.png",
+  "/images/npcs/boy-4.png",
+  "/images/npcs/girl-1.png",
+  "/images/npcs/girl-2.png",
+  "/images/npcs/girl-3.png",
+  "/images/npcs/girl-4.png",
 ];

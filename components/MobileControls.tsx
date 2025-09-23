@@ -8,7 +8,13 @@ interface MobileControlsProps {
   runeCount?: number;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, rockCount, onUseRune, runeCount }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({
+  onMove,
+  onThrowRock,
+  rockCount,
+  onUseRune,
+  runeCount,
+}) => {
   const [isMobile, setIsMobile] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
     UP: false,

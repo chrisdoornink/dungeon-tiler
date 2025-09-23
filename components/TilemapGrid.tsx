@@ -12,6 +12,7 @@ import {
   reviveFromLastCheckpoint,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
+import type { NPC, NPCInteractionEvent } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import {
@@ -41,6 +42,16 @@ import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
 import ItemPickupAnimation from "./ItemPickupAnimation";
+import DialogueOverlay from "./DialogueOverlay";
+import { useTypewriter } from "../lib/dialogue/useTypewriter";
+import { getDialogueScript, type DialogueLine } from "../lib/story/dialogue_registry";
+
+type DialogueSession = {
+  event: NPCInteractionEvent;
+  script: DialogueLine[];
+  lineIndex: number;
+  dialogueId: string;
+};
 
 // Grid dimensions will be derived from provided map data
 
@@ -147,6 +158,42 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     id: string;
     itemType: string;
   }>>([]);
+
+  const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
+  const activeDialogueLine = dialogueSession
+    ? dialogueSession.script[dialogueSession.lineIndex] ?? null
+    : null;
+  const {
+    rendered: dialogueRendered,
+    isTyping: dialogueTyping,
+    skip: revealDialogueImmediately,
+    reset: resetDialogue,
+  } = useTypewriter(activeDialogueLine?.text ?? "", 16);
+  const dialogueActive = Boolean(dialogueSession);
+
+  const consumeNpcInteraction = useCallback(
+    (timestamp: number) => {
+      setGameState((prev) => {
+        const queue = prev.npcInteractionQueue;
+        if (!queue || queue.length === 0) {
+          return prev;
+        }
+        const filtered = queue.filter((event) => event.timestamp !== timestamp);
+        if (filtered.length === queue.length) {
+          return prev;
+        }
+        const next: GameState = {
+          ...prev,
+          npcInteractionQueue: filtered,
+        };
+        try {
+          CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+        } catch {}
+        return next;
+      });
+    },
+    [resolvedStorageSlot]
+  );
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
@@ -344,6 +391,99 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return next;
     });
   }, [playerPosition, resolvedStorageSlot]);
+
+  const handleDialogueAdvance = useCallback(() => {
+    if (!dialogueSession) return;
+    if (dialogueTyping) {
+      revealDialogueImmediately();
+      return;
+    }
+    if (dialogueSession.lineIndex < dialogueSession.script.length - 1) {
+      setDialogueSession({
+        ...dialogueSession,
+        lineIndex: dialogueSession.lineIndex + 1,
+      });
+      return;
+    }
+    setDialogueSession(null);
+    resetDialogue();
+  }, [
+    dialogueSession,
+    dialogueTyping,
+    revealDialogueImmediately,
+    resetDialogue,
+  ]);
+
+  const handleInteract = useCallback(() => {
+    if (dialogueActive) {
+      handleDialogueAdvance();
+      return;
+    }
+    setGameState((prev) => {
+      const npcs = prev.npcs;
+      if (!npcs || npcs.length === 0) return prev;
+      if (!playerPosition) return prev;
+      const [py, px] = playerPosition;
+      let targetY = py;
+      let targetX = px;
+      switch (prev.playerDirection) {
+        case Direction.UP:
+          targetY = py - 1;
+          break;
+        case Direction.RIGHT:
+          targetX = px + 1;
+          break;
+        case Direction.DOWN:
+          targetY = py + 1;
+          break;
+        case Direction.LEFT:
+          targetX = px - 1;
+          break;
+      }
+
+      const npc = npcs.find(
+        (candidate) =>
+          candidate.y === targetY && candidate.x === targetX && !candidate.isDead()
+      );
+      if (!npc) return prev;
+
+      const dy = py - npc.y;
+      const dx = px - npc.x;
+      let faceDir = npc.facing;
+      if (Math.abs(dy) > Math.abs(dx)) {
+        faceDir = dy > 0 ? Direction.DOWN : Direction.UP;
+      } else if (Math.abs(dx) > 0) {
+        faceDir = dx > 0 ? Direction.RIGHT : Direction.LEFT;
+      }
+      npc.face(faceDir);
+      npc.setMemory("lastManualInteract", Date.now());
+      npc.setMemory("lastHeroDirection", prev.playerDirection);
+
+      const updatedNpcs = npcs.map((entry) =>
+        entry.id === npc.id ? npc : entry
+      );
+      const queue = prev.npcInteractionQueue
+        ? [...prev.npcInteractionQueue]
+        : [];
+      queue.push(npc.createInteractionEvent("action"));
+      const MAX_QUEUE = 20;
+      const trimmedQueue =
+        queue.length > MAX_QUEUE ? queue.slice(queue.length - MAX_QUEUE) : queue;
+
+      const next: GameState = {
+        ...prev,
+        npcs: updatedNpcs,
+        npcInteractionQueue: trimmedQueue,
+      };
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      return next;
+    });
+  }, [
+    dialogueActive,
+    handleDialogueAdvance,
+    playerPosition,
+    resolvedStorageSlot,
+  ]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -569,6 +709,49 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return next;
     });
   }, [playerPosition, resolvedStorageSlot]);
+
+  useEffect(() => {
+    if (dialogueSession) return;
+    const queue = gameState.npcInteractionQueue;
+    if (!queue || queue.length === 0) return;
+    const nextEvent = queue.find((entry) => entry.type === "dialogue");
+    if (!nextEvent) return;
+
+    let hook = nextEvent.availableHooks.find((h) => h.id === nextEvent.hookId);
+    if (!hook && nextEvent.availableHooks.length > 0) {
+      hook = nextEvent.availableHooks[0];
+    }
+    const dialogueId = (hook?.payload?.dialogueId ?? hook?.id) as string | undefined;
+    if (!dialogueId) {
+      consumeNpcInteraction(nextEvent.timestamp);
+      return;
+    }
+    const script = getDialogueScript(dialogueId);
+    if (!script || script.lines.length === 0) {
+      consumeNpcInteraction(nextEvent.timestamp);
+      return;
+    }
+
+    setDialogueSession({
+      event: nextEvent,
+      script: script.lines,
+      lineIndex: 0,
+      dialogueId,
+    });
+    consumeNpcInteraction(nextEvent.timestamp);
+    resetDialogue();
+  }, [
+    gameState.npcInteractionQueue,
+    dialogueSession,
+    consumeNpcInteraction,
+    resetDialogue,
+  ]);
+
+  const currentDialogueHasMore = dialogueSession
+    ? dialogueSession.lineIndex < dialogueSession.script.length - 1
+    : false;
+  const activeDialogueSpeaker = activeDialogueLine?.speaker ?? dialogueSession?.event.npcName ?? "";
+  const activeDialogueFullText = activeDialogueLine?.text ?? "";
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
@@ -779,6 +962,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     router,
     resolvedStorageSlot,
   ]);
+
+  useEffect(() => {
+    const queue = gameState.npcInteractionQueue;
+    if (!queue || queue.length === 0) return;
+    const last = queue[queue.length - 1];
+    try {
+      console.info(
+        `[NPC Interaction] ${last.npcName} -> ${last.type} (${last.trigger})`,
+        last
+      );
+    } catch {
+      // Silently ignore logging issues (e.g., no console in environment)
+    }
+  }, [gameState.npcInteractionQueue]);
 
   // Track pickups by diffing inventory/flags
   useEffect(() => {
@@ -1201,30 +1398,56 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     [gameState, playerPosition, resolvedStorageSlot]
   );
 
+  const handleMoveInput = useCallback(
+    (direction: Direction) => {
+      if (dialogueActive) {
+        handleDialogueAdvance();
+        return;
+      }
+      handlePlayerMove(direction);
+    },
+    [dialogueActive, handleDialogueAdvance, handlePlayerMove]
+  );
+
   // Handle mobile control button clicks
   const handleMobileMove = useCallback(
     (directionStr: string) => {
       switch (directionStr) {
         case "UP":
-          handlePlayerMove(Direction.UP);
+          handleMoveInput(Direction.UP);
           break;
         case "RIGHT":
-          handlePlayerMove(Direction.RIGHT);
+          handleMoveInput(Direction.RIGHT);
           break;
         case "DOWN":
-          handlePlayerMove(Direction.DOWN);
+          handleMoveInput(Direction.DOWN);
           break;
         case "LEFT":
-          handlePlayerMove(Direction.LEFT);
+          handleMoveInput(Direction.LEFT);
           break;
       }
     },
-    [handlePlayerMove]
+    [handleMoveInput]
   );
 
   // Add keyboard event listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (dialogueActive) {
+        if (
+          event.key === "Enter" ||
+          event.key === " " ||
+          event.key === "Spacebar" ||
+          event.key === "ArrowDown" ||
+          event.key === "ArrowRight" ||
+          event.key === "e" ||
+          event.key === "E"
+        ) {
+          event.preventDefault();
+          handleDialogueAdvance();
+        }
+        return;
+      }
       let direction: Direction | null = null;
 
       switch (event.key) {
@@ -1260,10 +1483,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Use potion
           handleUsePotion();
           return;
+        case "e":
+        case "E":
+          handleInteract();
+          return;
       }
 
       if (direction !== null) {
-        handlePlayerMove(direction);
+        handleMoveInput(direction);
       }
     };
 
@@ -1273,11 +1500,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     };
   }, [
     gameState,
-    handlePlayerMove,
+    dialogueActive,
+    handleDialogueAdvance,
+    handleMoveInput,
     handleThrowRock,
     handleThrowRune,
     handleUseFood,
     handleUsePotion,
+    handleInteract,
   ]);
 
   return (
@@ -1742,6 +1972,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       (forceDaylight && (gameState.heroTorchLit ?? true)),
                     gameState.playerDirection,
                     gameState.enemies,
+                    gameState.npcs,
                     gameState.hasSword,
                     gameState.hasShield,
                     gameState.heroTorchLit ?? true,
@@ -1767,6 +1998,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         />
       ))}
       </ScreenShake>
+      {dialogueActive && activeDialogueLine && (
+        <DialogueOverlay
+          speaker={activeDialogueSpeaker}
+          text={activeDialogueFullText}
+          renderedText={dialogueRendered}
+          isTyping={dialogueTyping}
+          hasMore={currentDialogueHasMore}
+          onAdvance={handleDialogueAdvance}
+        />
+      )}
       
       {/* Mobile controls - Outside ScreenShake to prevent displacement */}
       <MobileControls
@@ -1866,6 +2107,7 @@ function renderTileGrid(
   showFullMap: boolean = false,
   playerDirection: Direction = Direction.DOWN,
   enemies?: Enemy[],
+  npcs?: NPC[],
   hasSword?: boolean,
   hasShield?: boolean,
   heroTorchLit: boolean = true,
@@ -1928,6 +2170,13 @@ function renderTileGrid(
     for (const e of enemies) enemyMap.set(`${e.y},${e.x}`, e);
   }
 
+  const npcMap = new Map<string, NPC>();
+  if (npcs) {
+    for (const npc of npcs) {
+      npcMap.set(`${npc.y},${npc.x}`, npc);
+    }
+  }
+
   // Poison status passed in by caller
 
   const tiles = grid.flatMap((row, rowIndex) =>
@@ -1964,6 +2213,13 @@ function renderTileGrid(
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
+      const npcAtTile = npcMap.get(`${rowIndex},${colIndex}`);
+      const npcInteractable = (() => {
+        if (!npcAtTile || !playerPosition) return false;
+        if (npcAtTile.isDead()) return false;
+        const [py, px] = playerPosition;
+        return Math.abs(npcAtTile.y - py) + Math.abs(npcAtTile.x - px) === 1;
+      })();
 
       return (
         <div
@@ -2016,6 +2272,9 @@ function renderTileGrid(
                 Math.abs(enemyAtTile.x - playerPosition[1]);
               return d <= 2;
             })()}
+            npc={npcAtTile}
+            npcVisible={npcAtTile ? isVisible : undefined}
+            npcInteractable={npcInteractable}
             hasSword={hasSword}
             hasShield={hasShield}
             invisibleClassName={

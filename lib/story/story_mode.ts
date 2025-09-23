@@ -5,8 +5,12 @@ import {
   Direction,
   type RoomTransition,
   type RoomId,
+  createCheckpointSnapshot,
+  findPlayerPosition,
+  isWithinBounds,
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
+import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
 
 const FLOOR = 0;
 const WALL = 1;
@@ -65,6 +69,12 @@ function cloneEnemies(enemies?: Enemy[]): Enemy[] {
   return rehydrateEnemies(plain);
 }
 
+function cloneNPCs(npcs?: NPC[]): NPC[] {
+  if (!npcs) return [];
+  const plain = serializeNPCs(npcs) ?? [];
+  return rehydrateNPCs(plain);
+}
+
 type StoryRoom = {
   id: RoomId;
   mapData: MapData;
@@ -74,6 +84,7 @@ type StoryRoom = {
   transitionToNext?: [number, number];
   transitionToPrevious?: [number, number];
   enemies?: Enemy[];
+  npcs?: NPC[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
 };
 
@@ -98,7 +109,10 @@ function buildEntranceHall(): StoryRoom {
 
   const midRow = 1 + Math.floor(HALL_WIDTH / 2);
   const entryPoint: [number, number] = [midRow, 2];
-  const returnEntryPoint: [number, number] = [midRow, Math.max(2, HALL_LENGTH - 1)];
+  const returnEntryPoint: [number, number] = [
+    midRow,
+    Math.max(2, HALL_LENGTH - 1),
+  ];
   const rightWallX = width - 1;
   for (let y = 1; y <= HALL_WIDTH; y++) {
     tiles[y][rightWallX] = FLOOR;
@@ -134,13 +148,53 @@ function buildEntranceHall(): StoryRoom {
     }
   }
 
+  const mentorX = Math.min(HALL_LENGTH - 2, entryPoint[1] + 4);
+  const elder = new NPC({
+    id: "npc-elder-rowan",
+    name: "Elder Rowan",
+    sprite: "/images/npcs/boy-1.png",
+    y: midRow,
+    x: mentorX,
+    facing: Direction.LEFT,
+    canMove: false,
+    memory: {
+      metHero: false,
+      giftAvailable: true,
+    },
+    interactionHooks: [
+      {
+        id: "elder-rowan-greet",
+        type: "dialogue",
+        description: "Greet the elder",
+        payload: {
+          dialogueId: "elder-rowan-intro",
+        },
+      },
+      {
+        id: "elder-rowan-gift",
+        type: "item",
+        description: "Receive a restorative tonic",
+        payload: {
+          itemId: "med",
+          quantity: 1,
+        },
+      },
+    ],
+    actions: ["greet", "gift"],
+    metadata: {
+      archetype: "mentor",
+    },
+  });
+  const npcs = [elder];
+
   return {
     id: "story-hall-entrance",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     returnEntryPoint,
     transitionToNext,
     potOverrides,
+    npcs,
   };
 }
 
@@ -208,14 +262,20 @@ function buildAscentCorridor(): StoryRoom {
   ];
 
   const entryPoint: [number, number] = [entryRow, 1];
-  const entryFromNext: [number, number] = [Math.min(bottom, hallwayStartY + 1), hallwayX];
+  const entryFromNext: [number, number] = [
+    Math.min(bottom, hallwayStartY + 1),
+    hallwayX,
+  ];
   const transitionToNext: [number, number] = [hallwayStartY, hallwayX];
   subtypes[transitionToNext[0]][transitionToNext[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
 
   const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
-  const midSectionY = Math.max(hallwayStartY + 1, Math.floor((top + bottom) / 2));
+  const midSectionY = Math.max(
+    hallwayStartY + 1,
+    Math.floor((top + bottom) / 2)
+  );
   const potPositions: Array<[number, number]> = [
     [midSectionY, 2],
     [midSectionY, 4],
@@ -238,7 +298,7 @@ function buildAscentCorridor(): StoryRoom {
 
   return {
     id: "story-ascent",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     returnEntryPoint: [entryRow, 4],
     entryFromNext,
@@ -325,12 +385,6 @@ function buildSanctum(): StoryRoom {
 
   const entryFromNext: [number, number] = [transitionToNext[0] + 1, entryX];
 
-  const checkpointY = entryY - 4;
-  const checkpointX = entryX;
-  if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
-    subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
-  }
-
   const snakes: Enemy[] = [];
   const snakeA = new Enemy({ y: entryY - 3, x: entryX - 2 });
   snakeA.kind = "snake";
@@ -340,7 +394,9 @@ function buildSanctum(): StoryRoom {
   snakes.push(snakeB);
 
   const torchRow = 1;
-  const torchCols = [entryX - 1, entryX + 1].filter((x) => x >= 1 && x <= INNER_SIZE);
+  const torchCols = [entryX - 1, entryX + 1].filter(
+    (x) => x >= 1 && x <= INNER_SIZE
+  );
   for (const x of torchCols) {
     if (tiles[torchRow][x] === WALL) {
       subtypes[torchRow][x] = [TileSubtype.WALL_TORCH];
@@ -349,7 +405,7 @@ function buildSanctum(): StoryRoom {
 
   return {
     id: "story-sanctum",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     transitionToPrevious,
     entryFromNext,
@@ -386,6 +442,12 @@ function buildOutdoorWorld(): StoryRoom {
 
   const entryPoint: [number, number] = [bottomOpeningY - 1, entryX];
   const transitionToPrevious: [number, number] = [bottomOpeningY, entryX];
+
+  const checkpointY = Math.max(1, entryPoint[0] - 2);
+  const checkpointX = entryPoint[1];
+  if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
+    subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
+  }
 
   // Add small clusters of rocks to give the outdoor space some structure
   const featureSpots: Array<[number, number, number[]]> = [
@@ -427,7 +489,7 @@ function buildOutdoorWorld(): StoryRoom {
 
   return {
     id: "story-outdoor-clearing",
-    mapData: { tiles, subtypes, environment: 'outdoor' },
+    mapData: { tiles, subtypes, environment: "outdoor" },
     entryPoint,
     transitionToPrevious,
     entryFromNext: [exteriorDoorY, doorX],
@@ -479,12 +541,50 @@ function buildOutdoorHouse(): StoryRoom {
     }
   }
 
+  const caretaker = new NPC({
+    id: "npc-grounds-caretaker",
+    name: "Caretaker Lysa",
+    sprite: "/images/npcs/girl-1.png",
+    y: Math.max(2, Math.floor(SIZE / 2)),
+    x: Math.max(2, Math.floor(SIZE / 2)),
+    facing: Direction.DOWN,
+    canMove: false,
+    memory: {
+      sharedStories: 0,
+      restingSpotUnlocked: false,
+    },
+    interactionHooks: [
+      {
+        id: "lysa-chat",
+        type: "dialogue",
+        description: "Ask about the outside world",
+        payload: {
+          dialogueId: "caretaker-lysa-overview",
+        },
+      },
+      {
+        id: "lysa-rest",
+        type: "custom",
+        description: "Request a moment of rest",
+        payload: {
+          action: "rest",
+        },
+      },
+    ],
+    actions: ["talk", "rest"],
+    metadata: {
+      archetype: "caretaker",
+    },
+  });
+  const npcs = [caretaker];
+
   return {
-    id: 'story-outdoor-house',
-    mapData: { tiles, subtypes, environment: 'house' },
+    id: "story-outdoor-house",
+    mapData: { tiles, subtypes, environment: "house" },
     entryPoint,
     transitionToPrevious,
     entryFromNext,
+    npcs,
   };
 }
 
@@ -506,21 +606,36 @@ export function buildStoryModeState(): GameState {
     transitions.push({ from, to, position, targetEntryPoint });
   };
 
-  pushTransition(entrance.id, ascent.id, entrance.transitionToNext!, ascent.entryPoint);
+  pushTransition(
+    entrance.id,
+    ascent.id,
+    entrance.transitionToNext!,
+    ascent.entryPoint
+  );
   pushTransition(
     ascent.id,
     entrance.id,
     ascent.transitionToPrevious!,
     entrance.returnEntryPoint ?? entrance.entryPoint
   );
-  pushTransition(ascent.id, sanctum.id, ascent.transitionToNext!, sanctum.entryPoint);
+  pushTransition(
+    ascent.id,
+    sanctum.id,
+    ascent.transitionToNext!,
+    sanctum.entryPoint
+  );
   pushTransition(
     sanctum.id,
     ascent.id,
     sanctum.transitionToPrevious!,
     ascent.entryFromNext ?? ascent.entryPoint
   );
-  pushTransition(sanctum.id, outdoor.id, sanctum.transitionToNext!, outdoor.entryPoint);
+  pushTransition(
+    sanctum.id,
+    outdoor.id,
+    sanctum.transitionToNext!,
+    outdoor.entryPoint
+  );
   pushTransition(
     outdoor.id,
     sanctum.id,
@@ -556,7 +671,12 @@ export function buildStoryModeState(): GameState {
     ) {
       targetY = entranceTargetBase[0];
     }
-    pushTransition(entrance.id, ascent.id, [y, entranceBaseX], [targetY, entranceTargetBase[1]]);
+    pushTransition(
+      entrance.id,
+      ascent.id,
+      [y, entranceBaseX],
+      [targetY, entranceTargetBase[1]]
+    );
 
     let returnTargetY = entranceReturnBase[0] + offset;
     if (
@@ -566,18 +686,20 @@ export function buildStoryModeState(): GameState {
     ) {
       returnTargetY = entranceReturnBase[0];
     }
-    const ascentReturnPosition: [number, number] = [ascent.transitionToPrevious![0] + offset, ascent.transitionToPrevious![1]];
+    const ascentReturnPosition: [number, number] = [
+      ascent.transitionToPrevious![0] + offset,
+      ascent.transitionToPrevious![1],
+    ];
     if (
       ascentReturnPosition[0] > 0 &&
       ascentReturnPosition[0] < ascent.mapData.tiles.length &&
-      ascent.mapData.tiles[ascentReturnPosition[0]][ascentReturnPosition[1]] === FLOOR
+      ascent.mapData.tiles[ascentReturnPosition[0]][ascentReturnPosition[1]] ===
+        FLOOR
     ) {
-      pushTransition(
-        ascent.id,
-        entrance.id,
-        ascentReturnPosition,
-        [returnTargetY, entranceReturnBase[1]]
-      );
+      pushTransition(ascent.id, entrance.id, ascentReturnPosition, [
+        returnTargetY,
+        entranceReturnBase[1],
+      ]);
     }
   }
 
@@ -586,36 +708,42 @@ export function buildStoryModeState(): GameState {
       mapData: withoutPlayer(entrance.mapData),
       entryPoint: entrance.entryPoint,
       enemies: serializeEnemies(entrance.enemies),
+      npcs: serializeNPCs(entrance.npcs),
       potOverrides: entrance.potOverrides,
     },
     [ascent.id]: {
       mapData: withoutPlayer(ascent.mapData),
       entryPoint: ascent.entryPoint,
       enemies: serializeEnemies(ascent.enemies),
+      npcs: serializeNPCs(ascent.npcs),
       potOverrides: ascent.potOverrides,
     },
     [sanctum.id]: {
       mapData: withoutPlayer(sanctum.mapData),
       entryPoint: sanctum.entryPoint,
       enemies: serializeEnemies(sanctum.enemies),
+      npcs: serializeNPCs(sanctum.npcs),
       potOverrides: sanctum.potOverrides,
     },
     [outdoor.id]: {
       mapData: withoutPlayer(outdoor.mapData),
       entryPoint: outdoor.entryPoint,
       enemies: serializeEnemies(outdoor.enemies),
+      npcs: serializeNPCs(outdoor.npcs),
       potOverrides: outdoor.potOverrides,
     },
     [outdoorHouse.id]: {
       mapData: withoutPlayer(outdoorHouse.mapData),
       entryPoint: outdoorHouse.entryPoint,
       enemies: serializeEnemies(outdoorHouse.enemies),
+      npcs: serializeNPCs(outdoorHouse.npcs),
       potOverrides: outdoorHouse.potOverrides,
     },
   };
 
   const startingMap = addPlayer(entrance.mapData, entrance.entryPoint);
   const initialEnemies = cloneEnemies(entrance.enemies);
+  const initialNpcs = cloneNPCs(entrance.npcs);
   const initialPotOverrides = entrance.potOverrides
     ? { ...entrance.potOverrides }
     : undefined;
@@ -625,13 +753,14 @@ export function buildStoryModeState(): GameState {
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
-    mode: 'story',
+    mode: "story",
     allowCheckpoints: true,
     mapData: startingMap,
     showFullMap: false,
     win: false,
     playerDirection: Direction.RIGHT,
     enemies: initialEnemies,
+    npcs: initialNpcs,
     heroHealth: 1,
     heroAttack: 1,
     heroTorchLit: false,
@@ -646,6 +775,7 @@ export function buildStoryModeState(): GameState {
       steps: 0,
     },
     recentDeaths: [],
+    npcInteractionQueue: [],
     currentRoomId: entrance.id,
     rooms: roomSnapshots,
     roomTransitions: transitions,
@@ -653,4 +783,190 @@ export function buildStoryModeState(): GameState {
   };
 
   return gameState;
+}
+
+const STORY_ROOM_LABELS: Partial<Record<RoomId, string>> = {
+  "story-hall-entrance": "Entrance Hall",
+  "story-ascent": "Ascent Corridor",
+  "story-sanctum": "Sanctum",
+  "story-outdoor-clearing": "Outdoor Clearing",
+  "story-outdoor-house": "Caretaker's House",
+};
+
+function findSubtypePositions(
+  mapData: MapData,
+  subtype: TileSubtype
+): Array<[number, number]> {
+  const positions: Array<[number, number]> = [];
+  for (let y = 0; y < mapData.subtypes.length; y++) {
+    const row = mapData.subtypes[y];
+    if (!row) continue;
+    for (let x = 0; x < row.length; x++) {
+      const cell = row[x];
+      if (Array.isArray(cell) && cell.includes(subtype)) {
+        positions.push([y, x]);
+      }
+    }
+  }
+  return positions;
+}
+
+export interface StoryCheckpointOption {
+  id: string;
+  roomId: RoomId;
+  position: [number, number];
+  label: string;
+  kind: "entry" | "checkpoint";
+}
+
+export function collectStoryCheckpointOptions(
+  state: GameState
+): StoryCheckpointOption[] {
+  const options: StoryCheckpointOption[] = [];
+  const seen = new Set<string>();
+  const rooms = state.rooms ?? {};
+
+  const pushOption = (
+    roomId: RoomId,
+    position: [number, number],
+    kind: "entry" | "checkpoint",
+    index = 0
+  ) => {
+    const key = `${roomId}:${position[0]}:${position[1]}:${kind}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const baseLabel = STORY_ROOM_LABELS[roomId] ?? roomId;
+    const suffix = kind === "checkpoint" && index > 0 ? ` ${index + 1}` : "";
+    const label =
+      kind === "entry"
+        ? `${baseLabel} — Entry`
+        : `${baseLabel} — Checkpoint${suffix}`;
+    options.push({ id: key, roomId, position, label, kind });
+  };
+
+  for (const [roomIdRaw, snapshot] of Object.entries(rooms)) {
+    const roomId = roomIdRaw as RoomId;
+    if (snapshot.entryPoint) {
+      pushOption(roomId, snapshot.entryPoint, "entry");
+    }
+    const checkpoints = findSubtypePositions(
+      snapshot.mapData,
+      TileSubtype.CHECKPOINT
+    );
+    checkpoints.forEach((pos, idx) => pushOption(roomId, pos, "checkpoint", idx));
+  }
+
+  // Ensure the current player position is represented even if not in rooms map yet
+  const activeRoomId = state.currentRoomId;
+  if (activeRoomId) {
+    const playerPos = findPlayerPosition(state.mapData);
+    if (playerPos) {
+      pushOption(activeRoomId, playerPos, "entry");
+    }
+  }
+
+  const order: Record<StoryCheckpointOption["kind"], number> = {
+    checkpoint: 0,
+    entry: 1,
+  };
+
+  return options.sort((a, b) => {
+    const kindDelta = order[a.kind] - order[b.kind];
+    if (kindDelta !== 0) return kindDelta;
+    if (a.roomId === b.roomId) {
+      return a.label.localeCompare(b.label);
+    }
+    return a.roomId.localeCompare(b.roomId);
+  });
+}
+
+export interface StoryResetConfig {
+  targetRoomId: RoomId;
+  targetPosition: [number, number];
+  heroHealth: number;
+  heroTorchLit: boolean;
+  hasSword: boolean;
+  hasShield: boolean;
+  hasKey: boolean;
+  hasExitKey: boolean;
+  rockCount: number;
+  runeCount: number;
+  foodCount: number;
+  potionCount: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  if (Number.isNaN(value)) return min;
+  return Math.min(max, Math.max(min, value));
+}
+
+function applyStoryResetConfig(
+  state: GameState,
+  config: StoryResetConfig
+): void {
+  const rooms = state.rooms ?? {};
+  const { targetRoomId, targetPosition } = config;
+  const targetSnapshot = rooms[targetRoomId];
+  if (!targetSnapshot) {
+    throw new Error(`Unknown story room: ${targetRoomId}`);
+  }
+
+  const [ty, tx] = targetPosition;
+  if (!isWithinBounds(targetSnapshot.mapData, ty, tx)) {
+    throw new Error(`Invalid checkpoint position for ${targetRoomId}`);
+  }
+  if (targetSnapshot.mapData.tiles[ty]?.[tx] !== FLOOR) {
+    throw new Error(`Target position for ${targetRoomId} is not walkable`);
+  }
+
+  const activeRoomId = state.currentRoomId ?? targetRoomId;
+  const activeSnapshot = rooms[activeRoomId];
+  if (activeSnapshot) {
+    rooms[activeRoomId] = {
+      ...activeSnapshot,
+      mapData: withoutPlayer(state.mapData),
+      enemies: serializeEnemies(state.enemies),
+      npcs: serializeNPCs(state.npcs),
+      potOverrides: state.potOverrides ? { ...state.potOverrides } : undefined,
+    };
+  }
+
+  state.mapData = addPlayer(targetSnapshot.mapData, targetPosition);
+  state.currentRoomId = targetRoomId;
+  state.enemies = targetSnapshot.enemies
+    ? rehydrateEnemies(targetSnapshot.enemies)
+    : undefined;
+  state.npcs = targetSnapshot.npcs
+    ? rehydrateNPCs(targetSnapshot.npcs)
+    : undefined;
+  state.potOverrides = targetSnapshot.potOverrides
+    ? { ...targetSnapshot.potOverrides }
+    : undefined;
+
+  state.heroHealth = clamp(Math.floor(config.heroHealth), 1, 6);
+  state.heroTorchLit = config.heroTorchLit;
+  state.hasSword = config.hasSword;
+  state.hasShield = config.hasShield;
+  state.hasKey = config.hasKey;
+  state.hasExitKey = config.hasExitKey;
+  state.rockCount = clamp(Math.floor(config.rockCount), 0, 99);
+  state.runeCount = clamp(Math.floor(config.runeCount), 0, 99);
+  state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
+  state.potionCount = clamp(Math.floor(config.potionCount), 0, 99);
+
+  state.stats = {
+    ...state.stats,
+    steps: 0,
+  };
+  state.recentDeaths = [];
+  state.npcInteractionQueue = [];
+  state.deathCause = undefined;
+  state.conditions = undefined;
+}
+
+export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
+  const state = buildStoryModeState();
+  applyStoryResetConfig(state, config);
+  state.lastCheckpoint = createCheckpointSnapshot(state);
+  return state;
 }
