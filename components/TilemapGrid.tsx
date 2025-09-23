@@ -850,7 +850,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         triggerItemPickupAnimation("food");
       }
     } catch {}
-    setPrevInv({
+    const nextInv = {
       key: gameState.hasKey,
       exitKey: gameState.hasExitKey,
       sword: !!gameState.hasSword,
@@ -858,7 +858,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       rocks: gameState.rockCount ?? 0,
       runes: gameState.runeCount ?? 0,
       food: gameState.foodCount ?? 0,
-    });
+    };
+    const changed =
+      nextInv.key !== prevInv.key ||
+      nextInv.exitKey !== prevInv.exitKey ||
+      nextInv.sword !== prevInv.sword ||
+      nextInv.shield !== prevInv.shield ||
+      nextInv.rocks !== prevInv.rocks ||
+      nextInv.runes !== prevInv.runes ||
+      nextInv.food !== prevInv.food;
+    if (changed) {
+      setPrevInv(nextInv);
+    }
   }, [gameState, prevInv]);
 
   useEffect(() => {

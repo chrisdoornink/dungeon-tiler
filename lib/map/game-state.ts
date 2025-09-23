@@ -765,18 +765,32 @@ function applyRoomTransition(
     potOverrides: clonePotOverrides(targetRoom.potOverrides),
   };
 
-  let entry: [number, number] =
+  let entry: [number, number] | undefined =
     transition.targetEntryPoint ?? targetRoom.entryPoint;
 
-  if (
-    !entry ||
-    !isWithinBounds(sanitizedTarget, entry[0], entry[1]) ||
-    sanitizedTarget.tiles[entry[0]]?.[entry[1]] !== FLOOR
-  ) {
+  const isDoorEntry = (pos: [number, number]) => {
+    const [ey, ex] = pos;
+    const subs = sanitizedTarget.subtypes[ey]?.[ex] ?? [];
+    return (
+      subs.includes(TileSubtype.DOOR) ||
+      subs.includes(TileSubtype.ROOM_TRANSITION)
+    );
+  };
+
+  const isValidEntry = (pos?: [number, number]): pos is [number, number] => {
+    if (!pos) return false;
+    if (!isWithinBounds(sanitizedTarget, pos[0], pos[1])) return false;
+    const tile = sanitizedTarget.tiles[pos[0]]?.[pos[1]];
+    if (tile === FLOOR) return true;
+    return isDoorEntry(pos);
+  };
+
+  if (!isValidEntry(entry)) {
     let fallback: [number, number] | null = null;
     for (let y = 0; y < sanitizedTarget.tiles.length; y++) {
       for (let x = 0; x < sanitizedTarget.tiles[y].length; x++) {
-        if (sanitizedTarget.tiles[y][x] === FLOOR) {
+        const pos: [number, number] = [y, x];
+        if (isValidEntry(pos)) {
           fallback = [y, x];
           break;
         }
@@ -787,7 +801,7 @@ function applyRoomTransition(
   }
 
   const nextMapData = cloneMapData(sanitizedTarget);
-  const [entryY, entryX] = entry;
+  const [entryY, entryX] = entry!;
   const dest = nextMapData.subtypes[entryY][entryX] || [];
   const filtered = dest.filter((t) => t !== TileSubtype.PLAYER);
   if (!filtered.includes(TileSubtype.PLAYER)) {
@@ -960,45 +974,50 @@ export function movePlayer(
     }
   }
 
+  const destSubtypes = newMapData.subtypes[newY]?.[newX];
+  if (destSubtypes && destSubtypes.includes(TileSubtype.DOOR)) {
+    newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+      currentX
+    ].filter((type) => type !== TileSubtype.PLAYER);
+    if (!destSubtypes.includes(TileSubtype.PLAYER)) {
+      destSubtypes.push(TileSubtype.PLAYER);
+    }
+    moved = true;
+
+    const adj: Array<[number, number]> = [
+      [newY - 1, newX],
+      [newY + 1, newX],
+      [newY, newX - 1],
+      [newY, newX + 1],
+    ];
+    for (const [ay, ax] of adj) {
+      if (
+        isWithinBounds(newMapData, ay, ax) &&
+        newMapData.subtypes[ay]?.[ax]?.includes(TileSubtype.WALL_TORCH)
+      ) {
+        newGameState.heroTorchLit = true;
+        break;
+      }
+    }
+
+    if (moved) {
+      newGameState.stats.steps += 1;
+      const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
+      if (transition) {
+        newGameState = applyRoomTransition(newGameState, transition);
+      }
+    }
+
+    return newGameState;
+  }
+
   // Check if the new position is a wall
   if (newMapData.tiles[newY][newX] === WALL) {
     // Check if it's a door or lock
-    const subtype = newMapData.subtypes[newY][newX];
+    const subtype = destSubtypes ?? [];
 
-    // If it's a door, player can pass through
-    if (subtype.includes(TileSubtype.DOOR)) {
-      // Convert the door to floor when player passes through
-      newMapData.tiles[newY][newX] = FLOOR;
-      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
-        (type) => type !== TileSubtype.DOOR
-      );
-
-      // Move player to the new position
-      newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
-        currentX
-      ].filter((type) => type !== TileSubtype.PLAYER);
-      newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
-      moved = true;
-
-      // Relight hero torch if adjacent to any wall torch after moving
-      const adj: Array<[number, number]> = [
-        [newY - 1, newX],
-        [newY + 1, newX],
-        [newY, newX - 1],
-        [newY, newX + 1],
-      ];
-      for (const [ay, ax] of adj) {
-        if (
-          isWithinBounds(newMapData, ay, ax) &&
-          newMapData.subtypes[ay]?.[ax]?.includes(TileSubtype.WALL_TORCH)
-        ) {
-          newGameState.heroTorchLit = true;
-          break;
-        }
-      }
-    }
     // If it's a lock and player has key, unlock it
-    else if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
+    if (subtype.includes(TileSubtype.LOCK) && newGameState.hasKey) {
       // Convert the lock to floor when unlocked; universal key is not consumed
       newMapData.tiles[newY][newX] = FLOOR;
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
@@ -1420,4 +1439,3 @@ export function movePlayer(
 
   return newGameState;
 }
-

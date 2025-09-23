@@ -99,7 +99,12 @@ function buildEntranceHall(): StoryRoom {
   const midRow = 1 + Math.floor(HALL_WIDTH / 2);
   const entryPoint: [number, number] = [midRow, 2];
   const returnEntryPoint: [number, number] = [midRow, Math.max(2, HALL_LENGTH - 1)];
-  const transitionToNext: [number, number] = [midRow, HALL_LENGTH];
+  const rightWallX = width - 1;
+  for (let y = 1; y <= HALL_WIDTH; y++) {
+    tiles[y][rightWallX] = FLOOR;
+    subtypes[y][rightWallX] = [];
+  }
+  const transitionToNext: [number, number] = [midRow, rightWallX];
   subtypes[transitionToNext[0]][transitionToNext[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
@@ -117,12 +122,25 @@ function buildEntranceHall(): StoryRoom {
     }
   }
 
+  const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
+  const potPositions: Array<[number, number]> = [
+    [1, Math.max(3, Math.floor(width / 4))],
+    [1, Math.min(width - 2, Math.floor((width * 3) / 4))],
+  ];
+  for (const [py, px] of potPositions) {
+    if (tiles[py]?.[px] === FLOOR) {
+      subtypes[py][px] = [TileSubtype.POT];
+      potOverrides[`${py},${px}`] = TileSubtype.FOOD;
+    }
+  }
+
   return {
     id: "story-hall-entrance",
     mapData: { tiles, subtypes, environment: 'cave' },
     entryPoint,
     returnEntryPoint,
     transitionToNext,
+    potOverrides,
   };
 }
 
@@ -156,17 +174,58 @@ function buildAscentCorridor(): StoryRoom {
     }
   }
 
-  const transitionToPrevious: [number, number] = [entryRow, 1];
+  for (let y = entryRow - 1; y <= entryRow + 1; y++) {
+    if (y >= top && y <= bottom) {
+      tiles[y][0] = FLOOR;
+      subtypes[y][0] = [];
+    }
+  }
+
+  const hallwayX = 3;
+  const hallwayLength = 3;
+  const hallwayStartY = Math.max(0, top - (hallwayLength - 1));
+  for (let y = top; y >= hallwayStartY; y--) {
+    for (let x = 2; x <= 4; x++) {
+      if (x === hallwayX) {
+        tiles[y][x] = FLOOR;
+        if (!subtypes[y][x]) subtypes[y][x] = [];
+      } else {
+        tiles[y][x] = WALL;
+        subtypes[y][x] = [];
+      }
+    }
+  }
+
+  const openExitY = hallwayStartY - 1;
+  if (openExitY >= 0 && tiles[openExitY]) {
+    tiles[openExitY][hallwayX] = FLOOR;
+    subtypes[openExitY][hallwayX] = subtypes[openExitY][hallwayX] ?? [];
+  }
+
+  const transitionToPrevious: [number, number] = [entryRow, 0];
   subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
 
-  const entryPoint: [number, number] = [entryRow, 3];
-  const entryFromNext: [number, number] = [top + 1, 3];
-  const transitionToNext: [number, number] = [top, 3];
+  const entryPoint: [number, number] = [entryRow, 1];
+  const entryFromNext: [number, number] = [Math.min(bottom, hallwayStartY + 1), hallwayX];
+  const transitionToNext: [number, number] = [hallwayStartY, hallwayX];
   subtypes[transitionToNext[0]][transitionToNext[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
+
+  const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
+  const midSectionY = Math.max(hallwayStartY + 1, Math.floor((top + bottom) / 2));
+  const potPositions: Array<[number, number]> = [
+    [midSectionY, 2],
+    [midSectionY, 4],
+  ];
+  for (const [py, px] of potPositions) {
+    if (tiles[py]?.[px] === FLOOR) {
+      subtypes[py][px] = [TileSubtype.POT];
+      potOverrides[`${py},${px}`] = TileSubtype.FOOD;
+    }
+  }
 
   const torchColumns = [1, width - 2];
   for (let y = bottom; y >= top; y -= 4) {
@@ -185,6 +244,7 @@ function buildAscentCorridor(): StoryRoom {
     entryFromNext,
     transitionToNext,
     transitionToPrevious,
+    potOverrides,
   };
 }
 
@@ -207,13 +267,33 @@ function buildSanctum(): StoryRoom {
   }
 
   const entryX = Math.floor(width / 2);
-  const entryY = height - 3;
   const transitionY = height - 2;
+  const hallwayLength = 3;
+  const hallwayTopY = Math.max(1, transitionY - (hallwayLength - 1));
+  for (let y = transitionY; y >= hallwayTopY; y--) {
+    for (let x = 1; x <= INNER_SIZE; x++) {
+      if (x === entryX) {
+        tiles[y][x] = FLOOR;
+        if (!subtypes[y][x]) subtypes[y][x] = [];
+      } else {
+        tiles[y][x] = WALL;
+        subtypes[y][x] = [];
+      }
+    }
+  }
+
+  const entryY = Math.max(1, hallwayTopY - 1);
   const entryPoint: [number, number] = [entryY, entryX];
   const transitionToPrevious: [number, number] = [transitionY, entryX];
   subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
+
+  const openBottomY = transitionY + 1;
+  if (openBottomY < tiles.length) {
+    tiles[openBottomY][entryX] = FLOOR;
+    subtypes[openBottomY][entryX] = subtypes[openBottomY][entryX] ?? [];
+  }
 
   const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
   const potPositions: Array<[number, number]> = [
@@ -228,18 +308,20 @@ function buildSanctum(): StoryRoom {
   }
 
   const topRowY = 1;
-  const transitionToNext: [number, number] = [topRowY, entryX];
   for (let x = 1; x <= INNER_SIZE; x++) {
     if (x === entryX) {
-      subtypes[topRowY][x] = [TileSubtype.ROOM_TRANSITION];
       continue;
     }
     subtypes[topRowY][x] = [TileSubtype.POT];
     potOverrides[`${topRowY},${x}`] = TileSubtype.FOOD;
   }
   tiles[0][entryX] = FLOOR;
+  const transitionToNext: [number, number] = [0, entryX];
+  subtypes[transitionToNext[0]][transitionToNext[1]] = [
+    TileSubtype.ROOM_TRANSITION,
+  ];
 
-  const entryFromNext: [number, number] = [topRowY + 1, entryX];
+  const entryFromNext: [number, number] = [transitionToNext[0] + 1, entryX];
 
   const checkpointY = entryY - 4;
   const checkpointX = entryX;
@@ -297,11 +379,12 @@ function buildOutdoorWorld(): StoryRoom {
 
   const entryX = 1 + Math.floor((OUTER_WIDTH - 1) / 2);
   const entryY = height - 4;
-  const entryPoint: [number, number] = [entryY, entryX];
-  const transitionToPrevious: [number, number] = [entryY + 1, entryX];
-  subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
-    TileSubtype.ROOM_TRANSITION,
-  ];
+  const bottomOpeningY = height - 1;
+  tiles[bottomOpeningY][entryX] = FLOOR;
+  subtypes[bottomOpeningY][entryX] = [TileSubtype.ROOM_TRANSITION];
+
+  const entryPoint: [number, number] = [bottomOpeningY - 1, entryX];
+  const transitionToPrevious: [number, number] = [bottomOpeningY, entryX];
 
   // Add small clusters of rocks to give the outdoor space some structure
   const featureSpots: Array<[number, number, number[]]> = [
@@ -317,7 +400,7 @@ function buildOutdoorWorld(): StoryRoom {
 
   const houseTopY = entryY - 12;
   const houseHeight = 3;
-  const houseLeftX = OUTER_WIDTH - 1;
+  const houseLeftX = OUTER_WIDTH - 4;
 
   for (let y = 0; y < houseHeight; y++) {
     const row = houseTopY + y;
@@ -335,12 +418,18 @@ function buildOutdoorWorld(): StoryRoom {
   tiles[doorY][doorX] = WALL;
   subtypes[doorY][doorX] = [TileSubtype.DOOR, TileSubtype.ROOM_TRANSITION];
 
+  const exteriorDoorY = doorY + 1;
+  if (tiles[exteriorDoorY]?.[doorX] === WALL) {
+    tiles[exteriorDoorY][doorX] = FLOOR;
+    subtypes[exteriorDoorY][doorX] = [];
+  }
+
   return {
     id: "story-outdoor-clearing",
     mapData: { tiles, subtypes, environment: 'outdoor' },
     entryPoint,
     transitionToPrevious,
-    entryFromNext: [doorY, doorX],
+    entryFromNext: [exteriorDoorY, doorX],
     transitionToNext: [doorY, doorX],
   };
 }
@@ -361,13 +450,13 @@ function buildOutdoorHouse(): StoryRoom {
   }
 
   const doorCol = Math.floor(SIZE / 2) + 1;
-  const entryPoint: [number, number] = [SIZE - 2, doorCol];
-  const transitionToPrevious: [number, number] = [SIZE, doorCol];
+  const entryPoint: [number, number] = [SIZE, doorCol];
+  const transitionToPrevious: [number, number] = [SIZE + 1, doorCol];
   subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
     TileSubtype.DOOR,
     TileSubtype.ROOM_TRANSITION,
   ];
-  const entryFromNext: [number, number] = [entryPoint[0] - 1, entryPoint[1]];
+  const entryFromNext: [number, number] = [SIZE - 1, doorCol];
 
   const windowCols = [2, SIZE - 1];
   for (const col of windowCols) {
@@ -494,7 +583,7 @@ export function buildStoryModeState(): GameState {
     win: false,
     playerDirection: Direction.RIGHT,
     enemies: initialEnemies,
-    heroHealth: 5,
+    heroHealth: 1,
     heroAttack: 1,
     heroTorchLit: true,
     rockCount: 0,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useEffect, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
 import { tileTypes, type GameState } from "../../lib/map";
 import { buildStoryModeState } from "../../lib/story/story_mode";
@@ -9,6 +9,16 @@ import { rehydrateEnemies, type PlainEnemy } from "../../lib/enemy";
 
 function StoryModeInner() {
   const [initialState, setInitialState] = useState<GameState | null>(null);
+
+  const handleReset = useCallback(() => {
+    if (typeof window === "undefined") return;
+    try {
+      CurrentGameStorage.clearCurrentGame("story");
+    } catch {
+      // ignore storage errors and still reload below
+    }
+    window.location.reload();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +63,13 @@ function StoryModeInner() {
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
       <div className="relative z-10 flex flex-col items-center gap-4">
+        <button
+          type="button"
+          onClick={handleReset}
+          className="self-end rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
+        >
+          Reset Story
+        </button>
         <h1 className="text-xl font-semibold text-gray-300 tracking-wide uppercase">
           Story Mode Prototype
         </h1>

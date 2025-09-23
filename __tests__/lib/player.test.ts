@@ -572,10 +572,13 @@ describe("Player and Dynamic Subtypes", () => {
     // Step 1: Move right through the door
     gameState = movePlayer(gameState, Direction.RIGHT);
 
-    // Verify door became floor and player moved there
-    expect(gameState.mapData.tiles[10][11]).toBe(0); // Now floor
+    // Verify door remains and player moved there
+    expect(gameState.mapData.tiles[10][11]).toBe(1); // Door wall remains
     expect(
       gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)
+    ).toBe(true);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.DOOR)
     ).toBe(true);
 
     // Step 2: Attempt to move right into the exit without exit key (should be blocked)
@@ -584,6 +587,217 @@ describe("Player and Dynamic Subtypes", () => {
     // Verify exit is still a wall and player did not move
     expect(gameState.mapData.tiles[10][12]).toBe(1); // Still wall
     expect(findPlayerPosition(gameState.mapData)).toEqual([10, 11]);
+  });
+
+  it("allows stepping through dedicated door tiles without removing the door", () => {
+    const mapData: MapData = {
+      tiles: Array(25)
+        .fill(0)
+        .map(() => Array(25).fill(0)),
+      subtypes: Array(25)
+        .fill(0)
+        .map(() =>
+          Array(25)
+            .fill(0)
+            .map(() => [])
+        ),
+    };
+
+    mapData.subtypes[10][10] = [TileSubtype.PLAYER];
+    mapData.tiles[10][11] = 2; // Dedicated door tile id
+    mapData.subtypes[10][11] = [
+      TileSubtype.DOOR,
+      TileSubtype.ROOM_TRANSITION,
+    ];
+
+    let gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    gameState = movePlayer(gameState, Direction.RIGHT);
+
+    expect(gameState.mapData.tiles[10][11]).toBe(2);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.DOOR)
+    ).toBe(true);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.ROOM_TRANSITION)
+    ).toBe(true);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)
+    ).toBe(true);
+
+    // Step back and ensure the door remains intact
+    gameState = movePlayer(gameState, Direction.LEFT);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.DOOR)
+    ).toBe(true);
+    expect(
+      gameState.mapData.subtypes[10][11].includes(TileSubtype.PLAYER)
+    ).toBe(false);
+  });
+
+  it("moves the player to a door entry point when transitioning rooms", () => {
+    const buildEmptyMap = () =>
+      Array(3)
+        .fill(0)
+        .map(() => Array(3).fill(0));
+
+    const buildEmptySubtypes = () =>
+      Array(3)
+        .fill(0)
+        .map(() =>
+          Array(3)
+            .fill(0)
+            .map(() => [] as number[])
+        );
+
+    const currentMap: MapData = {
+      tiles: buildEmptyMap(),
+      subtypes: buildEmptySubtypes(),
+    };
+
+    currentMap.tiles[1][2] = 1; // wall door tile
+    currentMap.subtypes[1][1] = [TileSubtype.PLAYER];
+    currentMap.subtypes[1][2] = [TileSubtype.DOOR];
+
+    const nextMap: MapData = {
+      tiles: buildEmptyMap(),
+      subtypes: buildEmptySubtypes(),
+    };
+    nextMap.tiles[0][1] = 1; // door wall in next room
+    nextMap.subtypes[0][1] = [TileSubtype.DOOR, TileSubtype.ROOM_TRANSITION];
+
+    const rooms: NonNullable<GameState["rooms"]> = {
+      roomA: {
+        mapData: {
+          tiles: currentMap.tiles.map((row) => row.slice()),
+          subtypes: currentMap.subtypes.map((row) =>
+            row.map((cell) => cell.filter((t) => t !== TileSubtype.PLAYER))
+          ),
+        },
+        entryPoint: [1, 1],
+      },
+      roomB: {
+        mapData: nextMap,
+        entryPoint: [1, 1],
+      },
+    };
+
+    const gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: currentMap,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      rooms,
+      currentRoomId: "roomA",
+      roomTransitions: [
+        {
+          from: "roomA",
+          to: "roomB",
+          position: [1, 2],
+          targetEntryPoint: [0, 1],
+        },
+      ],
+    };
+
+    const transitioned = movePlayer(gameState, Direction.RIGHT);
+    const position = findPlayerPosition(transitioned.mapData);
+    expect(position).toEqual([0, 1]);
+    expect(transitioned.currentRoomId).toBe("roomB");
+    expect(
+      transitioned.mapData.subtypes[0][1].includes(TileSubtype.DOOR)
+    ).toBe(true);
+  });
+
+  it("places the player on a floor tile outside a door when provided", () => {
+    const buildEmptyMap = () =>
+      Array(3)
+        .fill(0)
+        .map(() => Array(3).fill(0));
+
+    const buildEmptySubtypes = () =>
+      Array(3)
+        .fill(0)
+        .map(() =>
+          Array(3)
+            .fill(0)
+            .map(() => [] as number[])
+        );
+
+    const currentMap: MapData = {
+      tiles: buildEmptyMap(),
+      subtypes: buildEmptySubtypes(),
+    };
+
+    currentMap.tiles[1][2] = 1;
+    currentMap.subtypes[1][1] = [TileSubtype.PLAYER];
+    currentMap.subtypes[1][2] = [TileSubtype.DOOR];
+
+    const nextMap: MapData = {
+      tiles: buildEmptyMap(),
+      subtypes: buildEmptySubtypes(),
+    };
+    nextMap.tiles[0][1] = 1;
+    nextMap.subtypes[0][1] = [TileSubtype.DOOR, TileSubtype.ROOM_TRANSITION];
+
+    const rooms: NonNullable<GameState["rooms"]> = {
+      house: {
+        mapData: {
+          tiles: currentMap.tiles.map((row) => row.slice()),
+          subtypes: currentMap.subtypes.map((row) =>
+            row.map((cell) => cell.filter((t) => t !== TileSubtype.PLAYER))
+          ),
+        },
+        entryPoint: [1, 1],
+      },
+      outside: {
+        mapData: nextMap,
+        entryPoint: [1, 1],
+      },
+    };
+
+    const gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: currentMap,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      rooms,
+      currentRoomId: "house",
+      roomTransitions: [
+        {
+          from: "house",
+          to: "outside",
+          position: [1, 2],
+          targetEntryPoint: [1, 1],
+        },
+      ],
+    };
+
+    const transitioned = movePlayer(gameState, Direction.RIGHT);
+    const position = findPlayerPosition(transitioned.mapData);
+    expect(position).toEqual([1, 1]);
+    expect(
+      transitioned.mapData.subtypes[0][1].includes(TileSubtype.DOOR)
+    ).toBe(true);
   });
 
   it("should not remove lightswitch when stepping on it", () => {

@@ -78,7 +78,14 @@ function hasHorizontalLineOfSight(grid: number[][], y: number, x1: number, x2: n
   
   // Check each point along the horizontal line (excluding start and end)
   for (let x = minX + 1; x < maxX; x++) {
-    if (grid[y][x] === 1) { // Wall found
+    if (y < 0 || y >= grid.length) {
+      return false;
+    }
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length) {
+      return false;
+    }
+    if (row[x] === 1) { // Wall found
       return false;
     }
   }
@@ -101,7 +108,14 @@ function hasVerticalLineOfSight(grid: number[][], x: number, y1: number, y2: num
   
   // Check each point along the vertical line (excluding start and end)
   for (let y = minY + 1; y < maxY; y++) {
-    if (grid[y][x] === 1) { // Wall found
+    if (y < 0 || y >= grid.length) {
+      return false;
+    }
+    const row = grid[y];
+    if (!row || x < 0 || x >= row.length) {
+      return false;
+    }
+    if (row[x] === 1) { // Wall found
       return false;
     }
   }
