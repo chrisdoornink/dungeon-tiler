@@ -8,6 +8,12 @@ import {
 import { enemyTypeAssignement } from "../enemy_assignment";
 import { EnemyRegistry, createEmptyByKind, type EnemyKind } from "../enemies/registry";
 import {
+  NPC,
+  rehydrateNPCs,
+  type PlainNPC,
+  type NPCInteractionEvent,
+} from "../npc";
+import {
   DEFAULT_ROOM_ID,
   Direction,
   FLOOR,
@@ -19,8 +25,10 @@ import type { MapData, RoomSnapshot, RoomTransition } from "./types";
 import {
   cloneMapData,
   clonePlainEnemies,
+  clonePlainNPCs,
   clonePotOverrides,
   serializeEnemies,
+  serializeNPCs,
   getMapHeight,
   getMapWidth,
   isWithinBounds,
@@ -507,6 +515,7 @@ export interface GameState {
   win: boolean; // Win state when player opens exit and steps onto it
   playerDirection: Direction; // Track the player's facing direction
   enemies?: Enemy[]; // Active enemies on the map
+  npcs?: NPC[]; // Friendly or neutral NPCs present in the map
   heroHealth: number; // Player health points for current run
   heroAttack: number; // Player base attack for current run
   // Optional RNG for combat variance injection in tests; falls back to Math.random
@@ -525,6 +534,7 @@ export interface GameState {
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
+  npcInteractionQueue?: NPCInteractionEvent[];
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
@@ -549,8 +559,9 @@ export interface GameState {
 }
 
 export type CheckpointSnapshot =
-  Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies"> & {
+  Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies" | "npcs"> & {
     enemies?: PlainEnemy[];
+    npcs?: PlainNPC[];
   };
 
 function cloneCheckpointSnapshot(
@@ -572,6 +583,7 @@ export function createCheckpointSnapshot(
   return {
     ...base,
     enemies: serializeEnemies(enemies),
+    npcs: serializeNPCs(state.npcs),
   };
 }
 
@@ -582,14 +594,16 @@ export function reviveFromLastCheckpoint(
   const snapshot = cloneCheckpointSnapshot(state.lastCheckpoint);
   if (!snapshot) return null;
 
-  const { enemies: snapshotEnemies, ...rest } = snapshot;
+  const { enemies: snapshotEnemies, npcs: snapshotNpcs, ...rest } = snapshot;
   const restoredEnemies = snapshotEnemies
     ? rehydrateEnemies(snapshotEnemies)
     : undefined;
+  const restoredNpcs = snapshotNpcs ? rehydrateNPCs(snapshotNpcs) : undefined;
 
   const restored: GameState = {
     ...rest,
     enemies: restoredEnemies,
+    npcs: restoredNpcs,
     combatRng: state.combatRng,
     lastCheckpoint: cloneCheckpointSnapshot(snapshot),
   };
@@ -636,6 +650,7 @@ export function initializeGameState(): GameState {
     win: false,
     playerDirection: Direction.DOWN, // Default facing down/front
     enemies: snakesAdded,
+    npcs: [],
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
@@ -649,6 +664,7 @@ export function initializeGameState(): GameState {
       byKind: createEmptyByKind(),
     },
     recentDeaths: [],
+    npcInteractionQueue: [],
   };
 }
 
@@ -688,6 +704,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     win: false,
     playerDirection: Direction.DOWN,
     enemies: snakesAdded,
+    npcs: [],
     heroHealth: 5,
     heroAttack: 1,
     rockCount: 0,
@@ -700,6 +717,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
       byKind: createEmptyByKind(),
     },
     recentDeaths: [],
+    npcInteractionQueue: [],
   };
 }
 
@@ -752,16 +770,19 @@ function applyRoomTransition(
       ...sourceRooms[fromId],
       mapData: removePlayerFromMapData(state.mapData),
       enemies: serializeEnemies(state.enemies),
+      npcs: serializeNPCs(state.npcs),
       potOverrides: clonePotOverrides(state.potOverrides),
     };
   }
 
   const sanitizedTarget = removePlayerFromMapData(targetRoom.mapData);
   const targetEnemiesPlain = clonePlainEnemies(targetRoom.enemies) ?? [];
+  const targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
   updatedRooms[toId] = {
     ...targetRoom,
     mapData: sanitizedTarget,
     enemies: targetEnemiesPlain,
+    npcs: targetNPCsPlain,
     potOverrides: clonePotOverrides(targetRoom.potOverrides),
   };
 
@@ -810,6 +831,7 @@ function applyRoomTransition(
   nextMapData.subtypes[entryY][entryX] = filtered;
 
   const nextEnemies = rehydrateEnemies(targetEnemiesPlain);
+  const nextNpcs = rehydrateNPCs(targetNPCsPlain);
   const nextPotOverrides = clonePotOverrides(targetRoom.potOverrides);
 
   return {
@@ -818,6 +840,7 @@ function applyRoomTransition(
     currentRoomId: toId,
     rooms: updatedRooms,
     enemies: nextEnemies,
+    npcs: nextNpcs,
     potOverrides: nextPotOverrides,
   };
 }
@@ -1070,6 +1093,43 @@ export function movePlayer(
   if (newMapData.tiles[newY][newX] === FLOOR) {
     const subtype = newMapData.subtypes[newY][newX];
     const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
+
+    const blockingNpc = newGameState.npcs?.find(
+      (npc) => npc.y === newY && npc.x === newX && !npc.isDead()
+    );
+    if (blockingNpc) {
+      const oppositeFacing = (() => {
+        switch (direction) {
+          case Direction.UP:
+            return Direction.DOWN;
+          case Direction.DOWN:
+            return Direction.UP;
+          case Direction.LEFT:
+            return Direction.RIGHT;
+          case Direction.RIGHT:
+          default:
+            return Direction.LEFT;
+        }
+      })();
+      blockingNpc.face(oppositeFacing);
+      blockingNpc.setMemory("lastBumpAt", Date.now());
+      blockingNpc.setMemory("lastHeroDirection", direction);
+      blockingNpc.setMemory("lastManualInteract", Date.now());
+      if (newGameState.npcs) {
+        newGameState.npcs = [...newGameState.npcs];
+      }
+      const queue = newGameState.npcInteractionQueue
+        ? [...newGameState.npcInteractionQueue]
+        : [];
+      queue.push(blockingNpc.createInteractionEvent("action"));
+      const MAX_QUEUE = 20;
+      const trimmed =
+        queue.length > MAX_QUEUE
+          ? queue.slice(queue.length - MAX_QUEUE)
+          : queue;
+      newGameState.npcInteractionQueue = trimmed;
+      return newGameState;
+    }
 
     // If it's a POT, reveal content without moving
     if (subtype.includes(TileSubtype.POT)) {

@@ -6,6 +6,7 @@ import { tileTypes, type GameState } from "../../lib/map";
 import { buildStoryModeState } from "../../lib/story/story_mode";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { rehydrateEnemies, type PlainEnemy } from "../../lib/enemy";
+import { rehydrateNPCs, type PlainNPC } from "../../lib/npc";
 
 function StoryModeInner() {
   const [initialState, setInitialState] = useState<GameState | null>(null);
@@ -28,6 +29,9 @@ function StoryModeInner() {
     if (saved) {
       if (Array.isArray(saved.enemies)) {
         saved.enemies = rehydrateEnemies(saved.enemies as unknown as PlainEnemy[]);
+      }
+      if (Array.isArray(saved.npcs)) {
+        saved.npcs = rehydrateNPCs(saved.npcs as unknown as PlainNPC[]);
       }
       const restored = saved as GameState;
       restored.mode = "story";

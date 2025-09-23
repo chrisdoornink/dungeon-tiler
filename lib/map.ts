@@ -50,6 +50,8 @@ export {
   clonePlainEnemies,
   clonePotOverrides,
   serializeEnemies,
+  serializeNPCs,
+  clonePlainNPCs,
   getMapHeight,
   getMapWidth,
   isWithinBounds,

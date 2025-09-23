@@ -6,9 +6,19 @@ interface MobileControlsProps {
   rockCount?: number;
   onUseRune?: () => void;
   runeCount?: number;
+  onInteract?: () => void;
+  interactEnabled?: boolean;
 }
 
-const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, rockCount, onUseRune, runeCount }) => {
+const MobileControls: React.FC<MobileControlsProps> = ({
+  onMove,
+  onThrowRock,
+  rockCount,
+  onUseRune,
+  runeCount,
+  onInteract,
+  interactEnabled = true,
+}) => {
   const [isMobile, setIsMobile] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
     UP: false,
@@ -150,6 +160,24 @@ const MobileControls: React.FC<MobileControlsProps> = ({ onMove, onThrowRock, ro
                 verticalAlign: 'middle'
               }}
             />
+          </button>
+        )}
+        {onInteract && (
+          <button
+            data-testid="mobile-action-interact"
+            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
+              interactEnabled
+                ? (isMobile
+                    ? 'bg-[#333333] hover:bg-[#444444] text-white'
+                    : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]')
+                : 'bg-[#222222] text-[#666666] cursor-not-allowed'
+            }`}
+            onClick={() => interactEnabled && onInteract()}
+            aria-label="Interact"
+            title="Interact"
+            disabled={!interactEnabled}
+          >
+            {isMobile ? 'Talk' : '💬'}
           </button>
         )}
       </div>

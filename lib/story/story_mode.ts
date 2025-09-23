@@ -7,6 +7,7 @@ import {
   type RoomId,
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
+import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
 
 const FLOOR = 0;
 const WALL = 1;
@@ -65,6 +66,12 @@ function cloneEnemies(enemies?: Enemy[]): Enemy[] {
   return rehydrateEnemies(plain);
 }
 
+function cloneNPCs(npcs?: NPC[]): NPC[] {
+  if (!npcs) return [];
+  const plain = serializeNPCs(npcs) ?? [];
+  return rehydrateNPCs(plain);
+}
+
 type StoryRoom = {
   id: RoomId;
   mapData: MapData;
@@ -74,6 +81,7 @@ type StoryRoom = {
   transitionToNext?: [number, number];
   transitionToPrevious?: [number, number];
   enemies?: Enemy[];
+  npcs?: NPC[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
 };
 
@@ -98,7 +106,10 @@ function buildEntranceHall(): StoryRoom {
 
   const midRow = 1 + Math.floor(HALL_WIDTH / 2);
   const entryPoint: [number, number] = [midRow, 2];
-  const returnEntryPoint: [number, number] = [midRow, Math.max(2, HALL_LENGTH - 1)];
+  const returnEntryPoint: [number, number] = [
+    midRow,
+    Math.max(2, HALL_LENGTH - 1),
+  ];
   const rightWallX = width - 1;
   for (let y = 1; y <= HALL_WIDTH; y++) {
     tiles[y][rightWallX] = FLOOR;
@@ -134,13 +145,53 @@ function buildEntranceHall(): StoryRoom {
     }
   }
 
+  const mentorX = Math.min(HALL_LENGTH - 2, entryPoint[1] + 4);
+  const elder = new NPC({
+    id: "npc-elder-rowan",
+    name: "Elder Rowan",
+    sprite: "/images/npcs/boy-1.png",
+    y: midRow,
+    x: mentorX,
+    facing: Direction.LEFT,
+    canMove: false,
+    memory: {
+      metHero: false,
+      giftAvailable: true,
+    },
+    interactionHooks: [
+      {
+        id: "elder-rowan-greet",
+        type: "dialogue",
+        description: "Greet the elder",
+        payload: {
+          dialogueId: "elder-rowan-intro",
+        },
+      },
+      {
+        id: "elder-rowan-gift",
+        type: "item",
+        description: "Receive a restorative tonic",
+        payload: {
+          itemId: "med",
+          quantity: 1,
+        },
+      },
+    ],
+    actions: ["greet", "gift"],
+    metadata: {
+      archetype: "mentor",
+    },
+  });
+  const npcs = [elder];
+
   return {
     id: "story-hall-entrance",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     returnEntryPoint,
     transitionToNext,
     potOverrides,
+    npcs,
   };
 }
 
@@ -208,14 +259,20 @@ function buildAscentCorridor(): StoryRoom {
   ];
 
   const entryPoint: [number, number] = [entryRow, 1];
-  const entryFromNext: [number, number] = [Math.min(bottom, hallwayStartY + 1), hallwayX];
+  const entryFromNext: [number, number] = [
+    Math.min(bottom, hallwayStartY + 1),
+    hallwayX,
+  ];
   const transitionToNext: [number, number] = [hallwayStartY, hallwayX];
   subtypes[transitionToNext[0]][transitionToNext[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
 
   const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
-  const midSectionY = Math.max(hallwayStartY + 1, Math.floor((top + bottom) / 2));
+  const midSectionY = Math.max(
+    hallwayStartY + 1,
+    Math.floor((top + bottom) / 2)
+  );
   const potPositions: Array<[number, number]> = [
     [midSectionY, 2],
     [midSectionY, 4],
@@ -238,7 +295,7 @@ function buildAscentCorridor(): StoryRoom {
 
   return {
     id: "story-ascent",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     returnEntryPoint: [entryRow, 4],
     entryFromNext,
@@ -340,7 +397,9 @@ function buildSanctum(): StoryRoom {
   snakes.push(snakeB);
 
   const torchRow = 1;
-  const torchCols = [entryX - 1, entryX + 1].filter((x) => x >= 1 && x <= INNER_SIZE);
+  const torchCols = [entryX - 1, entryX + 1].filter(
+    (x) => x >= 1 && x <= INNER_SIZE
+  );
   for (const x of torchCols) {
     if (tiles[torchRow][x] === WALL) {
       subtypes[torchRow][x] = [TileSubtype.WALL_TORCH];
@@ -349,7 +408,7 @@ function buildSanctum(): StoryRoom {
 
   return {
     id: "story-sanctum",
-    mapData: { tiles, subtypes, environment: 'cave' },
+    mapData: { tiles, subtypes, environment: "cave" },
     entryPoint,
     transitionToPrevious,
     entryFromNext,
@@ -427,7 +486,7 @@ function buildOutdoorWorld(): StoryRoom {
 
   return {
     id: "story-outdoor-clearing",
-    mapData: { tiles, subtypes, environment: 'outdoor' },
+    mapData: { tiles, subtypes, environment: "outdoor" },
     entryPoint,
     transitionToPrevious,
     entryFromNext: [exteriorDoorY, doorX],
@@ -479,12 +538,50 @@ function buildOutdoorHouse(): StoryRoom {
     }
   }
 
+  const caretaker = new NPC({
+    id: "npc-grounds-caretaker",
+    name: "Caretaker Lysa",
+    sprite: "/images/npcs/girl-1.png",
+    y: Math.max(2, Math.floor(SIZE / 2)),
+    x: Math.max(2, Math.floor(SIZE / 2)),
+    facing: Direction.DOWN,
+    canMove: false,
+    memory: {
+      sharedStories: 0,
+      restingSpotUnlocked: false,
+    },
+    interactionHooks: [
+      {
+        id: "lysa-chat",
+        type: "dialogue",
+        description: "Ask about the outside world",
+        payload: {
+          dialogueId: "caretaker-lysa-overview",
+        },
+      },
+      {
+        id: "lysa-rest",
+        type: "custom",
+        description: "Request a moment of rest",
+        payload: {
+          action: "rest",
+        },
+      },
+    ],
+    actions: ["talk", "rest"],
+    metadata: {
+      archetype: "caretaker",
+    },
+  });
+  const npcs = [caretaker];
+
   return {
-    id: 'story-outdoor-house',
-    mapData: { tiles, subtypes, environment: 'house' },
+    id: "story-outdoor-house",
+    mapData: { tiles, subtypes, environment: "house" },
     entryPoint,
     transitionToPrevious,
     entryFromNext,
+    npcs,
   };
 }
 
@@ -506,21 +603,36 @@ export function buildStoryModeState(): GameState {
     transitions.push({ from, to, position, targetEntryPoint });
   };
 
-  pushTransition(entrance.id, ascent.id, entrance.transitionToNext!, ascent.entryPoint);
+  pushTransition(
+    entrance.id,
+    ascent.id,
+    entrance.transitionToNext!,
+    ascent.entryPoint
+  );
   pushTransition(
     ascent.id,
     entrance.id,
     ascent.transitionToPrevious!,
     entrance.returnEntryPoint ?? entrance.entryPoint
   );
-  pushTransition(ascent.id, sanctum.id, ascent.transitionToNext!, sanctum.entryPoint);
+  pushTransition(
+    ascent.id,
+    sanctum.id,
+    ascent.transitionToNext!,
+    sanctum.entryPoint
+  );
   pushTransition(
     sanctum.id,
     ascent.id,
     sanctum.transitionToPrevious!,
     ascent.entryFromNext ?? ascent.entryPoint
   );
-  pushTransition(sanctum.id, outdoor.id, sanctum.transitionToNext!, outdoor.entryPoint);
+  pushTransition(
+    sanctum.id,
+    outdoor.id,
+    sanctum.transitionToNext!,
+    outdoor.entryPoint
+  );
   pushTransition(
     outdoor.id,
     sanctum.id,
@@ -556,7 +668,12 @@ export function buildStoryModeState(): GameState {
     ) {
       targetY = entranceTargetBase[0];
     }
-    pushTransition(entrance.id, ascent.id, [y, entranceBaseX], [targetY, entranceTargetBase[1]]);
+    pushTransition(
+      entrance.id,
+      ascent.id,
+      [y, entranceBaseX],
+      [targetY, entranceTargetBase[1]]
+    );
 
     let returnTargetY = entranceReturnBase[0] + offset;
     if (
@@ -566,18 +683,20 @@ export function buildStoryModeState(): GameState {
     ) {
       returnTargetY = entranceReturnBase[0];
     }
-    const ascentReturnPosition: [number, number] = [ascent.transitionToPrevious![0] + offset, ascent.transitionToPrevious![1]];
+    const ascentReturnPosition: [number, number] = [
+      ascent.transitionToPrevious![0] + offset,
+      ascent.transitionToPrevious![1],
+    ];
     if (
       ascentReturnPosition[0] > 0 &&
       ascentReturnPosition[0] < ascent.mapData.tiles.length &&
-      ascent.mapData.tiles[ascentReturnPosition[0]][ascentReturnPosition[1]] === FLOOR
+      ascent.mapData.tiles[ascentReturnPosition[0]][ascentReturnPosition[1]] ===
+        FLOOR
     ) {
-      pushTransition(
-        ascent.id,
-        entrance.id,
-        ascentReturnPosition,
-        [returnTargetY, entranceReturnBase[1]]
-      );
+      pushTransition(ascent.id, entrance.id, ascentReturnPosition, [
+        returnTargetY,
+        entranceReturnBase[1],
+      ]);
     }
   }
 
@@ -586,36 +705,42 @@ export function buildStoryModeState(): GameState {
       mapData: withoutPlayer(entrance.mapData),
       entryPoint: entrance.entryPoint,
       enemies: serializeEnemies(entrance.enemies),
+      npcs: serializeNPCs(entrance.npcs),
       potOverrides: entrance.potOverrides,
     },
     [ascent.id]: {
       mapData: withoutPlayer(ascent.mapData),
       entryPoint: ascent.entryPoint,
       enemies: serializeEnemies(ascent.enemies),
+      npcs: serializeNPCs(ascent.npcs),
       potOverrides: ascent.potOverrides,
     },
     [sanctum.id]: {
       mapData: withoutPlayer(sanctum.mapData),
       entryPoint: sanctum.entryPoint,
       enemies: serializeEnemies(sanctum.enemies),
+      npcs: serializeNPCs(sanctum.npcs),
       potOverrides: sanctum.potOverrides,
     },
     [outdoor.id]: {
       mapData: withoutPlayer(outdoor.mapData),
       entryPoint: outdoor.entryPoint,
       enemies: serializeEnemies(outdoor.enemies),
+      npcs: serializeNPCs(outdoor.npcs),
       potOverrides: outdoor.potOverrides,
     },
     [outdoorHouse.id]: {
       mapData: withoutPlayer(outdoorHouse.mapData),
       entryPoint: outdoorHouse.entryPoint,
       enemies: serializeEnemies(outdoorHouse.enemies),
+      npcs: serializeNPCs(outdoorHouse.npcs),
       potOverrides: outdoorHouse.potOverrides,
     },
   };
 
   const startingMap = addPlayer(entrance.mapData, entrance.entryPoint);
   const initialEnemies = cloneEnemies(entrance.enemies);
+  const initialNpcs = cloneNPCs(entrance.npcs);
   const initialPotOverrides = entrance.potOverrides
     ? { ...entrance.potOverrides }
     : undefined;
@@ -625,13 +750,14 @@ export function buildStoryModeState(): GameState {
     hasExitKey: false,
     hasSword: false,
     hasShield: false,
-    mode: 'story',
+    mode: "story",
     allowCheckpoints: true,
     mapData: startingMap,
     showFullMap: false,
     win: false,
     playerDirection: Direction.RIGHT,
     enemies: initialEnemies,
+    npcs: initialNpcs,
     heroHealth: 1,
     heroAttack: 1,
     heroTorchLit: false,
@@ -646,6 +772,7 @@ export function buildStoryModeState(): GameState {
       steps: 0,
     },
     recentDeaths: [],
+    npcInteractionQueue: [],
     currentRoomId: entrance.id,
     rooms: roomSnapshots,
     roomTransitions: transitions,
