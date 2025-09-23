@@ -132,16 +132,20 @@ export const Tile: React.FC<TileProps> = ({
 
   // Pixel art colors - directly use these values in the JSX
 
-  // If this is a player tile
-  const tierClass = isVisible
-    ? visibilityTier === 3
-      ? "fov-tier-3"
-      : visibilityTier === 2
-      ? "fov-tier-2"
-      : visibilityTier === 1
-      ? "fov-tier-1"
-      : ""
-    : "";
+  const isPlayerTile =
+    isVisible && Array.isArray(subtype) && subtype.includes(TileSubtype.PLAYER);
+
+  const tierClass = (() => {
+    if (!isVisible) return "";
+    if (!heroTorchLit) {
+      if (isPlayerTile) return "fov-tier-snuff-core";
+      if (visibilityTier <= 1) return "fov-tier-snuff-ring";
+    }
+    if (visibilityTier === 3) return "fov-tier-3";
+    if (visibilityTier === 2) return "fov-tier-2";
+    if (visibilityTier === 1) return "fov-tier-1";
+    return "";
+  })();
 
   // Get display name for a subtype
   const subtypeNames = (arr: number[] | undefined): string[] => {
@@ -618,7 +622,6 @@ export const Tile: React.FC<TileProps> = ({
     : '';
   
   // Determine if we need to flip the hero image for left-facing direction
-  const isPlayerTile = isVisible && subtype && subtype.includes(TileSubtype.PLAYER);
   const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);

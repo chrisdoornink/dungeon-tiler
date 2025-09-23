@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   TileType,
   GameState,
@@ -209,17 +209,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return prev;
     });
   }, [activeDialogueChoices]);
-
-  const interactAvailable = useMemo(() => {
-    if (!playerPosition || !gameState.npcs || gameState.npcs.length === 0) {
-      return false;
-    }
-    const [py, px] = playerPosition;
-    return gameState.npcs.some(
-      (npc) =>
-        !npc.isDead() && Math.abs(npc.y - py) + Math.abs(npc.x - px) === 1
-    );
-  }, [playerPosition, gameState.npcs]);
 
   const consumeNpcInteraction = useCallback(
     (timestamp: number) => {
@@ -2224,8 +2213,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         rockCount={gameState.rockCount ?? 0}
         onUseRune={handleThrowRune}
         runeCount={gameState.runeCount ?? 0}
-        onInteract={handleInteract}
-        interactEnabled={interactAvailable && !dialogueActive}
       />
     </div>
   );
