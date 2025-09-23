@@ -45,6 +45,7 @@ interface TileProps {
   invisibleClassName?: string; // Optional class override for invisible tiles
   playerHasExitKey?: boolean; // Player holds the exit key for conditional exit rendering
   environment?: EnvironmentId;
+  suppressDarknessOverlay?: boolean;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -73,6 +74,7 @@ export const Tile: React.FC<TileProps> = ({
   invisibleClassName,
   playerHasExitKey,
   environment = DEFAULT_ENVIRONMENT,
+  suppressDarknessOverlay = false,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Per-instance randomized torch animation interval (200–300ms)
@@ -137,7 +139,7 @@ export const Tile: React.FC<TileProps> = ({
 
   const tierClass = (() => {
     if (!isVisible) return "";
-    if (!heroTorchLit) {
+    if (!heroTorchLit && !suppressDarknessOverlay) {
       if (isPlayerTile) return "fov-tier-snuff-core";
       if (visibilityTier <= 1) return "fov-tier-snuff-ring";
     }

@@ -19,6 +19,7 @@ import {
   getEnemyIcon,
   createEmptyByKind,
   EnemyRegistry,
+  type EnemyKind,
 } from "../lib/enemies/registry";
 import MobileControls from "./MobileControls";
 import styles from "./TilemapGrid.module.css";
@@ -59,6 +60,8 @@ type DialogueSession = {
   dialogueId: string;
   consumedScriptIds: string[];
 };
+
+const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["goblin"]);
 
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
@@ -952,6 +955,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environmentConfig = getEnvironmentConfig(environment);
   const environmentDaylight = environmentConfig.daylight;
   const effectiveForceDaylight = forceDaylight || environmentDaylight;
+  const heroTorchLitState = gameState.heroTorchLit ?? true;
+  const suppressDarknessOverlay =
+    environmentDaylight || (forceDaylight && heroTorchLitState);
+  const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
 
   useEffect(() => {
@@ -2147,26 +2154,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // When the hero's torch is OFF, force a pure black background behind tiles
                     // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                     // the transparent center of the vignette.
-                    backgroundColor: gameState.heroTorchLit || environmentDaylight
-                      ? undefined
-                      : "#000",
+                    backgroundColor: heroTorchLitForVisibility ? undefined : "#000",
                   }}
                   tabIndex={0} // Make div focusable for keyboard events
                 >
-                  {renderTileGrid(
+                {renderTileGrid(
                     gameState.mapData.tiles,
                     tileTypes,
                     gameState.mapData.subtypes,
                     environment,
-                    gameState.showFullMap ||
-                      environmentDaylight ||
-                      (forceDaylight && (gameState.heroTorchLit ?? true)),
+                    gameState.showFullMap || suppressDarknessOverlay,
                     gameState.playerDirection,
                     gameState.enemies,
                     gameState.npcs,
                     gameState.hasSword,
                     gameState.hasShield,
-                    gameState.heroTorchLit ?? true,
+                    heroTorchLitState,
+                    suppressDarknessOverlay,
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active)
                   )}
@@ -2308,6 +2312,7 @@ function renderTileGrid(
   hasSword?: boolean,
   hasShield?: boolean,
   heroTorchLit: boolean = true,
+  suppressDarknessOverlay: boolean = false,
   hasExitKey?: boolean,
   heroPoisoned: boolean = false
 ) {
@@ -2328,15 +2333,18 @@ function renderTileGrid(
   }
 
   // Calculate visibility for each tile, honoring hero torch state
+  const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLit;
+
   const visibility = calculateVisibility(
     grid,
     playerPosition,
     showFullMap,
-    heroTorchLit
+    heroTorchLitForVisibility
   );
 
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
   const glowMap = new Map<string, number>();
+  const torchCarrierPositions = new Set<string>();
   if (subtypes) {
     for (let y = 0; y < subtypes.length; y++) {
       for (let x = 0; x < subtypes[y].length; x++) {
@@ -2349,6 +2357,18 @@ function renderTileGrid(
             glowMap.set(k, Math.max(prev, v));
           }
         }
+      }
+    }
+  }
+
+  if (enemies) {
+    for (const enemy of enemies) {
+      if (!TORCH_CARRIER_ENEMIES.has(enemy.kind as EnemyKind)) continue;
+      torchCarrierPositions.add(`${enemy.y},${enemy.x}`);
+      const m = computeTorchGlow(enemy.y, enemy.x, grid);
+      for (const [k, v] of m.entries()) {
+        const prev = glowMap.get(k) ?? 0;
+        glowMap.set(k, Math.max(prev, v));
       }
     }
   }
@@ -2387,8 +2407,9 @@ function renderTileGrid(
       const g = glowMap.get(glowKey);
       const isSelfTorch =
         Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
+      const isTorchCarrier = torchCarrierPositions.has(`${rowIndex},${colIndex}`);
       // Torch tile itself should always be at least tier 3 (fully visible)
-      if (isSelfTorch) tier = Math.max(tier, 3);
+      if (isSelfTorch || isTorchCarrier) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength
       if (g === ADJACENT_GLOW) {
         tier = Math.max(tier, 2);
@@ -2477,12 +2498,13 @@ function renderTileGrid(
             invisibleClassName={
               process.env.NODE_ENV === "test"
                 ? "bg-gray-900"
-                : !heroTorchLit
+                : !heroTorchLitForVisibility
                 ? "bg-black"
                 : undefined
             }
             playerHasExitKey={hasExitKey}
             environment={resolvedEnvironment}
+            suppressDarknessOverlay={suppressDarknessOverlay}
           />
         </div>
       );
