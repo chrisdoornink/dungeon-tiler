@@ -221,7 +221,7 @@
   animation-iteration-count: infinite;
   animation-direction: alternate;
   animation-timing-function: ease-in-out;
-  z-index: 11500; /* above enemies (10500), below wallTopOverlay (12000) */
+  z-index: 10800; /* below hero (11000), above enemies (10500) */
 }
 
 /* Positioning class for sprite-based wall torch */
@@ -232,7 +232,7 @@
   transform: translateX(-50%);
   width: 18px; /* Slightly larger than CSS flame for clarity */
   height: 24px;
-  z-index: 11500; /* above enemies (10500), below wallTopOverlay (12000) */
+  z-index: 10800; /* below hero (11000), above enemies (10500) */
 }
 
 /* Absolute overlay for revealed items to appear above chests */
@@ -587,7 +587,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 2; /* Ensure hero appears above the floor */
+  z-index: 11000; /* Above torches/enemies but below wall-top overlays */
   background-color: transparent; /* Make sure background is transparent */
 }
 
@@ -636,7 +636,16 @@
 }
 
 .invisible {
-  background: #1b1b1b; /* requested darker neutral */
+  position: relative;
+}
+
+.invisible::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 14, 12, 0.85);
+  box-shadow: inset 0 0 28px rgba(0, 0, 0, 0.82);
+  pointer-events: none;
 }
 
 /* Eerie green glow for stone-exciter when near the hero */

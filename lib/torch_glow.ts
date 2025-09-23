@@ -1,11 +1,13 @@
 export const ADJACENT_GLOW = 0.12;
 export const DIAGONAL_GLOW = 0.06;
+export const SECOND_RING_GLOW = 0.03;
 
 /**
  * Compute faint glow intensities around a torch at (y, x).
- * Returns a map keyed as "y,x" with intensity values for adjacent and diagonal tiles.
+ * Returns a map keyed as "y,x" with intensity values for nearby tiles.
  * - Adjacent N/E/S/W: ADJACENT_GLOW
- * - Diagonals: DIAGONAL_GLOW
+ * - Diagonals (distance 1): DIAGONAL_GLOW
+ * - Second ring (Chebyshev distance 2): SECOND_RING_GLOW
  * - Others: omitted
  */
 export function computeTorchGlow(
@@ -39,6 +41,21 @@ export function computeTorchGlow(
   ];
   for (const [yy, xx] of diag) {
     if (inBounds(yy, xx)) res.set(`${yy},${xx}`, DIAGONAL_GLOW);
+  }
+
+  // Second ring (Chebyshev distance 2)
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      const dist = Math.max(Math.abs(dy), Math.abs(dx));
+      if (dist !== 2) continue;
+      const yy = y + dy;
+      const xx = x + dx;
+      if (!inBounds(yy, xx)) continue;
+      const key = `${yy},${xx}`;
+      if (!res.has(key)) {
+        res.set(key, SECOND_RING_GLOW);
+      }
+    }
   }
 
   return res;

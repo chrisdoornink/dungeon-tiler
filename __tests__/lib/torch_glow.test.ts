@@ -37,11 +37,21 @@ describe('computeTorchGlow', () => {
     const maxDiag = Math.max(...(diag as number[]));
     expect(minAdj).toBeGreaterThan(maxDiag);
 
-    // Nothing beyond 1 tile in manhattan/diagonal distance
-    expect(glow.get(`${ty - 2},${tx}`)).toBeUndefined();
-    expect(glow.get(`${ty},${tx - 2}`)).toBeUndefined();
-    expect(glow.get(`${ty + 2},${tx}`)).toBeUndefined();
-    expect(glow.get(`${ty},${tx + 2}`)).toBeUndefined();
+    // Second ring tiles should exist but be weaker than diagonals
+    const ring2Keys = [
+      `${ty - 2},${tx}`,
+      `${ty + 2},${tx}`,
+      `${ty},${tx - 2}`,
+      `${ty},${tx + 2}`,
+      `${ty - 2},${tx - 2}`,
+      `${ty - 2},${tx + 2}`,
+      `${ty + 2},${tx - 2}`,
+      `${ty + 2},${tx + 2}`,
+    ];
+    const ring2 = ring2Keys.map((k) => glow.get(k));
+    ring2.forEach((v) => expect(v).toBeDefined());
+    const maxRing2 = Math.max(...(ring2 as number[]));
+    expect(maxDiag).toBeGreaterThan(maxRing2);
   });
 
   test('handles edge torch without out-of-bounds keys', () => {

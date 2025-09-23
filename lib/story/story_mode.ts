@@ -339,12 +339,11 @@ function buildSanctum(): StoryRoom {
   snakeB.kind = "snake";
   snakes.push(snakeB);
 
-  const torchRows = [1, height - 2];
-  for (const row of torchRows) {
-    for (let x = 2; x < width - 2; x += 3) {
-      if (tiles[row][x] === WALL) {
-        subtypes[row][x] = [TileSubtype.WALL_TORCH];
-      }
+  const torchRow = 1;
+  const torchCols = [entryX - 1, entryX + 1].filter((x) => x >= 1 && x <= INNER_SIZE);
+  for (const x of torchCols) {
+    if (tiles[torchRow][x] === WALL) {
+      subtypes[torchRow][x] = [TileSubtype.WALL_TORCH];
     }
   }
 
@@ -437,7 +436,7 @@ function buildOutdoorWorld(): StoryRoom {
 }
 
 function buildOutdoorHouse(): StoryRoom {
-  const SIZE = 6;
+  const SIZE = 5;
   const tiles: number[][] = Array.from({ length: SIZE + 2 }, () =>
     Array.from({ length: SIZE + 2 }, () => WALL)
   );
@@ -635,7 +634,7 @@ export function buildStoryModeState(): GameState {
     enemies: initialEnemies,
     heroHealth: 1,
     heroAttack: 1,
-    heroTorchLit: true,
+    heroTorchLit: false,
     rockCount: 0,
     runeCount: 0,
     foodCount: 0,

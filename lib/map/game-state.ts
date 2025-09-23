@@ -1353,7 +1353,8 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
       destSubtypes.includes(TileSubtype.CHEST) ||
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||
-      destSubtypes.includes(TileSubtype.CHECKPOINT)
+      destSubtypes.includes(TileSubtype.CHECKPOINT) ||
+      destSubtypes.includes(TileSubtype.WALL_TORCH)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);

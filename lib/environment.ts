@@ -30,7 +30,7 @@ const ENVIRONMENT_CONFIGS: Record<EnvironmentId, EnvironmentConfig> = {
     floorDefault: "/images/floor/in-house-floor-0000.png",
     floorNorthEdge: "/images/floor/in-house-floor-1000.png",
     wallPrefix: "/images/wall/outdoor-wall-",
-    daylight: false,
+    daylight: true,
   },
 };
 
