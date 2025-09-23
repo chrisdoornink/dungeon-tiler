@@ -7,9 +7,15 @@ jest.mock('next/navigation', () => ({
 }));
 import { TilemapGrid } from '../../components/TilemapGrid';
 import { TileSubtype, GameState, Direction } from '../../lib/map';
+import { NPC } from '../../lib/npc';
 import '@testing-library/jest-dom';
 
 describe('TilemapGrid component', () => {
+  const infoSpy = jest.spyOn(console, 'info').mockImplementation(() => {});
+  afterAll(() => {
+    infoSpy.mockRestore();
+  });
+
   // Mock data for testing
   const mockTileTypes = {
     0: { id: 0, name: 'floor', color: '#ccc', walkable: true },
@@ -414,5 +420,140 @@ describe('TilemapGrid component', () => {
     expect(firstTileAfter).toHaveClass('bg-gray-900');
 
     jest.useRealTimers();
+  });
+
+  describe('dialogue overlay', () => {
+    const makeBaseState = (): {
+      tiles: number[][];
+      subtypes: number[][][];
+      npc: NPC;
+      gameState: GameState;
+    } => {
+      const size = 7;
+      const tiles = Array(size)
+        .fill(0)
+        .map(() => Array(size).fill(0));
+      const subtypes = Array(size)
+        .fill(0)
+        .map(() => Array(size).fill(0).map(() => [] as number[]));
+      const heroY = 3;
+      const heroX = 3;
+      subtypes[heroY][heroX] = [TileSubtype.PLAYER];
+
+      const npc = new NPC({
+        id: 'npc-test',
+        name: 'Elder Rowan',
+        sprite: '/images/npcs/boy-3.png',
+        y: heroY,
+        x: heroX + 1,
+        facing: Direction.LEFT,
+        canMove: false,
+        interactionHooks: [
+          {
+            id: 'elder-rowan-greet',
+            type: 'dialogue',
+            payload: { dialogueId: 'elder-rowan-intro' },
+          },
+        ],
+      });
+
+      const gameState: GameState = {
+        hasKey: false,
+        hasExitKey: false,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.RIGHT,
+        heroHealth: 5,
+        heroAttack: 1,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+        npcs: [npc],
+        npcInteractionQueue: [npc.createInteractionEvent('action')],
+      };
+
+      return { tiles, subtypes, npc, gameState };
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows dialogue overlay when queue contains a dialogue event', () => {
+      jest.useFakeTimers();
+      const { tiles, subtypes, gameState } = makeBaseState();
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={gameState}
+        />
+      );
+
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+
+      const overlay = screen.getByTestId('dialogue-overlay');
+      expect(overlay).toBeInTheDocument();
+
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+
+      const text = screen.getByTestId('dialogue-text');
+      expect(text.textContent ?? '').toMatch(/torchlight finds you/);
+    });
+
+    it('advances dialogue lines and closes on Enter', () => {
+      jest.useFakeTimers();
+      const { tiles, subtypes, gameState } = makeBaseState();
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={gameState}
+        />
+      );
+
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+
+      const text = screen.getByTestId('dialogue-text');
+
+      // First Enter skips to full line
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(text.textContent ?? '').toMatch(/torchlight finds you/);
+
+      // Second Enter advances to line 2, third skips it fully
+      fireEvent.keyDown(window, { key: 'Enter' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(text.textContent ?? '').toMatch(/Tell me what I need to know/);
+
+      // Advance to line 3 and skip
+      fireEvent.keyDown(window, { key: 'Enter' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+      expect(text.textContent ?? '').toMatch(/Trust the floor runes/);
+
+      // Final Enter closes overlay
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+
+      expect(screen.queryByTestId('dialogue-overlay')).not.toBeInTheDocument();
+    });
   });
 });

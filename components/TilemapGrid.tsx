@@ -12,7 +12,7 @@ import {
   reviveFromLastCheckpoint,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
-import type { NPC } from "../lib/npc";
+import type { NPC, NPCInteractionEvent } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile } from "./Tile";
 import {
@@ -42,6 +42,16 @@ import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
 import ItemPickupAnimation from "./ItemPickupAnimation";
+import DialogueOverlay from "./DialogueOverlay";
+import { useTypewriter } from "../lib/dialogue/useTypewriter";
+import { getDialogueScript, type DialogueLine } from "../lib/story/dialogue_registry";
+
+type DialogueSession = {
+  event: NPCInteractionEvent;
+  script: DialogueLine[];
+  lineIndex: number;
+  dialogueId: string;
+};
 
 // Grid dimensions will be derived from provided map data
 
@@ -149,6 +159,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     itemType: string;
   }>>([]);
 
+  const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
+  const activeDialogueLine = dialogueSession
+    ? dialogueSession.script[dialogueSession.lineIndex] ?? null
+    : null;
+  const {
+    rendered: dialogueRendered,
+    isTyping: dialogueTyping,
+    skip: revealDialogueImmediately,
+    reset: resetDialogue,
+  } = useTypewriter(activeDialogueLine?.text ?? "", 16);
+  const dialogueActive = Boolean(dialogueSession);
+
   const interactAvailable = useMemo(() => {
     if (!playerPosition || !gameState.npcs || gameState.npcs.length === 0) {
       return false;
@@ -159,6 +181,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         !npc.isDead() && Math.abs(npc.y - py) + Math.abs(npc.x - px) === 1
     );
   }, [playerPosition, gameState.npcs]);
+
+  const consumeNpcInteraction = useCallback(
+    (timestamp: number) => {
+      setGameState((prev) => {
+        const queue = prev.npcInteractionQueue;
+        if (!queue || queue.length === 0) {
+          return prev;
+        }
+        const filtered = queue.filter((event) => event.timestamp !== timestamp);
+        if (filtered.length === queue.length) {
+          return prev;
+        }
+        const next: GameState = {
+          ...prev,
+          npcInteractionQueue: filtered,
+        };
+        try {
+          CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+        } catch {}
+        return next;
+      });
+    },
+    [resolvedStorageSlot]
+  );
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
@@ -357,7 +403,33 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     });
   }, [playerPosition, resolvedStorageSlot]);
 
+  const handleDialogueAdvance = useCallback(() => {
+    if (!dialogueSession) return;
+    if (dialogueTyping) {
+      revealDialogueImmediately();
+      return;
+    }
+    if (dialogueSession.lineIndex < dialogueSession.script.length - 1) {
+      setDialogueSession({
+        ...dialogueSession,
+        lineIndex: dialogueSession.lineIndex + 1,
+      });
+      return;
+    }
+    setDialogueSession(null);
+    resetDialogue();
+  }, [
+    dialogueSession,
+    dialogueTyping,
+    revealDialogueImmediately,
+    resetDialogue,
+  ]);
+
   const handleInteract = useCallback(() => {
+    if (dialogueActive) {
+      handleDialogueAdvance();
+      return;
+    }
     setGameState((prev) => {
       const npcs = prev.npcs;
       if (!npcs || npcs.length === 0) return prev;
@@ -417,7 +489,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       return next;
     });
-  }, [playerPosition, resolvedStorageSlot]);
+  }, [
+    dialogueActive,
+    handleDialogueAdvance,
+    playerPosition,
+    resolvedStorageSlot,
+  ]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -643,6 +720,49 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return next;
     });
   }, [playerPosition, resolvedStorageSlot]);
+
+  useEffect(() => {
+    if (dialogueSession) return;
+    const queue = gameState.npcInteractionQueue;
+    if (!queue || queue.length === 0) return;
+    const nextEvent = queue.find((entry) => entry.type === "dialogue");
+    if (!nextEvent) return;
+
+    let hook = nextEvent.availableHooks.find((h) => h.id === nextEvent.hookId);
+    if (!hook && nextEvent.availableHooks.length > 0) {
+      hook = nextEvent.availableHooks[0];
+    }
+    const dialogueId = (hook?.payload?.dialogueId ?? hook?.id) as string | undefined;
+    if (!dialogueId) {
+      consumeNpcInteraction(nextEvent.timestamp);
+      return;
+    }
+    const script = getDialogueScript(dialogueId);
+    if (!script || script.lines.length === 0) {
+      consumeNpcInteraction(nextEvent.timestamp);
+      return;
+    }
+
+    setDialogueSession({
+      event: nextEvent,
+      script: script.lines,
+      lineIndex: 0,
+      dialogueId,
+    });
+    consumeNpcInteraction(nextEvent.timestamp);
+    resetDialogue();
+  }, [
+    gameState.npcInteractionQueue,
+    dialogueSession,
+    consumeNpcInteraction,
+    resetDialogue,
+  ]);
+
+  const currentDialogueHasMore = dialogueSession
+    ? dialogueSession.lineIndex < dialogueSession.script.length - 1
+    : false;
+  const activeDialogueSpeaker = activeDialogueLine?.speaker ?? dialogueSession?.event.npcName ?? "";
+  const activeDialogueFullText = activeDialogueLine?.text ?? "";
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
@@ -1289,30 +1409,56 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     [gameState, playerPosition, resolvedStorageSlot]
   );
 
+  const handleMoveInput = useCallback(
+    (direction: Direction) => {
+      if (dialogueActive) {
+        handleDialogueAdvance();
+        return;
+      }
+      handlePlayerMove(direction);
+    },
+    [dialogueActive, handleDialogueAdvance, handlePlayerMove]
+  );
+
   // Handle mobile control button clicks
   const handleMobileMove = useCallback(
     (directionStr: string) => {
       switch (directionStr) {
         case "UP":
-          handlePlayerMove(Direction.UP);
+          handleMoveInput(Direction.UP);
           break;
         case "RIGHT":
-          handlePlayerMove(Direction.RIGHT);
+          handleMoveInput(Direction.RIGHT);
           break;
         case "DOWN":
-          handlePlayerMove(Direction.DOWN);
+          handleMoveInput(Direction.DOWN);
           break;
         case "LEFT":
-          handlePlayerMove(Direction.LEFT);
+          handleMoveInput(Direction.LEFT);
           break;
       }
     },
-    [handlePlayerMove]
+    [handleMoveInput]
   );
 
   // Add keyboard event listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (dialogueActive) {
+        if (
+          event.key === "Enter" ||
+          event.key === " " ||
+          event.key === "Spacebar" ||
+          event.key === "ArrowDown" ||
+          event.key === "ArrowRight" ||
+          event.key === "e" ||
+          event.key === "E"
+        ) {
+          event.preventDefault();
+          handleDialogueAdvance();
+        }
+        return;
+      }
       let direction: Direction | null = null;
 
       switch (event.key) {
@@ -1355,7 +1501,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       if (direction !== null) {
-        handlePlayerMove(direction);
+        handleMoveInput(direction);
       }
     };
 
@@ -1365,7 +1511,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     };
   }, [
     gameState,
-    handlePlayerMove,
+    dialogueActive,
+    handleDialogueAdvance,
+    handleMoveInput,
     handleThrowRock,
     handleThrowRune,
     handleUseFood,
@@ -1861,6 +2009,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         />
       ))}
       </ScreenShake>
+      {dialogueActive && activeDialogueLine && (
+        <DialogueOverlay
+          speaker={activeDialogueSpeaker}
+          text={activeDialogueFullText}
+          renderedText={dialogueRendered}
+          isTyping={dialogueTyping}
+          hasMore={currentDialogueHasMore}
+          onAdvance={handleDialogueAdvance}
+        />
+      )}
       
       {/* Mobile controls - Outside ScreenShake to prevent displacement */}
       <MobileControls
@@ -1870,7 +2028,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         onUseRune={handleThrowRune}
         runeCount={gameState.runeCount ?? 0}
         onInteract={handleInteract}
-        interactEnabled={interactAvailable}
+        interactEnabled={interactAvailable && !dialogueActive}
       />
     </div>
   );
