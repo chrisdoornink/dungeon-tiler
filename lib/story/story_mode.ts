@@ -782,6 +782,7 @@ export function buildStoryModeState(): GameState {
     roomTransitions: transitions,
     potOverrides: initialPotOverrides,
     storyFlags: createInitialStoryFlags(),
+    diaryEntries: [],
   };
 
   return gameState;

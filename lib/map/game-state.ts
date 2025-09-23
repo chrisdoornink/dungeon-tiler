@@ -40,6 +40,7 @@ import {
   createInitialStoryFlags,
   type StoryFlags,
 } from "../story/event_registry";
+import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
 
@@ -556,6 +557,7 @@ export interface GameState {
     };
   };
   storyFlags?: StoryFlags;
+  diaryEntries?: HeroDiaryEntry[];
   rooms?: Record<RoomId, RoomSnapshot>;
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
@@ -671,6 +673,7 @@ export function initializeGameState(): GameState {
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
+    diaryEntries: [],
   };
 }
 
@@ -725,6 +728,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
+    diaryEntries: [],
   };
 }
 
