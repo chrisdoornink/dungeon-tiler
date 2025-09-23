@@ -86,12 +86,12 @@ describe('TilemapGrid component', () => {
     const idx = (r: number, col: number) => r * width + col;
     const allTiles = screen.getAllByTestId(/^tile-/);
 
-    // Center is fully visible
-    expect(allTiles[idx(c, c)]).toHaveClass('fov-tier-3');
-    // Orthogonal neighbor visible (tier-1 at minimum)
-    expect(allTiles[idx(c, c + 1)]).toHaveClass('fov-tier-1');
-    // Diagonal neighbor should also be visible (tier-1)
-    expect(allTiles[idx(c + 1, c + 1)]).toHaveClass('fov-tier-1');
+    // Center tile uses the snuffed core styling when the torch is out
+    expect(allTiles[idx(c, c)]).toHaveClass('fov-tier-snuff-core');
+    // Orthogonal neighbors are still faintly visible via snuffed ring styling
+    expect(allTiles[idx(c, c + 1)]).toHaveClass('fov-tier-snuff-ring');
+    // Diagonal neighbors also get the snuffed ring styling
+    expect(allTiles[idx(c + 1, c + 1)]).toHaveClass('fov-tier-snuff-ring');
     // A tile two steps away should remain black
     expect(allTiles[idx(c + 2, c + 2)]).toHaveClass('bg-gray-900');
   });
