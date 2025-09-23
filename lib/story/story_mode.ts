@@ -312,8 +312,10 @@ function buildSanctum(): StoryRoom {
     if (x === entryX) {
       continue;
     }
-    subtypes[topRowY][x] = [TileSubtype.POT];
-    potOverrides[`${topRowY},${x}`] = TileSubtype.FOOD;
+    subtypes[topRowY][x] = [];
+    if (potOverrides[`${topRowY},${x}`]) {
+      delete potOverrides[`${topRowY},${x}`];
+    }
   }
   tiles[0][entryX] = FLOOR;
   const transitionToNext: [number, number] = [0, entryX];
@@ -466,6 +468,18 @@ function buildOutdoorHouse(): StoryRoom {
     }
   }
 
+  const cornerTorches: Array<[number, number]> = [
+    [1, 1],
+    [1, SIZE],
+    [SIZE, 1],
+    [SIZE, SIZE],
+  ];
+  for (const [ty, tx] of cornerTorches) {
+    if (tiles[ty]?.[tx] === FLOOR) {
+      subtypes[ty][tx] = [TileSubtype.WALL_TORCH];
+    }
+  }
+
   return {
     id: 'story-outdoor-house',
     mapData: { tiles, subtypes, environment: 'house' },
@@ -482,55 +496,91 @@ export function buildStoryModeState(): GameState {
   const outdoor = buildOutdoorWorld();
   const outdoorHouse = buildOutdoorHouse();
 
-  const transitions: RoomTransition[] = [
-    {
-      from: entrance.id,
-      to: ascent.id,
-      position: entrance.transitionToNext!,
-      targetEntryPoint: ascent.entryPoint,
-    },
-    {
-      from: ascent.id,
-      to: entrance.id,
-      position: ascent.transitionToPrevious!,
-      targetEntryPoint: entrance.returnEntryPoint ?? entrance.entryPoint,
-    },
-    {
-      from: ascent.id,
-      to: sanctum.id,
-      position: ascent.transitionToNext!,
-      targetEntryPoint: sanctum.entryPoint,
-    },
-    {
-      from: sanctum.id,
-      to: ascent.id,
-      position: sanctum.transitionToPrevious!,
-      targetEntryPoint: ascent.entryFromNext ?? ascent.entryPoint,
-    },
-    {
-      from: sanctum.id,
-      to: outdoor.id,
-      position: sanctum.transitionToNext!,
-      targetEntryPoint: outdoor.entryPoint,
-    },
-    {
-      from: outdoor.id,
-      to: sanctum.id,
-      position: outdoor.transitionToPrevious!,
-      targetEntryPoint: sanctum.entryFromNext ?? sanctum.entryPoint,
-    },
-    {
-      from: outdoor.id,
-      to: outdoorHouse.id,
-      position: outdoor.transitionToNext!,
-    },
-    {
-      from: outdoorHouse.id,
-      to: outdoor.id,
-      position: outdoorHouse.transitionToPrevious!,
-      targetEntryPoint: outdoor.entryFromNext ?? outdoor.entryPoint,
-    },
-  ];
+  const transitions: RoomTransition[] = [];
+
+  const pushTransition = (
+    from: RoomId,
+    to: RoomId,
+    position: [number, number],
+    targetEntryPoint?: [number, number]
+  ) => {
+    transitions.push({ from, to, position, targetEntryPoint });
+  };
+
+  pushTransition(entrance.id, ascent.id, entrance.transitionToNext!, ascent.entryPoint);
+  pushTransition(
+    ascent.id,
+    entrance.id,
+    ascent.transitionToPrevious!,
+    entrance.returnEntryPoint ?? entrance.entryPoint
+  );
+  pushTransition(ascent.id, sanctum.id, ascent.transitionToNext!, sanctum.entryPoint);
+  pushTransition(
+    sanctum.id,
+    ascent.id,
+    sanctum.transitionToPrevious!,
+    ascent.entryFromNext ?? ascent.entryPoint
+  );
+  pushTransition(sanctum.id, outdoor.id, sanctum.transitionToNext!, outdoor.entryPoint);
+  pushTransition(
+    outdoor.id,
+    sanctum.id,
+    outdoor.transitionToPrevious!,
+    sanctum.entryFromNext ?? sanctum.entryPoint
+  );
+  pushTransition(outdoor.id, outdoorHouse.id, outdoor.transitionToNext!);
+  pushTransition(
+    outdoorHouse.id,
+    outdoor.id,
+    outdoorHouse.transitionToPrevious!,
+    outdoor.entryFromNext ?? outdoor.entryPoint
+  );
+
+  const entranceTargetBase = ascent.entryPoint;
+  const entranceReturnBase = entrance.returnEntryPoint ?? entrance.entryPoint;
+  const [entranceBaseY, entranceBaseX] = entrance.transitionToNext!;
+  const entranceExtras = [-1, 1]
+    .map((offset) => entranceBaseY + offset)
+    .filter(
+      (y) =>
+        y > 0 &&
+        y < entrance.mapData.tiles.length &&
+        entrance.mapData.tiles[y][entranceBaseX] === FLOOR
+    );
+  for (const y of entranceExtras) {
+    const offset = y - entranceBaseY;
+    let targetY = entranceTargetBase[0] + offset;
+    if (
+      targetY < 0 ||
+      targetY >= ascent.mapData.tiles.length ||
+      ascent.mapData.tiles[targetY][entranceTargetBase[1]] !== FLOOR
+    ) {
+      targetY = entranceTargetBase[0];
+    }
+    pushTransition(entrance.id, ascent.id, [y, entranceBaseX], [targetY, entranceTargetBase[1]]);
+
+    let returnTargetY = entranceReturnBase[0] + offset;
+    if (
+      returnTargetY < 0 ||
+      returnTargetY >= entrance.mapData.tiles.length ||
+      entrance.mapData.tiles[returnTargetY][entranceReturnBase[1]] !== FLOOR
+    ) {
+      returnTargetY = entranceReturnBase[0];
+    }
+    const ascentReturnPosition: [number, number] = [ascent.transitionToPrevious![0] + offset, ascent.transitionToPrevious![1]];
+    if (
+      ascentReturnPosition[0] > 0 &&
+      ascentReturnPosition[0] < ascent.mapData.tiles.length &&
+      ascent.mapData.tiles[ascentReturnPosition[0]][ascentReturnPosition[1]] === FLOOR
+    ) {
+      pushTransition(
+        ascent.id,
+        entrance.id,
+        ascentReturnPosition,
+        [returnTargetY, entranceReturnBase[1]]
+      );
+    }
+  }
 
   const roomSnapshots: GameState["rooms"] = {
     [entrance.id]: {
