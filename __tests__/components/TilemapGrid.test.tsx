@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, within } from '@testing-library/react';
 import { fireEvent } from '@testing-library/dom';
 const pushMock = jest.fn();
 jest.mock('next/navigation', () => ({
@@ -554,6 +554,102 @@ describe('TilemapGrid component', () => {
       });
 
       expect(screen.queryByTestId('dialogue-overlay')).not.toBeInTheDocument();
+    });
+
+    it('supports branching dialogue choices', () => {
+      jest.useFakeTimers();
+      const size = 7;
+      const tiles = Array(size)
+        .fill(0)
+        .map(() => Array(size).fill(0));
+      const subtypes = Array(size)
+        .fill(0)
+        .map(() => Array(size).fill(0).map(() => [] as number[]));
+      const heroY = 3;
+      const heroX = 3;
+      subtypes[heroY][heroX] = [TileSubtype.PLAYER];
+
+      const npc = new NPC({
+        id: 'npc-caretaker',
+        name: 'Caretaker Lysa',
+        sprite: '/images/npcs/girl-1.png',
+        y: heroY,
+        x: heroX + 1,
+        facing: Direction.LEFT,
+        canMove: false,
+        interactionHooks: [
+          {
+            id: 'caretaker-lysa',
+            type: 'dialogue',
+            payload: { dialogueId: 'caretaker-lysa-overview' },
+          },
+        ],
+      });
+
+      const gameState: GameState = {
+        hasKey: false,
+        hasExitKey: false,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.RIGHT,
+        heroHealth: 5,
+        heroAttack: 1,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+        npcs: [npc],
+        npcInteractionQueue: [npc.createInteractionEvent('action')],
+      };
+
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={gameState}
+        />
+      );
+
+      act(() => {
+        jest.runOnlyPendingTimers();
+      });
+
+      // Advance through the preamble lines to reach the choice prompt
+      fireEvent.keyDown(window, { key: 'Enter' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+
+      const listbox = screen.getByRole('listbox', { name: 'Responses' });
+      const options = within(listbox).getAllByRole('button');
+      expect(options[0].textContent).toContain('Promise to stay cautious');
+
+      // Select the second option using keyboard navigation
+      fireEvent.keyDown(window, { key: 'ArrowDown' });
+      fireEvent.keyDown(window, { key: 'Enter' });
+
+      act(() => {
+        jest.runAllTimers();
+      });
+
+      // Skip the typewriter animation for the response line
+      fireEvent.keyDown(window, { key: 'Enter' });
+      act(() => {
+        jest.runAllTimers();
+      });
+
+      const text = screen.getByTestId('dialogue-text');
+      expect(text.textContent ?? '').toMatch(/Tell me what to watch for/);
     });
   });
 });

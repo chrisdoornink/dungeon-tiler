@@ -64,7 +64,8 @@ describe("NPC interaction events", () => {
     expect(event.npcId).toBe("solo");
     expect(event.type).toBe("dialogue");
     expect(event.hookId).toBe("solo-dialogue");
-    expect(event.availableHooks).toHaveLength(0);
+    expect(event.availableHooks).toHaveLength(1);
+    expect(event.availableHooks[0]?.id).toBe("solo-dialogue");
   });
 
   test("first hook metadata is surfaced when available", () => {
@@ -93,5 +94,33 @@ describe("NPC interaction events", () => {
     expect(event.availableHooks).toHaveLength(2);
     expect(event.availableHooks[1]?.id).toBe("mentor-gift");
     expect(event.memory?.mentor).toBeUndefined();
+  });
+
+  test("custom hook is prioritized when provided", () => {
+    const npc = new NPC({
+      id: "scribe",
+      name: "Scribe",
+      sprite: "/images/hero/hero-front-static.png",
+      y: 0,
+      x: 0,
+      interactionHooks: [
+        {
+          id: "scribe-default",
+          type: "dialogue",
+          description: "Talk",
+        },
+      ],
+    });
+
+    const event = npc.createInteractionEvent("action", {
+      id: "story-dialogue:custom",
+      type: "dialogue",
+      description: "Discuss current events",
+      payload: { dialogueId: "custom" },
+    });
+
+    expect(event.hookId).toBe("story-dialogue:custom");
+    expect(event.availableHooks[0]?.id).toBe("story-dialogue:custom");
+    expect(event.availableHooks).toHaveLength(2);
   });
 });

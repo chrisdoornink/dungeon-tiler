@@ -8,6 +8,7 @@ import {
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
 import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
+import { createInitialStoryFlags } from "./event_registry";
 
 const FLOOR = 0;
 const WALL = 1;
@@ -164,7 +165,7 @@ function buildEntranceHall(): StoryRoom {
         type: "dialogue",
         description: "Greet the elder",
         payload: {
-          dialogueId: "elder-rowan-intro",
+          dialogueId: "elder-rowan-default",
         },
       },
       {
@@ -556,7 +557,7 @@ function buildOutdoorHouse(): StoryRoom {
         type: "dialogue",
         description: "Ask about the outside world",
         payload: {
-          dialogueId: "caretaker-lysa-overview",
+          dialogueId: "caretaker-lysa-reminder",
         },
       },
       {
@@ -777,6 +778,7 @@ export function buildStoryModeState(): GameState {
     rooms: roomSnapshots,
     roomTransitions: transitions,
     potOverrides: initialPotOverrides,
+    storyFlags: createInitialStoryFlags(),
   };
 
   return gameState;

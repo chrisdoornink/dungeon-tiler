@@ -1,6 +1,11 @@
 import React from "react";
 import styles from "./DialogueOverlay.module.css";
 
+interface DialogueChoiceOption {
+  id: string;
+  label: string;
+}
+
 interface DialogueOverlayProps {
   speaker?: string;
   text: string;
@@ -8,6 +13,9 @@ interface DialogueOverlayProps {
   isTyping: boolean;
   hasMore: boolean;
   onAdvance: () => void;
+  choices?: DialogueChoiceOption[];
+  selectedChoiceIndex?: number;
+  onSelectChoice?: (id: string) => void;
 }
 
 const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
@@ -17,10 +25,26 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
   isTyping,
   hasMore,
   onAdvance,
+  choices,
+  selectedChoiceIndex = 0,
+  onSelectChoice,
 }) => {
   const displayText = renderedText.length > 0 ? renderedText : "\u00a0";
-  const showCursor = isTyping;
+  const showCursor = isTyping && (!choices || choices.length === 0);
   const ariaTitle = speaker ? `${speaker}: ${text}` : text;
+  const hasChoices = Boolean(choices && choices.length > 0);
+  const footerLabel = hasChoices
+    ? "Choose"
+    : isTyping
+    ? "Reveal"
+    : hasMore
+    ? "Next"
+    : "Close";
+
+  const handleOverlayClick = () => {
+    if (hasChoices) return;
+    onAdvance();
+  };
 
   return (
     <div
@@ -29,7 +53,7 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
       role="dialog"
       aria-live="polite"
       aria-label={ariaTitle}
-      onClick={onAdvance}
+      onClick={handleOverlayClick}
     >
       <div className={`${styles.panel} pixel-text`}>
         <div className={styles.header}>
@@ -39,11 +63,35 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
           {displayText}
           {showCursor ? <span className={styles.cursor}>▌</span> : null}
         </div>
+        {hasChoices ? (
+          <div className={styles.choices} role="listbox" aria-label="Responses">
+            {choices!.map((choice, index) => {
+              const isSelected = index === selectedChoiceIndex;
+              return (
+                <button
+                  key={choice.id}
+                  type="button"
+                  className={`${styles.choiceButton} ${
+                    isSelected ? styles.choiceButtonActive : ""
+                  }`}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onSelectChoice?.(choice.id);
+                  }}
+                  aria-selected={isSelected}
+                >
+                  <span className={styles.choiceBadge}>{index + 1}</span>
+                  <span className={styles.choiceLabel}>{choice.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className={styles.footer}>
           <div className={styles.hint}>
             <span className={styles.hintKey}>Enter</span>
             <span className={styles.hintKey}>Tap</span>
-            <span>{isTyping ? "Reveal" : hasMore ? "Next" : "Close"}</span>
+            <span>{footerLabel}</span>
           </div>
         </div>
       </div>

@@ -44,14 +44,35 @@ import { ScreenShake } from "./ScreenShake";
 import ItemPickupAnimation from "./ItemPickupAnimation";
 import DialogueOverlay from "./DialogueOverlay";
 import { useTypewriter } from "../lib/dialogue/useTypewriter";
-import { getDialogueScript, type DialogueLine } from "../lib/story/dialogue_registry";
+import {
+  getDialogueScript,
+  type DialogueChoice,
+  type DialogueLine,
+} from "../lib/story/dialogue_registry";
+import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
+import { applyStoryEffects } from "../lib/story/event_registry";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
   script: DialogueLine[];
   lineIndex: number;
   dialogueId: string;
+  consumedScriptIds: string[];
 };
+
+function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
+  return lines.map((line) => ({
+    ...line,
+    options: line.options
+      ? line.options.map((option) => ({
+          ...option,
+          response: option.response
+            ? cloneDialogueLines(option.response)
+            : undefined,
+        }))
+      : undefined,
+  }));
+}
 
 // Grid dimensions will be derived from provided map data
 
@@ -160,6 +181,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }>>([]);
 
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
+  const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
   const activeDialogueLine = dialogueSession
     ? dialogueSession.script[dialogueSession.lineIndex] ?? null
     : null;
@@ -170,6 +192,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     reset: resetDialogue,
   } = useTypewriter(activeDialogueLine?.text ?? "", 16);
   const dialogueActive = Boolean(dialogueSession);
+  const activeDialogueChoices: DialogueChoice[] | undefined =
+    activeDialogueLine?.options && activeDialogueLine.options.length > 0
+      ? activeDialogueLine.options
+      : undefined;
+
+  useEffect(() => {
+    if (!activeDialogueChoices || activeDialogueChoices.length === 0) {
+      setSelectedChoiceIndex(0);
+      return;
+    }
+    setSelectedChoiceIndex((prev) => {
+      if (prev < 0 || prev >= activeDialogueChoices.length) {
+        return 0;
+      }
+      return prev;
+    });
+  }, [activeDialogueChoices]);
 
   const interactAvailable = useMemo(() => {
     if (!playerPosition || !gameState.npcs || gameState.npcs.length === 0) {
@@ -403,10 +442,38 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     });
   }, [playerPosition, resolvedStorageSlot]);
 
+  const applyDialogueCompletionEffects = useCallback(
+    (session: DialogueSession) => {
+      const consumedIds = session.consumedScriptIds?.length
+        ? session.consumedScriptIds
+        : [session.dialogueId];
+      const seen = new Set<string>();
+      const pendingEffects = consumedIds.flatMap((id) => {
+        if (!id || seen.has(id)) return [];
+        seen.add(id);
+        const script = getDialogueScript(id);
+        if (!script?.onCompleteEffects) return [];
+        return script.onCompleteEffects;
+      });
+      if (pendingEffects.length === 0) return;
+      setGameState((prev) => {
+        const nextFlags = applyStoryEffects(prev.storyFlags, pendingEffects);
+        if (nextFlags === prev.storyFlags) {
+          return prev;
+        }
+        return { ...prev, storyFlags: nextFlags };
+      });
+    },
+    [setGameState]
+  );
+
   const handleDialogueAdvance = useCallback(() => {
     if (!dialogueSession) return;
     if (dialogueTyping) {
       revealDialogueImmediately();
+      return;
+    }
+    if (activeDialogueChoices && activeDialogueChoices.length > 0) {
       return;
     }
     if (dialogueSession.lineIndex < dialogueSession.script.length - 1) {
@@ -416,14 +483,100 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       });
       return;
     }
+    applyDialogueCompletionEffects(dialogueSession);
     setDialogueSession(null);
+    setSelectedChoiceIndex(0);
     resetDialogue();
   }, [
     dialogueSession,
     dialogueTyping,
+    activeDialogueChoices,
     revealDialogueImmediately,
     resetDialogue,
+    applyDialogueCompletionEffects,
   ]);
+
+  const handleDialogueChoiceSelect = useCallback(
+    (choiceId: string) => {
+      setDialogueSession((prev) => {
+        if (!prev) return prev;
+        const currentLine = prev.script[prev.lineIndex];
+        if (!currentLine || !currentLine.options) return prev;
+        const choice = currentLine.options.find((option) => option.id === choiceId);
+        if (!choice) return prev;
+
+        if (choice.effects && choice.effects.length > 0) {
+          setGameState((state) => {
+            const nextFlags = applyStoryEffects(state.storyFlags, choice.effects);
+            if (nextFlags === state.storyFlags) {
+              return state;
+            }
+            return { ...state, storyFlags: nextFlags };
+          });
+        }
+
+        const updatedCurrentLine: DialogueLine = {
+          ...currentLine,
+          options: undefined,
+        };
+
+        const newScript: DialogueLine[] = [
+          ...prev.script.slice(0, prev.lineIndex),
+          updatedCurrentLine,
+        ];
+
+        if (choice.response && choice.response.length > 0) {
+          newScript.push(...cloneDialogueLines(choice.response));
+        }
+
+        const consumedIds = new Set(prev.consumedScriptIds);
+
+        if (choice.nextDialogueId) {
+          const nextScript = getDialogueScript(choice.nextDialogueId);
+          if (nextScript) {
+            newScript.push(...cloneDialogueLines(nextScript.lines));
+            consumedIds.add(choice.nextDialogueId);
+          }
+        }
+
+        const nextIndex = Math.min(prev.lineIndex + 1, newScript.length - 1);
+
+        return {
+          ...prev,
+          script: newScript,
+          lineIndex: nextIndex,
+          consumedScriptIds: Array.from(consumedIds),
+        };
+      });
+      setSelectedChoiceIndex(0);
+      resetDialogue();
+    },
+    [resetDialogue, setGameState]
+  );
+
+  const handleDialogueChoiceNavigate = useCallback(
+    (delta: number) => {
+      if (!activeDialogueChoices || activeDialogueChoices.length === 0) {
+        return;
+      }
+      setSelectedChoiceIndex((prev) => {
+        const length = activeDialogueChoices.length;
+        const next = (prev + delta + length) % length;
+        return next;
+      });
+    },
+    [activeDialogueChoices]
+  );
+
+  const handleDialogueChoiceConfirm = useCallback(() => {
+    if (!activeDialogueChoices || activeDialogueChoices.length === 0) {
+      return;
+    }
+    const choice = activeDialogueChoices[selectedChoiceIndex];
+    if (choice) {
+      handleDialogueChoiceSelect(choice.id);
+    }
+  }, [activeDialogueChoices, selectedChoiceIndex, handleDialogueChoiceSelect]);
 
   const handleInteract = useCallback(() => {
     if (dialogueActive) {
@@ -476,7 +629,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const queue = prev.npcInteractionQueue
         ? [...prev.npcInteractionQueue]
         : [];
-      queue.push(npc.createInteractionEvent("action"));
+      const scriptId = resolveNpcDialogueScript(npc.id, prev.storyFlags);
+      const dynamicHook = scriptId
+        ? {
+            id: `story-dialogue:${scriptId}`,
+            type: "dialogue" as const,
+            description: `Talk to ${npc.name}`,
+            payload: { dialogueId: scriptId },
+          }
+        : undefined;
+      queue.push(npc.createInteractionEvent("action", dynamicHook));
       const MAX_QUEUE = 20;
       const trimmedQueue =
         queue.length > MAX_QUEUE ? queue.slice(queue.length - MAX_QUEUE) : queue;
@@ -743,12 +905,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return;
     }
 
+    const scriptLines = cloneDialogueLines(script.lines);
     setDialogueSession({
       event: nextEvent,
-      script: script.lines,
+      script: scriptLines,
       lineIndex: 0,
       dialogueId,
+      consumedScriptIds: [dialogueId],
     });
+    setSelectedChoiceIndex(0);
     consumeNpcInteraction(nextEvent.timestamp);
     resetDialogue();
   }, [
@@ -1445,6 +1610,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (dialogueActive) {
+        if (activeDialogueChoices && activeDialogueChoices.length > 0) {
+          if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
+            event.preventDefault();
+            handleDialogueChoiceNavigate(-1);
+            return;
+          }
+          if (event.key === "ArrowDown" || event.key === "ArrowRight") {
+            event.preventDefault();
+            handleDialogueChoiceNavigate(1);
+            return;
+          }
+          if (
+            event.key === "Enter" ||
+            event.key === " " ||
+            event.key === "Spacebar" ||
+            event.key === "e" ||
+            event.key === "E"
+          ) {
+            event.preventDefault();
+            handleDialogueChoiceConfirm();
+          }
+          return;
+        }
         if (
           event.key === "Enter" ||
           event.key === " " ||
@@ -1512,6 +1700,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [
     gameState,
     dialogueActive,
+    activeDialogueChoices,
     handleDialogueAdvance,
     handleMoveInput,
     handleThrowRock,
@@ -1519,6 +1708,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleUseFood,
     handleUsePotion,
     handleInteract,
+    handleDialogueChoiceNavigate,
+    handleDialogueChoiceConfirm,
   ]);
 
   return (
@@ -2017,6 +2208,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           isTyping={dialogueTyping}
           hasMore={currentDialogueHasMore}
           onAdvance={handleDialogueAdvance}
+          choices={activeDialogueChoices?.map((choice) => ({
+            id: choice.id,
+            label: choice.prompt,
+          }))}
+          selectedChoiceIndex={selectedChoiceIndex}
+          onSelectChoice={handleDialogueChoiceSelect}
         />
       )}
       

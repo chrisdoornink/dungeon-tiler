@@ -162,7 +162,15 @@ export class NPC {
     trigger: NPCInteractionTriggerSource,
     hook?: NPCInteractionHook
   ): NPCInteractionEvent {
-    const resolvedHook = hook ?? this.interactionHooks[0];
+    const availableHooks = this.interactionHooks.map((h) => ({ ...h }));
+    if (hook) {
+      const exists = availableHooks.some((candidate) => candidate.id === hook.id);
+      if (!exists) {
+        availableHooks.unshift({ ...hook });
+      }
+    }
+
+    const resolvedHook = hook ?? availableHooks[0];
     const fallback: NPCInteractionHook | undefined = resolvedHook
       ? { ...resolvedHook }
       : {
@@ -171,12 +179,16 @@ export class NPC {
           description: `Talk to ${this.name}`,
         };
 
+    if (!resolvedHook && availableHooks.length === 0) {
+      availableHooks.push({ ...fallback });
+    }
+
     return {
       npcId: this.id,
       npcName: this.name,
       type: fallback.type,
       hookId: fallback.id,
-      availableHooks: this.interactionHooks.map((h) => ({ ...h })),
+      availableHooks,
       trigger,
       timestamp: Date.now(),
       memory: { ...this.memory },

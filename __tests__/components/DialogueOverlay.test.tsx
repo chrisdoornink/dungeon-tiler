@@ -33,4 +33,29 @@ describe("DialogueOverlay", () => {
     fireEvent.click(screen.getByTestId("dialogue-overlay"));
     expect(onAdvance).toHaveBeenCalledTimes(1);
   });
+
+  it("renders selectable choices and handles selection", () => {
+    const onSelectChoice = jest.fn();
+    const onAdvance = jest.fn();
+    render(
+      <DialogueOverlay
+        {...baseProps}
+        choices={[
+          { id: "a", label: "Affirm the warning" },
+          { id: "b", label: "Ask for details" },
+        ]}
+        selectedChoiceIndex={1}
+        onSelectChoice={onSelectChoice}
+        onAdvance={onAdvance}
+      />
+    );
+    expect(screen.getByRole("listbox", { name: "Responses" })).toBeInTheDocument();
+    const options = screen.getAllByRole("button");
+    expect(options).toHaveLength(2);
+    fireEvent.click(options[0]);
+    expect(onSelectChoice).toHaveBeenCalledWith("a");
+    // Clicking overlay should not trigger advance while choices are visible
+    fireEvent.click(screen.getByTestId("dialogue-overlay"));
+    expect(onAdvance).not.toHaveBeenCalled();
+  });
 });

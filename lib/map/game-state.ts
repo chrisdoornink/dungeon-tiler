@@ -36,6 +36,10 @@ import {
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
+import {
+  createInitialStoryFlags,
+  type StoryFlags,
+} from "../story/event_registry";
 
 import { pickPotRevealDeterministic } from "./pots";
 
@@ -551,6 +555,7 @@ export interface GameState {
       stepInterval: number;
     };
   };
+  storyFlags?: StoryFlags;
   rooms?: Record<RoomId, RoomSnapshot>;
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
@@ -665,6 +670,7 @@ export function initializeGameState(): GameState {
     },
     recentDeaths: [],
     npcInteractionQueue: [],
+    storyFlags: createInitialStoryFlags(),
   };
 }
 
@@ -718,6 +724,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     },
     recentDeaths: [],
     npcInteractionQueue: [],
+    storyFlags: createInitialStoryFlags(),
   };
 }
 
