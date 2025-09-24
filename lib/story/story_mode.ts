@@ -584,21 +584,30 @@ function buildOutdoorHouse(): StoryRoom {
     },
     interactionHooks: [
       {
-        id: "lysa-chat",
+        id: "lysa-intro",
         type: "dialogue",
-        description: "Ask about the outside world",
+        description: "Hear Lysa's introduction",
         payload: {
-          dialogueId: "caretaker-lysa-default",
+          dialogueId: "caretaker-lysa-intro",
         },
       },
-      {
-        id: "lysa-rest",
-        type: "custom",
-        description: "Request a moment of rest",
-        payload: {
-          action: "rest",
-        },
-      },
+      // {
+      //   id: "lysa-chat",
+      //   type: "dialogue",
+      //   description: "Listen to Lysa's song",
+      //   payload: {
+      //     dialogueId: "caretaker-lysa-default",
+      //   },
+      // },
+
+      // {
+      //   id: "lysa-rest",
+      //   type: "custom",
+      //   description: "Request a moment of rest",
+      //   payload: {
+      //     action: "rest",
+      //   },
+      // },
     ],
     actions: ["talk", "rest"],
     metadata: {
@@ -704,7 +713,10 @@ function buildTorchTown(): StoryRoom {
     const doorRow = top + height - 1;
     const doorCol = left + Math.floor(width / 2);
     // Mark building door as both a door and a room transition entry point
-    subtypes[doorRow][doorCol] = [TileSubtype.DOOR, TileSubtype.ROOM_TRANSITION];
+    subtypes[doorRow][doorCol] = [
+      TileSubtype.DOOR,
+      TileSubtype.ROOM_TRANSITION,
+    ];
 
     return [doorRow, doorCol];
   };
@@ -722,8 +734,10 @@ function buildTorchTown(): StoryRoom {
   // Library: taller building, placed near upper third
   const libraryWidth = 3;
   const libraryHeight = 5;
-  const libraryTop = innerMin + Math.max(2, Math.floor((innerMax - innerMin) / 6));
-  const libraryLeft = innerMin + Math.floor((innerMax - innerMin - libraryWidth) / 2);
+  const libraryTop =
+    innerMin + Math.max(2, Math.floor((innerMax - innerMin) / 6));
+  const libraryLeft =
+    innerMin + Math.floor((innerMax - innerMin - libraryWidth) / 2);
   const libraryDoor = buildStructure(
     libraryTop,
     libraryLeft,
@@ -734,7 +748,10 @@ function buildTorchTown(): StoryRoom {
   // Store: shorter building, placed below library with more spacing
   const storeWidth = 3;
   const storeHeight = 3;
-  const storeTop = Math.min(innerMax - storeHeight - 2, libraryTop + libraryHeight + 8);
+  const storeTop = Math.min(
+    innerMax - storeHeight - 2,
+    libraryTop + libraryHeight + 8
+  );
   const storeLeft = libraryLeft;
   const storeDoor = buildStructure(
     storeTop,
@@ -762,7 +779,8 @@ function buildTorchTown(): StoryRoom {
   const isAreaFree = (top: number, left: number, w: number, h: number) => {
     for (let y = top; y < top + h; y++) {
       for (let x = left; x < left + w; x++) {
-        if (y < innerMin || y > innerMax || x < innerMin || x > innerMax) return false;
+        if (y < innerMin || y > innerMax || x < innerMin || x > innerMax)
+          return false;
         if (tiles[y]?.[x] !== FLOOR) return false; // something already occupies this spot
       }
     }
@@ -770,11 +788,13 @@ function buildTorchTown(): StoryRoom {
   };
   // Base rows (structured), then apply small jitter so they aren't in straight lines
   const baseRows: number[] = [];
-  for (let y = innerMin + 4; y <= innerMax - homeHeight - 4; y += 5) baseRows.push(y);
+  for (let y = innerMin + 4; y <= innerMax - homeHeight - 4; y += 5)
+    baseRows.push(y);
   const leftColBase = innerMin + 3;
   const rightColBase = innerMax - homeWidth - 3;
 
-  const jitter = (range: number) => (Math.floor(Math.random() * (2 * range + 1)) - range);
+  const jitter = (range: number) =>
+    Math.floor(Math.random() * (2 * range + 1)) - range;
   const candidates: Array<{ top: number; left: number }> = [];
   for (const baseTop of baseRows) {
     // Left column home
@@ -790,10 +810,17 @@ function buildTorchTown(): StoryRoom {
     // Apply small jitter (±2 tiles) and clamp inside bounds
     const dy = jitter(2);
     const dx = jitter(2);
-    let top = Math.max(innerMin + 2, Math.min(innerMax - homeHeight - 2, base.top + dy));
-    let left = Math.max(innerMin + 2, Math.min(innerMax - homeWidth - 2, base.left + dx));
+    let top = Math.max(
+      innerMin + 2,
+      Math.min(innerMax - homeHeight - 2, base.top + dy)
+    );
+    let left = Math.max(
+      innerMin + 2,
+      Math.min(innerMax - homeWidth - 2, base.left + dx)
+    );
     // Keep a little breathing room from the center plaza
-    const tooCloseToCenter = Math.abs(top - centerY) <= 2 && Math.abs(left - centerX) <= 2;
+    const tooCloseToCenter =
+      Math.abs(top - centerY) <= 2 && Math.abs(left - centerX) <= 2;
     if (tooCloseToCenter) continue;
     if (!isAreaFree(top, left, homeWidth, homeHeight)) {
       // Try a couple nearby fallbacks without randomness explosion
@@ -806,18 +833,24 @@ function buildTorchTown(): StoryRoom {
       let placed = false;
       for (const [fy, fx] of fallbackSpots) {
         if (
-          fy >= innerMin + 2 && fy <= innerMax - homeHeight - 2 &&
-          fx >= innerMin + 2 && fx <= innerMax - homeWidth - 2 &&
+          fy >= innerMin + 2 &&
+          fy <= innerMax - homeHeight - 2 &&
+          fx >= innerMin + 2 &&
+          fx <= innerMax - homeWidth - 2 &&
           !(Math.abs(fy - centerY) <= 2 && Math.abs(fx - centerX) <= 2) &&
           isAreaFree(fy, fx, homeWidth, homeHeight)
         ) {
-          top = fy; left = fx; placed = true; break;
+          top = fy;
+          left = fx;
+          placed = true;
+          break;
         }
       }
       if (!placed) continue;
     }
     const door = buildStructure(top, left, homeWidth, homeHeight);
-    homeAssignments[`${door[0]},${door[1]}`] = homeLastNames[homesPlaced] ?? `Family ${homesPlaced+1}`;
+    homeAssignments[`${door[0]},${door[1]}`] =
+      homeLastNames[homesPlaced] ?? `Family ${homesPlaced + 1}`;
     homesPlaced++;
   }
 
@@ -985,7 +1018,8 @@ export function buildStoryModeState(): GameState {
         homeSize: [number, number];
       }
     | undefined;
-  const torchTownHomes = (torchTown.metadata?.homes as Record<string, string>) || {};
+  const torchTownHomes =
+    (torchTown.metadata?.homes as Record<string, string>) || {};
 
   if (torchTownBuildings) {
     // Library interior (environment uses 'house' palette for now)
@@ -1070,14 +1104,22 @@ export function buildStoryModeState(): GameState {
     let homeIdx = 0;
     for (const key of Object.keys(torchTownHomes)) {
       const [yStr, xStr] = key.split(",");
-      const doorPos: [number, number] = [parseInt(yStr, 10), parseInt(xStr, 10)];
-      const homeId = (`story-torch-town-home-${homeIdx}`) as RoomId;
+      const doorPos: [number, number] = [
+        parseInt(yStr, 10),
+        parseInt(xStr, 10),
+      ];
+      const homeId = `story-torch-town-home-${homeIdx}` as RoomId;
       const homeRoom = buildInteriorRoom(homeId, homeW, homeH, "house");
       extraRooms.push(homeRoom);
       pushTransition(torchTown.id, homeRoom.id, doorPos, homeRoom.entryPoint);
       // Land outside each home door when exiting interior
       const homeExitTarget: [number, number] = [doorPos[0] + 1, doorPos[1]];
-      pushTransition(homeRoom.id, torchTown.id, homeRoom.transitionToPrevious!, homeExitTarget);
+      pushTransition(
+        homeRoom.id,
+        torchTown.id,
+        homeRoom.transitionToPrevious!,
+        homeExitTarget
+      );
       homeIdx += 1;
     }
   }

@@ -12,15 +12,17 @@ export interface NPCDialogueRule {
 }
 
 const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
+  // Elder Rowan
   {
     npcId: "npc-elder-rowan",
-    scriptId: "elder-rowan-warning-response",
-    priority: 40,
-    conditions: [
-      { eventId: "met-elder-rowan", value: true },
-      { eventId: "heard-lysa-warning", value: true },
-      { eventId: "elder-rowan-acknowledged-warning", value: false },
-    ],
+    scriptId: "elder-rowan-default",
+    priority: 0,
+  },
+  {
+    npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-intro",
+    priority: 30,
+    conditions: [{ eventId: "met-elder-rowan", value: false }],
   },
   {
     npcId: "npc-elder-rowan",
@@ -31,26 +33,42 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
       { eventId: "heard-lysa-warning", value: false },
     ],
   },
+
   {
     npcId: "npc-elder-rowan",
-    scriptId: "elder-rowan-intro",
-    priority: 30,
-    conditions: [{ eventId: "met-elder-rowan", value: false }],
+    scriptId: "elder-rowan-warning-response",
+    priority: 40,
+    conditions: [
+      { eventId: "met-elder-rowan", value: true },
+      { eventId: "heard-lysa-warning", value: true },
+      { eventId: "elder-rowan-acknowledged-warning", value: false },
+    ],
   },
+
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-post-warning",
     priority: 20,
     conditions: [{ eventId: "elder-rowan-acknowledged-warning", value: true }],
   },
-  {
-    npcId: "npc-elder-rowan",
-    scriptId: "elder-rowan-default",
-    priority: 0,
-  },
+
+  // Caretaker Lysa
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-default",
+    priority: 5,
+  },
+  {
+    npcId: "npc-grounds-caretaker",
+    scriptId: "caretaker-lysa-intro",
+    priority: 10,
+    conditions: [{ eventId: "met-caretaker-lysa", value: false }],
+  },
+
+  // Librarian
+  {
+    npcId: "npc-librarian",
+    scriptId: "librarian-default",
     priority: 5,
   },
 ];
@@ -65,7 +83,9 @@ export function resolveNpcDialogueScript(
 ): string | undefined {
   const candidates = NPC_DIALOGUE_RULES.filter((rule) => rule.npcId === npcId);
   if (candidates.length === 0) return undefined;
-  const sorted = [...candidates].sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
+  const sorted = [...candidates].sort(
+    (a, b) => (b.priority ?? 0) - (a.priority ?? 0)
+  );
   for (const rule of sorted) {
     if (areStoryConditionsMet(flags, rule.conditions)) {
       return rule.scriptId;

@@ -31,7 +31,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Elder Rowan",
-        text: "Word will fly through town. They're will be much excitement when they hear you've returned.",
+        text: "There will be much excitement when they hear you've returned.",
       },
       {
         speaker: "Hero",
@@ -39,7 +39,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Elder Rowan",
-        text: "Caretaker Lysa has always felt the sanctum breathe before the rest of us. What message did she press into your hands?",
+        text: "Caretaker Lysa is inside the sanctum preparing for your return.",
       },
     ],
     onCompleteEffects: [{ eventId: "met-elder-rowan", value: true }],
@@ -86,15 +86,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Elder Rowan",
-        text: "Seek Lysa's guidance before you climb beyond the hall. She hears the sanctum's pulse before anyone else.",
-      },
-      {
-        speaker: "Hero",
-        text: "I'll speak with her next.",
-      },
-      {
-        speaker: "Elder Rowan",
-        text: "Good. Return once her warning settles your stride.",
+        text: "Seek Lysa's guidance before you wander beyond the hall. She hears the sanctum's pulse before anyone else.",
       },
     ],
   },
@@ -192,7 +184,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Librarian",
-        text: "Welcome to the town stacks. I'm the librarian—keeper of maps, rumors, and the quiet between.",
+        text: "Welcome to the town hall. I'm the librarian—keeper of maps, rumors, and the quiet between.",
       },
       {
         speaker: "Librarian",

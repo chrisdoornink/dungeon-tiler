@@ -1718,7 +1718,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           event.key === " " ||
           event.key === "Spacebar" ||
           event.key === "ArrowDown" ||
+          event.key === "ArrowUp" ||
           event.key === "ArrowRight" ||
+          event.key === "ArrowLeft" ||
           event.key === "e" ||
           event.key === "E"
         ) {
