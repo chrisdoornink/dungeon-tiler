@@ -51,7 +51,9 @@ import {
   type DialogueLine,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
-import { applyStoryEffects } from "../lib/story/event_registry";
+import { createInitialStoryFlags } from "../lib/story/event_registry";
+import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
+import { HeroDiaryModal } from "./HeroDiaryModal";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -140,6 +142,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         heroAttack: 1,
         rockCount: 0,
         heroTorchLit: true,
+        diaryEntries: [],
         stats: {
           damageDealt: 0,
           damageTaken: 0,
@@ -183,6 +186,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     itemType: string;
   }>>([]);
 
+  const [isHeroDiaryOpen, setHeroDiaryOpen] = useState(false);
+
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
   const activeDialogueLine = dialogueSession
@@ -199,6 +204,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     activeDialogueLine?.options && activeDialogueLine.options.length > 0
       ? activeDialogueLine.options
       : undefined;
+
+  const diaryEntries = gameState.diaryEntries ?? [];
+  const incompleteDiaryCount = diaryEntries.reduce(
+    (count, entry) => (entry.completed ? count : count + 1),
+    0
+  );
 
   useEffect(() => {
     if (!activeDialogueChoices || activeDialogueChoices.length === 0) {
@@ -260,6 +271,38 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return newState;
     });
   }, [resolvedStorageSlot]);
+
+  const handleDiaryToggle = useCallback(
+    (entryId: string, completed: boolean) => {
+      const timestamp = Date.now();
+      setGameState((prev) => {
+        const entries = prev.diaryEntries ?? [];
+        const index = entries.findIndex((entry) => entry.id === entryId);
+        if (index === -1) {
+          return prev;
+        }
+        const current = entries[index];
+        if (Boolean(current.completed) === completed) {
+          return prev;
+        }
+        const nextEntries = entries.map((entry, idx) =>
+          idx === index
+            ? {
+                ...entry,
+                completed,
+                completedAt: completed ? timestamp : undefined,
+              }
+            : entry
+        );
+        const nextState: GameState = { ...prev, diaryEntries: nextEntries };
+        try {
+          CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+        } catch {}
+        return nextState;
+      });
+    },
+    [resolvedStorageSlot]
+  );
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
@@ -449,14 +492,26 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       });
       if (pendingEffects.length === 0) return;
       setGameState((prev) => {
-        const nextFlags = applyStoryEffects(prev.storyFlags, pendingEffects);
-        if (nextFlags === prev.storyFlags) {
+        const result = applyStoryEffectsWithDiary(
+          prev.storyFlags,
+          prev.diaryEntries,
+          pendingEffects
+        );
+        if (!result.flagsChanged && !result.diaryChanged) {
           return prev;
         }
-        return { ...prev, storyFlags: nextFlags };
+        const nextState: GameState = {
+          ...prev,
+          storyFlags: result.flags ?? prev.storyFlags,
+          diaryEntries: result.diaryEntries ?? prev.diaryEntries ?? [],
+        };
+        try {
+          CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+        } catch {}
+        return nextState;
       });
     },
-    [setGameState]
+    [resolvedStorageSlot, setGameState]
   );
 
   const handleDialogueAdvance = useCallback(() => {
@@ -499,11 +554,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
         if (choice.effects && choice.effects.length > 0) {
           setGameState((state) => {
-            const nextFlags = applyStoryEffects(state.storyFlags, choice.effects);
-            if (nextFlags === state.storyFlags) {
+            const result = applyStoryEffectsWithDiary(
+              state.storyFlags,
+              state.diaryEntries,
+              choice.effects
+            );
+            if (!result.flagsChanged && !result.diaryChanged) {
               return state;
             }
-            return { ...state, storyFlags: nextFlags };
+            const nextState: GameState = {
+              ...state,
+              storyFlags: result.flags ?? state.storyFlags,
+              diaryEntries: result.diaryEntries ?? state.diaryEntries ?? [],
+            };
+            try {
+              CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+            } catch {}
+            return nextState;
           });
         }
 
@@ -543,7 +610,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setSelectedChoiceIndex(0);
       resetDialogue();
     },
-    [resetDialogue, setGameState]
+    [resetDialogue, resolvedStorageSlot, setGameState]
   );
 
   const handleDialogueChoiceNavigate = useCallback(
@@ -621,7 +688,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const queue = prev.npcInteractionQueue
         ? [...prev.npcInteractionQueue]
         : [];
-      const scriptId = resolveNpcDialogueScript(npc.id, prev.storyFlags);
+      const flags = prev.storyFlags ?? createInitialStoryFlags();
+      const scriptId = resolveNpcDialogueScript(npc.id, flags);
+      if (process.env.NODE_ENV === "development") {
+        try {
+          console.info("[Story][NPC]", npc.id, {
+            flags,
+            selected: scriptId,
+          });
+        } catch {}
+      }
       const dynamicHook = scriptId
         ? {
             id: `story-dialogue:${scriptId}`,
@@ -630,6 +706,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             payload: { dialogueId: scriptId },
           }
         : undefined;
+      if (dynamicHook) {
+        const existingDialogueHooks =
+          npc.interactionHooks?.filter(
+            (hook) => hook.type === "dialogue" && hook.id !== dynamicHook.id
+          ) ?? [];
+        npc.interactionHooks = [dynamicHook, ...existingDialogueHooks];
+      }
       queue.push(npc.createInteractionEvent("action", dynamicHook));
       const MAX_QUEUE = 20;
       const trimmedQueue =
@@ -639,6 +722,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         ...prev,
         npcs: updatedNpcs,
         npcInteractionQueue: trimmedQueue,
+        storyFlags: flags,
       };
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       return next;
@@ -1710,6 +1794,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   return (
     <div className="relative">
+      {isHeroDiaryOpen && (
+        <HeroDiaryModal
+          entries={diaryEntries}
+          onClose={() => setHeroDiaryOpen(false)}
+          onToggleComplete={handleDiaryToggle}
+        />
+      )}
       <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
         <div
           className="relative flex justify-center"
@@ -1800,6 +1891,28 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             >
               <h3 className="text-xs font-medium mb-1">Inventory</h3>
               <div className="flex flex-wrap gap-1">
+                {diaryEntries.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setHeroDiaryOpen(true)}
+                    aria-haspopup="dialog"
+                    className="flex items-center gap-2 rounded bg-[#333333] px-2 py-0.5 text-xs text-white transition-colors hover:bg-[#444444]"
+                    title="Open hero diary"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="flex h-8 w-8 items-center justify-center rounded bg-[#2f2a25]/80 text-lg shadow-inner"
+                    >
+                      📖
+                    </span>
+                    <span className="whitespace-nowrap">
+                      Hero Diary
+                      {incompleteDiaryCount > 0
+                        ? ` (${incompleteDiaryCount})`
+                        : ""}
+                    </span>
+                  </button>
+                )}
                 {gameState.hasKey && (
                   <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
                     <span

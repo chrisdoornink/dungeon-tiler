@@ -151,6 +151,26 @@ function StoryModeInner() {
         >
           Reset Story
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              CurrentGameStorage.clearCurrentGame("story");
+            } catch {}
+            const fresh = buildStoryModeState();
+            try {
+              CurrentGameStorage.saveCurrentGame(fresh, "story");
+            } catch {}
+            setInitialState(fresh);
+            const options = collectStoryCheckpointOptions(fresh);
+            setCheckpointOptions(options);
+            setResetConfig(createDefaultResetConfig(fresh, options));
+            setTilemapKey((key) => key + 1);
+          }}
+          className="self-end rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
+        >
+          Reset Dialogs
+        </button>
         <h1 className="text-xl font-semibold text-gray-300 tracking-wide uppercase">
           Story Mode Prototype
         </h1>

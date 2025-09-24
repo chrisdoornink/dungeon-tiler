@@ -27,15 +27,15 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Elder Rowan",
-        text: "Ah, the torchlight finds you at last. The dungeon has been restless without a guardian.",
-      },
-      {
-        speaker: "Hero",
-        text: "Tell me what I need to know and I'll quiet its rage.",
+        text: "By the stones—you're alive. We feared the dark had swallowed you whole.",
       },
       {
         speaker: "Elder Rowan",
-        text: "Trust the floor runes. Their glow marks safe footing when the shadows lie to you.",
+        text: "Word will fly through town. They'll ring the chimes tonight when they hear you've returned.",
+      },
+      {
+        speaker: "Hero",
+        text: "It was a long climb. Point me where I'm needed next.",
       },
     ],
     onCompleteEffects: [{ eventId: "met-elder-rowan", value: true }],
@@ -58,6 +58,40 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     ],
     onCompleteEffects: [
       { eventId: "elder-rowan-acknowledged-warning", value: true },
+    ],
+  },
+  "caretaker-lysa-default": {
+    id: "caretaker-lysa-default",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "Sweep, sweep, the same old stones… sing while the dust clings to my bones…",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Left to right and back once more… hush little echo on the floor…",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Oh. I didn't see you there. Mind your step—the grout remembers.",
+      },
+    ],
+  },
+  "elder-rowan-awaiting-warning": {
+    id: "elder-rowan-awaiting-warning",
+    lines: [
+      {
+        speaker: "Elder Rowan",
+        text: "Seek Lysa's guidance before you climb beyond the hall. She hears the sanctum's pulse before anyone else.",
+      },
+      {
+        speaker: "Hero",
+        text: "I'll speak with her next.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Good. Return once her warning settles your stride.",
+      },
     ],
   },
   "elder-rowan-post-warning": {

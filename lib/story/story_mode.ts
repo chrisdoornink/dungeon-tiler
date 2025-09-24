@@ -149,44 +149,8 @@ function buildEntranceHall(): StoryRoom {
     }
   }
 
-  const mentorX = Math.min(HALL_LENGTH - 2, entryPoint[1] + 4);
-  const elder = new NPC({
-    id: "npc-elder-rowan",
-    name: "Elder Rowan",
-    sprite: "/images/npcs/boy-1.png",
-    y: midRow,
-    x: mentorX,
-    facing: Direction.LEFT,
-    canMove: false,
-    memory: {
-      metHero: false,
-      giftAvailable: true,
-    },
-    interactionHooks: [
-      {
-        id: "elder-rowan-greet",
-        type: "dialogue",
-        description: "Greet the elder",
-        payload: {
-          dialogueId: "elder-rowan-default",
-        },
-      },
-      {
-        id: "elder-rowan-gift",
-        type: "item",
-        description: "Receive a restorative tonic",
-        payload: {
-          itemId: "med",
-          quantity: 1,
-        },
-      },
-    ],
-    actions: ["greet", "gift"],
-    metadata: {
-      archetype: "mentor",
-    },
-  });
-  const npcs = [elder];
+  // No mentor in the entrance hall; elder is placed outside in the clearing
+  const npcs: NPC[] = [];
 
   return {
     id: "story-hall-entrance",
@@ -444,7 +408,7 @@ function buildOutdoorWorld(): StoryRoom {
   const entryPoint: [number, number] = [bottomOpeningY - 1, entryX];
   const transitionToPrevious: [number, number] = [bottomOpeningY, entryX];
 
-  const checkpointY = Math.max(1, entryPoint[0] - 2);
+  const checkpointY = Math.max(1, entryPoint[0] - 7);
   const checkpointX = entryPoint[1];
   if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
     subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
@@ -488,6 +452,38 @@ function buildOutdoorWorld(): StoryRoom {
     subtypes[exteriorDoorY][doorX] = [];
   }
 
+  // Place Elder Rowan just outside the cave entrance: 3 tiles up and 3 to the right of the mouth
+  const elderY = Math.max(1, entryPoint[0] - 3);
+  const elderX = Math.min(width - 2, entryPoint[1] + 3);
+  const elder = new NPC({
+    id: "npc-elder-rowan",
+    name: "Elder Rowan",
+    sprite: "/images/npcs/boy-1.png",
+    y: elderY,
+    x: elderX,
+    facing: Direction.DOWN,
+    canMove: false,
+    memory: {
+      metHero: false,
+    },
+    interactionHooks: [
+      {
+        id: "elder-rowan-greet",
+        type: "dialogue",
+        description: "Greet the elder",
+        payload: {
+          dialogueId: "elder-rowan-intro",
+        },
+      },
+    ],
+    actions: ["greet"],
+    metadata: {
+      archetype: "mentor",
+    },
+  });
+
+  const npcs: NPC[] = [elder];
+
   return {
     id: "story-outdoor-clearing",
     mapData: { tiles, subtypes, environment: "outdoor" },
@@ -495,6 +491,7 @@ function buildOutdoorWorld(): StoryRoom {
     transitionToPrevious,
     entryFromNext: [exteriorDoorY, doorX],
     transitionToNext: [doorY, doorX],
+    npcs,
   };
 }
 
@@ -560,7 +557,7 @@ function buildOutdoorHouse(): StoryRoom {
         type: "dialogue",
         description: "Ask about the outside world",
         payload: {
-          dialogueId: "caretaker-lysa-reminder",
+          dialogueId: "caretaker-lysa-default",
         },
       },
       {
@@ -782,6 +779,7 @@ export function buildStoryModeState(): GameState {
     roomTransitions: transitions,
     potOverrides: initialPotOverrides,
     storyFlags: createInitialStoryFlags(),
+    diaryEntries: [],
   };
 
   return gameState;
@@ -964,6 +962,8 @@ function applyStoryResetConfig(
   state.npcInteractionQueue = [];
   state.deathCause = undefined;
   state.conditions = undefined;
+  state.storyFlags = createInitialStoryFlags();
+  state.diaryEntries = [];
 }
 
 export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
