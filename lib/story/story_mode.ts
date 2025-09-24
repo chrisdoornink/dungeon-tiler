@@ -76,6 +76,13 @@ function cloneNPCs(npcs?: NPC[]): NPC[] {
   return rehydrateNPCs(plain);
 }
 
+type StoryRoomLink = {
+  roomId: RoomId;
+  position: [number, number];
+  targetEntryPoint?: [number, number];
+  returnEntryPoint?: [number, number];
+};
+
 type StoryRoom = {
   id: RoomId;
   mapData: MapData;
@@ -87,6 +94,8 @@ type StoryRoom = {
   enemies?: Enemy[];
   npcs?: NPC[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
+  metadata?: Record<string, unknown>;
+  otherTransitions?: StoryRoomLink[];
 };
 
 function buildEntranceHall(): StoryRoom {
@@ -452,6 +461,20 @@ function buildOutdoorWorld(): StoryRoom {
     subtypes[exteriorDoorY][doorX] = [];
   }
 
+  const torchTownTransition: [number, number] = [0, width - 2];
+  tiles[torchTownTransition[0]][torchTownTransition[1]] = FLOOR;
+  subtypes[torchTownTransition[0]][torchTownTransition[1]] = [
+    TileSubtype.ROOM_TRANSITION,
+  ];
+  const torchTownReturn: [number, number] = [
+    Math.min(height - 2, torchTownTransition[0] + 1),
+    torchTownTransition[1],
+  ];
+  if (tiles[torchTownReturn[0]]?.[torchTownReturn[1]] === WALL) {
+    tiles[torchTownReturn[0]][torchTownReturn[1]] = FLOOR;
+    subtypes[torchTownReturn[0]][torchTownReturn[1]] = [];
+  }
+
   // Place Elder Rowan just outside the cave entrance: 3 tiles up and 3 to the right of the mouth
   const elderY = Math.max(1, entryPoint[0] - 3);
   const elderX = Math.min(width - 2, entryPoint[1] + 3);
@@ -491,6 +514,13 @@ function buildOutdoorWorld(): StoryRoom {
     transitionToPrevious,
     entryFromNext: [exteriorDoorY, doorX],
     transitionToNext: [doorY, doorX],
+    otherTransitions: [
+      {
+        roomId: "story-torch-town" as RoomId,
+        position: torchTownTransition,
+        returnEntryPoint: torchTownReturn,
+      },
+    ],
     npcs,
   };
 }
@@ -586,12 +616,166 @@ function buildOutdoorHouse(): StoryRoom {
   };
 }
 
+function buildTorchTown(): StoryRoom {
+  const SIZE = 25;
+  const tiles: number[][] = Array.from({ length: SIZE }, () =>
+    Array.from({ length: SIZE }, () => FLOOR)
+  );
+  const subtypes: number[][][] = Array.from({ length: SIZE }, () =>
+    Array.from({ length: SIZE }, () => [] as number[])
+  );
+
+  const ensureSubtype = (y: number, x: number, subtype: TileSubtype) => {
+    const cell = subtypes[y][x] ?? [];
+    if (!cell.includes(subtype)) {
+      subtypes[y][x] = [...cell, subtype];
+    }
+  };
+
+  const grassMargin = 2;
+  const wallThickness = 2;
+  const wallMin = grassMargin;
+  const wallMax = SIZE - grassMargin - 1;
+
+  for (let layer = 0; layer < wallThickness; layer++) {
+    const top = wallMin + layer;
+    const bottom = wallMax - layer;
+    for (let x = wallMin; x <= wallMax; x++) {
+      tiles[top][x] = WALL;
+      subtypes[top][x] = [];
+      tiles[bottom][x] = WALL;
+      subtypes[bottom][x] = [];
+    }
+    for (let y = wallMin; y <= wallMax; y++) {
+      const left = wallMin + layer;
+      const right = wallMax - layer;
+      tiles[y][left] = WALL;
+      subtypes[y][left] = [];
+      tiles[y][right] = WALL;
+      subtypes[y][right] = [];
+    }
+  }
+
+  const entryColumn = wallMax - 1;
+  const transitionRow = SIZE - 1;
+  const corridorRows = [wallMax - 1, wallMax, transitionRow - 1, transitionRow];
+  for (const row of corridorRows) {
+    if (tiles[row]?.[entryColumn] !== undefined) {
+      tiles[row][entryColumn] = FLOOR;
+      subtypes[row][entryColumn] = [];
+    }
+  }
+  ensureSubtype(transitionRow, entryColumn, TileSubtype.ROOM_TRANSITION);
+
+  const entryPoint: [number, number] = [wallMax - 2, entryColumn];
+  const transitionToPrevious: [number, number] = [transitionRow, entryColumn];
+  const entryFromNext: [number, number] = [entryPoint[0], entryPoint[1]];
+
+  const buildStructure = (
+    top: number,
+    left: number,
+    width: number,
+    height: number,
+    options?: { windowCols?: number[] }
+  ): [number, number] => {
+    for (let y = top; y < top + height; y++) {
+      for (let x = left; x < left + width; x++) {
+        tiles[y][x] = WALL;
+        subtypes[y][x] = [];
+      }
+    }
+    const doorRow = top + height - 1;
+    const doorCol = left + Math.floor(width / 2);
+    ensureSubtype(doorRow, doorCol, TileSubtype.DOOR);
+    const windowCols = options?.windowCols ??
+      Array.from({ length: width }, (_, index) => left + index);
+    for (const col of windowCols) {
+      ensureSubtype(top, col, TileSubtype.WINDOW);
+    }
+    return [doorRow, doorCol];
+  };
+
+  const innerMin = wallMin + wallThickness;
+  const innerMax = wallMax - wallThickness;
+
+  const libraryWidth = 3;
+  const libraryHeight = 5;
+  const libraryTop = innerMin + 1;
+  const libraryLeft = innerMin + Math.floor((innerMax - innerMin - libraryWidth) / 2);
+  const libraryDoor = buildStructure(
+    libraryTop,
+    libraryLeft,
+    libraryWidth,
+    libraryHeight
+  );
+
+  const storeWidth = 3;
+  const storeHeight = 3;
+  const storeTop = libraryTop + libraryHeight + 4;
+  const storeLeft = libraryLeft;
+  const storeDoor = buildStructure(storeTop, storeLeft, storeWidth, storeHeight);
+
+  const homeLastNames = [
+    "Ashwood",
+    "Brightfield",
+    "Cindercrest",
+    "Dawnhollow",
+    "Emberline",
+    "Frostvale",
+    "Glimmerstone",
+    "Highridge",
+    "Ironwood",
+    "Juniperfell",
+  ];
+  const homeAssignments: Record<string, string> = {};
+  const homeWidth = 3;
+  const homeHeight = 2;
+  const leftHomeX = innerMin + 1;
+  const rightHomeX = innerMax - homeWidth - 1;
+  const homeRows = [6, 9, 12, 15, 18];
+  let homeIndex = 0;
+  for (const top of homeRows) {
+    const door = buildStructure(top, leftHomeX, homeWidth, homeHeight, {
+      windowCols: [leftHomeX + 1],
+    });
+    if (homeIndex < homeLastNames.length) {
+      homeAssignments[`${door[0]},${door[1]}`] = homeLastNames[homeIndex];
+    }
+    homeIndex += 1;
+  }
+  for (const top of homeRows) {
+    const door = buildStructure(top, rightHomeX, homeWidth, homeHeight, {
+      windowCols: [rightHomeX + 1],
+    });
+    if (homeIndex < homeLastNames.length) {
+      homeAssignments[`${door[0]},${door[1]}`] = homeLastNames[homeIndex];
+    }
+    homeIndex += 1;
+  }
+
+  return {
+    id: "story-torch-town",
+    mapData: { tiles, subtypes, environment: "outdoor" },
+    entryPoint,
+    entryFromNext,
+    transitionToPrevious,
+    metadata: {
+      homes: homeAssignments,
+      buildings: {
+        libraryDoor,
+        storeDoor,
+      },
+    },
+  };
+}
+
 export function buildStoryModeState(): GameState {
   const entrance = buildEntranceHall();
   const ascent = buildAscentCorridor();
   const sanctum = buildSanctum();
   const outdoor = buildOutdoorWorld();
   const outdoorHouse = buildOutdoorHouse();
+  const torchTown = buildTorchTown();
 
   const transitions: RoomTransition[] = [];
 
@@ -648,6 +832,26 @@ export function buildStoryModeState(): GameState {
     outdoor.entryFromNext ?? outdoor.entryPoint
   );
 
+  if (outdoor.otherTransitions) {
+    for (const link of outdoor.otherTransitions) {
+      if (link.roomId !== torchTown.id) continue;
+      pushTransition(
+        outdoor.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint ?? torchTown.entryFromNext ?? torchTown.entryPoint
+      );
+      if (torchTown.transitionToPrevious) {
+        pushTransition(
+          torchTown.id,
+          outdoor.id,
+          torchTown.transitionToPrevious,
+          link.returnEntryPoint ?? outdoor.entryPoint
+        );
+      }
+    }
+  }
+
   const entranceTargetBase = ascent.entryPoint;
   const entranceReturnBase = entrance.returnEntryPoint ?? entrance.entryPoint;
   const [entranceBaseY, entranceBaseX] = entrance.transitionToNext!;
@@ -701,43 +905,30 @@ export function buildStoryModeState(): GameState {
     }
   }
 
-  const roomSnapshots: GameState["rooms"] = {
-    [entrance.id]: {
-      mapData: withoutPlayer(entrance.mapData),
-      entryPoint: entrance.entryPoint,
-      enemies: serializeEnemies(entrance.enemies),
-      npcs: serializeNPCs(entrance.npcs),
-      potOverrides: entrance.potOverrides,
-    },
-    [ascent.id]: {
-      mapData: withoutPlayer(ascent.mapData),
-      entryPoint: ascent.entryPoint,
-      enemies: serializeEnemies(ascent.enemies),
-      npcs: serializeNPCs(ascent.npcs),
-      potOverrides: ascent.potOverrides,
-    },
-    [sanctum.id]: {
-      mapData: withoutPlayer(sanctum.mapData),
-      entryPoint: sanctum.entryPoint,
-      enemies: serializeEnemies(sanctum.enemies),
-      npcs: serializeNPCs(sanctum.npcs),
-      potOverrides: sanctum.potOverrides,
-    },
-    [outdoor.id]: {
-      mapData: withoutPlayer(outdoor.mapData),
-      entryPoint: outdoor.entryPoint,
-      enemies: serializeEnemies(outdoor.enemies),
-      npcs: serializeNPCs(outdoor.npcs),
-      potOverrides: outdoor.potOverrides,
-    },
-    [outdoorHouse.id]: {
-      mapData: withoutPlayer(outdoorHouse.mapData),
-      entryPoint: outdoorHouse.entryPoint,
-      enemies: serializeEnemies(outdoorHouse.enemies),
-      npcs: serializeNPCs(outdoorHouse.npcs),
-      potOverrides: outdoorHouse.potOverrides,
-    },
-  };
+  const storyRooms: StoryRoom[] = [
+    entrance,
+    ascent,
+    sanctum,
+    outdoor,
+    outdoorHouse,
+    torchTown,
+  ];
+
+  const roomSnapshots: GameState["rooms"] = {};
+  for (const room of storyRooms) {
+    roomSnapshots[room.id] = {
+      mapData: withoutPlayer(room.mapData),
+      entryPoint: room.entryPoint,
+      enemies: serializeEnemies(room.enemies),
+      npcs: serializeNPCs(room.npcs),
+      potOverrides: room.potOverrides,
+      metadata: room.metadata
+        ? (JSON.parse(
+            JSON.stringify(room.metadata)
+          ) as Record<string, unknown>)
+        : undefined,
+    };
+  }
 
   const startingMap = addPlayer(entrance.mapData, entrance.entryPoint);
   const initialEnemies = cloneEnemies(entrance.enemies);
@@ -791,6 +982,7 @@ const STORY_ROOM_LABELS: Partial<Record<RoomId, string>> = {
   "story-sanctum": "Sanctum",
   "story-outdoor-clearing": "Outdoor Clearing",
   "story-outdoor-house": "Caretaker's House",
+  "story-torch-town": "Torch Town",
 };
 
 function findSubtypePositions(

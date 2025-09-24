@@ -15,6 +15,7 @@ export interface RoomSnapshot {
   enemies?: PlainEnemy[];
   npcs?: PlainNPC[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface RoomTransition {
