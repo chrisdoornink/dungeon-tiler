@@ -24,6 +24,15 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   },
   {
     npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-awaiting-warning",
+    priority: 35,
+    conditions: [
+      { eventId: "met-elder-rowan", value: true },
+      { eventId: "heard-lysa-warning", value: false },
+    ],
+  },
+  {
+    npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-intro",
     priority: 30,
     conditions: [{ eventId: "met-elder-rowan", value: false }],
@@ -41,15 +50,8 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   },
   {
     npcId: "npc-grounds-caretaker",
-    scriptId: "caretaker-lysa-overview",
-    priority: 20,
-    conditions: [{ eventId: "heard-lysa-warning", value: false }],
-  },
-  {
-    npcId: "npc-grounds-caretaker",
-    scriptId: "caretaker-lysa-reminder",
-    priority: 10,
-    conditions: [{ eventId: "heard-lysa-warning", value: true }],
+    scriptId: "caretaker-lysa-default",
+    priority: 5,
   },
 ];
 

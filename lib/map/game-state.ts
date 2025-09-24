@@ -13,6 +13,11 @@ import {
   type PlainNPC,
   type NPCInteractionEvent,
 } from "../npc";
+import { resolveNpcDialogueScript } from "../story/npc_script_registry";
+import {
+  createInitialStoryFlags,
+  type StoryFlags,
+} from "../story/event_registry";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -36,10 +41,6 @@ import {
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
-import {
-  createInitialStoryFlags,
-  type StoryFlags,
-} from "../story/event_registry";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
@@ -1132,13 +1133,31 @@ export function movePlayer(
       const queue = newGameState.npcInteractionQueue
         ? [...newGameState.npcInteractionQueue]
         : [];
-      queue.push(blockingNpc.createInteractionEvent("action"));
+      const flags = newGameState.storyFlags ?? createInitialStoryFlags();
+      const scriptId = resolveNpcDialogueScript(blockingNpc.id, flags);
+      const dynamicHook = scriptId
+        ? {
+            id: `story-dialogue:${scriptId}`,
+            type: "dialogue" as const,
+            description: `Talk to ${blockingNpc.name}`,
+            payload: { dialogueId: scriptId },
+          }
+        : undefined;
+      if (dynamicHook) {
+        const existingDialogueHooks =
+          blockingNpc.interactionHooks?.filter(
+            (hook) => hook.type === "dialogue" && hook.id !== dynamicHook.id
+          ) ?? [];
+        blockingNpc.interactionHooks = [dynamicHook, ...existingDialogueHooks];
+      }
+      queue.push(blockingNpc.createInteractionEvent("action", dynamicHook));
       const MAX_QUEUE = 20;
       const trimmed =
         queue.length > MAX_QUEUE
           ? queue.slice(queue.length - MAX_QUEUE)
           : queue;
       newGameState.npcInteractionQueue = trimmed;
+      newGameState.storyFlags = flags;
       return newGameState;
     }
 

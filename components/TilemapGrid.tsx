@@ -50,6 +50,7 @@ import {
   type DialogueLine,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
+import { createInitialStoryFlags } from "../lib/story/event_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { HeroDiaryModal } from "./HeroDiaryModal";
 
@@ -684,7 +685,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const queue = prev.npcInteractionQueue
         ? [...prev.npcInteractionQueue]
         : [];
-      const scriptId = resolveNpcDialogueScript(npc.id, prev.storyFlags);
+      const flags = prev.storyFlags ?? createInitialStoryFlags();
+      const scriptId = resolveNpcDialogueScript(npc.id, flags);
+      if (process.env.NODE_ENV === "development") {
+        try {
+          console.info("[Story][NPC]", npc.id, {
+            flags,
+            selected: scriptId,
+          });
+        } catch {}
+      }
       const dynamicHook = scriptId
         ? {
             id: `story-dialogue:${scriptId}`,
@@ -693,6 +703,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             payload: { dialogueId: scriptId },
           }
         : undefined;
+      if (dynamicHook) {
+        const existingDialogueHooks =
+          npc.interactionHooks?.filter(
+            (hook) => hook.type === "dialogue" && hook.id !== dynamicHook.id
+          ) ?? [];
+        npc.interactionHooks = [dynamicHook, ...existingDialogueHooks];
+      }
       queue.push(npc.createInteractionEvent("action", dynamicHook));
       const MAX_QUEUE = 20;
       const trimmedQueue =
@@ -702,6 +719,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         ...prev,
         npcs: updatedNpcs,
         npcInteractionQueue: trimmedQueue,
+        storyFlags: flags,
       };
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       return next;
