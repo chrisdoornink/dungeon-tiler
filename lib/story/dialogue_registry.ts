@@ -182,6 +182,19 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "town-librarian-default": {
+    id: "town-librarian-default",
+    lines: [
+      {
+        speaker: "Librarian",
+        text: "Welcome to the town stacks. I'm the librarian—keeper of maps, rumors, and the quiet between.",
+      },
+      {
+        speaker: "Librarian",
+        text: "If you bring back scraps of history, I'll make space for them on our shelves.",
+      },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {
