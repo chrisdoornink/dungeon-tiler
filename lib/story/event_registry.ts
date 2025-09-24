@@ -48,15 +48,16 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
       summary: "Caretaker Lysa is nice.",
     },
   },
-  "heard-lysa-warning": {
-    id: "heard-lysa-warning",
-    description: "Caretaker Lysa shared the sanctum warning.",
+  "heard-missing-boy": {
+    id: "heard-missing-boy",
+    description:
+      "Caretaker Lysa reported her companion (the boy from the sanctum) went missing near the bluff northeast of the sanctum.",
     defaultValue: false,
     diaryEntry: {
-      id: "heard-lysa-warning",
-      title: "Caretaker Lysa's Warning",
+      id: "heard-missing-boy",
+      title: "Missing at the Bluff",
       summary:
-        "Caretaker Lysa warned that the sanctum's wards are thin. Listen for the hum in the stones before climbing east.",
+        "Lysa senses a growing negative pulse from the bluff northeast of the sanctum. Her companion went to investigate and hasn't returned. I should find him.",
     },
   },
   "elder-rowan-acknowledged-warning": {
@@ -72,7 +73,7 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
     },
     diaryUpdates: [
       {
-        entryId: "heard-lysa-warning",
+        entryId: "heard-missing-boy",
         complete: true,
       },
     ],

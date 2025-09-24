@@ -1033,7 +1033,7 @@ export function buildStoryModeState(): GameState {
     const libNpcY = Math.max(2, libraryRoom.entryPoint[0] - 2);
     const libNpcX = libraryRoom.entryPoint[1];
     const librarian = new NPC({
-      id: "npc-town-librarian",
+      id: "npc-librarian",
       name: "Town Librarian",
       sprite: "/images/npcs/boy-2.png",
       y: libNpcY,

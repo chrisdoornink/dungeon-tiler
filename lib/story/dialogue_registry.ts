@@ -117,54 +117,68 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Caretaker Lysa",
-        text: "I sensed you were coming. The sanctum's pulse is strong today.",
+        text: "The sanctum feels wrong today—the pulse carries a weight I don't like.",
       },
       {
         speaker: "Hero",
-        text: "Did it tell you of my experiences?",
+        text: "Are you sure?",
       },
       {
         speaker: "Caretaker Lysa",
-        text: "Then keep your step light and your blade kinder still. Every rescued spirit strengthens us both.",
+        text: "Other feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
       },
       {
         speaker: "Caretaker Lysa",
-        text: "How should I mark you down before you ascend again?",
+        text: "My companion went to look into it earlier—a boy who tends the inner torches. He hasn't returned.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Can you go check on him?",
         options: [
           {
-            id: "promise-caution",
-            prompt: "Promise to stay cautious",
+            id: "get-directions",
+            prompt: "Where should I go?",
             response: [
               {
-                speaker: "Hero",
-                text: "Write that I'll return when the wards are steadied.",
+                speaker: "Caretaker Lysa",
+                text: "Just outside of this sanctum to the northeast. There is a narrow passageway leading to the bluff.",
               },
               {
                 speaker: "Caretaker Lysa",
-                text: "Good. Take this ember charm—let it flare if the sanctum's floor gives way.",
+                text: "If you need supplies you can head into town first. It is a short walk north of here.",
               },
             ],
-            effects: [{ eventId: "heard-lysa-warning", value: true }],
+            effects: [{ eventId: "heard-missing-boy", value: true }],
           },
           {
             id: "ask-for-details",
-            prompt: "Ask for sanctum details",
+            prompt: "What is this place?",
             response: [
               {
-                speaker: "Hero",
-                text: "Tell me what to watch for when the sanctum turns hostile.",
-              },
-              {
                 speaker: "Caretaker Lysa",
-                text: "Listen for the hum in the stones. If it falters, stop. The next tile may be hollow.",
+                text: "This is the sanctum. We monitor the forces in the stones to keep the town safe. Recent vibration have cause concern. This is why you were sent to the caves. We need to understand what is causing the unrest before its too late",
               },
             ],
-            effects: [{ eventId: "heard-lysa-warning", value: true }],
+            effects: [{ eventId: "heard-missing-boy", value: true }],
+          },
+          {
+            id: "confirm",
+            prompt: "I'll go check on the boy",
+            response: [
+              {
+                speaker: "Caretaker Lysa",
+                text: "Thank you! I'll be here when you return.",
+              },
+            ],
+            effects: [{ eventId: "heard-missing-boy", value: true }],
           },
         ],
       },
     ],
-    onCompleteEffects: [{ eventId: "met-caretaker-lysa", value: true }],
+    onCompleteEffects: [
+      { eventId: "met-caretaker-lysa", value: true },
+      { eventId: "heard-missing-boy", value: true },
+    ],
   },
   "caretaker-lysa-reminder": {
     id: "caretaker-lysa-reminder",
@@ -189,6 +203,41 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       {
         speaker: "Librarian",
         text: "If you bring back scraps of history, I'll make space for them on our shelves.",
+      },
+    ],
+  },
+  "librarian-default": {
+    id: "librarian-default",
+    lines: [
+      {
+        speaker: "Librarian",
+        text: "Welcome. How can I help you orient yourself?",
+      },
+    ],
+  },
+  "elder-rowan-missing-boy": {
+    id: "elder-rowan-missing-boy",
+    lines: [
+      {
+        speaker: "Elder Rowan",
+        text: "The air has been restless all day. If Lysa sensed the bluff, go—find the boy and return together.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Keep your step steady. Unease is a warning—not a verdict.",
+      },
+    ],
+  },
+  "librarian-missing-boy": {
+    id: "librarian-missing-boy",
+    lines: [
+      {
+        speaker: "Librarian",
+        text: "The boy from the sanctum hasn't returned? The bluff to the northeast… it's not often kind.",
+      },
+      {
+        speaker: "Librarian",
+        text: "Check the path markers north of the hall. If you find notes, bring them here and I'll catalogue the route.",
       },
     ],
   },

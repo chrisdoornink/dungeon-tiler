@@ -12,6 +12,13 @@ export interface NPCDialogueRule {
 }
 
 const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
+  // Missing boy reactions take precedence where applicable
+  {
+    npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-missing-boy",
+    priority: 60,
+    conditions: [{ eventId: "heard-missing-boy", value: true }],
+  },
   // Elder Rowan
   {
     npcId: "npc-elder-rowan",
@@ -30,7 +37,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: 35,
     conditions: [
       { eventId: "met-elder-rowan", value: true },
-      { eventId: "heard-lysa-warning", value: false },
+      { eventId: "heard-missing-boy", value: false },
     ],
   },
 
@@ -40,7 +47,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: 40,
     conditions: [
       { eventId: "met-elder-rowan", value: true },
-      { eventId: "heard-lysa-warning", value: true },
+      { eventId: "heard-missing-boy", value: true },
       { eventId: "elder-rowan-acknowledged-warning", value: false },
     ],
   },
@@ -56,7 +63,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-default",
-    priority: 5,
+    priority: 0,
   },
   {
     npcId: "npc-grounds-caretaker",
@@ -68,8 +75,14 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   // Librarian
   {
     npcId: "npc-librarian",
+    scriptId: "librarian-missing-boy",
+    priority: 15,
+    conditions: [{ eventId: "heard-missing-boy", value: true }],
+  },
+  {
+    npcId: "npc-librarian",
     scriptId: "librarian-default",
-    priority: 5,
+    priority: 0,
   },
 ];
 
