@@ -2345,30 +2345,31 @@ function renderTileGrid(
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
   const glowMap = new Map<string, number>();
   const torchCarrierPositions = new Set<string>();
-  if (subtypes) {
-    for (let y = 0; y < subtypes.length; y++) {
-      for (let x = 0; x < subtypes[y].length; x++) {
-        const st = subtypes[y][x];
-        if (st && st.includes(TileSubtype.WALL_TORCH)) {
-          const m = computeTorchGlow(y, x, grid);
-          for (const [k, v] of m.entries()) {
-            // If overlapping glows occur, keep the stronger one
-            const prev = glowMap.get(k) ?? 0;
-            glowMap.set(k, Math.max(prev, v));
+  if (!suppressDarknessOverlay) {
+    if (subtypes) {
+      for (let y = 0; y < subtypes.length; y++) {
+        for (let x = 0; x < subtypes[y].length; x++) {
+          const st = subtypes[y][x];
+          if (st && st.includes(TileSubtype.WALL_TORCH)) {
+            const m = computeTorchGlow(y, x, grid);
+            for (const [k, v] of m.entries()) {
+              const prev = glowMap.get(k) ?? 0;
+              glowMap.set(k, Math.max(prev, v));
+            }
           }
         }
       }
     }
-  }
 
-  if (enemies) {
-    for (const enemy of enemies) {
-      if (!TORCH_CARRIER_ENEMIES.has(enemy.kind as EnemyKind)) continue;
-      torchCarrierPositions.add(`${enemy.y},${enemy.x}`);
-      const m = computeTorchGlow(enemy.y, enemy.x, grid);
-      for (const [k, v] of m.entries()) {
-        const prev = glowMap.get(k) ?? 0;
-        glowMap.set(k, Math.max(prev, v));
+    if (enemies) {
+      for (const enemy of enemies) {
+        if (!TORCH_CARRIER_ENEMIES.has(enemy.kind as EnemyKind)) continue;
+        torchCarrierPositions.add(`${enemy.y},${enemy.x}`);
+        const m = computeTorchGlow(enemy.y, enemy.x, grid);
+        for (const [k, v] of m.entries()) {
+          const prev = glowMap.get(k) ?? 0;
+          glowMap.set(k, Math.max(prev, v));
+        }
       }
     }
   }
@@ -2408,7 +2409,6 @@ function renderTileGrid(
       const isSelfTorch =
         Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
       const isTorchCarrier = torchCarrierPositions.has(`${rowIndex},${colIndex}`);
-      // Torch tile itself should always be at least tier 3 (fully visible)
       if (isSelfTorch || isTorchCarrier) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength
       if (g === ADJACENT_GLOW) {
@@ -2542,7 +2542,7 @@ function renderTileGrid(
 
     // When the hero's torch is OFF, use a pure black vignette to avoid gray tint.
     // Otherwise, keep the dark gray for a softer ambiance.
-    const gradient = heroTorchLit
+    const gradient = heroTorchLitForVisibility
       ? `radial-gradient(circle at ${centerX}px ${centerY}px,
       rgba(26,26,26,0) ${r0}px,
       rgba(26,26,26,0.25) ${r1}px,
@@ -2562,7 +2562,7 @@ function renderTileGrid(
 
     // Push the warm torch glow first (lower z) ONLY if the hero's torch is lit,
     // then the dark vignette (higher z) ONLY when torch is lit as well.
-    if (heroTorchLit) {
+    if (!suppressDarknessOverlay && heroTorchLitForVisibility) {
       tiles.push(
         <div
           key="torch-glow"
@@ -2571,7 +2571,7 @@ function renderTileGrid(
         />
       );
     }
-    if (heroTorchLit) {
+    if (!suppressDarknessOverlay && heroTorchLitForVisibility) {
       tiles.push(
         <div
           key="fov-radial-overlay"
