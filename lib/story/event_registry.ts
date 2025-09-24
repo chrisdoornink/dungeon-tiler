@@ -35,7 +35,17 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
       id: "met-elder-rowan",
       title: "Elder Rowan's Guidance",
       summary:
-        "Elder Rowan told me to trust the glowing floor runes—they reveal safe footing when shadows deceive.",
+        "Elder Rowan told me to talk to Caretaker Lysa about the sanctum's warning.",
+    },
+  },
+  "met-caretaker-lysa": {
+    id: "met-caretaker-lysa",
+    description: "The hero has met Caretaker Lysa for the first time.",
+    defaultValue: false,
+    diaryEntry: {
+      id: "met-caretaker-lysa",
+      title: "Caretaker Lysa's Introduction",
+      summary: "Caretaker Lysa is nice.",
     },
   },
   "heard-lysa-warning": {

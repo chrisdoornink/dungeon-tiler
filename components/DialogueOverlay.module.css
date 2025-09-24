@@ -34,12 +34,21 @@
   letter-spacing: 1px;
 }
 
+/* Hero-specific color accents for better speaker distinction */
+.heroSpeaker {
+  color: #8fd3ff; /* soft sky-blue accent for the Hero name */
+}
+
 .body {
   font-size: 14px;
   line-height: 1.8;
   color: #fefcf2;
   min-height: 44px;
   position: relative;
+}
+
+.heroBody {
+  color: #cfeeff; /* lighter blue-white for Hero text */
 }
 
 .choices {

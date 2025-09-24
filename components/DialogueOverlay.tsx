@@ -40,6 +40,7 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
     : hasMore
     ? "Next"
     : "Close";
+  const isHero = (speaker ?? "").toLowerCase() === "hero";
 
   const handleOverlayClick = () => {
     if (hasChoices) return;
@@ -57,9 +58,12 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
     >
       <div className={`${styles.panel} pixel-text`}>
         <div className={styles.header}>
-          <span className={styles.speaker}>{speaker ?? ""}</span>
+          <span className={`${styles.speaker} ${isHero ? styles.heroSpeaker : ""}`}>{speaker ?? ""}</span>
         </div>
-        <div className={styles.body} data-testid="dialogue-text">
+        <div
+          className={`${styles.body} ${isHero ? styles.heroBody : ""}`}
+          data-testid="dialogue-text"
+        >
           {displayText}
           {showCursor ? <span className={styles.cursor}>▌</span> : null}
         </div>

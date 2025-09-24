@@ -31,11 +31,15 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Elder Rowan",
-        text: "Word will fly through town. They'll ring the chimes tonight when they hear you've returned.",
+        text: "Word will fly through town. They're will be much excitement when they hear you've returned.",
       },
       {
         speaker: "Hero",
-        text: "It was a long climb. Point me where I'm needed next.",
+        text: "It was a long climb out. Point me where I'm needed next.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Caretaker Lysa has always felt the sanctum breathe before the rest of us. What message did she press into your hands?",
       },
     ],
     onCompleteEffects: [{ eventId: "met-elder-rowan", value: true }],
@@ -116,16 +120,16 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
-  "caretaker-lysa-overview": {
-    id: "caretaker-lysa-overview",
+  "caretaker-lysa-intro": {
+    id: "caretaker-lysa-intro",
     lines: [
       {
         speaker: "Caretaker Lysa",
-        text: "Breathe. The climb past the sanctum rattles even seasoned delvers.",
+        text: "I sensed you were coming. The sanctum's pulse is strong today.",
       },
       {
         speaker: "Hero",
-        text: "If you've kept these halls standing, I can keep moving forward.",
+        text: "Did it tell you of my experiences?",
       },
       {
         speaker: "Caretaker Lysa",
@@ -168,6 +172,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
         ],
       },
     ],
+    onCompleteEffects: [{ eventId: "met-caretaker-lysa", value: true }],
   },
   "caretaker-lysa-reminder": {
     id: "caretaker-lysa-reminder",
