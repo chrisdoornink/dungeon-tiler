@@ -56,12 +56,20 @@ describe("DailyChallengeStorage", () => {
     });
 
     it("should return stored data when localStorage has valid data", () => {
+      const todayLocal = (() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      })();
+
       const storedData: DailyChallengeData = {
         hasSeenIntro: true,
         currentStreak: 5,
         totalGamesPlayed: 10,
         totalGamesWon: 7,
-        lastPlayedDate: new Date().toISOString().split("T")[0],
+        lastPlayedDate: todayLocal,
         todayCompleted: true,
         todayResult: "won",
         streakHistory: [{ date: "2025-08-30", result: "won", streak: 5 }],

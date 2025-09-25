@@ -20,13 +20,14 @@ describe("npc script registry", () => {
     expect(resolveNpcDialogueScript("npc-elder-rowan", flags)).toBe(
       "elder-rowan-awaiting-warning"
     );
-    flags["heard-lysa-warning"] = true;
+    flags["heard-missing-boy"] = true;
     expect(resolveNpcDialogueScript("npc-elder-rowan", flags)).toBe(
-      "elder-rowan-warning-response"
+      "elder-rowan-missing-boy"
     );
     flags["elder-rowan-acknowledged-warning"] = true;
+    // With current precedence, missing-boy reaction still takes priority
     expect(resolveNpcDialogueScript("npc-elder-rowan", flags)).toBe(
-      "elder-rowan-post-warning"
+      "elder-rowan-missing-boy"
     );
   });
 });

@@ -12,7 +12,7 @@ import { TileSubtype } from '../../lib/map';
  */
 
 describe('Wall Torch rendering', () => {
-  it('renders a wall torch with randomized frame interval between 200–300ms', () => {
+  it('renders a wall torch as a static sprite without animation attributes', () => {
     const mockWall = { id: 1, name: 'wall', color: '#333', walkable: false };
 
     render(
@@ -27,11 +27,8 @@ describe('Wall Torch rendering', () => {
 
     const torch = screen.getByTestId('wall-torch');
     expect(torch).toBeInTheDocument();
-
-    const durAttr = torch.getAttribute('data-duration-ms');
-    expect(durAttr).toBeTruthy();
-    const dur = Number(durAttr);
-    expect(dur).toBeGreaterThanOrEqual(200);
-    expect(dur).toBeLessThanOrEqual(300);
+    // No animation metadata should be present
+    expect(torch.getAttribute('data-duration-ms')).toBeNull();
+    expect(torch.getAttribute('data-frame')).toBeNull();
   });
 });

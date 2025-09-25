@@ -34,22 +34,22 @@ describe("story event registry", () => {
   it("applies story effects and returns updated flags", () => {
     const flags = createInitialStoryFlags();
     const next = applyStoryEffects(flags, [
-      { eventId: "heard-lysa-warning", value: true },
+      { eventId: "heard-missing-boy", value: true },
     ]);
-    expect(next?.["heard-lysa-warning"]).toBe(true);
+    expect(next?.["heard-missing-boy"]).toBe(true);
   });
 
   it("updates hero diary entries when events resolve", () => {
     const flags = createInitialStoryFlags();
     const initialDiary: HeroDiaryEntry[] = [];
     const first = applyStoryEffectsWithDiary(flags, initialDiary, [
-      { eventId: "heard-lysa-warning", value: true },
+      { eventId: "heard-missing-boy", value: true },
     ]);
 
-    expect(first.flags?.["heard-lysa-warning"]).toBe(true);
+    expect(first.flags?.["heard-missing-boy"]).toBe(true);
     expect(first.diaryEntries).toHaveLength(1);
     const firstEntry = first.diaryEntries?.[0];
-    expect(firstEntry?.id).toBe("heard-lysa-warning");
+    expect(firstEntry?.id).toBe("heard-missing-boy");
     expect(firstEntry?.completed).toBeUndefined();
 
     const second = applyStoryEffectsWithDiary(
@@ -59,7 +59,7 @@ describe("story event registry", () => {
     );
 
     const warningEntry = second.diaryEntries?.find(
-      (entry) => entry.id === "heard-lysa-warning"
+      (entry) => entry.id === "heard-missing-boy"
     );
     expect(warningEntry?.completed).toBe(true);
 

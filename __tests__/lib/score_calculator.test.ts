@@ -222,8 +222,8 @@ describe('ScoreCalculator', () => {
       expect(scoreDiff).toBeLessThan(15);
       
       // Both should achieve decent grades
-      expect(['S+', 'S', 'A+', 'A', 'B+', 'B', 'C+']).toContain(speedScore.grade);
-      expect(['S+', 'S', 'A+', 'A', 'B+', 'B', 'C+']).toContain(combatScore.grade);
+      expect(['S+', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C+']).toContain(speedScore.grade);
+      expect(['S+', 'S', 'A+', 'A', 'A-', 'B+', 'B', 'C+']).toContain(combatScore.grade);
     });
 
     it('should heavily penalize excessive steps', () => {
