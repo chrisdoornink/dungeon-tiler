@@ -18,7 +18,7 @@ describe("npc script registry", () => {
     );
     flags["met-elder-rowan"] = true;
     expect(resolveNpcDialogueScript("npc-elder-rowan", flags)).toBe(
-      "elder-rowan-default"
+      "elder-rowan-awaiting-warning"
     );
     flags["heard-lysa-warning"] = true;
     expect(resolveNpcDialogueScript("npc-elder-rowan", flags)).toBe(

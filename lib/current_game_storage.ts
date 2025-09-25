@@ -4,6 +4,7 @@
  */
 
 import type { GameState } from "./map";
+import { createInitialTimeOfDay } from "./time_of_day";
 
 const CURRENT_GAME_KEY = "currentGame";
 const DAILY_GAME_KEY = "currentDailyGame";
@@ -40,6 +41,7 @@ export class CurrentGameStorage {
     try {
       const storedState: StoredGameState = {
         ...gameState,
+        timeOfDay: gameState.timeOfDay ?? createInitialTimeOfDay(),
         lastSaved: Date.now(),
         isDailyChallenge: slot === "daily",
       };
@@ -72,6 +74,10 @@ export class CurrentGameStorage {
         typeof parsed.heroHealth !== "number"
       ) {
         return null;
+      }
+
+      if (!parsed.timeOfDay) {
+        parsed.timeOfDay = createInitialTimeOfDay();
       }
 
       return parsed;

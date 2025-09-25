@@ -71,3 +71,12 @@ export {
 } from "./map/game-state";
 
 export type { GameState, CheckpointSnapshot } from "./map/game-state";
+
+export {
+  DAY_PHASES,
+  DAY_PHASE_CONFIG,
+  DAY_CYCLE_TOTAL_STEPS,
+  advanceTimeOfDay,
+  createInitialTimeOfDay,
+} from "./time_of_day";
+export type { DayPhaseId, TimeOfDayState } from "./time_of_day";

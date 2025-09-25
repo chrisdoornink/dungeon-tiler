@@ -44,6 +44,22 @@ import { addSnakesPerRules } from "./enemy-features";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
+import {
+  advanceTimeOfDay,
+  createInitialTimeOfDay,
+  type TimeOfDayState,
+} from "../time_of_day";
+
+function incrementStepsAndTime(state: GameState, amount: number = 1): void {
+  if (amount <= 0) return;
+  const currentStats = state.stats;
+  const nextStats = {
+    ...currentStats,
+    steps: currentStats.steps + amount,
+  };
+  state.stats = nextStats;
+  state.timeOfDay = advanceTimeOfDay(state.timeOfDay, amount);
+}
 
 export function performUseFood(gameState: GameState): GameState {
   const count = gameState.foodCount || 0;
@@ -96,7 +112,7 @@ export function performUseFood(gameState: GameState): GameState {
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 1);
   newGameState.foodCount = count - 1;
-  newGameState.stats.steps += 1;
+  incrementStepsAndTime(newGameState);
 
   // debug: used food
   
@@ -156,7 +172,7 @@ export function performUsePotion(gameState: GameState): GameState {
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 2);
   newGameState.potionCount = count - 1;
-  newGameState.stats.steps += 1;
+  incrementStepsAndTime(newGameState);
 
   // Cure poison condition
   if (newGameState.conditions?.poisoned?.active) {
@@ -557,6 +573,7 @@ export interface GameState {
       stepInterval: number;
     };
   };
+  timeOfDay?: TimeOfDayState;
   storyFlags?: StoryFlags;
   diaryEntries?: HeroDiaryEntry[];
   rooms?: Record<RoomId, RoomSnapshot>;
@@ -671,6 +688,7 @@ export function initializeGameState(): GameState {
       steps: 0,
       byKind: createEmptyByKind(),
     },
+    timeOfDay: createInitialTimeOfDay(),
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
@@ -726,6 +744,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
       steps: 0,
       byKind: createEmptyByKind(),
     },
+    timeOfDay: createInitialTimeOfDay(),
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
@@ -1036,7 +1055,7 @@ export function movePlayer(
     }
 
     if (moved) {
-      newGameState.stats.steps += 1;
+      incrementStepsAndTime(newGameState);
       const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
       if (transition) {
         newGameState = applyRoomTransition(newGameState, transition);
@@ -1092,7 +1111,7 @@ export function movePlayer(
 
     // For regular walls, do nothing - player cannot move there
     if (moved) {
-      newGameState.stats.steps += 1;
+      incrementStepsAndTime(newGameState);
       const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
       if (transition) {
         newGameState = applyRoomTransition(newGameState, transition);
@@ -1495,7 +1514,7 @@ export function movePlayer(
   // Enemies have already been updated at the start of this turn
   // Increment steps if a move occurred
   if (moved) {
-    newGameState.stats.steps += 1;
+    incrementStepsAndTime(newGameState);
     const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
     if (transition) {
       newGameState = applyRoomTransition(newGameState, transition);
