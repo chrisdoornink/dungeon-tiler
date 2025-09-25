@@ -44,7 +44,7 @@ export const DAY_PHASES: DayPhaseConfig[] = [
       opacity: 0.22,
       blendMode: "multiply",
     },
-    allowsFullVisibility: false,
+    allowsFullVisibility: true,
   },
   {
     id: "night",

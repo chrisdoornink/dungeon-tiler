@@ -117,6 +117,10 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Caretaker Lysa",
+        text: "I sensed your arrival today. The town was beginning to worry, but I felt your energy increasing over the last few days.",
+      },
+      {
+        speaker: "Caretaker Lysa",
         text: "The sanctum feels wrong today—the pulse carries a weight I don't like.",
       },
       {
@@ -178,19 +182,6 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     onCompleteEffects: [
       { eventId: "met-caretaker-lysa", value: true },
       { eventId: "heard-missing-boy", value: true },
-    ],
-  },
-  "caretaker-lysa-reminder": {
-    id: "caretaker-lysa-reminder",
-    lines: [
-      {
-        speaker: "Caretaker Lysa",
-        text: "You already carry my warning. Check the charm if the air tastes of ash.",
-      },
-      {
-        speaker: "Hero",
-        text: "I'll keep it close.",
-      },
     ],
   },
   "town-librarian-default": {

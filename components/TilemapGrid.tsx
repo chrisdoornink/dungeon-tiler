@@ -1047,10 +1047,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.timeOfDay ?? createInitialTimeOfDay();
   const environmentConfig = getEnvironmentConfig(environment);
   const environmentDaylight = environmentConfig.daylight;
-  const phaseConfig = DAY_PHASE_CONFIG[timeOfDayState.phase];
-  const phaseAllowsFullVisibility = phaseConfig?.allowsFullVisibility ?? false;
+  // Visually treat dawn/dusk as day for outdoor visibility
+  const visualPhaseId =
+    timeOfDayState.phase === "dawn" || timeOfDayState.phase === "dusk"
+      ? "day"
+      : timeOfDayState.phase;
+  const visualPhaseAllowsFull = DAY_PHASE_CONFIG[visualPhaseId]?.allowsFullVisibility ?? false;
   const autoPhaseVisibility =
-    environment === "outdoor" ? phaseAllowsFullVisibility : environmentDaylight;
+    environment === "outdoor" ? visualPhaseAllowsFull : environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
   const suppressDarknessOverlay =
     autoPhaseVisibility || (forceDaylight && heroTorchLitState);
@@ -2306,15 +2310,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               </div>
             </div>
           </div>
-          <div
-            className="absolute bottom-4 left-4 pointer-events-none"
-            style={{ zIndex: 12000 }}
-          >
-            <DayNightMeter
-              timeOfDay={timeOfDayState}
-              className="pointer-events-auto"
-            />
-          </div>
+          {!isDailyChallenge && (
+            <div
+              className="absolute bottom-4 left-4 pointer-events-none"
+              style={{ zIndex: 12000 }}
+            >
+              <DayNightMeter
+                timeOfDay={timeOfDayState}
+                className="pointer-events-auto"
+                variant={gameState.mode === 'story' ? 'story' : 'rich'}
+                sunIconUrl={gameState.mode === 'story' ? '/images/presentational/sun.png' : undefined}
+                moonIconUrl={gameState.mode === 'story' ? '/images/presentational/moon.png' : undefined}
+              />
+            </div>
+          )}
         </div>
         {/* Close centering wrapper */}
         </div>
