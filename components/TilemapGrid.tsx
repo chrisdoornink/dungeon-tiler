@@ -10,6 +10,9 @@ import {
   performUseFood,
   performUsePotion,
   reviveFromLastCheckpoint,
+  type TimeOfDayState,
+  createInitialTimeOfDay,
+  DAY_PHASE_CONFIG,
 } from "../lib/map";
 import type { Enemy } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
@@ -54,6 +57,7 @@ import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
 import { createInitialStoryFlags } from "../lib/story/event_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { HeroDiaryModal } from "./HeroDiaryModal";
+import DayNightMeter from "./DayNightMeter";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -115,7 +119,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Initialize game state
   const [gameState, setGameState] = useState<GameState>(() => {
     if (initialGameState) {
-      return initialGameState;
+      return initialGameState.timeOfDay
+        ? initialGameState
+        : { ...initialGameState, timeOfDay: createInitialTimeOfDay() };
     } else if (tilemap) {
       // Create a new game state with the provided tilemap and subtypes
       const dynH = tilemap.length;
@@ -150,6 +156,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           steps: 0,
           byKind: createEmptyByKind(),
         },
+        timeOfDay: createInitialTimeOfDay(),
       };
     } else {
       throw new Error("Either initialGameState or tilemap must be provided");
@@ -1036,12 +1043,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environment: EnvironmentId =
     (gameState.mapData.environment as EnvironmentId | undefined) ??
     DEFAULT_ENVIRONMENT;
+  const timeOfDayState: TimeOfDayState =
+    gameState.timeOfDay ?? createInitialTimeOfDay();
   const environmentConfig = getEnvironmentConfig(environment);
   const environmentDaylight = environmentConfig.daylight;
-  const effectiveForceDaylight = forceDaylight || environmentDaylight;
+  const phaseConfig = DAY_PHASE_CONFIG[timeOfDayState.phase];
+  const phaseAllowsFullVisibility = phaseConfig?.allowsFullVisibility ?? false;
+  const autoPhaseVisibility =
+    environment === "outdoor" ? phaseAllowsFullVisibility : environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
   const suppressDarknessOverlay =
-    environmentDaylight || (forceDaylight && heroTorchLitState);
+    autoPhaseVisibility || (forceDaylight && heroTorchLitState);
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
 
@@ -1093,14 +1105,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Auto-disable full map visibility after 3 seconds
   useEffect(() => {
-    if (effectiveForceDaylight) return; // do not auto-disable when daylight override is on
+    if (suppressDarknessOverlay) return; // do not auto-disable when daylight override is on
     if (gameState.showFullMap) {
       const timer = setTimeout(() => {
         setGameState((prev) => ({ ...prev, showFullMap: false }));
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [gameState.showFullMap, effectiveForceDaylight]);
+  }, [gameState.showFullMap, suppressDarknessOverlay]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
@@ -1815,7 +1827,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         )}
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 flex items-center justify-center">
-          <div className="game-scale" data-testid="game-scale">
+          <div className="game-scale relative" data-testid="game-scale">
             {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
             <div
               className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
@@ -2285,17 +2297,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     heroTorchLitState,
                     suppressDarknessOverlay,
                     gameState.hasExitKey,
-                    Boolean(gameState.conditions?.poisoned?.active)
+                    Boolean(gameState.conditions?.poisoned?.active),
+                    timeOfDayState
                   )}
                 </div>
               </div>
             </div>
           </div>
+          <div
+            className="absolute bottom-4 left-4 pointer-events-none"
+            style={{ zIndex: 12000 }}
+          >
+            <DayNightMeter
+              timeOfDay={timeOfDayState}
+              className="pointer-events-auto"
+            />
+          </div>
         </div>
         {/* Close centering wrapper */}
         </div>
       </div>
-      
+
       {/* Item pickup animations */}
       {itemPickupAnimations.map((animation) => (
         <ItemPickupAnimation
@@ -2427,9 +2449,12 @@ function renderTileGrid(
   heroTorchLit: boolean = true,
   suppressDarknessOverlay: boolean = false,
   hasExitKey?: boolean,
-  heroPoisoned: boolean = false
+  heroPoisoned: boolean = false,
+  timeOfDay?: TimeOfDayState
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
+  const resolvedTimeOfDay = timeOfDay ?? createInitialTimeOfDay();
+  const timeOfDayVisual = DAY_PHASE_CONFIG[resolvedTimeOfDay.phase];
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
 
@@ -2703,6 +2728,24 @@ function renderTileGrid(
         />
       );
     }
+  }
+
+  if (timeOfDayVisual?.overlay) {
+    const overlayStyle: React.CSSProperties = {
+      background: timeOfDayVisual.overlay.color,
+      opacity: timeOfDayVisual.overlay.opacity,
+      zIndex: 8800,
+    };
+    if (timeOfDayVisual.overlay.blendMode) {
+      overlayStyle.mixBlendMode = timeOfDayVisual.overlay.blendMode;
+    }
+    tiles.push(
+      <div
+        key="time-of-day-overlay"
+        className="pointer-events-none absolute inset-0"
+        style={overlayStyle}
+      />
+    );
   }
 
   return tiles;

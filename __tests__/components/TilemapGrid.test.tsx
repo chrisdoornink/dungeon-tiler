@@ -503,7 +503,7 @@ describe('TilemapGrid component', () => {
       });
 
       const text = screen.getByTestId('dialogue-text');
-      expect(text.textContent ?? '').toMatch(/torchlight finds you/);
+      expect(text.textContent ?? '').toMatch(/By the stones—you're alive/);
     });
 
     it('advances dialogue lines and closes on Enter', () => {
@@ -529,7 +529,7 @@ describe('TilemapGrid component', () => {
       act(() => {
         jest.runAllTimers();
       });
-      expect(text.textContent ?? '').toMatch(/torchlight finds you/);
+      expect(text.textContent ?? '').toMatch(/By the stones—you're alive/);
 
       // Second Enter advances to line 2, third skips it fully
       fireEvent.keyDown(window, { key: 'Enter' });
@@ -537,7 +537,7 @@ describe('TilemapGrid component', () => {
       act(() => {
         jest.runAllTimers();
       });
-      expect(text.textContent ?? '').toMatch(/Tell me what I need to know/);
+      expect(text.textContent ?? '').toMatch(/Word will fly through town/);
 
       // Advance to line 3 and skip
       fireEvent.keyDown(window, { key: 'Enter' });
@@ -545,7 +545,7 @@ describe('TilemapGrid component', () => {
       act(() => {
         jest.runAllTimers();
       });
-      expect(text.textContent ?? '').toMatch(/Trust the floor runes/);
+      expect(text.textContent ?? '').toMatch(/It was a long climb/);
 
       // Final Enter closes overlay
       fireEvent.keyDown(window, { key: 'Enter' });
