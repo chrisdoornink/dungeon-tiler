@@ -232,6 +232,15 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "bluff-coiled-snake": {
+    id: "bluff-coiled-snake",
+    lines: [
+      {
+        speaker: "Coiled Snake",
+        text: "You found me.",
+      },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {
