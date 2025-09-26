@@ -184,6 +184,19 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { eventId: "heard-missing-boy", value: true },
     ],
   },
+  "caretaker-lysa-reminder": {
+    id: "caretaker-lysa-reminder",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "The bluff still thrums with that uneasy current. Please—find the boy and bring him back safely.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Head northeast from the sanctum entrance. The passage hugs the cliff before it opens into the caves.",
+      },
+    ],
+  },
   "town-librarian-default": {
     id: "town-librarian-default",
     lines: [
