@@ -129,7 +129,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Caretaker Lysa",
-        text: "Other feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
+        text: "Even others feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
       },
       {
         speaker: "Caretaker Lysa",
@@ -182,6 +182,19 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     onCompleteEffects: [
       { eventId: "met-caretaker-lysa", value: true },
       { eventId: "heard-missing-boy", value: true },
+    ],
+  },
+  "caretaker-lysa-reminder": {
+    id: "caretaker-lysa-reminder",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "The bluff still thrums with that uneasy current. Please—find the boy and bring him back safely.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Head northeast from the sanctum entrance. The passage hugs the cliff before it opens into the caves.",
+      },
     ],
   },
   "town-librarian-default": {

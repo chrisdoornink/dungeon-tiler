@@ -67,6 +67,15 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   },
   {
     npcId: "npc-grounds-caretaker",
+    scriptId: "caretaker-lysa-reminder",
+    priority: 5,
+    conditions: [
+      { eventId: "met-caretaker-lysa", value: true },
+      { eventId: "heard-missing-boy", value: true },
+    ],
+  },
+  {
+    npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-intro",
     priority: 10,
     conditions: [{ eventId: "met-caretaker-lysa", value: false }],
