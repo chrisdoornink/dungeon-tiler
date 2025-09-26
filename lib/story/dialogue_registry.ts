@@ -129,7 +129,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Caretaker Lysa",
-        text: "Other feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
+        text: "Even others feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
       },
       {
         speaker: "Caretaker Lysa",

@@ -32,6 +32,22 @@ function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
 }
 
+/**
+ * Resolve a human-friendly room label for UI overlays.
+ * Prefers snapshot metadata (displayLabel), then known labels map, then
+ * a generic "Torch Town — Home" fallback for generated homes, else the raw id.
+ */
+export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
+  const rooms = state.rooms ?? {};
+  const snapshot = rooms[roomId as keyof typeof rooms];
+  const fromMeta = (snapshot as any)?.metadata?.displayLabel as string | undefined;
+  if (fromMeta && typeof fromMeta === "string") return fromMeta;
+  const known = STORY_ROOM_LABELS[roomId];
+  if (known) return known;
+  if (roomId.startsWith("story-torch-town-home-")) return "Torch Town — Home";
+  return roomId;
+}
+
 function withoutPlayer(mapData: MapData): MapData {
   const clone = cloneMapData(mapData);
   for (let y = 0; y < clone.subtypes.length; y++) {
@@ -286,6 +302,11 @@ export function buildStoryModeState(): GameState {
       torchTownBuildings.librarySize[1],
       "house"
     );
+    // Friendly label for UI overlays
+    libraryRoom.metadata = {
+      ...(libraryRoom.metadata || {}),
+      displayLabel: "Torch Town — Library",
+    };
     // Place the town librarian inside the library
     const libNpcY = Math.max(2, libraryRoom.entryPoint[0] - 2);
     const libNpcX = libraryRoom.entryPoint[1];
@@ -337,6 +358,11 @@ export function buildStoryModeState(): GameState {
       torchTownBuildings.storeSize[1],
       "house"
     );
+    // Friendly label for UI overlays
+    storeRoom.metadata = {
+      ...(storeRoom.metadata || {}),
+      displayLabel: "Torch Town — Store",
+    };
     extraRooms.push(storeRoom);
     pushTransition(
       torchTown.id,
@@ -367,6 +393,11 @@ export function buildStoryModeState(): GameState {
       ];
       const homeId = `story-torch-town-home-${homeIdx}` as RoomId;
       const homeRoom = buildInteriorRoom(homeId, homeW, homeH, "house");
+      // Friendly, generic label; can be overridden later when owner is known
+      homeRoom.metadata = {
+        ...(homeRoom.metadata || {}),
+        displayLabel: "Torch Town — Home",
+      };
       extraRooms.push(homeRoom);
       pushTransition(torchTown.id, homeRoom.id, doorPos, homeRoom.entryPoint);
       // Land outside each home door when exiting interior
@@ -549,6 +580,18 @@ export function collectStoryCheckpointOptions(
   const seen = new Set<string>();
   const rooms = state.rooms ?? {};
 
+  // Resolve a friendly room label using (1) snapshot metadata, (2) known labels map,
+  // (3) generic fallbacks for generated homes, else raw room id.
+  const labelForRoom = (roomId: RoomId): string => {
+    const snapshot = rooms[roomId as keyof typeof rooms];
+    const fromMeta = (snapshot as any)?.metadata?.displayLabel as string | undefined;
+    if (fromMeta && typeof fromMeta === "string") return fromMeta;
+    const known = STORY_ROOM_LABELS[roomId];
+    if (known) return known;
+    if (roomId.startsWith("story-torch-town-home-")) return "Torch Town — Home";
+    return roomId;
+  };
+
   const pushOption = (
     roomId: RoomId,
     position: [number, number],
@@ -558,7 +601,7 @@ export function collectStoryCheckpointOptions(
     const key = `${roomId}:${position[0]}:${position[1]}:${kind}`;
     if (seen.has(key)) return;
     seen.add(key);
-    const baseLabel = STORY_ROOM_LABELS[roomId] ?? roomId;
+    const baseLabel = labelForRoom(roomId);
     const suffix = kind === "checkpoint" && index > 0 ? ` ${index + 1}` : "";
     const label =
       kind === "entry"
