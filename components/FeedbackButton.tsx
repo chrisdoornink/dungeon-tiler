@@ -48,11 +48,28 @@ export default function FeedbackButton() {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="rounded-full bg-slate-800 px-3 py-2 text-xs font-semibold uppercase text-white shadow-md transition hover:bg-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
+        className="group relative flex items-center gap-2 p-2 text-white transition focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-500"
         aria-haspopup="dialog"
         aria-expanded={isOpen}
+        aria-label="Open feedback form"
+        title="Feedback"
       >
-        Feedback
+        <span
+          aria-hidden
+          className="w-8 h-8 inline-block"
+          style={{
+            backgroundImage: "url(/images/presentational/chat-bubble.png)",
+            backgroundSize: "contain",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+          }}
+        />
+        {/* Hover/focus reveal label */}
+        <span
+          className="pointer-events-none select-none absolute left-full ml-2 top-1/2 -translate-y-1/2 whitespace-nowrap text-sm font-medium opacity-0 translate-x-1 transition-all duration-200 group-hover:opacity-100 group-hover:translate-x-0 group-focus:opacity-100 group-focus:translate-x-0"
+        >
+          Share Feedback
+        </span>
       </button>
 
       {isOpen && (
@@ -137,3 +154,4 @@ export default function FeedbackButton() {
     </div>
   );
 }
+
