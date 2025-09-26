@@ -133,3 +133,15 @@ export function trackMapInteraction(params: {
 }) {
   captureEvent('map_interaction', params);
 }
+
+export function trackFeedback(params: {
+  message: string;
+  email?: string;
+  url?: string;
+}) {
+  captureEvent('user_feedback', {
+    message: params.message,
+    email: params.email,
+    url: params.url,
+  });
+}

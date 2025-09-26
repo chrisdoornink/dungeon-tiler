@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
 import "./globals.css";
 import PreloadImages from "../components/PreloadImages";
 import PostHogProvider from "../components/PostHogProvider";
+import FeedbackButton from "../components/FeedbackButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -82,6 +83,7 @@ export default function RootLayout({
         <PostHogProvider>
           <PreloadImages />
           {children}
+          <FeedbackButton />
         </PostHogProvider>
       </body>
     </html>
