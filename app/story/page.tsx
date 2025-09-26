@@ -19,6 +19,9 @@ import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { rehydrateEnemies, type PlainEnemy } from "../../lib/enemy";
 import { rehydrateNPCs, type PlainNPC } from "../../lib/npc";
 import StoryResetModal from "../../components/StoryResetModal";
+import StoryEventSimulator from "../../components/StoryEventSimulator";
+import type { StoryFlags } from "../../lib/story/event_registry";
+import type { HeroDiaryEntry } from "../../lib/story/hero_diary";
 
 function createDefaultResetConfig(
   state: GameState,
@@ -55,6 +58,7 @@ function StoryModeInner() {
   const [resetConfig, setResetConfig] = useState<StoryResetConfig | null>(null);
   const [showResetModal, setShowResetModal] = useState(false);
   const [tilemapKey, setTilemapKey] = useState(0);
+  const isDev = process.env.NODE_ENV === "development";
 
   useEffect(() => {
     let cancelled = false;
@@ -125,6 +129,25 @@ function StoryModeInner() {
     ]
   );
 
+  const handleStoryEventApply = useCallback(
+    (update: { flags: StoryFlags; diaryEntries: HeroDiaryEntry[] }) => {
+      setInitialState((prev) => {
+        if (!prev) return prev;
+        const nextState: GameState = {
+          ...prev,
+          storyFlags: update.flags,
+          diaryEntries: update.diaryEntries,
+        };
+        try {
+          CurrentGameStorage.saveCurrentGame(nextState, "story");
+        } catch {}
+        return nextState;
+      });
+      setTilemapKey((key) => key + 1);
+    },
+    []
+  );
+
   if (!initialState) {
     return (
       <div className="min-h-screen flex items-center justify-center text-white">
@@ -172,6 +195,13 @@ function StoryModeInner() {
           onConfirm={handleResetApply}
         />
       )}
+      {isDev && initialState ? (
+        <StoryEventSimulator
+          currentFlags={initialState.storyFlags}
+          diaryEntries={initialState.diaryEntries}
+          onApply={handleStoryEventApply}
+        />
+      ) : null}
     </div>
   );
 }
