@@ -143,34 +143,15 @@ function StoryModeInner() {
       }}
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+      {/* Fixed Reset Story button that doesn't affect layout */}
+      <button
+        type="button"
+        onClick={() => resetConfig && setShowResetModal(true)}
+        className="absolute top-4 right-4 z-20 rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
+      >
+        Reset Story
+      </button>
       <div className="relative z-10 flex flex-col items-center gap-4">
-        <button
-          type="button"
-          onClick={() => resetConfig && setShowResetModal(true)}
-          className="self-end rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
-        >
-          Reset Story
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            try {
-              CurrentGameStorage.clearCurrentGame("story");
-            } catch {}
-            const fresh = buildStoryModeState();
-            try {
-              CurrentGameStorage.saveCurrentGame(fresh, "story");
-            } catch {}
-            setInitialState(fresh);
-            const options = collectStoryCheckpointOptions(fresh);
-            setCheckpointOptions(options);
-            setResetConfig(createDefaultResetConfig(fresh, options));
-            setTilemapKey((key) => key + 1);
-          }}
-          className="self-end rounded border border-white/30 bg-black/40 px-3 py-1 text-xs uppercase tracking-wide text-gray-200 transition hover:bg-white/10"
-        >
-          Reset Dialogs
-        </button>
         <h1 className="text-xl font-semibold text-gray-300 tracking-wide uppercase">
           Story Mode Prototype
         </h1>
