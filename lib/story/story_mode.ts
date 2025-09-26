@@ -71,7 +71,7 @@ function buildBluffPassageway(): StoryRoom {
   subtypes[openY][width - 1] = [TileSubtype.ROOM_TRANSITION];
 
   // Opening at the top-left interior that leads deeper into the bluff
-  const bluffCaveEntry: [number, number] = [1, 1];
+  const bluffCaveEntry: [number, number] = [1, 3];
   tiles[bluffCaveEntry[0]][bluffCaveEntry[1]] = FLOOR;
   subtypes[bluffCaveEntry[0]][bluffCaveEntry[1]] = [
     TileSubtype.ROOM_TRANSITION,
