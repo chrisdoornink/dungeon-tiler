@@ -255,18 +255,42 @@ export function buildStoryModeState(): GameState {
     [4, 1]
   );
 
-  pushTransition(
-    bluffPassage.id,
-    bluffCaves.id,
-    [1, 1],
-    bluffCaves.entryPoint
-  );
-  pushTransition(
-    bluffCaves.id,
-    bluffPassage.id,
-    bluffCaves.transitionToPrevious!,
-    [1, 2]
-  );
+  if (bluffPassage.transitionToNext) {
+    pushTransition(
+      bluffPassage.id,
+      bluffCaves.id,
+      bluffPassage.transitionToNext,
+      bluffCaves.entryPoint
+    );
+  }
+  // When returning from Bluff Caves, land just left of the cave opening
+  {
+    const prevPos = bluffCaves.transitionToPrevious!;
+    let targetInPassage: [number, number] = [1, 2];
+    if (bluffPassage.transitionToNext) {
+      const [ey, ex] = bluffPassage.transitionToNext;
+      const candidate: [number, number] = [ey, Math.max(1, ex - 1)];
+      // Use candidate only if it's a FLOOR within bounds
+      const md = bluffPassage.mapData;
+      if (
+        candidate[0] >= 0 &&
+        candidate[0] < md.tiles.length &&
+        candidate[1] >= 0 &&
+        candidate[1] < md.tiles[0].length &&
+        md.tiles[candidate[0]][candidate[1]] === FLOOR
+      ) {
+        targetInPassage = candidate;
+      } else if (md.tiles[ey]?.[ex] === FLOOR) {
+        targetInPassage = [ey, ex];
+      }
+    }
+    pushTransition(
+      bluffCaves.id,
+      bluffPassage.id,
+      prevPos,
+      targetInPassage
+    );
+  }
   pushTransition(
     bluffCaves.id,
     bluffSerpentDen.id,

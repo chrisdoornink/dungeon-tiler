@@ -274,6 +274,10 @@ export const Tile: React.FC<TileProps> = ({
   const hasExit = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.EXIT) || false;
   };
+  // Story-only cave opening visual (uses exit-dark art, but not a Daily EXIT)
+  const hasCaveOpening = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.CAVE_OPENING) || false;
+  };
 
   // Pots and Rocks + revealed items
   const hasPot = (subtypes: number[] | undefined): boolean => {
@@ -344,6 +348,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.EXITKEY &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.EXIT &&
+        subtype !== TileSubtype.CAVE_OPENING &&
         // Exclude pots/rocks and revealed items from generic rendering
         subtype !== TileSubtype.POT &&
         subtype !== TileSubtype.ROCK &&
@@ -470,6 +475,18 @@ export const Tile: React.FC<TileProps> = ({
               className={`${styles.assetIcon} ${styles.exitLockIcon}`}
             />
           </>
+        )}
+
+        {/* Render cave opening using exit-dark art, without lock overlay */}
+        {hasCaveOpening(subtypes) && (
+          <div
+            key="cave-opening"
+            data-testid={`subtype-icon-${TileSubtype.CAVE_OPENING}`}
+            className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+            style={{
+              backgroundImage: `url('/images/door/exit-dark.png')`,
+            }}
+          />
         )}
 
         {/* Render POT/ROCK/FOOD/MED with assets if present */}

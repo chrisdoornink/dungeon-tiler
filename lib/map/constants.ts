@@ -58,6 +58,7 @@ export enum TileSubtype {
   ROOM_TRANSITION = 21,
   CHECKPOINT = 22,
   WINDOW = 23,
+  CAVE_OPENING = 24,
 }
 
 /**
