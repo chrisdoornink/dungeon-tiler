@@ -635,6 +635,13 @@ export const Tile: React.FC<TileProps> = ({
     }
     return transforms.join(' ');
   })();
+  const npcScale = (() => {
+    const s = (npc as any)?.metadata?.scale;
+    return typeof s === 'number' ? s : 1;
+  })();
+  const npcTransformWithScale = npc
+    ? `${npcTransform}${npcScale !== 1 ? ` scale(${npcScale})` : ''}`
+    : npcTransform;
   const npcTransformOrigin = (() => {
     if (!npc) return '50% 100%';
     switch (npc.facing) {
@@ -727,7 +734,7 @@ export const Tile: React.FC<TileProps> = ({
               className={styles.npcImage}
               style={{
                 backgroundImage: `url(${npc.sprite})`,
-                transform: npcTransform,
+                transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
               }}
               aria-hidden="true"

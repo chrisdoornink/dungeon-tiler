@@ -36,8 +36,9 @@ export function buildBluffSerpentDen(): StoryRoom {
     }
   }
 
-  const npcY = entryY;
-  const npcX = size - 2;
+  // Place coiled snake NPC at a specific tile
+  const npcY = 3;
+  const npcX = 8;
   const coiledSnake = new NPC({
     id: "npc-bluff-coiled-snake",
     name: "Coiled Snake",
@@ -46,6 +47,8 @@ export function buildBluffSerpentDen(): StoryRoom {
     x: npcX,
     facing: Direction.LEFT,
     canMove: false,
+    // Match enemy sprite scale (enemies scale snakes to 0.5 in Tile.tsx)
+    metadata: { scale: 0.5 },
     interactionHooks: [
       {
         id: "coiled-snake-greeting",
@@ -77,8 +80,9 @@ export function buildBluffSerpentDen(): StoryRoom {
   // Greedy blue-noise style selection with a minimum Manhattan spacing
   const chosen: Array<[number, number]> = [];
   const MIN_SPACING = 2; // increase to 3 for sparser placement
+  const TARGET_COUNT = 15; // halve from 30 to 15
   for (const pos of candidates) {
-    if (chosen.length >= 30) break;
+    if (chosen.length >= TARGET_COUNT) break;
     const [py, px] = pos;
     let ok = true;
     for (const [cy, cx] of chosen) {

@@ -48,6 +48,22 @@ export function buildOutdoorClearing(): StoryRoom {
     }
   }
 
+  // Add ~5 more rocks randomly on empty floor tiles (non-blocking variety)
+  {
+    const want = 5;
+    let placed = 0;
+    const rand = (min: number, max: number) =>
+      Math.floor(Math.random() * (max - min + 1)) + min;
+    for (let attempts = 0; attempts < 500 && placed < want; attempts++) {
+      const y = rand(1, height - 2);
+      const x = rand(1, width - 2);
+      if (tiles[y][x] !== FLOOR) continue;
+      if (subtypes[y][x].length > 0) continue; // keep clear of other features/NPCs/etc
+      subtypes[y][x] = [TileSubtype.ROCK];
+      placed++;
+    }
+  }
+
   const houseTopY = entryY - 12;
   const houseHeight = 3;
   const houseLeftX = OUTER_WIDTH - 4;

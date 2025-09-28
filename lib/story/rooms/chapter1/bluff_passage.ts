@@ -152,6 +152,22 @@ export function buildBluffPassageway(): StoryRoom {
     }
   }
 
+  // Scatter ~5 rocks on empty FLOOR tiles in the same bottom area
+  {
+    const want = 5;
+    let placed = 0;
+    for (let attempts = 0; attempts < 400 && placed < want; attempts++) {
+      const y = rand(bottomYStart, bottomYEnd);
+      const x = rand(2, width - 3);
+      // Keep a clear lane near the right entry row
+      if (y === height - 3 && x > width - 8) continue;
+      if (tiles[y][x] !== FLOOR) continue;
+      if (subtypes[y][x].length > 0) continue;
+      subtypes[y][x] = [TileSubtype.ROCK];
+      placed++;
+    }
+  }
+
   return {
     id: "story-bluff-passage" as RoomId,
     mapData: { tiles, subtypes, environment: "outdoor" },

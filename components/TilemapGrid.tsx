@@ -196,6 +196,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const [isHeroDiaryOpen, setHeroDiaryOpen] = useState(false);
 
+  // Developer hover coordinates for story mode (dev only)
+  const [hoverTile, setHoverTile] = useState<[number, number] | null>(null);
+
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
   const activeDialogueLine = dialogueSession
@@ -2302,6 +2305,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     backgroundColor: heroTorchLitForVisibility ? undefined : "#000",
                   }}
                   tabIndex={0} // Make div focusable for keyboard events
+                  onMouseMove={(e) => {
+                    if (process.env.NODE_ENV !== 'development') return;
+                    if (gameState.mode !== 'story') return;
+                    const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                    const tileSize = 40;
+                    const x = Math.floor((e.clientX - rect.left) / tileSize);
+                    const y = Math.floor((e.clientY - rect.top) / tileSize);
+                    const h = gameState.mapData.tiles.length;
+                    const w = gameState.mapData.tiles[0]?.length ?? 0;
+                    if (y >= 0 && y < h && x >= 0 && x < w) {
+                      setHoverTile([y, x]);
+                    } else {
+                      setHoverTile(null);
+                    }
+                  }}
+                  onMouseLeave={() => {
+                    if (process.env.NODE_ENV !== 'development') return;
+                    setHoverTile(null);
+                  }}
                 >
                 {renderTileGrid(
                     gameState.mapData.tiles,
@@ -2342,6 +2364,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         {/* Close centering wrapper */}
         </div>
       </div>
+
+      {process.env.NODE_ENV === 'development' && gameState.mode === 'story' && hoverTile && (
+        <div
+          aria-live="polite"
+          className="fixed bottom-4 right-4 text-xs px-2 py-1 rounded bg-black/70 text-white pointer-events-none shadow"
+          style={{ zIndex: 14000 }}
+        >
+          y {hoverTile[0]}, x {hoverTile[1]}
+        </div>
+      )}
 
       {/* Item pickup animations */}
       {itemPickupAnimations.map((animation) => (
