@@ -957,6 +957,11 @@ function applyRoomTransition(
       // Update conditional NPCs after story flags change
       if (finalState.storyFlags && finalState.rooms) {
         updateConditionalNpcs(finalState);
+        // Refresh active NPCs for the current room from updated snapshots
+        const updatedSnapshot = finalState.rooms[toId];
+        if (updatedSnapshot?.npcs) {
+          finalState.npcs = rehydrateNPCs(updatedSnapshot.npcs);
+        }
       }
     }
   }
