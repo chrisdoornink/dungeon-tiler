@@ -132,6 +132,14 @@ export function buildBluffCaves(): StoryRoom {
     }
   }
 
+  // Pot with a potion reward at the end of the short top-left branch
+  const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
+  const potionSpot: [number, number] = [6, 13];
+  if (tiles[potionSpot[0]]?.[potionSpot[1]] === FLOOR) {
+    subtypes[potionSpot[0]][potionSpot[1]] = [TileSubtype.POT];
+    potOverrides[`${potionSpot[0]},${potionSpot[1]}`] = TileSubtype.MED; // guaranteed potion
+  }
+
   return {
     id: "story-bluff-caves" as RoomId,
     mapData: { tiles, subtypes, environment: "cave" },
@@ -140,6 +148,7 @@ export function buildBluffCaves(): StoryRoom {
     transitionToPrevious,
     transitionToNext,
     enemies,
+    potOverrides,
     metadata: {
       onRoomEnter: {
         effects: [{ eventId: "entered-bluff-cave", value: true }]
