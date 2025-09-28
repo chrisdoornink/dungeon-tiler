@@ -34,7 +34,7 @@ export function buildBluffPassageway(): StoryRoom {
 
   // Midpoints used for placements
   const midY = Math.floor(height / 2);
-  const midX = Math.floor(width / 2);
+  // const midX = Math.floor(width / 2); // unused for now
 
   // Opening on right wall near bottom
   const openY = height - 3; // two tiles up from bottom
@@ -72,7 +72,7 @@ export function buildBluffPassageway(): StoryRoom {
   const boyX = 1; // far left inside wall
   const boy = new NPC({
     id: "npc-sanctum-boy",
-    name: "Sanctum Acolyte",
+    name: "Kalen",
     sprite: "/images/npcs/boy-3.png",
     y: boyY,
     x: boyX,
@@ -80,10 +80,9 @@ export function buildBluffPassageway(): StoryRoom {
     canMove: false,
     interactionHooks: [
       {
-        id: "boy-greet",
+        id: "kalen-talk",
         type: "dialogue",
-        description: "Check on the boy",
-        payload: { dialogueId: "librarian-default" },
+        description: "Talk to Kalen",
       },
     ],
     actions: ["talk"],
@@ -91,30 +90,32 @@ export function buildBluffPassageway(): StoryRoom {
 
   // Place a goblin ~5 tiles below the boy (clamped to room bounds and nearest FLOOR)
   {
-    let gy = Math.min(height - 2, boyY + 5);
-    let gx = Math.min(width - 3, boyX + 1);
+    const gy = Math.min(height - 2, boyY + 5);
+    const gx = Math.min(width - 3, boyX + 1);
     // Find nearest floor within a small search radius
     let placed = false;
     const search: Array<[number, number]> = [];
     for (let dy = 0; dy <= 3; dy++) {
       search.push([gy + dy, gx]);
-      search.push([gy - dy, gx]);
       search.push([gy, gx + dy]);
       search.push([gy, gx - dy]);
     }
     for (const [yy, xx] of search) {
       if (yy > 0 && yy < height - 1 && xx > 0 && xx < width - 1 && tiles[yy][xx] === FLOOR) {
-        const guard = new Enemy({ y: yy, x: xx });
-        guard.kind = 'goblin';
-        enemies.push(guard);
+        const goblin = new Enemy({ y: yy, x: xx });
+        goblin.kind = "goblin";
+        // Mark this as the special goblin that triggers Kalen's rescue
+        goblin.behaviorMemory["isKalenThreat"] = true;
+        enemies.push(goblin);
         placed = true;
         break;
       }
     }
     if (!placed && tiles[gy]?.[gx] === FLOOR) {
-      const guard = new Enemy({ y: gy, x: gx });
-      guard.kind = 'goblin';
-      enemies.push(guard);
+      const fallbackGoblin = new Enemy({ y: gy, x: gx });
+      fallbackGoblin.kind = 'goblin';
+      fallbackGoblin.behaviorMemory["isKalenThreat"] = true;
+      enemies.push(fallbackGoblin);
     }
   }
 
@@ -160,6 +161,21 @@ export function buildBluffPassageway(): StoryRoom {
     transitionToNext: [exitY, exitX],
     enemies,
     npcs: [boy],
+    metadata: {
+      conditionalNpcs: {
+        "npc-sanctum-boy": {
+          removeWhen: [{ eventId: "rescued-kalen", value: true }]
+        }
+      },
+      onEnemyDefeat: {
+        isKalenThreat: {
+          effects: [
+            { eventId: "rescued-kalen", value: true },
+            { eventId: "kalen-rescued-at-bluff", value: true }
+          ]
+        }
+      }
+    },
   };
 
 }

@@ -273,6 +273,16 @@ export function performThrowRock(gameState: GameState): GameState {
       ) {
         // Enemy dies instantly
         const removed = newEnemies.splice(hitIdx, 1)[0];
+        
+        // Store defeated enemy info for onEnemyDefeat processing
+        const newDefeatedEnemies = (preTickState.defeatedEnemies ? preTickState.defeatedEnemies.slice() : [])
+          .concat([{
+            y: removed.y,
+            x: removed.x,
+            kind: removed.kind,
+            behaviorMemory: removed.behaviorMemory
+          }]);
+        
         const newStats = {
           ...preTickState.stats,
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
@@ -289,6 +299,7 @@ export function performThrowRock(gameState: GameState): GameState {
           enemies: newEnemies,
           stats: newStats,
           recentDeaths: newRecent,
+          defeatedEnemies: newDefeatedEnemies,
           runeCount: (preTickState.runeCount ?? 0) - 1,
         };
       }
@@ -297,6 +308,16 @@ export function performThrowRock(gameState: GameState): GameState {
       if (newHealth <= 0) {
         // Enemy dies: remove and record for spirit VFX
         const removed = newEnemies.splice(hitIdx, 1)[0];
+        
+        // Store defeated enemy info for onEnemyDefeat processing
+        const newDefeatedEnemies = (preTickState.defeatedEnemies ? preTickState.defeatedEnemies.slice() : [])
+          .concat([{
+            y: removed.y,
+            x: removed.x,
+            kind: removed.kind,
+            behaviorMemory: removed.behaviorMemory
+          }]);
+        
         const newStats = {
           ...preTickState.stats,
           // Count full remaining health as damage dealt when we finish the kill
@@ -316,6 +337,7 @@ export function performThrowRock(gameState: GameState): GameState {
           enemies: newEnemies,
           stats: newStats,
           recentDeaths: newRecent,
+          defeatedEnemies: newDefeatedEnemies,
           rockCount: count - 1,
         };
       } else {
@@ -452,6 +474,16 @@ export function performThrowRune(gameState: GameState): GameState {
       const newEnemies = enemies.slice();
       // Runes instantly kill ALL enemies, rune consumed
       const removed = newEnemies.splice(hitIdx, 1)[0];
+      
+      // Store defeated enemy info for onEnemyDefeat processing
+      const newDefeatedEnemies = (preTickState.defeatedEnemies ? preTickState.defeatedEnemies.slice() : [])
+        .concat([{
+          y: removed.y,
+          x: removed.x,
+          kind: removed.kind,
+          behaviorMemory: removed.behaviorMemory
+        }]);
+      
       const dealt = removed.health ?? 2;
       const newStats = {
         ...preTickState.stats,
@@ -470,6 +502,7 @@ export function performThrowRune(gameState: GameState): GameState {
         enemies: newEnemies,
         stats: newStats,
         recentDeaths: newRecent,
+        defeatedEnemies: newDefeatedEnemies,
         runeCount: count - 1,
       };
     }
@@ -556,6 +589,13 @@ export interface GameState {
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
+  // Transient: defeated enemies with their memory for onEnemyDefeat processing
+  defeatedEnemies?: Array<{
+    y: number;
+    x: number;
+    kind: string;
+    behaviorMemory?: Record<string, unknown>;
+  }>;
   npcInteractionQueue?: NPCInteractionEvent[];
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
@@ -1153,7 +1193,10 @@ export function movePlayer(
         ? [...newGameState.npcInteractionQueue]
         : [];
       const flags = newGameState.storyFlags ?? createInitialStoryFlags();
-      const scriptId = resolveNpcDialogueScript(blockingNpc.id, flags);
+      // Only resolve dialogue scripts in story mode
+      const scriptId = newGameState.mode === 'story' 
+        ? resolveNpcDialogueScript(blockingNpc.id, flags)
+        : undefined;
       const dynamicHook = scriptId
         ? {
             id: `story-dialogue:${scriptId}`,
@@ -1371,6 +1414,40 @@ export function movePlayer(
         newGameState.stats.damageDealt += heroDamage;
 
         if (enemy.health <= 0) {
+          // Store defeated enemy info for onEnemyDefeat processing
+          if (!newGameState.defeatedEnemies) newGameState.defeatedEnemies = [];
+          const defeatedEnemy = {
+            y: newY,
+            x: newX,
+            kind: enemy.kind,
+            behaviorMemory: enemy.behaviorMemory
+          };
+          newGameState.defeatedEnemies.push(defeatedEnemy);
+          
+          // Process onEnemyDefeat effects immediately (story mode only)
+          if (newGameState.mode === 'story') {
+            const roomMetadata = newGameState.rooms?.[newGameState.currentRoomId || ""]?.metadata;
+            const onEnemyDefeat = roomMetadata?.onEnemyDefeat as Record<string, { effects?: Array<{ eventId: string; value: boolean }> }> | undefined;
+            if (onEnemyDefeat && typeof onEnemyDefeat === "object") {
+            for (const [memoryKey, config] of Object.entries(onEnemyDefeat)) {
+              if (defeatedEnemy.behaviorMemory && defeatedEnemy.behaviorMemory[memoryKey]) {
+                const effects = config?.effects;
+                if (effects && Array.isArray(effects)) {
+                  // Apply effects directly to newGameState
+                  for (const effect of effects) {
+                    if (effect.eventId && typeof effect.value === 'boolean') {
+                      if (!newGameState.storyFlags) {
+                        newGameState.storyFlags = {};
+                      }
+                      newGameState.storyFlags[effect.eventId] = effect.value;
+                    }
+                  }
+                }
+              }
+            }
+            }
+          }
+          
           // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;

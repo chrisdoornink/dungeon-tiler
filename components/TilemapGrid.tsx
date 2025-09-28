@@ -56,6 +56,7 @@ import {
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
 import { createInitialStoryFlags } from "../lib/story/event_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
+import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
 import DayNightMeter from "./DayNightMeter";
 
@@ -512,6 +513,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           storyFlags: result.flags ?? prev.storyFlags,
           diaryEntries: result.diaryEntries ?? prev.diaryEntries ?? [],
         };
+        // Update conditional NPCs when story flags change
+        updateConditionalNpcs(nextState);
         try {
           CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
         } catch {}
@@ -574,6 +577,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               storyFlags: result.flags ?? state.storyFlags,
               diaryEntries: result.diaryEntries ?? state.diaryEntries ?? [],
             };
+            // Update conditional NPCs when story flags change
+            updateConditionalNpcs(nextState);
             try {
               CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
             } catch {}
@@ -696,7 +701,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         ? [...prev.npcInteractionQueue]
         : [];
       const flags = prev.storyFlags ?? createInitialStoryFlags();
-      const scriptId = resolveNpcDialogueScript(npc.id, flags);
+      // Default script resolution via registry (story mode only)
+      const scriptId = prev.mode === 'story' 
+        ? resolveNpcDialogueScript(npc.id, flags)
+        : undefined;
       if (process.env.NODE_ENV === "development") {
         try {
           console.info("[Story][NPC]", npc.id, {
@@ -714,10 +722,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           }
         : undefined;
       if (dynamicHook) {
-        const existingDialogueHooks =
-          npc.interactionHooks?.filter(
-            (hook) => hook.type === "dialogue" && hook.id !== dynamicHook.id
-          ) ?? [];
+        const existingDialogueHooks = npc.interactionHooks?.filter(
+          (h) => h.type !== "dialogue"
+        ) ?? [];
         npc.interactionHooks = [dynamicHook, ...existingDialogueHooks];
       }
       queue.push(npc.createInteractionEvent("action", dynamicHook));
@@ -1644,6 +1651,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Spawn spirits only for actual deaths reported by the engine this tick
       const died = newGameState.recentDeaths || [];
       if (died.length > 0) {
+        // onEnemyDefeat processing is now handled directly in game-state.ts
+        // Clear defeated enemies after processing
+        if (newGameState.defeatedEnemies) {
+          newGameState.defeatedEnemies = [];
+        }
+        
         // Trigger screen shake when killing enemies
         setIsShaking(true);
         setTimeout(() => setIsShaking(false), 200);

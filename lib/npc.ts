@@ -164,12 +164,16 @@ export class NPC {
   ): NPCInteractionEvent {
     const availableHooks = this.interactionHooks.map((h) => ({ ...h }));
     if (hook) {
-      const exists = availableHooks.some((candidate) => candidate.id === hook.id);
-      if (!exists) {
-        availableHooks.unshift({ ...hook });
+      // Remove any existing hook with the same ID to ensure the dynamic hook takes priority
+      const existingIndex = availableHooks.findIndex((candidate) => candidate.id === hook.id);
+      if (existingIndex >= 0) {
+        availableHooks.splice(existingIndex, 1);
       }
+      // Add the dynamic hook at the beginning
+      availableHooks.unshift({ ...hook });
     }
 
+    // If a dynamic hook was provided, it takes priority; otherwise use the first available hook
     const resolvedHook = hook ?? availableHooks[0];
     const fallback: NPCInteractionHook | undefined = resolvedHook
       ? { ...resolvedHook }
@@ -177,6 +181,7 @@ export class NPC {
           id: `${this.id}-dialogue`,
           type: "dialogue",
           description: `Talk to ${this.name}`,
+          payload: { dialogueId: `${this.id}-default` },
         };
 
     if (!resolvedHook && availableHooks.length === 0) {

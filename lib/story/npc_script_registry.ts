@@ -93,6 +93,31 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     scriptId: "librarian-default",
     priority: 0,
   },
+
+  // Kalen (sanctum boy) - rescued and back at sanctum (only when rescued but not at bluff)
+  {
+    npcId: "npc-sanctum-boy",
+    scriptId: "kalen-sanctum-default",
+    priority: 30,
+    conditions: [
+      { eventId: "rescued-kalen", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: false }
+    ],
+  },
+  // Kalen at bluff - grateful after rescue (when rescued at bluff)
+  {
+    npcId: "npc-sanctum-boy",
+    scriptId: "kalen-thanks-cave",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  // Kalen at bluff - distressed before rescue (default when not rescued)
+  {
+    npcId: "npc-sanctum-boy",
+    scriptId: "kalen-distressed",
+    priority: 10,
+    // No conditions - this is the default for Kalen
+  },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {

@@ -78,6 +78,22 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
       },
     ],
   },
+  "rescued-kalen": {
+    id: "rescued-kalen",
+    description: "Kalen was rescued at the bluff and returned safely.",
+    defaultValue: false,
+    diaryEntry: {
+      id: "rescued-kalen",
+      title: "Kalen Rescued",
+      summary: "I found Kalen near the bluff and drove off the goblin. He said he discovered a cave up there.",
+    },
+  },
+  "kalen-rescued-at-bluff": {
+    id: "kalen-rescued-at-bluff",
+    description: "Kalen was rescued at the bluff and is still there.",
+    defaultValue: false,
+    // No diary entry - this is just for dialogue state tracking
+  },
 };
 
 export function listStoryEvents(): StoryEventDefinition[] {

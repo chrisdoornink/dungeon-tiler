@@ -254,6 +254,29 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  // Kalen (the sanctum boy at the bluff)
+  "kalen-distressed": {
+    id: "kalen-distressed",
+    lines: [
+      { speaker: "Kalen", text: "H-help! There's a goblin—he won't let me pass!" },
+      { speaker: "Kalen", text: "I was just exploring, I didn't mean to— please, make him go away!" },
+    ],
+  },
+  "kalen-thanks-cave": {
+    id: "kalen-thanks-cave",
+    lines: [
+      { speaker: "Kalen", text: "You... you got him! Thank you!" },
+      { speaker: "Kalen", text: "I found a cave up here. I was about to look inside when the goblin cornered me." },
+      { speaker: "Kalen", text: "Caretaker Lysa and the Elder will want to know what's in there. I'll head back when it's safe." },
+    ],
+  },
+  "kalen-sanctum-default": {
+    id: "kalen-sanctum-default",
+    lines: [
+      { speaker: "Kalen", text: "The energy flows feel different today—like the stones are humming a new tune!" },
+      { speaker: "Kalen", text: "I can sense the vibrations from here. Much safer than wandering off to mysterious caves, don't you think?" },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {

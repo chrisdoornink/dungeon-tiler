@@ -118,7 +118,30 @@ export function buildOutdoorClearing(): StoryRoom {
     },
   });
 
-  const npcs: NPC[] = [elder];
+  // Add Kalen outside the sanctum when he's been rescued
+  const kalenY = Math.max(1, entryPoint[0] - 5);
+  const kalenX = Math.max(1, entryPoint[1] - 2);
+  const kalen = new NPC({
+    id: "npc-sanctum-boy",
+    name: "Kalen",
+    sprite: "/images/npcs/boy-3.png",
+    y: kalenY,
+    x: kalenX,
+    facing: Direction.DOWN,
+    canMove: false,
+    interactionHooks: [
+      {
+        id: "kalen-sanctum-greet",
+        type: "dialogue",
+        description: "Talk to Kalen",
+        payload: { dialogueId: "kalen-sanctum-default" },
+      },
+    ],
+    actions: ["talk"],
+    metadata: { archetype: "rescued-boy" },
+  });
+
+  const npcs: NPC[] = [elder, kalen];
 
   // Carve an opening at the left wall ~3 tiles down from top to lead to the bluff passageway
   if (tiles[3]?.[0] !== undefined) {
@@ -147,6 +170,13 @@ export function buildOutdoorClearing(): StoryRoom {
       },
     ],
     npcs,
+    metadata: {
+      conditionalNpcs: {
+        "npc-sanctum-boy": {
+          showWhen: [{ eventId: "rescued-kalen", value: true }]
+        }
+      }
+    },
   };
 }
 

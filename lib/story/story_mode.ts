@@ -27,6 +27,7 @@ import {
   buildTorchTown,
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
+import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
 
 function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -46,6 +47,52 @@ export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
   if (known) return known;
   if (roomId.startsWith("story-torch-town-home-")) return "Torch Town — Home";
   return roomId;
+}
+
+/**
+ * Apply conditional NPC visibility based on story flags.
+ * Modifies room snapshots to show/hide NPCs based on conditions.
+ */
+function applyConditionalNpcs(roomSnapshots: GameState["rooms"], flags: StoryFlags): void {
+  if (!roomSnapshots) return;
+  for (const [roomId, snapshot] of Object.entries(roomSnapshots)) {
+    const conditionalNpcs = (snapshot.metadata as any)?.conditionalNpcs;
+    if (!conditionalNpcs || typeof conditionalNpcs !== "object") continue;
+
+    let npcs = snapshot.npcs ? [...snapshot.npcs] : [];
+    let modified = false;
+
+    for (const [npcId, config] of Object.entries(conditionalNpcs)) {
+      const npcConfig = config as any;
+      const showWhen = npcConfig?.showWhen as StoryCondition[] | undefined;
+      const removeWhen = npcConfig?.removeWhen as StoryCondition[] | undefined;
+
+      const npcIndex = npcs.findIndex((npc) => npc.id === npcId);
+      const npcExists = npcIndex >= 0;
+
+      let shouldShow = npcExists; // default: keep current state
+
+      if (showWhen && !areStoryConditionsMet(flags, showWhen)) {
+        shouldShow = false;
+      }
+      if (removeWhen && areStoryConditionsMet(flags, removeWhen)) {
+        shouldShow = false;
+      }
+
+      if (!shouldShow && npcExists) {
+        npcs.splice(npcIndex, 1);
+        modified = true;
+      } else if (shouldShow && !npcExists && showWhen) {
+        // NPC should be shown but doesn't exist - this means it needs to be added
+        // For now, we'll handle this case by keeping the NPC in the original room definition
+        // and only removing when conditions are met
+      }
+    }
+
+    if (modified) {
+      snapshot.npcs = npcs;
+    }
+  }
 }
 
 function withoutPlayer(mapData: MapData): MapData {
@@ -516,6 +563,10 @@ export function buildStoryModeState(): GameState {
     };
   }
 
+  // Apply conditional NPC filtering based on initial story flags
+  const initialFlags = createInitialStoryFlags();
+  applyConditionalNpcs(roomSnapshots, initialFlags);
+
   const startingMap = addPlayer(entrance.mapData, entrance.entryPoint);
   const initialEnemies = cloneEnemies(entrance.enemies);
   const initialNpcs = cloneNPCs(entrance.npcs);
@@ -756,6 +807,9 @@ function applyStoryResetConfig(
   state.conditions = undefined;
   state.storyFlags = createInitialStoryFlags();
   state.diaryEntries = [];
+
+  // Apply conditional NPC filtering after resetting flags
+  applyConditionalNpcs(state.rooms, state.storyFlags);
 }
 
 export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
@@ -763,4 +817,13 @@ export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
   applyStoryResetConfig(state, config);
   state.lastCheckpoint = createCheckpointSnapshot(state);
   return state;
+}
+
+/**
+ * Update NPCs in room snapshots based on current story flags.
+ * Call this when story flags change to show/hide conditional NPCs.
+ */
+export function updateConditionalNpcs(state: GameState): void {
+  if (!state.storyFlags || !state.rooms) return;
+  applyConditionalNpcs(state.rooms, state.storyFlags);
 }
