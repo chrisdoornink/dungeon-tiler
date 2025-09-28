@@ -58,27 +58,43 @@ export function buildBluffSerpentDen(): StoryRoom {
   });
 
   const enemies: Enemy[] = [];
-  const snakePositions: Array<[number, number]> = [];
-  for (let y = 1; y < size - 1 && snakePositions.length < 30; y++) {
-    for (let x = 1; x < size - 1 && snakePositions.length < 30; x++) {
-      if (x <= 2) continue;
-      if (
-        (y === entryPoint[0] && x <= entryPoint[1] + 2) ||
-        (y === npcY && x === npcX)
-      ) {
-        continue;
-      }
-      snakePositions.push([y, x]);
+  // Build candidate floor tiles away from the left wall and actor entry/npc tiles
+  const candidates: Array<[number, number]> = [];
+  for (let y = 1; y < size - 1; y++) {
+    for (let x = 1; x < size - 1; x++) {
+      if (x <= 2) continue; // leave some breathing room near entrance
+      if ((y === entryPoint[0] && x <= entryPoint[1] + 2) || (y === npcY && x === npcX)) continue;
+      if (tiles[y][x] === FLOOR) candidates.push([y, x]);
     }
   }
 
-  for (let i = 0; i < 30 && i < snakePositions.length; i++) {
-    const [y, x] = snakePositions[i];
-    if (tiles[y]?.[x] === FLOOR) {
-      const snake = new Enemy({ y, x });
-      snake.kind = "snake";
-      enemies.push(snake);
+  // Shuffle candidates (Fisher–Yates)
+  for (let i = candidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+
+  // Greedy blue-noise style selection with a minimum Manhattan spacing
+  const chosen: Array<[number, number]> = [];
+  const MIN_SPACING = 2; // increase to 3 for sparser placement
+  for (const pos of candidates) {
+    if (chosen.length >= 30) break;
+    const [py, px] = pos;
+    let ok = true;
+    for (const [cy, cx] of chosen) {
+      const dist = Math.abs(py - cy) + Math.abs(px - cx);
+      if (dist < MIN_SPACING) {
+        ok = false;
+        break;
+      }
     }
+    if (ok) chosen.push(pos);
+  }
+
+  for (const [y, x] of chosen) {
+    const snake = new Enemy({ y, x });
+    snake.kind = "snake";
+    enemies.push(snake);
   }
 
   return {

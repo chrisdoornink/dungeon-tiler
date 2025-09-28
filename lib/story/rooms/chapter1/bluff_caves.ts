@@ -134,7 +134,7 @@ export function buildBluffCaves(): StoryRoom {
 
   // Pot with a potion reward at the end of the short top-left branch
   const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
-  const potionSpot: [number, number] = [6, 13];
+  const potionSpot: [number, number] = [12, 8];
   if (tiles[potionSpot[0]]?.[potionSpot[1]] === FLOOR) {
     subtypes[potionSpot[0]][potionSpot[1]] = [TileSubtype.POT];
     potOverrides[`${potionSpot[0]},${potionSpot[1]}`] = TileSubtype.MED; // guaranteed potion

@@ -1876,7 +1876,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       d: calculateDistance([py, px], [e.y, e.x], "manhattan"),
                     }))
                     .filter(({ d }) => d <= 8)
-                    .sort((a, b) => a.d - b.d);
+                    .sort((a, b) => a.d - b.d)
+                    .slice(0, 5);
                   if (visibleNearby.length === 0) return null;
                   return (
                     <div className="mt-2">
