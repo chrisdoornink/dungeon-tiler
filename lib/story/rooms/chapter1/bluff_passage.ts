@@ -164,7 +164,7 @@ export function buildBluffPassageway(): StoryRoom {
     metadata: {
       conditionalNpcs: {
         "npc-sanctum-boy": {
-          removeWhen: [{ eventId: "rescued-kalen", value: true }]
+          removeWhen: [{ eventId: "entered-bluff-cave", value: true }]
         }
       },
       onEnemyDefeat: {

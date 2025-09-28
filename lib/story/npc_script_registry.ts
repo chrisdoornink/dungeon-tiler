@@ -94,29 +94,29 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: 0,
   },
 
-  // Kalen (sanctum boy) - rescued and back at sanctum (only when rescued but not at bluff)
+  // Kalen (sanctum boy) - at sanctum after entering cave (highest priority)
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-sanctum-default",
     priority: 30,
-    conditions: [
-      { eventId: "rescued-kalen", value: true },
-      { eventId: "kalen-rescued-at-bluff", value: false }
-    ],
+    conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
-  // Kalen at bluff - grateful after rescue (when rescued at bluff)
+  // Kalen at bluff - grateful after rescue but before entering cave
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-thanks-cave",
     priority: 20,
-    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+    conditions: [
+      { eventId: "rescued-kalen", value: true },
+      { eventId: "entered-bluff-cave", value: false }
+    ],
   },
   // Kalen at bluff - distressed before rescue (default when not rescued)
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-distressed",
     priority: 10,
-    // No conditions - this is the default for Kalen
+    conditions: [{ eventId: "rescued-kalen", value: false }],
   },
 ];
 

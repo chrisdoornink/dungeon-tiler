@@ -140,5 +140,10 @@ export function buildBluffCaves(): StoryRoom {
     transitionToPrevious,
     transitionToNext,
     enemies,
+    metadata: {
+      onRoomEnter: {
+        effects: [{ eventId: "entered-bluff-cave", value: true }]
+      }
+    },
   };
 }

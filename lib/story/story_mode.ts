@@ -41,7 +41,7 @@ function cloneMapData(mapData: MapData): MapData {
 export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
   const rooms = state.rooms ?? {};
   const snapshot = rooms[roomId as keyof typeof rooms];
-  const fromMeta = (snapshot as any)?.metadata?.displayLabel as string | undefined;
+  const fromMeta = (snapshot)?.metadata?.displayLabel as string | undefined;
   if (fromMeta && typeof fromMeta === "string") return fromMeta;
   const known = STORY_ROOM_LABELS[roomId];
   if (known) return known;
@@ -55,15 +55,15 @@ export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
  */
 function applyConditionalNpcs(roomSnapshots: GameState["rooms"], flags: StoryFlags): void {
   if (!roomSnapshots) return;
-  for (const [roomId, snapshot] of Object.entries(roomSnapshots)) {
-    const conditionalNpcs = (snapshot.metadata as any)?.conditionalNpcs;
+  for (const [, snapshot] of Object.entries(roomSnapshots)) {
+    const conditionalNpcs = snapshot.metadata?.conditionalNpcs;
     if (!conditionalNpcs || typeof conditionalNpcs !== "object") continue;
 
-    let npcs = snapshot.npcs ? [...snapshot.npcs] : [];
+    const npcs = snapshot.npcs ? [...snapshot.npcs] : [];
     let modified = false;
 
     for (const [npcId, config] of Object.entries(conditionalNpcs)) {
-      const npcConfig = config as any;
+      const npcConfig = config as { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] };
       const showWhen = npcConfig?.showWhen as StoryCondition[] | undefined;
       const removeWhen = npcConfig?.removeWhen as StoryCondition[] | undefined;
 
@@ -659,7 +659,7 @@ export function collectStoryCheckpointOptions(
   // (3) generic fallbacks for generated homes, else raw room id.
   const labelForRoom = (roomId: RoomId): string => {
     const snapshot = rooms[roomId as keyof typeof rooms];
-    const fromMeta = (snapshot as any)?.metadata?.displayLabel as string | undefined;
+    const fromMeta = snapshot?.metadata?.displayLabel as string | undefined;
     if (fromMeta && typeof fromMeta === "string") return fromMeta;
     const known = STORY_ROOM_LABELS[roomId];
     if (known) return known;

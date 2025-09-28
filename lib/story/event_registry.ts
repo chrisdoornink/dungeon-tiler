@@ -94,6 +94,12 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
     defaultValue: false,
     // No diary entry - this is just for dialogue state tracking
   },
+  "entered-bluff-cave": {
+    id: "entered-bluff-cave",
+    description: "Hero entered the bluff cave, Kalen moved to sanctum area.",
+    defaultValue: false,
+    // No diary entry - this is just for NPC positioning
+  },
 };
 
 export function listStoryEvents(): StoryEventDefinition[] {

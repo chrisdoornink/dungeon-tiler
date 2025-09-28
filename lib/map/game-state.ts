@@ -18,6 +18,8 @@ import {
   createInitialStoryFlags,
   type StoryFlags,
 } from "../story/event_registry";
+import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-handler";
+import { updateConditionalNpcs } from "../story/story_mode";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -294,7 +296,8 @@ export function performThrowRock(gameState: GameState): GameState {
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
         ).concat([[removed.y, removed.x] as [number, number]]);
-        return {
+        
+        const finalState = {
           ...preTickState,
           enemies: newEnemies,
           stats: newStats,
@@ -302,6 +305,13 @@ export function performThrowRock(gameState: GameState): GameState {
           defeatedEnemies: newDefeatedEnemies,
           runeCount: (preTickState.runeCount ?? 0) - 1,
         };
+
+        // Process enemy defeat story events
+        const defeatedEnemyInfo = createDefeatedEnemyInfo(removed);
+        const updatedState = processEnemyDefeat(finalState, defeatedEnemyInfo);
+        Object.assign(finalState, updatedState);
+
+        return finalState;
       }
       const prevHealth = target.health ?? 1;
       const newHealth = prevHealth - 2; // rock deals 2 damage
@@ -332,7 +342,8 @@ export function performThrowRock(gameState: GameState): GameState {
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
         ).concat([[removed.y, removed.x] as [number, number]]);
-        return {
+        
+        const finalState = {
           ...preTickState,
           enemies: newEnemies,
           stats: newStats,
@@ -340,6 +351,13 @@ export function performThrowRock(gameState: GameState): GameState {
           defeatedEnemies: newDefeatedEnemies,
           rockCount: count - 1,
         };
+
+        // Process enemy defeat story events
+        const defeatedEnemyInfo = createDefeatedEnemyInfo(removed);
+        const updatedState = processEnemyDefeat(finalState, defeatedEnemyInfo);
+        Object.assign(finalState, updatedState);
+
+        return finalState;
       } else {
         // Enemy survives: update its health in place
         target.health = newHealth;
@@ -497,7 +515,8 @@ export function performThrowRune(gameState: GameState): GameState {
       const newRecent = (
         preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
       ).concat([[removed.y, removed.x] as [number, number]]);
-      return {
+      
+      const finalState = {
         ...preTickState,
         enemies: newEnemies,
         stats: newStats,
@@ -505,6 +524,13 @@ export function performThrowRune(gameState: GameState): GameState {
         defeatedEnemies: newDefeatedEnemies,
         runeCount: count - 1,
       };
+
+      // Process enemy defeat story events
+      const defeatedEnemyInfo = createDefeatedEnemyInfo(removed);
+      const updatedState = processEnemyDefeat(finalState, defeatedEnemyInfo);
+      Object.assign(finalState, updatedState);
+
+      return finalState;
     }
 
     // Wall/obstacle -> drop on last floor tile
@@ -905,7 +931,7 @@ function applyRoomTransition(
   const nextNpcs = rehydrateNPCs(targetNPCsPlain);
   const nextPotOverrides = clonePotOverrides(targetRoom.potOverrides);
 
-  return {
+  const finalState = {
     ...state,
     mapData: nextMapData,
     currentRoomId: toId,
@@ -914,6 +940,28 @@ function applyRoomTransition(
     npcs: nextNpcs,
     potOverrides: nextPotOverrides,
   };
+
+  // Process onRoomEnter effects (story mode only)
+  if (finalState.mode === 'story') {
+    const roomMetadata = targetRoom.metadata;
+    const onRoomEnter = roomMetadata?.onRoomEnter as { effects?: Array<{ eventId: string; value: boolean }> } | undefined;
+    if (onRoomEnter?.effects && Array.isArray(onRoomEnter.effects)) {
+      for (const effect of onRoomEnter.effects) {
+        if (effect.eventId && typeof effect.value === 'boolean') {
+          if (!finalState.storyFlags) {
+            finalState.storyFlags = {};
+          }
+          finalState.storyFlags[effect.eventId] = effect.value;
+        }
+      }
+      // Update conditional NPCs after story flags change
+      if (finalState.storyFlags && finalState.rooms) {
+        updateConditionalNpcs(finalState);
+      }
+    }
+  }
+
+  return finalState;
 }
 
 export function movePlayer(
@@ -1424,29 +1472,9 @@ export function movePlayer(
           };
           newGameState.defeatedEnemies.push(defeatedEnemy);
           
-          // Process onEnemyDefeat effects immediately (story mode only)
-          if (newGameState.mode === 'story') {
-            const roomMetadata = newGameState.rooms?.[newGameState.currentRoomId || ""]?.metadata;
-            const onEnemyDefeat = roomMetadata?.onEnemyDefeat as Record<string, { effects?: Array<{ eventId: string; value: boolean }> }> | undefined;
-            if (onEnemyDefeat && typeof onEnemyDefeat === "object") {
-            for (const [memoryKey, config] of Object.entries(onEnemyDefeat)) {
-              if (defeatedEnemy.behaviorMemory && defeatedEnemy.behaviorMemory[memoryKey]) {
-                const effects = config?.effects;
-                if (effects && Array.isArray(effects)) {
-                  // Apply effects directly to newGameState
-                  for (const effect of effects) {
-                    if (effect.eventId && typeof effect.value === 'boolean') {
-                      if (!newGameState.storyFlags) {
-                        newGameState.storyFlags = {};
-                      }
-                      newGameState.storyFlags[effect.eventId] = effect.value;
-                    }
-                  }
-                }
-              }
-            }
-            }
-          }
+          // Process enemy defeat story events
+          const updatedGameState = processEnemyDefeat(newGameState, defeatedEnemy);
+          Object.assign(newGameState, updatedGameState);
           
           // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);

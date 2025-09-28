@@ -1,4 +1,4 @@
-import { FLOOR, WALL, TileSubtype, type RoomId } from "../../../map";
+import { FLOOR, WALL, TileSubtype } from "../../../map";
 import type { StoryRoom } from "../types";
 
 export function buildTorchTown(): StoryRoom {
