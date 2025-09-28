@@ -381,28 +381,28 @@ export function buildStoryModeState(): GameState {
     // Place the town librarian inside the library
     const libNpcY = Math.max(2, libraryRoom.entryPoint[0] - 2);
     const libNpcX = libraryRoom.entryPoint[1];
-    const librarian = new NPC({
-      id: "npc-librarian",
-      name: "Town Librarian",
-      sprite: "/images/npcs/boy-2.png",
+    const eldra = new NPC({
+      id: "npc-eldra",
+      name: "Eldra",
+      sprite: "/images/npcs/torch-town/eldra.png",
       y: libNpcY,
       x: libNpcX,
       facing: Direction.DOWN,
       canMove: false,
       interactionHooks: [
         {
-          id: "librarian-greet",
+          id: "eldra-greet",
           type: "dialogue",
-          description: "Greet the librarian",
+          description: "Speak with Eldra",
           payload: {
-            dialogueId: "town-librarian-default",
+            dialogueId: "torch-town-eldra-default",
           },
         },
       ],
       actions: ["talk"],
-      metadata: { archetype: "librarian" },
+      metadata: { archetype: "librarian", role: "story-keeper" },
     });
-    libraryRoom.npcs = [librarian];
+    libraryRoom.npcs = [eldra];
     extraRooms.push(libraryRoom);
     pushTransition(
       torchTown.id,
@@ -434,6 +434,30 @@ export function buildStoryModeState(): GameState {
       ...(storeRoom.metadata || {}),
       displayLabel: "Torch Town — Store",
     };
+    const storeNpcY = Math.max(2, storeRoom.entryPoint[0] - 2);
+    const storeNpcX = storeRoom.entryPoint[1];
+    const maro = new NPC({
+      id: "npc-maro",
+      name: "Maro",
+      sprite: "/images/npcs/torch-town/maro.png",
+      y: storeNpcY,
+      x: storeNpcX,
+      facing: Direction.DOWN,
+      canMove: false,
+      interactionHooks: [
+        {
+          id: "maro-greet",
+          type: "dialogue",
+          description: "Chat with Maro",
+          payload: {
+            dialogueId: "torch-town-maro-default",
+          },
+        },
+      ],
+      actions: ["talk"],
+      metadata: { archetype: "storekeeper" },
+    });
+    storeRoom.npcs = [maro];
     extraRooms.push(storeRoom);
     pushTransition(
       torchTown.id,

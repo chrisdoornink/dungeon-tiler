@@ -254,6 +254,237 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "torch-town-eldra-default": {
+    id: "torch-town-eldra-default",
+    lines: [
+      {
+        speaker: "Eldra",
+        text: "Tread lightly among the stacks. The parchment remembers who respects it—and who misplaces ledgers.",
+      },
+      {
+        speaker: "Eldra",
+        text: "If you cross paths with Maro, remind him Serin and I still await the inventory book he swears vanished on its own.",
+      },
+    ],
+  },
+  "torch-town-maro-default": {
+    id: "torch-town-maro-default",
+    lines: [
+      {
+        speaker: "Maro",
+        text: "Need something practical? Say it straight. I'm short on patience and shorter on surplus.",
+      },
+      {
+        speaker: "Maro",
+        text: "And if you see Kira near the guard tower again, send her home before Bren gives me another speech.",
+      },
+    ],
+  },
+  "torch-town-kira-default": {
+    id: "torch-town-kira-default",
+    lines: [
+      {
+        speaker: "Kira",
+        text: "Bren thinks I don't notice his patrol routes, but I map them out every evening from the rooftops.",
+      },
+      {
+        speaker: "Kira",
+        text: "Eldra says curiosity should be fed with books. I prefer unlocked doors.",
+      },
+    ],
+  },
+  "torch-town-captain-bren-default": {
+    id: "torch-town-captain-bren-default",
+    lines: [
+      {
+        speaker: "Captain Bren",
+        text: "The walls keep danger out, but discipline keeps peace within. I expect both from my watch.",
+      },
+      {
+        speaker: "Captain Bren",
+        text: "If you spot Yanna drifting past curfew, steer her back before the night shift does.",
+      },
+    ],
+  },
+  "torch-town-sela-default": {
+    id: "torch-town-sela-default",
+    lines: [
+      {
+        speaker: "Sela",
+        text: "Training at dusk keeps the blood warm—and lets Bren think I'm following orders to the letter.",
+      },
+      {
+        speaker: "Sela",
+        text: "If you smell spiced cider on the wind, keep it between us. Maro owes me a quiet night.",
+      },
+    ],
+  },
+  "torch-town-thane-default": {
+    id: "torch-town-thane-default",
+    lines: [
+      { speaker: "Thane", text: "..." },
+      {
+        speaker: "Thane",
+        text: "The gate holds. I intend to keep it that way.",
+      },
+    ],
+  },
+  "torch-town-jorin-default": {
+    id: "torch-town-jorin-default",
+    lines: [
+      {
+        speaker: "Jorin",
+        text: "Forge is roaring hot. Bring me raw metal and I'll hammer it into something worthy of your grip.",
+      },
+      {
+        speaker: "Jorin",
+        text: "If Yanna drifts past muttering about spores, drag her back before she singes her skirts again.",
+      },
+    ],
+  },
+  "torch-town-yanna-default": {
+    id: "torch-town-yanna-default",
+    lines: [
+      {
+        speaker: "Yanna",
+        text: "These herbs hum when the moon leans close. Fenna swears it's ominous; I say it's a doorway.",
+      },
+      {
+        speaker: "Yanna",
+        text: "If you gather petals beyond the walls, keep them shaded. The flame reacts poorly to sudden change.",
+      },
+    ],
+  },
+  "torch-town-serin-default": {
+    id: "torch-town-serin-default",
+    lines: [
+      {
+        speaker: "Serin",
+        text: "Sit a moment. Let me see the strain in your shoulders before it settles deeper.",
+      },
+      {
+        speaker: "Serin",
+        text: "Dara still sleeps lightly. If you speak with them, offer kindness before questions.",
+      },
+    ],
+  },
+  "torch-town-rhett-default": {
+    id: "torch-town-rhett-default",
+    lines: [
+      {
+        speaker: "Rhett",
+        text: "Soil's thin this season. Every stalk we coax up is another day the town eats.",
+      },
+      {
+        speaker: "Rhett",
+        text: "Tell Lio the fields aren't a larder for his hunts. If he wants venison, let him stalk it proper.",
+      },
+    ],
+  },
+  "torch-town-mira-default": {
+    id: "torch-town-mira-default",
+    lines: [
+      {
+        speaker: "Mira",
+        text: "The loom sings when gossip is good. Sit—I'll trade you a shawl for a secret worth weaving.",
+      },
+      {
+        speaker: "Mira",
+        text: "Rhett pretends he doesn't listen, but he knows every thread I spin keeps his shoulders covered.",
+      },
+    ],
+  },
+  "torch-town-lio-default": {
+    id: "torch-town-lio-default",
+    lines: [
+      {
+        speaker: "Lio",
+        text: "The ridgeline is quiet today—too quiet. I might slip beyond the torches after dusk.",
+      },
+      {
+        speaker: "Lio",
+        text: "If Rhett asks, I brought those herbs to his doorstep. He just beat me there in the telling.",
+      },
+    ],
+  },
+  "torch-town-dara-default": {
+    id: "torch-town-dara-default",
+    lines: [
+      {
+        speaker: "Dara",
+        text: "The town listens. Some with welcome, some with wary glances—but warmth is better than the night.",
+      },
+      {
+        speaker: "Dara",
+        text: "I'll linger near the fire until the walls feel like home. Share a story if you have one to spare.",
+      },
+    ],
+  },
+  "torch-town-old-fenna-default": {
+    id: "torch-town-old-fenna-default",
+    lines: [
+      {
+        speaker: "Old Fenna",
+        text: "Keep your shadow clear of the flame. Every breath it takes keeps the town in step.",
+      },
+      {
+        speaker: "Old Fenna",
+        text: "Yanna thinks her tinctures strengthen it. Hah. Tradition burns steadier than any experiment.",
+      },
+    ],
+  },
+  "torch-town-arin-default": {
+    id: "torch-town-arin-default",
+    lines: [
+      {
+        speaker: "Arin",
+        text: "If a beam creaks, I hear it before dawn. These homes stand because I never sleep easy.",
+      },
+      {
+        speaker: "Arin",
+        text: "Mira's laughter carries across the yard. I fix things so she never has to patch splinters into cloth.",
+      },
+    ],
+  },
+  "torch-town-haro-default": {
+    id: "torch-town-haro-default",
+    lines: [
+      {
+        speaker: "Haro",
+        text: "River's low but the nets hold. If Len would stop complaining, we'd haul twice the catch.",
+      },
+      {
+        speaker: "Haro",
+        text: "Bring me a good lure and I'll trade you smoked fish. Bring me Len's attitude and you'll get tossed in.",
+      },
+    ],
+  },
+  "torch-town-len-default": {
+    id: "torch-town-len-default",
+    lines: [
+      {
+        speaker: "Len",
+        text: "Haro thinks he's captain of the dock. I'm the one who patches the nets when he shreds them.",
+      },
+      {
+        speaker: "Len",
+        text: "If you hear splashing, it's just me proving him wrong again.",
+      },
+    ],
+  },
+  "torch-town-tavi-default": {
+    id: "torch-town-tavi-default",
+    lines: [
+      {
+        speaker: "Tavi",
+        text: "Look! The sparks chase me when I dance. Grandma says I'm faster than the flame.",
+      },
+      {
+        speaker: "Tavi",
+        text: "Want to play tag around the plaza? I'll show you all the hiding spots before the guards notice.",
+      },
+    ],
+  },
   // Kalen (the sanctum boy at the bluff)
   "kalen-distressed": {
     id: "kalen-distressed",
