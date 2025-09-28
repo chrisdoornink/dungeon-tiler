@@ -123,3 +123,150 @@ Here’s where we add fuel for dynamic dialog:
 * Befriending or angering an NPC changes **dialog priorities**.
 * Certain quests only available at **day vs. night** (guards swap, store closes).
 * The **central flame** can dim or flare based on outcomes of town storylines.
+
+🏘 Torch Town: Houses & Inhabitants
+House 1 – Eldra’s Cottage
+
+Eldra (Librarian) — lives alone.
+
+Day: Library (short walk, central).
+
+Night: Home.
+
+Often seen walking slowly through the square, muttering.
+
+House 2 – Maro & Kira
+
+Maro (Storekeeper)
+
+Kira (Teen niece)
+
+Day: Maro at Store (central); Kira wanders (sometimes to library, sometimes sneaks near guard tower).
+
+Night: Both home.
+
+Commute: Straight path between store & house near market square.
+
+House 3 – Captain Bren & Guards
+
+Captain Bren (Guard Captain)
+
+Sela (Night Guard)
+
+Thane (Guard)
+
+Day: Bren on patrol; Sela & Thane rest/spar in training yard.
+
+Night: Bren and Thane at tower, Sela on perimeter.
+
+Needs: Training yard near tower; perimeter wall walkable at night.
+
+House 4 – Jorin & Yanna
+
+Jorin (Blacksmith)
+
+Yanna (Herbalist)
+
+Day: Jorin at smithy (near central fire, heat source); Yanna at edge of forest gate (gathering).
+
+Night: Home together.
+
+Commute: Jorin → central, Yanna → out gate path.
+
+Needs: Small garden patch inside town where Yanna tends plants if she doesn’t venture out.
+
+House 5 – Serin
+
+Serin (Healer)
+
+Day: Home (patients come to her).
+
+Night: Same.
+
+Commute minimal. Torch Town might need a small herb garden or apothecary hut by her house.
+
+House 6 – Rhett & Mira
+
+Rhett (Farmer)
+
+Mira (Weaver)
+
+Day: Rhett at fields near gate; Mira weaving at a loom hut by house.
+
+Night: Both at home.
+
+Commute: Rhett walks out daily toward the field plots inside town walls.
+
+Needs: Field plots (grain/vegetables), loom hut with drying racks for Mira.
+
+House 7 – Haro & Len
+
+Haro (Fisher)
+
+Len (Fisher)
+
+Day: At fishing dock/pond outside wall (risky). Sometimes one stays in to mend nets.
+
+Night: Home.
+
+Commute: Daily trek to water.
+
+Needs: Fishing dock/river access just beyond walls, with a gate path.
+
+House 8 – Fenna, Tavi, Arin
+
+Fenna (Caretaker of central flame)
+
+Tavi (Child)
+
+Arin (Carpenter)
+
+Day: Fenna at flame monument; Tavi runs around playfully; Arin at work site repairing homes or helping farmers.
+
+Night: All home.
+
+Needs: Carpenter’s yard (wood pile, saw horse) near homes.
+
+Spare House – Dara (Outsider)
+
+Dara (Wanderer)
+
+Day: Wanders town outskirts, sometimes helps guards.
+
+Night: Alone in spare house.
+
+Needs: Edge-of-town bench/fire pit where they linger.
+
+🗺️ Torch Town Spaces Outside Structures
+
+To make NPC routines believable, here are essential communal or work areas:
+
+Central Fire Monument (sacred, tended by Fenna).
+
+Market Square (store + small stalls).
+
+Library (near square).
+
+Smithy (by square, with forge chimney visible).
+
+Guard Tower + Training Yard + Wall Path.
+
+Fields (inside near gate, to avoid monsters).
+
+Fishing Dock/Water Gate.
+
+Carpenter’s Yard (wood storage, tools).
+
+Herbal Garden Patch (between Serin’s and Yanna’s houses).
+
+Children’s Play Area (Tavi + Kira hangout).
+
+🔄 Day/Night Flow (commute loops)
+
+Morning: Farmers → fields, fishers → dock, Yanna → gate/forest edge.
+
+Midday: Market square busy (Maro, Mira selling goods, Kira sneaking).
+
+Evening: Everyone gravitates to central fire for warmth/stories.
+
+Night: Guards rotate to tower/walls; others at homes.
