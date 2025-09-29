@@ -1573,7 +1573,16 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.CHEST) ||
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||
       destSubtypes.includes(TileSubtype.CHECKPOINT) ||
-      destSubtypes.includes(TileSubtype.WALL_TORCH)
+      destSubtypes.includes(TileSubtype.WALL_TORCH) ||
+      // Roads are floor overlays; keep them when the player steps on them
+      destSubtypes.includes(TileSubtype.ROAD) ||
+      destSubtypes.includes(TileSubtype.ROAD_STRAIGHT) ||
+      destSubtypes.includes(TileSubtype.ROAD_CORNER) ||
+      destSubtypes.includes(TileSubtype.ROAD_T) ||
+      destSubtypes.includes(TileSubtype.ROAD_END) ||
+      destSubtypes.includes(TileSubtype.ROAD_ROTATE_90) ||
+      destSubtypes.includes(TileSubtype.ROAD_ROTATE_180) ||
+      destSubtypes.includes(TileSubtype.ROAD_ROTATE_270)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
