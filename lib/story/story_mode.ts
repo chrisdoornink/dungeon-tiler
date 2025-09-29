@@ -359,6 +359,10 @@ export function buildStoryModeState(): GameState {
         librarySize: [number, number];
         storeDoor: [number, number];
         storeSize: [number, number];
+        smithyDoor?: [number, number];
+        smithySize?: [number, number];
+        guardTowerDoor?: [number, number];
+        guardTowerSize?: [number, number];
         homeSize: [number, number];
       }
     | undefined;
@@ -452,6 +456,66 @@ export function buildStoryModeState(): GameState {
       storeRoom.transitionToPrevious!,
       storeExitTarget
     );
+
+    if (torchTownBuildings.smithyDoor && torchTownBuildings.smithySize) {
+      const smithyRoom = buildInteriorRoom(
+        "story-torch-town-smithy" as RoomId,
+        torchTownBuildings.smithySize[0],
+        torchTownBuildings.smithySize[1],
+        "house"
+      );
+      smithyRoom.metadata = {
+        ...(smithyRoom.metadata || {}),
+        displayLabel: "Torch Town — Smithy",
+      };
+      extraRooms.push(smithyRoom);
+      pushTransition(
+        torchTown.id,
+        smithyRoom.id,
+        torchTownBuildings.smithyDoor,
+        smithyRoom.entryPoint
+      );
+      const smithyExitTarget: [number, number] = [
+        torchTownBuildings.smithyDoor[0] + 1,
+        torchTownBuildings.smithyDoor[1],
+      ];
+      pushTransition(
+        smithyRoom.id,
+        torchTown.id,
+        smithyRoom.transitionToPrevious!,
+        smithyExitTarget
+      );
+    }
+
+    if (torchTownBuildings.guardTowerDoor && torchTownBuildings.guardTowerSize) {
+      const guardTowerRoom = buildInteriorRoom(
+        "story-torch-town-guard-tower" as RoomId,
+        torchTownBuildings.guardTowerSize[0],
+        torchTownBuildings.guardTowerSize[1],
+        "house"
+      );
+      guardTowerRoom.metadata = {
+        ...(guardTowerRoom.metadata || {}),
+        displayLabel: "Torch Town — Guard Tower",
+      };
+      extraRooms.push(guardTowerRoom);
+      pushTransition(
+        torchTown.id,
+        guardTowerRoom.id,
+        torchTownBuildings.guardTowerDoor,
+        guardTowerRoom.entryPoint
+      );
+      const guardTowerExit: [number, number] = [
+        torchTownBuildings.guardTowerDoor[0] + 1,
+        torchTownBuildings.guardTowerDoor[1],
+      ];
+      pushTransition(
+        guardTowerRoom.id,
+        torchTown.id,
+        guardTowerRoom.transitionToPrevious!,
+        guardTowerExit
+      );
+    }
 
     // Homes interiors
     const [homeW, homeH] = torchTownBuildings.homeSize;

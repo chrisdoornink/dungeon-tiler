@@ -102,17 +102,26 @@ export function buildTorchTown(): StoryRoom {
   // Central plaza checkpoint roughly in the middle of the inner area
   const centerY = Math.floor((innerMin + innerMax) / 2);
   const centerX = Math.floor((innerMin + innerMax) / 2);
-  if (tiles[centerY]?.[centerX] === FLOOR) {
-    subtypes[centerY][centerX] = [TileSubtype.CHECKPOINT];
+  for (let y = centerY - 1; y <= centerY + 1; y++) {
+    for (let x = centerX - 1; x <= centerX + 1; x++) {
+      if (y === centerY && x === centerX) {
+        tiles[y][x] = FLOOR;
+        subtypes[y][x] = [TileSubtype.CHECKPOINT, TileSubtype.WALL_TORCH];
+      } else if (y === centerY || x === centerX) {
+        tiles[y][x] = FLOOR;
+        if (!subtypes[y][x]) subtypes[y][x] = [];
+      } else {
+        tiles[y][x] = WALL;
+        subtypes[y][x] = [];
+      }
+    }
   }
 
-  // Library: taller building, placed near upper third
-  const libraryWidth = 3;
-  const libraryHeight = 5;
-  const libraryTop =
-    innerMin + Math.max(2, Math.floor((innerMax - innerMin) / 6));
-  const libraryLeft =
-    innerMin + Math.floor((innerMax - innerMin - libraryWidth) / 2);
+  // Library anchors the north side of the plaza
+  const libraryWidth = 5;
+  const libraryHeight = 4;
+  const libraryTop = innerMin + 3;
+  const libraryLeft = centerX - Math.floor(libraryWidth / 2);
   const libraryDoor = buildStructure(
     libraryTop,
     libraryLeft,
@@ -120,14 +129,11 @@ export function buildTorchTown(): StoryRoom {
     libraryHeight
   );
 
-  // Store: shorter building, placed below library with more spacing
-  const storeWidth = 3;
+  // Store sits to the west of the central plaza
+  const storeWidth = 4;
   const storeHeight = 3;
-  const storeTop = Math.min(
-    innerMax - storeHeight - 2,
-    libraryTop + libraryHeight + 8
-  );
-  const storeLeft = libraryLeft;
+  const storeTop = centerY - Math.floor(storeHeight / 2) - 2;
+  const storeLeft = centerX - storeWidth - 6;
   const storeDoor = buildStructure(
     storeTop,
     storeLeft,
@@ -135,98 +141,47 @@ export function buildTorchTown(): StoryRoom {
     storeHeight
   );
 
-  const homeLastNames = [
-    "Ashwood",
-    "Brightfield",
-    "Cindercrest",
-    "Dawnhollow",
-    "Emberline",
-    "Frostvale",
-    "Glimmerstone",
-    "Highridge",
-    "Ironwood",
-    "Juniperfell",
-  ];
+  // Workshop / smithy is mirrored to the east of the plaza
+  const smithyWidth = 4;
+  const smithyHeight = 3;
+  const smithyTop = storeTop;
+  const smithyLeft = centerX + 6;
+  const smithyDoor = buildStructure(
+    smithyTop,
+    smithyLeft,
+    smithyWidth,
+    smithyHeight
+  );
+
+  // Guard tower watches from the north-east corner with a front-facing door
+  const guardTowerWidth = 3;
+  const guardTowerHeight = 4;
+  const guardTowerTop = innerMin + 1;
+  const guardTowerLeft = innerMax - guardTowerWidth - 2;
+  const guardTowerDoor = buildStructure(
+    guardTowerTop,
+    guardTowerLeft,
+    guardTowerWidth,
+    guardTowerHeight
+  );
+
   const homeAssignments: Record<string, string> = {};
   const homeWidth = 3;
   const homeHeight = 2;
-  // Helper: check if a rectangular area is clear floor (no overlaps)
-  const isAreaFree = (top: number, left: number, w: number, h: number) => {
-    for (let y = top; y < top + h; y++) {
-      for (let x = left; x < left + w; x++) {
-        if (y < innerMin || y > innerMax || x < innerMin || x > innerMax)
-          return false;
-        if (tiles[y]?.[x] !== FLOOR) return false; // something already occupies this spot
-      }
-    }
-    return true;
-  };
-  // Base rows (structured), then apply small jitter so they aren't in straight lines
-  const baseRows: number[] = [];
-  for (let y = innerMin + 4; y <= innerMax - homeHeight - 4; y += 5)
-    baseRows.push(y);
-  const leftColBase = innerMin + 3;
-  const rightColBase = innerMax - homeWidth - 3;
+  const houses: Array<{ top: number; left: number; label: string }> = [
+    { top: 20, left: 18, label: "Eldra's Cottage" },
+    { top: 23, left: 19, label: "Maro & Kira" },
+    { top: 19, left: 24, label: "Guard Barracks" },
+    { top: 22, left: 25, label: "Jorin & Yanna" },
+    { top: 24, left: 22, label: "Serin" },
+    { top: 26, left: 25, label: "Rhett & Mira" },
+    { top: 27, left: 22, label: "Dara" },
+    { top: 25, left: 18, label: "Fenna & Tavi" },
+  ];
 
-  const jitter = (range: number) =>
-    Math.floor(Math.random() * (2 * range + 1)) - range;
-  const candidates: Array<{ top: number; left: number }> = [];
-  for (const baseTop of baseRows) {
-    // Left column home
-    candidates.push({ top: baseTop, left: leftColBase });
-    // Right column home
-    candidates.push({ top: baseTop, left: rightColBase });
-  }
-
-  const homesToPlace = Math.min(10, homeLastNames.length);
-  let homesPlaced = 0;
-  for (const base of candidates) {
-    if (homesPlaced >= homesToPlace) break;
-    // Apply small jitter (±2 tiles) and clamp inside bounds
-    const dy = jitter(2);
-    const dx = jitter(2);
-    let top = Math.max(
-      innerMin + 2,
-      Math.min(innerMax - homeHeight - 2, base.top + dy)
-    );
-    let left = Math.max(
-      innerMin + 2,
-      Math.min(innerMax - homeWidth - 2, base.left + dx)
-    );
-    // Keep a little breathing room from the center plaza
-    const tooCloseToCenter =
-      Math.abs(top - centerY) <= 2 && Math.abs(left - centerX) <= 2;
-    if (tooCloseToCenter) continue;
-    if (!isAreaFree(top, left, homeWidth, homeHeight)) {
-      // Try a couple nearby fallbacks without randomness explosion
-      const fallbackSpots: Array<[number, number]> = [
-        [top, left + 1],
-        [top, left - 1],
-        [top + 1, left],
-        [top - 1, left],
-      ];
-      let placed = false;
-      for (const [fy, fx] of fallbackSpots) {
-        if (
-          fy >= innerMin + 2 &&
-          fy <= innerMax - homeHeight - 2 &&
-          fx >= innerMin + 2 &&
-          fx <= innerMax - homeWidth - 2 &&
-          !(Math.abs(fy - centerY) <= 2 && Math.abs(fx - centerX) <= 2) &&
-          isAreaFree(fy, fx, homeWidth, homeHeight)
-        ) {
-          top = fy;
-          left = fx;
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) continue;
-    }
-    const door = buildStructure(top, left, homeWidth, homeHeight);
-    homeAssignments[`${door[0]},${door[1]}`] =
-      homeLastNames[homesPlaced] ?? `Family ${homesPlaced + 1}`;
-    homesPlaced++;
+  for (const house of houses) {
+    const door = buildStructure(house.top, house.left, homeWidth, homeHeight);
+    homeAssignments[`${door[0]},${door[1]}`] = house.label;
   }
 
   return {
@@ -242,6 +197,10 @@ export function buildTorchTown(): StoryRoom {
         librarySize: [libraryWidth, libraryHeight],
         storeDoor,
         storeSize: [storeWidth, storeHeight],
+        smithyDoor,
+        smithySize: [smithyWidth, smithyHeight],
+        guardTowerDoor,
+        guardTowerSize: [guardTowerWidth, guardTowerHeight],
         homeSize: [homeWidth, homeHeight],
       },
     },
