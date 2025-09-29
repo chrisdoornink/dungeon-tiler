@@ -141,7 +141,8 @@
   background-position: center;
   background-repeat: no-repeat;
   position: relative; /* allow z-index stacking over glow */
-  z-index: 1;
+  /* Ensure items render above road overlay (roadOverlay is 1010) */
+  z-index: 1030;
 }
 
 /* Torch icon: CSS-only flame with flicker */

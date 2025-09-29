@@ -382,16 +382,22 @@ export function performThrowRock(gameState: GameState): GameState {
     if (subs.includes(TileSubtype.POT)) {
       // If this pot contains a rune, reveal it; otherwise remove pot
       if (subs.includes(TileSubtype.RUNE)) {
-        newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+        // Preserve non-pot tags (e.g., ROAD overlays) and add RUNE
+        const kept = subs.filter((s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE);
+        newMapData.subtypes[ty][tx] = kept.concat([TileSubtype.RUNE]);
       } else {
+        // Remove only the pot marker; keep other tags (e.g., ROAD)
         newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
       }
       return { ...preTickState, mapData: newMapData, rockCount: count - 1 };
     }
   }
 
-  // Land the rock on the 4th tile
-  newMapData.subtypes[ty][tx] = [TileSubtype.ROCK];
+  // Land the rock on the 4th tile, preserving existing overlays (e.g., ROAD)
+  {
+    const base = (newMapData.subtypes[ty][tx] || []).filter((t) => t !== TileSubtype.ROCK);
+    newMapData.subtypes[ty][tx] = base.concat([TileSubtype.ROCK]);
+  }
 
   return {
     ...preTickState,
@@ -549,8 +555,11 @@ export function performThrowRune(gameState: GameState): GameState {
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
       if (subs.includes(TileSubtype.RUNE)) {
-        newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+        // Preserve other tags and reveal RUNE
+        const kept = subs.filter((s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE);
+        newMapData.subtypes[ty][tx] = kept.concat([TileSubtype.RUNE]);
       } else {
+        // Remove only pot; keep others
         newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
       }
       // Drop rune before the pot
@@ -569,9 +578,10 @@ export function performThrowRune(gameState: GameState): GameState {
     lastFloorX = tx;
   }
 
-  // Clear path for 4 tiles -> land on 4th tile
+  // Clear path for 4 tiles -> land on 4th tile (preserve overlays)
   if (newMapData.tiles[ty][tx] === FLOOR) {
-    newMapData.subtypes[ty][tx] = [TileSubtype.RUNE];
+    const base = (newMapData.subtypes[ty][tx] || []).filter((t) => t !== TileSubtype.RUNE);
+    newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
     return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
   }
   return preTickState;
@@ -1335,13 +1345,18 @@ export function movePlayer(
 
       // If this pot is tagged with RUNE, reveal the rune; otherwise reveal FOOD/MED 50/50
       if (subtype.includes(TileSubtype.RUNE)) {
-        newMapData.subtypes[newY][newX] = [TileSubtype.RUNE];
+        // Reveal rune while preserving other overlays except POT
+        const base = newMapData.subtypes[newY][newX].filter(
+          (t) => t !== TileSubtype.POT && t !== TileSubtype.RUNE
+        );
+        newMapData.subtypes[newY][newX] = base.concat([TileSubtype.RUNE]);
       } else {
         const key = `${newY},${newX}`;
         const overrides = newGameState.potOverrides;
         const overrideReveal = overrides?.[key];
         if (overrideReveal) {
-          newMapData.subtypes[newY][newX] = [overrideReveal];
+          const base = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.POT);
+          newMapData.subtypes[newY][newX] = base.concat([overrideReveal]);
           if (overrides) {
             const nextOverrides = { ...overrides };
             delete nextOverrides[key];
@@ -1352,7 +1367,8 @@ export function movePlayer(
         } else {
           // Deterministic reveal so all players see the same contents for this pot
           const reveal = pickPotRevealDeterministic(newMapData, newY, newX);
-          newMapData.subtypes[newY][newX] = [reveal];
+          const base = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.POT);
+          newMapData.subtypes[newY][newX] = base.concat([reveal]);
         }
       }
       return newGameState;
@@ -1390,7 +1406,8 @@ export function movePlayer(
     // If it's a RUNE, pick it up and clear the tile
     if (subtype.includes(TileSubtype.RUNE)) {
       newGameState.runeCount = (newGameState.runeCount || 0) + 1;
-      newMapData.subtypes[newY][newX] = [];
+      // Remove only the RUNE tag; preserve other overlays like ROAD
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.RUNE);
       // debug: rune picked up
     }
 
@@ -1439,7 +1456,8 @@ export function movePlayer(
     // If it's a ROCK, pick it up (increment inventory) and clear the tile
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
-      newMapData.subtypes[newY][newX] = [];
+      // Remove only the ROCK tag; preserve other overlays like ROAD
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.ROCK);
       // debug: rock picked up
     }
 
