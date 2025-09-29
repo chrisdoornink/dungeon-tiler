@@ -11,10 +11,38 @@ export function buildTorchTown(): StoryRoom {
     Array.from({ length: SIZE }, () => [] as number[])
   );
 
-  const ensureSubtype = (y: number, x: number, subtype: TileSubtype) => {
-    const cell = subtypes[y][x] ?? [];
-    if (!cell.includes(subtype)) {
-      subtypes[y][x] = [...cell, subtype];
+  const ensureSubtype = (y: number, x: number, ...types: TileSubtype[]) => {
+    if (!subtypes[y][x]) subtypes[y][x] = [];
+    if (types.length === 0) return;
+    const cell = subtypes[y][x];
+    for (const subtype of types) {
+      if (!cell.includes(subtype)) {
+        cell.push(subtype);
+      }
+    }
+  };
+
+  const markRoad = (
+    y: number,
+    x: number,
+    shape: TileSubtype,
+    rotation: 0 | 90 | 180 | 270 = 0
+  ) => {
+    tiles[y][x] = FLOOR;
+    ensureSubtype(y, x); // ensure the cell exists before filtering rotations
+    subtypes[y][x] = subtypes[y][x].filter(
+      (value) =>
+        value !== TileSubtype.ROAD_ROTATE_90 &&
+        value !== TileSubtype.ROAD_ROTATE_180 &&
+        value !== TileSubtype.ROAD_ROTATE_270
+    );
+    ensureSubtype(y, x, TileSubtype.ROAD, shape);
+    if (rotation === 90) {
+      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_90);
+    } else if (rotation === 180) {
+      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_180);
+    } else if (rotation === 270) {
+      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_270);
     }
   };
 
@@ -183,6 +211,39 @@ export function buildTorchTown(): StoryRoom {
     const door = buildStructure(house.top, house.left, homeWidth, homeHeight);
     homeAssignments[`${door[0]},${door[1]}`] = house.label;
   }
+
+  // Build a welcoming dirt road from the southern gate toward the central plaza
+  const roadStartRow = spawnRow;
+  const desiredCornerRow = centerY + 5;
+  const roadCornerRow = Math.max(
+    Math.min(roadStartRow - 1, desiredCornerRow),
+    centerY + 2
+  );
+
+  // Southern entry terminates the road with a cul-de-sac cap
+  markRoad(roadStartRow, entryColumn, TileSubtype.ROAD_END, 180);
+
+  for (let y = roadStartRow - 1; y > roadCornerRow; y--) {
+    markRoad(y, entryColumn, TileSubtype.ROAD_STRAIGHT, 90);
+  }
+
+  // Turn east toward the plaza
+  markRoad(roadCornerRow, entryColumn, TileSubtype.ROAD_CORNER, 90);
+  for (let x = entryColumn + 1; x < centerX; x++) {
+    markRoad(roadCornerRow, x, TileSubtype.ROAD_STRAIGHT);
+  }
+
+  // Curve north toward the plaza center
+  markRoad(roadCornerRow, centerX, TileSubtype.ROAD_CORNER, 270);
+  for (let y = roadCornerRow - 1; y > centerY + 1; y--) {
+    markRoad(y, centerX, TileSubtype.ROAD_STRAIGHT, 90);
+  }
+
+  // Final approach into the plaza with a T-intersection hub
+  markRoad(centerY + 1, centerX, TileSubtype.ROAD_STRAIGHT, 90);
+  markRoad(centerY, centerX, TileSubtype.ROAD_T);
+  markRoad(centerY, centerX - 1, TileSubtype.ROAD_STRAIGHT);
+  markRoad(centerY, centerX + 1, TileSubtype.ROAD_STRAIGHT);
 
   return {
     id: "story-torch-town",

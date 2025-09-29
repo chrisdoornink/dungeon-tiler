@@ -35,6 +35,10 @@ export const ASSET_URLS: string[] = [
   "/images/floor/outdoor-floor-1000.png",
   "/images/floor/in-house-floor-0000.png",
   "/images/floor/in-house-floor-1000.png",
+  "/images/floor/dirt-road-i.png",
+  "/images/floor/dirt-road-r.png",
+  "/images/floor/dirt-road-t.png",
+  "/images/floor/dirt-road-end.png",
 
   // Remaining walls
   "/images/wall/wall-0000.png",

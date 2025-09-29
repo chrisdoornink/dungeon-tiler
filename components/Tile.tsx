@@ -158,14 +158,30 @@ export const Tile: React.FC<TileProps> = ({
           return "NONE";
         case TileSubtype.ROOM_TRANSITION:
           return "ROOM_TRANSITION";
-        case TileSubtype.CHECKPOINT:
-          return "CHECKPOINT";
-        case TileSubtype.WINDOW:
-          return "WINDOW";
-        default:
-          return String(s);
-      }
-    });
+      case TileSubtype.CHECKPOINT:
+        return "CHECKPOINT";
+      case TileSubtype.WINDOW:
+        return "WINDOW";
+      case TileSubtype.ROAD:
+        return "ROAD";
+      case TileSubtype.ROAD_STRAIGHT:
+        return "ROAD_STRAIGHT";
+      case TileSubtype.ROAD_CORNER:
+        return "ROAD_CORNER";
+      case TileSubtype.ROAD_T:
+        return "ROAD_T";
+      case TileSubtype.ROAD_END:
+        return "ROAD_END";
+      case TileSubtype.ROAD_ROTATE_90:
+        return "ROAD_ROTATE_90";
+      case TileSubtype.ROAD_ROTATE_180:
+        return "ROAD_ROTATE_180";
+      case TileSubtype.ROAD_ROTATE_270:
+        return "ROAD_ROTATE_270";
+      default:
+        return String(s);
+    }
+  });
   };
 
   // Get color for a subtype icon
@@ -199,6 +215,12 @@ export const Tile: React.FC<TileProps> = ({
         return "bg-cyan-500";
       case TileSubtype.WINDOW:
         return "bg-sky-500";
+      case TileSubtype.ROAD:
+      case TileSubtype.ROAD_STRAIGHT:
+      case TileSubtype.ROAD_CORNER:
+      case TileSubtype.ROAD_T:
+      case TileSubtype.ROAD_END:
+        return "bg-amber-600";
       default:
         return "bg-gray-400";
     }
@@ -235,6 +257,12 @@ export const Tile: React.FC<TileProps> = ({
         return "⛳";
       case TileSubtype.WINDOW:
         return "≋";
+      case TileSubtype.ROAD:
+      case TileSubtype.ROAD_STRAIGHT:
+      case TileSubtype.ROAD_CORNER:
+      case TileSubtype.ROAD_T:
+      case TileSubtype.ROAD_END:
+        return "≡";
       default:
         return "?";
     }
@@ -311,6 +339,66 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.DARKNESS) || false;
   };
 
+  const hasRoad = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.ROAD) || false;
+  };
+
+  const getRoadShape = (
+    subtypes: number[] | undefined
+  ): TileSubtype | null => {
+    if (!hasRoad(subtypes) || !subtypes) return null;
+    if (subtypes.includes(TileSubtype.ROAD_T)) return TileSubtype.ROAD_T;
+    if (subtypes.includes(TileSubtype.ROAD_CORNER)) return TileSubtype.ROAD_CORNER;
+    if (subtypes.includes(TileSubtype.ROAD_END)) return TileSubtype.ROAD_END;
+    if (subtypes.includes(TileSubtype.ROAD_STRAIGHT)) {
+      return TileSubtype.ROAD_STRAIGHT;
+    }
+    return TileSubtype.ROAD;
+  };
+
+  const getRoadRotation = (subtypes: number[] | undefined): number => {
+    if (!subtypes) return 0;
+    if (subtypes.includes(TileSubtype.ROAD_ROTATE_270)) return 270;
+    if (subtypes.includes(TileSubtype.ROAD_ROTATE_180)) return 180;
+    if (subtypes.includes(TileSubtype.ROAD_ROTATE_90)) return 90;
+    return 0;
+  };
+
+  const getRoadAsset = (shape: TileSubtype | null): string | null => {
+    switch (shape) {
+      case TileSubtype.ROAD_STRAIGHT:
+        return "/images/floor/dirt-road-i.png";
+      case TileSubtype.ROAD_CORNER:
+        return "/images/floor/dirt-road-r.png";
+      case TileSubtype.ROAD_T:
+        return "/images/floor/dirt-road-t.png";
+      case TileSubtype.ROAD_END:
+        return "/images/floor/dirt-road-end.png";
+      case TileSubtype.ROAD:
+        return "/images/floor/dirt-road-i.png";
+      default:
+        return null;
+    }
+  };
+
+  const renderRoadOverlay = (subtypes: number[] | undefined) => {
+    const shape = getRoadShape(subtypes);
+    const asset = getRoadAsset(shape);
+    if (!asset) return null;
+    const rotation = getRoadRotation(subtypes);
+    return (
+      <div
+        key="road"
+        data-testid="road-overlay"
+        className={styles.roadOverlay}
+        style={{
+          backgroundImage: `url(${asset})`,
+          transform: `rotate(${rotation}deg)`,
+        }}
+      />
+    );
+  };
+
   // Generate random rotation for faulty floors based on coordinates
   const getFaultyFloorRotation = (): number => {
     const y = typeof row === 'number' ? row : 0;
@@ -361,7 +449,15 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
         subtype !== TileSubtype.PLAYER &&
-        subtype !== TileSubtype.WINDOW // Filter out player/window subtypes from icon overlay
+        subtype !== TileSubtype.WINDOW &&
+        subtype !== TileSubtype.ROAD &&
+        subtype !== TileSubtype.ROAD_STRAIGHT &&
+        subtype !== TileSubtype.ROAD_CORNER &&
+        subtype !== TileSubtype.ROAD_T &&
+        subtype !== TileSubtype.ROAD_END &&
+        subtype !== TileSubtype.ROAD_ROTATE_90 &&
+        subtype !== TileSubtype.ROAD_ROTATE_180 &&
+        subtype !== TileSubtype.ROAD_ROTATE_270 // Filter out subtypes with custom rendering
     );
   };
 
@@ -708,9 +804,11 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Render dirt road overlay if this floor tile is marked as part of a road */}
+          {hasRoad(subtype) && renderRoadOverlay(subtype)}
           {/* Render hero image on top of floor if this is a player tile */}
           {isPlayerTile && (
-            <div 
+            <div
               className={styles.heroImage}
               style={{
                 backgroundImage: `url(${heroImage})`,

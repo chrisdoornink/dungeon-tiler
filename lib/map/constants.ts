@@ -59,6 +59,14 @@ export enum TileSubtype {
   CHECKPOINT = 22,
   WINDOW = 23,
   CAVE_OPENING = 24,
+  ROAD = 25,
+  ROAD_STRAIGHT = 26,
+  ROAD_CORNER = 27,
+  ROAD_T = 28,
+  ROAD_END = 29,
+  ROAD_ROTATE_90 = 30,
+  ROAD_ROTATE_180 = 31,
+  ROAD_ROTATE_270 = 32,
 }
 
 /**

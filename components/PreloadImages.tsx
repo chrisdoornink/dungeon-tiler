@@ -18,6 +18,10 @@ export default function PreloadImages() {
       "/images/floor/outdoor-floor-1000.png",
       "/images/floor/in-house-floor-0000.png",
       "/images/floor/in-house-floor-1000.png",
+      "/images/floor/dirt-road-i.png",
+      "/images/floor/dirt-road-r.png",
+      "/images/floor/dirt-road-t.png",
+      "/images/floor/dirt-road-end.png",
 
       // Walls (all 8 NESW variants implemented)
       "/images/wall/wall-0000.png",

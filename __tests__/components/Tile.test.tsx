@@ -131,7 +131,7 @@ describe('Tile component', () => {
   it('should render asset-based icons for special subtypes', () => {
     const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
     render(<Tile tileId={0} tileType={mockTileType} subtype={[
-      TileSubtype.LIGHTSWITCH, 
+      TileSubtype.LIGHTSWITCH,
       TileSubtype.OPEN_CHEST,
       TileSubtype.KEY,
       TileSubtype.EXITKEY,
@@ -163,6 +163,29 @@ describe('Tile component', () => {
     expect(doorIcon.className).toContain('fullHeightAssetIcon');
     expect(exitIcon.className).toContain('exitIcon');
     expect(exitIcon.className).toContain('fullHeightAssetIcon');
+  });
+
+  it('renders a dirt road overlay with the correct asset and rotation', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    render(
+      <Tile
+        tileId={0}
+        tileType={mockTileType}
+        subtype={[
+          TileSubtype.ROAD,
+          TileSubtype.ROAD_STRAIGHT,
+          TileSubtype.ROAD_ROTATE_90,
+        ]}
+        isVisible={true}
+      />
+    );
+
+    const roadOverlay = screen.getByTestId('road-overlay');
+    expect(roadOverlay).toBeInTheDocument();
+    expect(roadOverlay).toHaveStyle(
+      "background-image: url(/images/floor/dirt-road-i.png)"
+    );
+    expect(roadOverlay).toHaveStyle('transform: rotate(90deg)');
   });
 
   it('should not display content when subtype is empty array', () => {

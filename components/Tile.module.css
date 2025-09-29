@@ -192,6 +192,18 @@
   margin: auto;
 }
 
+.roadOverlay {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 1010;
+  transform-origin: 50% 50%;
+}
+
 /* Special full-height asset icon for doors */
 .fullHeightAssetIcon {
   width: 28px;
