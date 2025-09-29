@@ -19,6 +19,12 @@ type NeighborInfo = {
   left: number | null;
 };
 
+export interface HeroMovementState {
+  offsetX: number;
+  offsetY: number;
+  isAnimating: boolean;
+}
+
 interface TileProps {
   tileId: number;
   tileType: TileType;
@@ -31,6 +37,7 @@ interface TileProps {
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
+  heroMovement?: HeroMovementState; // Visual offset when hero is sliding between tiles
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -60,6 +67,7 @@ export const Tile: React.FC<TileProps> = ({
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
   heroPoisoned = false,
+  heroMovement,
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
@@ -711,7 +719,18 @@ export const Tile: React.FC<TileProps> = ({
     : '';
   
   // Determine if we need to flip the hero image for left-facing direction
-  const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
+  const heroOrientationTransform =
+    isPlayerTile && playerDirection === Direction.LEFT ? "scaleX(-1)" : "";
+  const heroMovementTransform =
+    isPlayerTile && heroMovement
+      ? `translate3d(${heroMovement.offsetX}px, ${heroMovement.offsetY}px, 0)`
+      : "";
+  const heroCombinedTransform =
+    heroMovementTransform || heroOrientationTransform
+      ? [heroMovementTransform, heroOrientationTransform]
+          .filter((value) => Boolean(value && value.length > 0))
+          .join(" ")
+      : "none";
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
   const npcTransform = (() => {
@@ -809,10 +828,12 @@ export const Tile: React.FC<TileProps> = ({
           {/* Render hero image on top of floor if this is a player tile */}
           {isPlayerTile && (
             <div
-              className={styles.heroImage}
+              className={`${styles.heroImage} ${
+                heroMovement?.isAnimating ? styles.heroImageSliding : ""
+              }`}
               style={{
                 backgroundImage: `url(${heroImage})`,
-                transform: heroTransform,
+                transform: heroCombinedTransform,
                 backgroundColor: 'transparent'
               }}
             />

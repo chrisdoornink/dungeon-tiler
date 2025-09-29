@@ -17,7 +17,7 @@ import {
 import type { Enemy } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
-import { Tile } from "./Tile";
+import { Tile, type HeroMovementState } from "./Tile";
 import {
   getEnemyIcon,
   createEmptyByKind,
@@ -69,6 +69,8 @@ type DialogueSession = {
 };
 
 const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["goblin"]);
+const TILE_PIXEL_SIZE = 40;
+const HERO_SLIDE_DURATION_MS = 300;
 
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
@@ -195,6 +197,63 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }>>([]);
 
   const [isHeroDiaryOpen, setHeroDiaryOpen] = useState(false);
+
+  const [heroOffset, setHeroOffset] = useState<{ x: number; y: number }>({
+    x: 0,
+    y: 0,
+  });
+  const [heroIsSliding, setHeroIsSliding] = useState(false);
+  const heroSlideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const triggerHeroSlide = useCallback((dx: number, dy: number) => {
+    if (dx === 0 && dy === 0) return;
+
+    if (heroSlideTimeoutRef.current) {
+      clearTimeout(heroSlideTimeoutRef.current);
+      heroSlideTimeoutRef.current = null;
+    }
+
+    setHeroIsSliding(false);
+    setHeroOffset({
+      x: -dx * TILE_PIXEL_SIZE,
+      y: -dy * TILE_PIXEL_SIZE,
+    });
+
+    requestAnimationFrame(() => {
+      setHeroIsSliding(true);
+      setHeroOffset({ x: 0, y: 0 });
+    });
+
+    heroSlideTimeoutRef.current = setTimeout(() => {
+      setHeroIsSliding(false);
+      setHeroOffset({ x: 0, y: 0 });
+      heroSlideTimeoutRef.current = null;
+    }, HERO_SLIDE_DURATION_MS);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (heroSlideTimeoutRef.current) {
+        clearTimeout(heroSlideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const getPlayerPositionFromSubtypes = useCallback(
+    (subtypes?: number[][][]): [number, number] | null => {
+      if (!subtypes) return null;
+      for (let y = 0; y < subtypes.length; y++) {
+        for (let x = 0; x < subtypes[y].length; x++) {
+          if (subtypes[y][x].includes(TileSubtype.PLAYER)) {
+            return [y, x];
+          }
+        }
+      }
+      return null;
+    },
+    []
+  );
 
   // Developer hover coordinates for story mode (dev only)
   const [hoverTile, setHoverTile] = useState<[number, number] | null>(null);
@@ -1071,9 +1130,35 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
 
+  const heroMovementActive =
+    heroIsSliding || heroOffset.x !== 0 || heroOffset.y !== 0;
+  const heroMovementForTiles: HeroMovementState | undefined = heroMovementActive
+    ? {
+        offsetX: heroOffset.x,
+        offsetY: heroOffset.y,
+        isAnimating: heroIsSliding,
+      }
+    : undefined;
+
   useEffect(() => {
     // Find player position whenever gameState changes
     if (gameState.mapData.subtypes) {
+      if (prevGameState) {
+        const previousPosition = getPlayerPositionFromSubtypes(
+          prevGameState.mapData.subtypes
+        );
+        const currentPosition = getPlayerPositionFromSubtypes(
+          gameState.mapData.subtypes
+        );
+        if (previousPosition && currentPosition) {
+          const deltaY = currentPosition[0] - previousPosition[0];
+          const deltaX = currentPosition[1] - previousPosition[1];
+          if (deltaX !== 0 || deltaY !== 0) {
+            triggerHeroSlide(deltaX, deltaY);
+          }
+        }
+      }
+
       // If we have a previous state and the player has moved
       if (prevGameState && !isMoving) {
         // Set moving flag to true
@@ -1081,39 +1166,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
         // Delay updating the player position to match the grid transition
         setTimeout(() => {
-          // Find new player position
-          for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
-            for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
-              if (
-                gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)
-              ) {
-                setPlayerPosition([y, x]);
-                // Reset moving flag
-                setIsMoving(false);
-                return;
-              }
-            }
-          }
-          setPlayerPosition(null);
+          const newPosition = getPlayerPositionFromSubtypes(
+            gameState.mapData.subtypes
+          );
+          setPlayerPosition(newPosition);
           setIsMoving(false);
         }, 150); // Half of the CSS transition time for a smooth effect
       } else if (!prevGameState) {
         // Initial load - set position immediately
-        for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
-          for (let x = 0; x < gameState.mapData.subtypes[y].length; x++) {
-            if (gameState.mapData.subtypes[y][x].includes(TileSubtype.PLAYER)) {
-              setPlayerPosition([y, x]);
-              return;
-            }
-          }
-        }
-        setPlayerPosition(null);
+        const initialPosition = getPlayerPositionFromSubtypes(
+          gameState.mapData.subtypes
+        );
+        setPlayerPosition(initialPosition);
       }
 
       // Update previous game state
       setPrevGameState(gameState);
     }
-  }, [gameState, prevGameState, isMoving]);
+  }, [
+    gameState,
+    prevGameState,
+    isMoving,
+    triggerHeroSlide,
+    getPlayerPositionFromSubtypes,
+  ]);
 
   // Inventory is derived from gameState flags (hasKey, hasExitKey)
 
@@ -2340,6 +2416,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     suppressDarknessOverlay,
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
+                    heroMovementForTiles,
                     timeOfDayState
                   )}
                 </div>
@@ -2507,6 +2584,7 @@ function renderTileGrid(
   suppressDarknessOverlay: boolean = false,
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
+  heroMovement?: HeroMovementState,
   timeOfDay?: TimeOfDayState
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
@@ -2658,6 +2736,9 @@ function renderTileGrid(
             visibilityTier={tier}
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
+            heroMovement={
+              isPlayerTile && heroMovement ? heroMovement : undefined
+            }
             heroTorchLit={heroTorchLit}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}

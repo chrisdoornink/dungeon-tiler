@@ -549,6 +549,11 @@
   bottom: 0;
   z-index: 11000; /* Above torches/enemies but below wall-top overlays */
   background-color: transparent; /* Make sure background is transparent */
+  will-change: transform;
+}
+
+.heroImageSliding {
+  transition: transform 0.3s ease-out;
 }
 
 .npcImage {
