@@ -176,7 +176,7 @@ export function buildTorchTown(): StoryRoom {
     { top: 24, left: 22, label: "Serin" },
     { top: 26, left: 25, label: "Rhett & Mira" },
     { top: 27, left: 22, label: "Dara" },
-    { top: 25, left: 18, label: "Fenna & Tavi" },
+    { top: 26, left: 18, label: "Fenna & Tavi" },
   ];
 
   for (const house of houses) {
