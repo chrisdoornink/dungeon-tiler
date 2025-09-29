@@ -1,4 +1,13 @@
 import { FLOOR, WALL, TileSubtype } from "../../../map";
+import {
+  placeStraight,
+  placeCorner,
+  placeT,
+  placeEnd,
+  layStraightBetween,
+  layManhattan,
+  layCircularHubIntersection,
+} from "../../../map/roads";
 import type { StoryRoom } from "../types";
 
 export function buildTorchTown(): StoryRoom {
@@ -22,29 +31,7 @@ export function buildTorchTown(): StoryRoom {
     }
   };
 
-  const markRoad = (
-    y: number,
-    x: number,
-    shape: TileSubtype,
-    rotation: 0 | 90 | 180 | 270 = 0
-  ) => {
-    tiles[y][x] = FLOOR;
-    ensureSubtype(y, x); // ensure the cell exists before filtering rotations
-    subtypes[y][x] = subtypes[y][x].filter(
-      (value) =>
-        value !== TileSubtype.ROAD_ROTATE_90 &&
-        value !== TileSubtype.ROAD_ROTATE_180 &&
-        value !== TileSubtype.ROAD_ROTATE_270
-    );
-    ensureSubtype(y, x, TileSubtype.ROAD, shape);
-    if (rotation === 90) {
-      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_90);
-    } else if (rotation === 180) {
-      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_180);
-    } else if (rotation === 270) {
-      ensureSubtype(y, x, TileSubtype.ROAD_ROTATE_270);
-    }
-  };
+  // Roads are placed using helpers from lib/map/roads.ts
 
   const grassMargin = 2;
   const wallThickness = 2;
@@ -215,35 +202,39 @@ export function buildTorchTown(): StoryRoom {
   // Build a welcoming dirt road from the southern gate toward the central plaza
   const roadStartRow = spawnRow;
   const desiredCornerRow = centerY + 5;
-  const roadCornerRow = Math.max(
-    Math.min(roadStartRow - 1, desiredCornerRow),
-    centerY + 2
-  );
+  const roadCornerRow = 28;
 
-  // Southern entry terminates the road with a cul-de-sac cap
-  markRoad(roadStartRow, entryColumn, TileSubtype.ROAD_END, 180);
+  const middlePathCol = centerX - 5;
 
-  for (let y = roadStartRow - 1; y > roadCornerRow; y--) {
-    markRoad(y, entryColumn, TileSubtype.ROAD_STRAIGHT, 90);
-  }
 
-  // Turn east toward the plaza
-  markRoad(roadCornerRow, entryColumn, TileSubtype.ROAD_CORNER, 90);
-  for (let x = entryColumn + 1; x < centerX; x++) {
-    markRoad(roadCornerRow, x, TileSubtype.ROAD_STRAIGHT);
-  }
+  // Vertical segment from
+  layStraightBetween(tiles, subtypes, roadStartRow +1, entryColumn, roadCornerRow, entryColumn);
+  placeCorner(tiles, subtypes, 28, 3, ["S", "E"]);
+  
+  // Horizontal run to just before centerX
+  layStraightBetween(tiles, subtypes, roadCornerRow, entryColumn + 1, roadCornerRow, middlePathCol-1);
 
-  // Curve north toward the plaza center
-  markRoad(roadCornerRow, centerX, TileSubtype.ROAD_CORNER, 270);
-  for (let y = roadCornerRow - 1; y > centerY + 1; y--) {
-    markRoad(y, centerX, TileSubtype.ROAD_STRAIGHT, 90);
-  }
+  // Curve north toward the plaza center with corner at (roadCornerRow, centerX)
+  placeCorner(tiles, subtypes, roadCornerRow, middlePathCol, ["W", "N"]);
+  // Vertical run up to one below centerY
+  layStraightBetween(tiles, subtypes, roadCornerRow - 1, middlePathCol, centerY + 1, middlePathCol);
+
+  // Curve east toward the plaza center
+  placeCorner(tiles, subtypes, centerY, middlePathCol, ["S", "E"]);
+  layStraightBetween(tiles, subtypes, centerY, middlePathCol + 1, centerY, centerX-3);
+  
+
+  // A circlualr 4 road intersection around the central checkpoint hub
+  layCircularHubIntersection(tiles, subtypes, centerY, centerX);
+  
 
   // Final approach into the plaza with a T-intersection hub
-  markRoad(centerY + 1, centerX, TileSubtype.ROAD_STRAIGHT, 90);
-  markRoad(centerY, centerX, TileSubtype.ROAD_T);
-  markRoad(centerY, centerX - 1, TileSubtype.ROAD_STRAIGHT);
-  markRoad(centerY, centerX + 1, TileSubtype.ROAD_STRAIGHT);
+  // placeStraight(tiles, subtypes, centerY + 1, middlePathCol, 90);
+  // placeT(tiles, subtypes, centerY, centerX, ["W", "E", "S"]);
+  // placeStraight(tiles, subtypes, centerY, centerX - 1, 0);
+  // placeStraight(tiles, subtypes, centerY, centerX + 1, 0);
+  // Turn east toward the plaza with a corner at (roadCornerRow, entryColumn)
+  
 
   return {
     id: "story-torch-town",

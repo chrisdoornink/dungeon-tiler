@@ -97,10 +97,11 @@ export function placeCorner(
   const a = new Set<Dir>(dirs);
   let rot: 0 | 90 | 180 | 270 = 0;
   const n = a.has("N"), e = a.has("E"), s = a.has("S"), w = a.has("W");
-  if (n && e) rot = 270;
-  else if (e && s) rot = 90;
-  else if (s && w) rot = 180;
-  else if (w && n) rot = 0;
+  // Base art orientation: corner asset faces N+E at 0deg
+  if (n && e) rot = 0;     // NE
+  else if (e && s) rot = 90;   // ES
+  else if (s && w) rot = 180;  // SW
+  else if (w && n) rot = 270;  // WN
   setShape(tiles, subtypes, y, x, TileSubtype.ROAD_CORNER, rot);
 }
 
@@ -123,9 +124,14 @@ export function placeT(
   const set = new Set<Dir>(dirsPresent);
   const n = set.has("N"), e = set.has("E"), s = set.has("S"), w = set.has("W");
   let rot: 0 | 90 | 180 | 270 = 0;
-  if (!n) rot = 180;
+  // Renderer mapping for T: base art appears 180° off; use mapping below
+  // missing N -> 0
+  // missing E -> 90
+  // missing S -> 180
+  // missing W -> 270
+  if (!n) rot = 0;
   else if (!e) rot = 90;
-  else if (!s) rot = 0;
+  else if (!s) rot = 180;
   else if (!w) rot = 270;
   setShape(tiles, subtypes, y, x, TileSubtype.ROAD_T, rot);
 }
@@ -190,7 +196,7 @@ export function layManhattan(
     layStraightBetween(tiles, subtypes, y1, x1, y2, x1);
     // corner at (y2, x1)
     const dirA: Dir = y2 < y1 ? "N" : "S";
-    const dirB: Dir = x2 > x1 ? "E" : "W";
+    const dirB: Dir = x2 < x1 ? "E" : "W";
     placeCorner(tiles, subtypes, y2, x1, [dirA, dirB]);
     // horizontal to x2 (start adjacent to corner to avoid overwriting it)
     const startX = x2 > x1 ? x1 + 1 : x1 - 1;
@@ -198,11 +204,35 @@ export function layManhattan(
   } else {
     // horizontal first
     layStraightBetween(tiles, subtypes, y1, x1, y1, x2);
-    const dirA: Dir = x2 > x1 ? "E" : "W";
+    const dirA: Dir = x2 < x1 ? "E" : "W";
     const dirB: Dir = y2 < y1 ? "N" : "S";
     placeCorner(tiles, subtypes, y1, x2, [dirA, dirB]);
     // vertical to y2 (start adjacent to corner to avoid overwriting it)
     const startY = y2 > y1 ? y1 + 1 : y1 - 1;
     layStraightBetween(tiles, subtypes, startY, x2, y2, x2);
   }
+}
+
+/**
+ * Lay a circular hub intersection at (y,x) with 4 roads radiating out.
+ * The result is a 5x5 grid of roads centered at (y,x).
+ */
+export function layCircularHubIntersection(tiles: number[][], subtypes: number[][][], y: number, x: number) {
+   // A circlualr 4 road intersection around the central checkpoint hub
+   placeT(tiles, subtypes, y, x-2, ["W", "N", "S"]);
+   placeT(tiles, subtypes, y+2, x, ["W", "S", "E"]);
+   placeT(tiles, subtypes, y, x+2, ["S", "E", "N"]);
+   placeT(tiles, subtypes, y-2, x, ["N", "E", "W"]);
+   placeCorner(tiles, subtypes, y+2, x+2, ["N", "W"]);
+   placeCorner(tiles, subtypes, y+2, x-2, ["N", "E"]);
+   placeCorner(tiles, subtypes, y-2, x-2, ["S", "E"]);
+   placeCorner(tiles, subtypes, y-2, x+2, ["S", "W"]);
+   placeStraight(tiles, subtypes, y-1, x-2, 90);
+   placeStraight(tiles, subtypes, y+1, x-2, 90);  
+   placeStraight(tiles, subtypes, y+1, x+2, 90);
+   placeStraight(tiles, subtypes, y-1, x+2, 90);
+   placeStraight(tiles, subtypes, y-2, x-1, 0);
+   placeStraight(tiles, subtypes, y+2, x-1, 0);
+   placeStraight(tiles, subtypes, y+2, x+1, 0);
+   placeStraight(tiles, subtypes, y-2, x+1, 0);
 }

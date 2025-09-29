@@ -51,6 +51,7 @@ describe("roads helpers", () => {
     placeCorner(tiles, subtypes, 2, 2, ["N", "E"]);
     let c = subtypes[2][2]!;
     expect(has(c, TileSubtype.ROAD_CORNER)).toBe(true);
+    // Renderer base orientation is W+N (0deg), so NE requires r270
     expect(rotationFlags(c).r270).toBe(true);
 
     placeCorner(tiles, subtypes, 2, 3, ["E", "S"]);
@@ -66,7 +67,8 @@ describe("roads helpers", () => {
     placeCorner(tiles, subtypes, 3, 2, ["W", "N"]);
     c = subtypes[3][2]!;
     expect(has(c, TileSubtype.ROAD_CORNER)).toBe(true);
-    expect(rotationFlags(c).r90 || rotationFlags(c).r180 || rotationFlags(c).r270).toBe(false); // base 0
+    // W+N is base => no rotation flags
+    expect(rotationFlags(c).r90 || rotationFlags(c).r180 || rotationFlags(c).r270).toBe(false);
   });
 
   test("placeT sets correct rotation for missing side", () => {
@@ -96,6 +98,36 @@ describe("roads helpers", () => {
     expect(has(c, TileSubtype.ROAD_T)).toBe(true);
     const rot = rotationFlags(c);
     expect(rot.r90 || rot.r180 || rot.r270).toBe(false);
+  });
+
+  test("corner regression: NE and NW map correctly", () => {
+    const { tiles, subtypes } = makeGrid();
+    // NE should be base (no rotation flags when corner base is NE)
+    placeCorner(tiles, subtypes, 2, 2, ["N", "E"]);
+    let c = subtypes[2][2]!;
+    expect(has(c, TileSubtype.ROAD_CORNER)).toBe(true);
+    expect(rotationFlags(c).r90 || rotationFlags(c).r180 || rotationFlags(c).r270).toBe(false);
+
+    // NW should require 270
+    placeCorner(tiles, subtypes, 2, 3, ["N", "W"]);
+    c = subtypes[2][3]!;
+    expect(has(c, TileSubtype.ROAD_CORNER)).toBe(true);
+    expect(rotationFlags(c).r270).toBe(true);
+  });
+
+  test("T regression: present sets map to correct missing sides", () => {
+    const { tiles, subtypes } = makeGrid();
+    // W,S,E present -> missing N => expect 180
+    placeT(tiles, subtypes, 3, 3, ["W", "S", "E"]);
+    let c = subtypes[3][3]!;
+    expect(has(c, TileSubtype.ROAD_T)).toBe(true);
+    expect(rotationFlags(c).r180).toBe(true);
+
+    // N,E,W present -> missing S => expect 0 (no rotation flags)
+    placeT(tiles, subtypes, 3, 4, ["N", "E", "W"]);
+    c = subtypes[3][4]!;
+    expect(has(c, TileSubtype.ROAD_T)).toBe(true);
+    expect(rotationFlags(c).r90 || rotationFlags(c).r180 || rotationFlags(c).r270).toBe(false);
   });
 
   test("placeEnd maps direction to rotation", () => {
@@ -151,7 +183,7 @@ describe("roads helpers", () => {
     expect(has(v, TileSubtype.ROAD_STRAIGHT)).toBe(true);
     expect(rotationFlags(v).r90).toBe(true);
 
-    // Corner at (2,2) with dirs N+E
+    // Corner at (2,2) with dirs N+E (expects r270)
     const corner = subtypes[2][2]!;
     expect(has(corner, TileSubtype.ROAD_CORNER)).toBe(true);
     expect(rotationFlags(corner).r270).toBe(true);
