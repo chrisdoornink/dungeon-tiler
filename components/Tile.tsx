@@ -523,7 +523,9 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
             className={`${styles.assetIcon} ${styles.torchSprite}`}
             style={{ backgroundImage: `url(/images/items/wall-torch-2.png)` }}
-          />
+          >
+            <span data-testid="wall-torch" className="sr-only" />
+          </div>
         )}
 
         {/* Render key with asset if present */}
@@ -736,8 +738,8 @@ export const Tile: React.FC<TileProps> = ({
     return transforms.join(' ');
   })();
   const npcScale = (() => {
-    const s = (npc as any)?.metadata?.scale;
-    return typeof s === 'number' ? s : 1;
+    const scale = npc?.metadata?.scale;
+    return typeof scale === 'number' ? scale : 1;
   })();
   const npcTransformWithScale = npc
     ? `${npcTransform}${npcScale !== 1 ? ` scale(${npcScale})` : ''}`
