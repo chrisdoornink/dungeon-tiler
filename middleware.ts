@@ -4,12 +4,9 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // In production, block access to test routes and non-daily game modes
+  // In production, block access to non-daily game modes
   if (process.env.NODE_ENV === 'production') {
-    // Block test routes
-    if (pathname.startsWith('/test-room') || 
-        pathname.startsWith('/test-world') ||
-        pathname.startsWith('/planned-daily')) {
+    if (pathname.startsWith('/planned-daily')) {
       return NextResponse.redirect(new URL('/', request.url));
     }
     
@@ -34,8 +31,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/test-room/:path*',
-    '/test-world/:path*', 
     '/planned-daily/:path*',
     '/intro',
     '/end',

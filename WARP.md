@@ -77,7 +77,6 @@ The codebase follows a strict TDD methodology:
 ```
 app/                    # Next.js App Router pages
 ├── daily/             # Main entry point (production)
-├── test-room*/        # Development test environments (blocked in production)
 └── layout.tsx         # Global layout with fonts and preloading
 
 components/            # React components (one per file)
@@ -119,8 +118,6 @@ __tests__/            # Jest tests (mirrors source structure)
 
 ### Route Security (middleware.ts)
 Production blocks access to:
-- `/test-room*` - Development test environments
-- `/test-world` - Testing sandbox
 - `/intro` - Standalone intro (only through daily flow)
 - `/end` - Direct end page access
 - `/analytics*` - Analytics dashboard

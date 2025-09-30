@@ -34,7 +34,6 @@ export function buildBluffPassageway(): StoryRoom {
 
   // Midpoints used for placements
   const midY = Math.floor(height / 2);
-  // const midX = Math.floor(width / 2); // unused for now
 
   // Opening on right wall near bottom
   const openY = height - 3; // two tiles up from bottom

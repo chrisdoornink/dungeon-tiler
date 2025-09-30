@@ -8,7 +8,7 @@ A roguelike dungeon crawler game built with Next.js featuring daily challenges, 
 - **Roguelike Mechanics**: Turn-based combat, item collection, procedural dungeons
 - **Analytics Integration**: PostHog for user behavior tracking
 - **Mobile Responsive**: Optimized for both desktop and mobile play
-- **Production Security**: Test routes blocked in production
+- **Production Security**: Non-daily routes blocked in production
 
 ## Prerequisites
 
@@ -92,12 +92,8 @@ npm run build
 - `/` - Daily challenge (only accessible route in production)
 
 ### Development/Test Routes (blocked in production)
-- `/test-room` - Basic test room
-- `/test-room-2` - Advanced test room  
-- `/test-room-3` - Combat test room
-- `/test-world` - Full test world with parameters
-- `/intro` - Game instructions
-- `/end` - Game completion screen
+- `/intro` - Game instructions (accessible only through the daily flow)
+- `/end` - Game completion screen (requires session data)
 
 ## Architecture
 

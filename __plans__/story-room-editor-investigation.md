@@ -6,8 +6,8 @@
 - Because each room is generated through imperative code, tweaking a single tile requires understanding bespoke carving logic, with no shared abstraction for tile grids, transitions, or placed objects.
 
 ## Existing rendering/editor surfaces
-- The main playable grid is rendered through `components/TilemapGrid`, which already knows how to display arbitrary `mapData` plus enemies/NPCs from an initial `GameState`. It can also run in a mode where a raw `tilemap` is provided and it will fabricate a temporary `GameState` on the fly, as demonstrated by the prototype pages in `app/test-room`.*【F:components/TilemapGrid.tsx†L99-L161】【F:app/test-room/page.tsx†L1-L123】
-- The "test room" pages show that we can mount custom rooms in isolation today, but the data is still produced as imperative scripts.
+- The main playable grid is rendered through `components/TilemapGrid`, which already knows how to display arbitrary `mapData` plus enemies/NPCs from an initial `GameState`. It can also run in a mode where a raw `tilemap` is provided and it will fabricate a temporary `GameState` on the fly, as demonstrated by the former prototype pages in `app/test-room`.*【F:components/TilemapGrid.tsx†L99-L161】
+- The old "test room" pages showed that we could mount custom rooms in isolation, but the data was still produced as imperative scripts. Those pages have since been removed to reduce unused surface area.
 
 ## Pain points for manual editing
 1. **Readability** – There is no human-readable snapshot of a room layout. Floors vs walls, transitions, and decorations all require following loops/algorithms.
@@ -39,4 +39,4 @@
 3. Add utilities for loading/saving blueprint JSON to support a future browser-based editor view.
 4. Once comfortable with the schema, proceed to implement the interactive editor page that edits blueprint objects instead of imperative code.
 
-*The existing test-room page could be repurposed as an early experiment for the editor UI once declarative data is available.
+*The previous test-room page could be repurposed as an early experiment for the editor UI once declarative data is available, should we decide to revive it.

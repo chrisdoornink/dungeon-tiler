@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
-// import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
 import {
   EnemyRegistry,
@@ -210,11 +209,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     }
     lines.push(healthTiles.join(""));
-
-    // Grade (moved below hearts), intentionally commented out for now until accuracy is improved
-    // if (scoreBreakdown) {
-    //   lines.push(`Grade: ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)`);
-    // }
 
     // A link to the game at torchboy.com
     lines.push("\n#TorchBoy https://torchboy.com");
@@ -472,12 +466,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         return tiles;
                       })()}
                     </div>
-                    {/* Grade moved below hearts; hidden for now until accuracy is improved.
-                        When re-enabling, render something like:
-                        <div className="mt-2 text-sm text-gray-300">
-                          Grade: {scoreBreakdown.grade} ({scoreBreakdown.percentage}%)
-                        </div>
-                    */}
                   </div>
                 </div>
               </div>

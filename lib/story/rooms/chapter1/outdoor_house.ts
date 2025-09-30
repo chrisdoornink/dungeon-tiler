@@ -67,23 +67,6 @@ export function buildOutdoorHouse(): StoryRoom {
           dialogueId: "caretaker-lysa-intro",
         },
       },
-      // {
-      //   id: "lysa-chat",
-      //   type: "dialogue",
-      //   description: "Listen to Lysa's song",
-      //   payload: {
-      //     dialogueId: "caretaker-lysa-default",
-      //   },
-      // },
-
-      // {
-      //   id: "lysa-rest",
-      //   type: "custom",
-      //   description: "Request a moment of rest",
-      //   payload: {
-      //     action: "rest",
-      //   },
-      // },
     ],
     actions: ["talk", "rest"],
     metadata: {
