@@ -3,7 +3,6 @@ import {
   placeStraight,
   placeCorner,
   placeT,
-  placeEnd,
   layStraightBetween,
   layManhattan,
 } from "../../../map/roads";

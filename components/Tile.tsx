@@ -736,7 +736,7 @@ export const Tile: React.FC<TileProps> = ({
     return transforms.join(' ');
   })();
   const npcScale = (() => {
-    const s = (npc as any)?.metadata?.scale;
+    const s = npc?.metadata?.scale;
     return typeof s === 'number' ? s : 1;
   })();
   const npcTransformWithScale = npc
