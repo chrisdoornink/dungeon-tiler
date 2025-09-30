@@ -147,7 +147,7 @@ Night: Both home.
 
 Commute: Straight path between store & house near market square.
 
-House 3 – Captain Bren & Guards
+Guard Tower – Captain Bren & Guards
 
 Captain Bren (Guard Captain)
 
@@ -161,7 +161,7 @@ Night: Bren and Thane at tower, Sela on perimeter.
 
 Needs: Training yard near tower; perimeter wall walkable at night.
 
-House 4 – Jorin & Yanna
+House 3 – Jorin & Yanna
 
 Jorin (Blacksmith)
 
@@ -175,7 +175,7 @@ Commute: Jorin → central, Yanna → out gate path.
 
 Needs: Small garden patch inside town where Yanna tends plants if she doesn’t venture out.
 
-House 5 – Serin
+House 4 – Serin
 
 Serin (Healer)
 
@@ -185,7 +185,7 @@ Night: Same.
 
 Commute minimal. Torch Town might need a small herb garden or apothecary hut by her house.
 
-House 6 – Rhett & Mira
+House 5 – Rhett & Mira
 
 Rhett (Farmer)
 
@@ -199,7 +199,7 @@ Commute: Rhett walks out daily toward the field plots inside town walls.
 
 Needs: Field plots (grain/vegetables), loom hut with drying racks for Mira.
 
-House 7 – Haro & Len
+House 6 – Haro & Len
 
 Haro (Fisher)
 
@@ -213,7 +213,7 @@ Commute: Daily trek to water.
 
 Needs: Fishing dock/river access just beyond walls, with a gate path.
 
-House 8 – Fenna, Tavi, Arin
+House 7 – Fenna, Tavi, Arin
 
 Fenna (Caretaker of central flame)
 
@@ -227,7 +227,7 @@ Night: All home.
 
 Needs: Carpenter’s yard (wood pile, saw horse) near homes.
 
-Spare House – Dara (Outsider)
+House 8 – Dara (Outsider)
 
 Dara (Wanderer)
 

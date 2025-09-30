@@ -122,13 +122,7 @@ export function buildTorchTown(): StoryRoom {
       if (y === centerY && x === centerX) {
         tiles[y][x] = FLOOR;
         subtypes[y][x] = [TileSubtype.CHECKPOINT];
-      } else if (y === centerY || x === centerX) {
-        tiles[y][x] = FLOOR;
-        if (!subtypes[y][x]) subtypes[y][x] = [];
-      } else {
-        tiles[y][x] = WALL;
-        subtypes[y][x] = [];
-      }
+      } 
     }
   }
 
@@ -219,9 +213,10 @@ export function buildTorchTown(): StoryRoom {
   // Vertical run up to one below centerY
   layStraightBetween(tiles, subtypes, roadCornerRow - 1, middlePathCol, centerY + 1, middlePathCol);
 
-  // Curve east toward the plaza center
-  placeCorner(tiles, subtypes, centerY, middlePathCol, ["S", "E"]);
-  layStraightBetween(tiles, subtypes, centerY, middlePathCol + 1, centerY, centerX-3);
+  // Curve east toward the plaza center and west to the store
+  layStraightBetween(tiles, subtypes, centerY, 9, centerY, centerX-3);
+  placeT(tiles, subtypes, centerY, middlePathCol, ["S", "E", "W"]);
+  placeEnd(tiles, subtypes, centerY, 8, "E");
   
 
   // A circlualr 4 road intersection around the central checkpoint hub
@@ -260,6 +255,7 @@ export function buildTorchTown(): StoryRoom {
     entryFromNext,
     transitionToPrevious,
     metadata: {
+      displayLabel: "Torch Town",
       homes: homeAssignments,
       buildings: {
         libraryDoor,

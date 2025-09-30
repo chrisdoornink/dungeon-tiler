@@ -229,6 +229,7 @@ export function buildOutdoorClearing(): StoryRoom {
     ],
     npcs,
     metadata: {
+      displayLabel: "Forest Clearing",
       conditionalNpcs: {
         "npc-sanctum-boy": {
           showWhen: [{ eventId: "entered-bluff-cave", value: true }]

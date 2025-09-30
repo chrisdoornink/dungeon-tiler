@@ -2384,6 +2384,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       </div>
 
+      {gameState.mode === 'story' && gameState.currentRoomId && (() => {
+        const roomId = gameState.currentRoomId;
+        const room = gameState.rooms?.[roomId];
+        const label = room?.metadata?.displayLabel as string | undefined;
+        if (!label) return null;
+        return (
+          <div
+            className="fixed top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-black/80 text-white text-sm font-semibold pointer-events-none shadow-lg border border-white/20"
+            style={{ zIndex: 14000 }}
+          >
+            {label}
+          </div>
+        );
+      })()}
+
       {process.env.NODE_ENV === 'development' && gameState.mode === 'story' && hoverTile && (
         <div
           aria-live="polite"
