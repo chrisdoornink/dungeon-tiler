@@ -6,10 +6,38 @@ import type { StoryRoom } from "../types";
 const SIZE = 25;
 
 /**
+ * FIXED_ROOM_DATA: Set this to freeze a specific map + enemy layout permanently.
+ * 
+ * How to freeze a map you like:
+ * 1. Enter The Wilds and play through the map
+ * 2. If you like it, check DevTools Console - it auto-logs the room data
+ * 3. Look for: "[The Wilds] Room data ready to freeze (copy command above)"
+ * 4. Run the copy() command shown in the console
+ * 5. Paste the result here as: const FIXED_ROOM_DATA = <paste>;
+ * 6. Save this file and reload
+ * 
+ * The frozen room will have the same map layout AND enemy positions every time!
+ * Set back to null to generate random maps again.
+ */
+const FIXED_ROOM_DATA: { mapData: MapData; enemies: Array<{ y: number; x: number; kind: string }> } | null = null;
+
+// Example after pasting:
+// const FIXED_ROOM_DATA = {
+//   mapData: { tiles: [[...]], subtypes: [[...]] },
+//   enemies: [{ y: 5, x: 10, kind: "goblin" }, ...]
+// };
+
+/**
  * Generate The Wilds map using the same generation as daily mode.
  * This ensures proper connectivity and environment.
  */
 function generateWildsMap(): MapData {
+  // If a fixed room is set, use its map data
+  if (FIXED_ROOM_DATA) {
+    console.log('[The Wilds] Using FIXED_ROOM_DATA - map and enemies are frozen');
+    return FIXED_ROOM_DATA.mapData;
+  }
+
   // Use the exact same generation as daily mode
   const tiles = generateMap();
   
@@ -58,9 +86,18 @@ function generateWildsMap(): MapData {
 }
 
 /**
- * Place enemies randomly in the wilds
+ * Place enemies randomly in the wilds (or use fixed positions if FIXED_ROOM_DATA is set)
  */
 function generateWildsEnemies(mapData: MapData): Enemy[] {
+  // If using fixed room data, recreate enemies from saved positions
+  if (FIXED_ROOM_DATA) {
+    return FIXED_ROOM_DATA.enemies.map(e => {
+      const enemy = new Enemy({ y: e.y, x: e.x });
+      enemy.kind = e.kind as "goblin" | "snake";
+      return enemy;
+    });
+  }
+
   const enemies: Enemy[] = [];
   const floorTiles: Array<[number, number]> = [];
 
@@ -117,6 +154,27 @@ export function buildTheWildsEntrance(): StoryRoom {
   }
   
   const enemies = generateWildsEnemies(mapData);
+
+  // Auto-log the room data for easy freezing (only when generating randomly)
+  if (!FIXED_ROOM_DATA && typeof window !== 'undefined') {
+    const roomSnapshot = {
+      mapData,
+      enemies: enemies.map(e => ({ y: e.y, x: e.x, kind: e.kind }))
+    };
+    
+    console.log(
+      '%c[The Wilds] Generated new random room. To freeze this layout, run:',
+      'color: #4CAF50; font-weight: bold'
+    );
+    console.log(
+      '%ccopy(JSON.stringify(' + JSON.stringify(roomSnapshot) + '))',
+      'background: #f0f0f0; padding: 8px; border-radius: 4px; font-family: monospace'
+    );
+    console.log(
+      '%c[The Wilds] Room data ready to freeze (copy command above)',
+      'color: #2196F3; font-weight: bold'
+    );
+  }
 
   return {
     id: "story-the-wilds-entrance",
