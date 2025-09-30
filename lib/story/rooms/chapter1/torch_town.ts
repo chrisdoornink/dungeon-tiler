@@ -1,14 +1,25 @@
-import { FLOOR, WALL, TileSubtype } from "../../../map";
+import { FLOOR, WALL, TileSubtype, Direction } from "../../../map";
 import {
-  placeStraight,
   placeCorner,
   placeT,
   placeEnd,
   layStraightBetween,
-  layManhattan,
   layCircularHubIntersection,
 } from "../../../map/roads";
+import { NPC } from "../../../npc";
 import type { StoryRoom } from "../types";
+
+// House labels - defined once and reused
+export const HOUSE_LABELS = {
+  HOUSE_1: "Eldra's Cottage",
+  HOUSE_2: "Maro & Kira's Cottage",
+  HOUSE_3: "Jorin & Yanna's Cottage",
+  HOUSE_4: "Serin's Clinic",
+  HOUSE_5: "Rhett & Mira's Cottage",
+  HOUSE_6: "Haro & Len's Cottage",
+  HOUSE_7: "Fenna, Tavi & Arin's Cottage",
+  HOUSE_8: "Dara's Cottage",
+} as const;
 
 export function buildTorchTown(): StoryRoom {
   const SIZE = 35;
@@ -174,18 +185,20 @@ export function buildTorchTown(): StoryRoom {
     guardTowerHeight
   );
 
+
+
   const homeAssignments: Record<string, string> = {};
   const homeWidth = 3;
   const homeHeight = 2;
   const houses: Array<{ top: number; left: number; label: string }> = [
-    { top: 20, left: 18, label: "Eldra's Cottage" },
-    { top: 23, left: 19, label: "Maro & Kira" },
-    { top: 19, left: 24, label: "Guard Barracks" },
-    { top: 22, left: 25, label: "Jorin & Yanna" },
-    { top: 24, left: 22, label: "Serin" },
-    { top: 26, left: 25, label: "Rhett & Mira" },
-    { top: 27, left: 22, label: "Dara" },
-    { top: 26, left: 18, label: "Fenna & Tavi" },
+    { top: 20, left: 18, label: HOUSE_LABELS.HOUSE_1 },
+    { top: 23, left: 19, label: HOUSE_LABELS.HOUSE_2 },
+    { top: 19, left: 24, label: HOUSE_LABELS.HOUSE_3 },
+    { top: 22, left: 25, label: HOUSE_LABELS.HOUSE_4 },
+    { top: 24, left: 22, label: HOUSE_LABELS.HOUSE_5 },
+    { top: 26, left: 25, label: HOUSE_LABELS.HOUSE_6 },
+    { top: 27, left: 22, label: HOUSE_LABELS.HOUSE_7 },
+    { top: 26, left: 18, label: HOUSE_LABELS.HOUSE_8 },
   ];
 
   for (const house of houses) {
@@ -195,7 +208,6 @@ export function buildTorchTown(): StoryRoom {
 
   // Build a welcoming dirt road from the southern gate toward the central plaza
   const roadStartRow = spawnRow;
-  const desiredCornerRow = centerY + 5;
   const roadCornerRow = 28;
 
   const middlePathCol = centerX - 5;
@@ -247,6 +259,224 @@ export function buildTorchTown(): StoryRoom {
   // placeStraight(tiles, subtypes, centerY, centerX + 1, 0);
   // Turn east toward the plaza with a corner at (roadCornerRow, entryColumn)
   
+  // NPCs - Day and Night positions
+  const npcs: NPC[] = [];
+
+  // 1. Eldra (Librarian) - Day: Library, Night: House 1
+  npcs.push(new NPC({
+    id: "npc-eldra",
+    name: "Eldra",
+    sprite: "/images/npcs/torch-town/eldra.png",
+    y: libraryDoor[0] - 1,
+    x: libraryDoor[1],
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "library", nightLocation: "house1", house: HOUSE_LABELS.HOUSE_1 },
+  }));
+
+  // 2. Maro (Storekeeper) - Day: Store, Night: House 2
+  npcs.push(new NPC({
+    id: "npc-maro",
+    name: "Maro",
+    sprite: "/images/npcs/torch-town/maro.png",
+    y: storeDoor[0] - 1,
+    x: storeDoor[1],
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "store", nightLocation: "house2", house: HOUSE_LABELS.HOUSE_2 },
+  }));
+
+  // 3. Captain Bren (Guard Captain) - Day: Patrol (plaza), Night: Guard Tower
+  npcs.push(new NPC({
+    id: "npc-captain-bren",
+    name: "Captain Bren",
+    sprite: "/images/npcs/torch-town/captain-bren.png",
+    y: centerY - 2,
+    x: centerX + 2,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "patrol", nightLocation: "guardTower" },
+  }));
+
+  // 4. Jorin (Blacksmith) - Day: Smithy, Night: House 3
+  npcs.push(new NPC({
+    id: "npc-jorin",
+    name: "Jorin",
+    sprite: "/images/npcs/torch-town/jorin.png",
+    y: smithyDoor[0] - 1,
+    x: smithyDoor[1],
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "smithy", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
+  }));
+
+  // 5. Yanna (Herbalist) - Day: Forest edge (near gate), Night: House 3
+  npcs.push(new NPC({
+    id: "npc-yanna",
+    name: "Yanna",
+    sprite: "/images/npcs/torch-town/yanna.png",
+    y: spawnRow - 2,
+    x: entryColumn + 2,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "forestEdge", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
+  }));
+
+  // 6. Serin (Healer) - Day: House 4 (clinic), Night: House 4
+  npcs.push(new NPC({
+    id: "npc-serin",
+    name: "Serin",
+    sprite: "/images/npcs/torch-town/serin.png",
+    y: houses[3].top + homeHeight,
+    x: houses[3].left + 1,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "house4", nightLocation: "house4", house: HOUSE_LABELS.HOUSE_4 },
+  }));
+
+  // 7. Rhett (Farmer) - Day: Fields (near gate), Night: House 5
+  npcs.push(new NPC({
+    id: "npc-rhett",
+    name: "Rhett",
+    sprite: "/images/npcs/torch-town/rhett.png",
+    y: spawnRow - 4,
+    x: entryColumn - 2,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "fields", nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
+  }));
+
+  // 8. Mira (Weaver) - Day: Near house 5 (weaving), Night: House 5
+  npcs.push(new NPC({
+    id: "npc-mira",
+    name: "Mira",
+    sprite: "/images/npcs/torch-town/mira.png",
+    y: houses[4].top + homeHeight,
+    x: houses[4].left + 2,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "weaving", nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
+  }));
+
+  // 9. Kira (Teen) - Day: Wandering (plaza), Night: House 2
+  npcs.push(new NPC({
+    id: "npc-kira",
+    name: "Kira",
+    sprite: "/images/npcs/torch-town/kira.png",
+    y: centerY + 1,
+    x: centerX - 2,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "plaza", nightLocation: "house2", house: HOUSE_LABELS.HOUSE_2 },
+  }));
+
+  // 10. Lio (Hunter) - Day: Near gate, Night: Wandering
+  npcs.push(new NPC({
+    id: "npc-lio",
+    name: "Lio",
+    sprite: "/images/npcs/torch-town/lio.png",
+    y: spawnRow - 3,
+    x: entryColumn + 3,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "gate", nightLocation: "gate" },
+  }));
+
+  // 11. Dara (Outsider) - Day: Town outskirts, Night: House 8
+  npcs.push(new NPC({
+    id: "npc-dara",
+    name: "Dara",
+    sprite: "/images/npcs/torch-town/dara.png",
+    y: centerY + 4,
+    x: centerX - 4,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "outskirts", nightLocation: "house8", house: HOUSE_LABELS.HOUSE_8 },
+  }));
+
+  // 12. Sela (Night Guard) - Day: Training yard, Night: Guard Tower
+  npcs.push(new NPC({
+    id: "npc-sela",
+    name: "Sela",
+    sprite: "/images/npcs/torch-town/sela.png",
+    y: guardTowerDoor[0] + 1,
+    x: guardTowerDoor[1] + 1,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "trainingYard", nightLocation: "guardTower" },
+  }));
+
+  // 13. Thane (Guard) - Day: Training yard, Night: Guard Tower
+  npcs.push(new NPC({
+    id: "npc-thane",
+    name: "Thane",
+    sprite: "/images/npcs/torch-town/thane.png",
+    y: guardTowerDoor[0] + 1,
+    x: guardTowerDoor[1] - 1,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "trainingYard", nightLocation: "guardTower" },
+  }));
+
+  // 14. Old Fenna (Flame Caretaker) - Day: Central fire, Night: House 7
+  npcs.push(new NPC({
+    id: "npc-fenna",
+    name: "Old Fenna",
+    sprite: "/images/npcs/torch-town/old-fenna.png",
+    y: centerY,
+    x: centerX,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "centralFire", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
+  }));
+
+  // 15. Arin (Carpenter) - Day: Work site (near houses), Night: House 7
+  npcs.push(new NPC({
+    id: "npc-arin",
+    name: "Arin",
+    sprite: "/images/npcs/torch-town/arin.png",
+    y: centerY + 3,
+    x: centerX + 3,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "workSite", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
+  }));
+
+  // 16. Haro (Fisher) - Day: Fishing area, Night: House 6
+  npcs.push(new NPC({
+    id: "npc-haro",
+    name: "Haro",
+    sprite: "/images/npcs/torch-town/haro.png",
+    y: spawnRow - 5,
+    x: entryColumn - 3,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "fishing", nightLocation: "house6", house: HOUSE_LABELS.HOUSE_6 },
+  }));
+
+  // 17. Len (Fisher) - Day: Fishing area, Night: House 6
+  npcs.push(new NPC({
+    id: "npc-len",
+    name: "Len",
+    sprite: "/images/npcs/torch-town/len.png",
+    y: spawnRow - 5,
+    x: entryColumn - 4,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "fishing", nightLocation: "house6", house: HOUSE_LABELS.HOUSE_6 },
+  }));
+
+  // 18. Tavi (Child) - Day: Playing in plaza, Night: House 7
+  npcs.push(new NPC({
+    id: "npc-tavi",
+    name: "Tavi",
+    sprite: "/images/npcs/torch-town/tavi.png",
+    y: centerY + 2,
+    x: centerX + 1,
+    facing: Direction.UP,
+    canMove: false,
+    metadata: { dayLocation: "plaza", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
+  }));
 
   return {
     id: "story-torch-town",
@@ -254,6 +484,7 @@ export function buildTorchTown(): StoryRoom {
     entryPoint,
     entryFromNext,
     transitionToPrevious,
+    npcs,
     metadata: {
       displayLabel: "Torch Town",
       homes: homeAssignments,

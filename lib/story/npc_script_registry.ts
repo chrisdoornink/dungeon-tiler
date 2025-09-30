@@ -118,6 +118,26 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: 10,
     conditions: [{ eventId: "rescued-kalen", value: false }],
   },
+
+  // Torch Town NPCs
+  { npcId: "npc-eldra", scriptId: "eldra-default", priority: 0 },
+  { npcId: "npc-maro", scriptId: "maro-default", priority: 0 },
+  { npcId: "npc-captain-bren", scriptId: "captain-bren-default", priority: 0 },
+  { npcId: "npc-jorin", scriptId: "jorin-default", priority: 0 },
+  { npcId: "npc-yanna", scriptId: "yanna-default", priority: 0 },
+  { npcId: "npc-serin", scriptId: "serin-default", priority: 0 },
+  { npcId: "npc-rhett", scriptId: "rhett-default", priority: 0 },
+  { npcId: "npc-mira", scriptId: "mira-default", priority: 0 },
+  { npcId: "npc-kira", scriptId: "kira-default", priority: 0 },
+  { npcId: "npc-lio", scriptId: "lio-default", priority: 0 },
+  { npcId: "npc-dara", scriptId: "dara-default", priority: 0 },
+  { npcId: "npc-sela", scriptId: "sela-default", priority: 0 },
+  { npcId: "npc-thane", scriptId: "thane-default", priority: 0 },
+  { npcId: "npc-fenna", scriptId: "fenna-default", priority: 0 },
+  { npcId: "npc-arin", scriptId: "arin-default", priority: 0 },
+  { npcId: "npc-haro", scriptId: "haro-default", priority: 0 },
+  { npcId: "npc-len", scriptId: "len-default", priority: 0 },
+  { npcId: "npc-tavi", scriptId: "tavi-default", priority: 0 },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {

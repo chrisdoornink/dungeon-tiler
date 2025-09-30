@@ -28,6 +28,8 @@ import {
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
 import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
+import type { DayPhaseId } from "../time_of_day";
+import { HOUSE_LABELS } from "./rooms/chapter1/torch_town";
 
 function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -92,6 +94,123 @@ function applyConditionalNpcs(roomSnapshots: GameState["rooms"], flags: StoryFla
     if (modified) {
       snapshot.npcs = npcs;
     }
+  }
+}
+
+/**
+ * Apply day/night NPC positioning based on time of day.
+ * Modifies NPC positions in Torch Town based on current phase.
+ */
+function applyDayNightNpcPositioning(roomSnapshots: GameState["rooms"], phase: DayPhaseId): void {
+  if (!roomSnapshots) return;
+  
+  const torchTown = roomSnapshots["story-torch-town"];
+  if (!torchTown || !torchTown.npcs) return;
+
+  const isNight = phase === "night";
+  const buildings = torchTown.metadata?.buildings as Record<string, unknown> | undefined;
+  if (!buildings) return;
+
+  const guardTowerDoor = buildings.guardTowerDoor as [number, number] | undefined;
+
+  // Get house positions from the houses array in torch_town.ts
+  const houses = [
+    { top: 20, left: 18, label: HOUSE_LABELS.HOUSE_1 },
+    { top: 23, left: 19, label: HOUSE_LABELS.HOUSE_2 },
+    { top: 19, left: 24, label: HOUSE_LABELS.HOUSE_3 },
+    { top: 22, left: 25, label: HOUSE_LABELS.HOUSE_4 },
+    { top: 24, left: 22, label: HOUSE_LABELS.HOUSE_5 },
+    { top: 26, left: 25, label: HOUSE_LABELS.HOUSE_6 },
+    { top: 27, left: 22, label: HOUSE_LABELS.HOUSE_7 },
+    { top: 26, left: 18, label: HOUSE_LABELS.HOUSE_8 },
+  ];
+  const homeHeight = 2;
+
+  for (const npc of torchTown.npcs) {
+    const metadata = npc.metadata as Record<string, unknown> | undefined;
+    if (!metadata) continue;
+
+    const nightLocation = metadata.nightLocation as string | undefined;
+
+    if (isNight && nightLocation) {
+      // Move NPCs to their night positions
+      switch (nightLocation) {
+        case "house1":
+          npc.y = houses[0].top + homeHeight;
+          npc.x = houses[0].left + 1;
+          break;
+        case "house2":
+          if (npc.id === "npc-maro") {
+            npc.y = houses[1].top + homeHeight;
+            npc.x = houses[1].left + 1;
+          } else if (npc.id === "npc-kira") {
+            npc.y = houses[1].top + homeHeight;
+            npc.x = houses[1].left + 2;
+          }
+          break;
+        case "house3":
+          if (npc.id === "npc-jorin") {
+            npc.y = houses[2].top + homeHeight;
+            npc.x = houses[2].left + 1;
+          } else if (npc.id === "npc-yanna") {
+            npc.y = houses[2].top + homeHeight;
+            npc.x = houses[2].left + 2;
+          }
+          break;
+        case "house4":
+          // Serin stays at house 4 day and night
+          break;
+        case "house5":
+          if (npc.id === "npc-rhett") {
+            npc.y = houses[4].top + homeHeight;
+            npc.x = houses[4].left + 1;
+          } else if (npc.id === "npc-mira") {
+            npc.y = houses[4].top + homeHeight;
+            npc.x = houses[4].left + 2;
+          }
+          break;
+        case "house6":
+          if (npc.id === "npc-haro") {
+            npc.y = houses[5].top + homeHeight;
+            npc.x = houses[5].left + 1;
+          } else if (npc.id === "npc-len") {
+            npc.y = houses[5].top + homeHeight;
+            npc.x = houses[5].left + 2;
+          }
+          break;
+        case "house7":
+          if (npc.id === "npc-fenna") {
+            npc.y = houses[6].top + homeHeight;
+            npc.x = houses[6].left + 1;
+          } else if (npc.id === "npc-tavi") {
+            npc.y = houses[6].top + homeHeight - 1;
+            npc.x = houses[6].left + 2;
+          } else if (npc.id === "npc-arin") {
+            npc.y = houses[6].top + homeHeight;
+            npc.x = houses[6].left + 2;
+          }
+          break;
+        case "house8":
+          npc.y = houses[7].top + homeHeight;
+          npc.x = houses[7].left + 1;
+          break;
+        case "guardTower":
+          if (guardTowerDoor) {
+            if (npc.id === "npc-captain-bren") {
+              npc.y = guardTowerDoor[0] - 1;
+              npc.x = guardTowerDoor[1];
+            } else if (npc.id === "npc-sela") {
+              npc.y = guardTowerDoor[0] - 1;
+              npc.x = guardTowerDoor[1] + 1;
+            } else if (npc.id === "npc-thane") {
+              npc.y = guardTowerDoor[0] - 1;
+              npc.x = guardTowerDoor[1] - 1;
+            }
+          }
+          break;
+      }
+    }
+    // Day positions are the default positions set in torch_town.ts, so we don't need to change them
   }
 }
 
@@ -528,10 +647,11 @@ export function buildStoryModeState(): GameState {
       ];
       const homeId = `story-torch-town-home-${homeIdx}` as RoomId;
       const homeRoom = buildInteriorRoom(homeId, homeW, homeH, "house");
-      // Friendly, generic label; can be overridden later when owner is known
+      // Use the specific label from homeAssignments
+      const homeLabel = torchTownHomes[key] || "Torch Town — Home";
       homeRoom.metadata = {
         ...(homeRoom.metadata || {}),
-        displayLabel: "Torch Town — Home",
+        displayLabel: homeLabel,
       };
       extraRooms.push(homeRoom);
       pushTransition(torchTown.id, homeRoom.id, doorPos, homeRoom.entryPoint);
@@ -890,4 +1010,13 @@ export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
 export function updateConditionalNpcs(state: GameState): void {
   if (!state.storyFlags || !state.rooms) return;
   applyConditionalNpcs(state.rooms, state.storyFlags);
+}
+
+/**
+ * Update NPC positions in Torch Town based on time of day.
+ * Call this when the day/night phase changes.
+ */
+export function updateDayNightNpcPositions(state: GameState): void {
+  if (!state.timeOfDay || !state.rooms) return;
+  applyDayNightNpcPositioning(state.rooms, state.timeOfDay.phase);
 }

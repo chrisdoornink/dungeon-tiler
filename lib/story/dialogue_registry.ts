@@ -277,6 +277,117 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Kalen", text: "I can sense the vibrations from here. Much safer than wandering off to mysterious caves, don't you think?" },
     ],
   },
+  
+  // Torch Town NPCs
+  "eldra-default": {
+    id: "eldra-default",
+    lines: [
+      { speaker: "Eldra", text: "The pages whisper truths that others refuse to hear. Do you have the patience to listen?" },
+    ],
+  },
+  "maro-default": {
+    id: "maro-default",
+    lines: [
+      { speaker: "Maro", text: "Need supplies? I've got what you need. Just don't ask me to extend credit." },
+    ],
+  },
+  "captain-bren-default": {
+    id: "captain-bren-default",
+    lines: [
+      { speaker: "Captain Bren", text: "The walls hold strong, but vigilance is what keeps us safe. Stay sharp out there." },
+    ],
+  },
+  "jorin-default": {
+    id: "jorin-default",
+    lines: [
+      { speaker: "Jorin", text: "A good blade needs a steady hand and a hot forge. I can provide both if you need repairs." },
+    ],
+  },
+  "yanna-default": {
+    id: "yanna-default",
+    lines: [
+      { speaker: "Yanna", text: "The herbs speak in their own language... if you know how to listen. Most people don't." },
+    ],
+  },
+  "serin-default": {
+    id: "serin-default",
+    lines: [
+      { speaker: "Serin", text: "Healing takes time and care. If you're hurt, come see me. I'll do what I can." },
+    ],
+  },
+  "rhett-default": {
+    id: "rhett-default",
+    lines: [
+      { speaker: "Rhett", text: "The fields don't tend themselves. Hard work keeps this town fed, day after day." },
+    ],
+  },
+  "mira-default": {
+    id: "mira-default",
+    lines: [
+      { speaker: "Mira", text: "Every thread tells a story. What's yours, traveler?" },
+    ],
+  },
+  "kira-default": {
+    id: "kira-default",
+    lines: [
+      { speaker: "Kira", text: "There's so much more beyond these walls... don't you ever wonder what's out there?" },
+    ],
+  },
+  "lio-default": {
+    id: "lio-default",
+    lines: [
+      { speaker: "Lio", text: "The hunt keeps me sharp. Out there, hesitation means you go hungry—or worse." },
+    ],
+  },
+  "dara-default": {
+    id: "dara-default",
+    lines: [
+      { speaker: "Dara", text: "I've walked many roads before finding this place. Each one taught me something different." },
+    ],
+  },
+  "sela-default": {
+    id: "sela-default",
+    lines: [
+      { speaker: "Sela", text: "Night watch isn't for everyone. But someone's got to keep an eye on the shadows." },
+    ],
+  },
+  "thane-default": {
+    id: "thane-default",
+    lines: [
+      { speaker: "Thane", text: "..." },
+      { speaker: "Thane", text: "*nods respectfully*" },
+    ],
+  },
+  "fenna-default": {
+    id: "fenna-default",
+    lines: [
+      { speaker: "Old Fenna", text: "The flame must never die. It's not just fire—it's our promise to those who came before." },
+    ],
+  },
+  "arin-default": {
+    id: "arin-default",
+    lines: [
+      { speaker: "Arin", text: "Wood and nails, that's all it takes to keep a roof over your head. Simple work for simple folk." },
+    ],
+  },
+  "haro-default": {
+    id: "haro-default",
+    lines: [
+      { speaker: "Haro", text: "My brother thinks he knows the water better than me. He's wrong, of course." },
+    ],
+  },
+  "len-default": {
+    id: "len-default",
+    lines: [
+      { speaker: "Len", text: "Haro's too stubborn to admit when I'm right. But the fish don't lie." },
+    ],
+  },
+  "tavi-default": {
+    id: "tavi-default",
+    lines: [
+      { speaker: "Tavi", text: "Wanna play? Grandma says I can't go near the walls, but we could explore the square!" },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {
