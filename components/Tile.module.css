@@ -211,10 +211,47 @@
   inset: 0;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 120% 120%;
+  background-size: 130% 115%;
   image-rendering: pixelated;
   pointer-events: none;
   z-index: 11050; /* above torch sprites and roads */
+}
+
+/* Pulsating teal glow behind lit checkpoint (shows through transparent center) */
+.checkpointGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-60%, -50%);
+  width: 8px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 11049; /* just below checkpoint overlay */
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(80, 255, 180, 0.95),
+    rgba(80, 255, 180, 0.55) 40%,
+    rgba(60, 210, 150, 0.15) 65%,
+    rgba(0, 0, 0, 0) 80%
+  );
+  filter: blur(1.5px) saturate(120%);
+  mix-blend-mode: screen;
+  animation: checkpointPulse 2.2s ease-in-out infinite;
+}
+
+@keyframes checkpointPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.15;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.92);
+    opacity: 0.15;
+  }
 }
 
 /* Special full-height asset icon for doors */

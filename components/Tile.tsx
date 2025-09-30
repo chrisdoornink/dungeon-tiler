@@ -809,21 +809,30 @@ export const Tile: React.FC<TileProps> = ({
           data-neighbor-code={neighborCode}
         >
           {/* Render checkpoint asset if present (full-tile overlay) */}
-          {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (
-            <div
-              key="checkpoint"
-              className={styles.checkpointOverlay}
-              style={{
-                backgroundImage: `url(${(() => {
-                  const isActive = Array.isArray(activeCheckpoint) &&
-                    typeof row === 'number' && typeof col === 'number' &&
-                    activeCheckpoint[0] === row && activeCheckpoint[1] === col;
-                  return isActive ? '/images/items/checkpoint-lit.png' : '/images/items/checkpoint-unlit.png';
-                })()})`
-              }}
-              aria-label="checkpoint"
-            />
-          )}
+          {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (() => {
+            const isActive = Array.isArray(activeCheckpoint) &&
+              typeof row === 'number' && typeof col === 'number' &&
+              activeCheckpoint[0] === row && activeCheckpoint[1] === col;
+            return (
+              <>
+                {isActive && (
+                  <div
+                    key="checkpoint-glow"
+                    className={styles.checkpointGlow}
+                    aria-hidden="true"
+                  />
+                )}
+                <div
+                  key="checkpoint"
+                  className={styles.checkpointOverlay}
+                  style={{
+                    backgroundImage: `url(${isActive ? '/images/items/checkpoint-lit.png' : '/images/items/checkpoint-unlit.png'})`
+                  }}
+                  aria-label="checkpoint"
+                />
+              </>
+            );
+          })()}
           {/* Render dirt road overlay if this floor tile is marked as part of a road */}
           {hasRoad(subtype) && renderRoadOverlay(subtype)}
           {/* Render hero image on top of floor if this is a player tile */}
