@@ -1071,6 +1071,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
 
+  // Determine the currently active checkpoint tile from the lastCheckpoint snapshot
+  const activeCheckpoint: [number, number] | null = React.useMemo(() => {
+    const cp = gameState.lastCheckpoint;
+    if (!cp || !cp.mapData || !cp.mapData.subtypes) return null;
+    const subs = cp.mapData.subtypes as number[][][];
+    for (let y = 0; y < subs.length; y++) {
+      const row = subs[y];
+      if (!row) continue;
+      for (let x = 0; x < row.length; x++) {
+        const cell = row[x];
+        if (Array.isArray(cell) && cell.includes(TileSubtype.CHECKPOINT)) {
+          return [y, x];
+        }
+      }
+    }
+    return null;
+  }, [gameState.lastCheckpoint]);
+
   useEffect(() => {
     // Find player position whenever gameState changes
     if (gameState.mapData.subtypes) {
@@ -2340,7 +2358,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     suppressDarknessOverlay,
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
-                    timeOfDayState
+                    timeOfDayState,
+                    activeCheckpoint
                   )}
                 </div>
               </div>
@@ -2507,7 +2526,8 @@ function renderTileGrid(
   suppressDarknessOverlay: boolean = false,
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
-  timeOfDay?: TimeOfDayState
+  timeOfDay?: TimeOfDayState,
+  activeCheckpoint?: [number, number] | null
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   const resolvedTimeOfDay = timeOfDay ?? createInitialTimeOfDay();
@@ -2672,9 +2692,7 @@ function renderTileGrid(
                 | undefined
             }
             enemyMoved={Boolean(
-              (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.[
-                "moved"
-              ]
+              (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.["moved"]
             )}
             enemyAura={(() => {
               if (!enemyAtTile) return false;
@@ -2700,6 +2718,7 @@ function renderTileGrid(
             playerHasExitKey={hasExitKey}
             environment={resolvedEnvironment}
             suppressDarknessOverlay={suppressDarknessOverlay}
+            activeCheckpoint={activeCheckpoint}
           />
         </div>
       );
