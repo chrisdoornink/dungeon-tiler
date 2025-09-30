@@ -7,6 +7,7 @@ export { buildSanctum } from "./sanctum";
 export { buildOutdoorClearing } from "./outdoor_clearing";
 export { buildOutdoorHouse } from "./outdoor_house";
 export { buildTorchTown } from "./torch_town";
+export { buildTheWildsEntrance } from "./the_wilds_entrance";
 
 // Torch Town Houses
 export {

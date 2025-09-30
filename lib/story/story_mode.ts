@@ -23,6 +23,7 @@ import {
   buildOutdoorHouse,
   buildSanctum,
   buildTorchTown,
+  buildTheWildsEntrance,
   buildEldrasCottage,
   buildMaroAndKirasCottage,
   buildJorinAndYannasCottage,
@@ -199,6 +200,7 @@ export function buildStoryModeState(): GameState {
   const bluffPassage = buildBluffPassageway();
   const bluffCaves = buildBluffCaves();
   const bluffSerpentDen = buildBluffSerpentDen();
+  const wildsEntrance = buildTheWildsEntrance();
 
   const transitions: RoomTransition[] = [];
 
@@ -557,6 +559,20 @@ export function buildStoryModeState(): GameState {
     }
   }
 
+  // Torch Town -> The Wilds transitions
+  pushTransition(
+    torchTown.id,
+    wildsEntrance.id,
+    [12, 34], // Exit position from Torch Town (east side)
+    wildsEntrance.entryPoint
+  );
+  pushTransition(
+    wildsEntrance.id,
+    torchTown.id,
+    wildsEntrance.entryPoint, // Entry/exit at bottom-left [24, 1]
+    [12, 33] // Return to inside Torch Town, just before the exit
+  );
+
   const storyRooms: StoryRoom[] = [
     entrance,
     ascent,
@@ -567,6 +583,7 @@ export function buildStoryModeState(): GameState {
     bluffSerpentDen,
     outdoorHouse,
     torchTown,
+    wildsEntrance,
     ...extraRooms,
   ];
 

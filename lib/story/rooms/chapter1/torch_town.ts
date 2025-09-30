@@ -76,6 +76,17 @@ export function buildTorchTown(): StoryRoom {
     }
   }
 
+  // Carve Larger Town Entrance/Exit to the outer world to the East
+  // From 10,32 to 14,34
+  for (let y = 10; y <= 14; y++) {
+    tiles[y][32] = FLOOR;
+    subtypes[y][32] = [];
+    tiles[y][33] = FLOOR;
+    subtypes[y][33] = [];
+    tiles[y][34] = FLOOR;
+    subtypes[y][34] = [];
+  }
+
   // Bottom-left entrance opening with a short corridor
   const entryColumn = wallMin + 1;
   const transitionRow = SIZE - 1;
@@ -250,6 +261,13 @@ export function buildTorchTown(): StoryRoom {
   // From the plaza intersection to house area
   layStraightBetween(tiles, subtypes, centerY +3, centerX, centerY + 5, centerX);
   placeEnd(tiles, subtypes, 22, 17, "N");
+
+  // From the guard tower to the outside of town
+  placeT(tiles, subtypes, 12, 26, ["N", "E", "W"]);
+  layStraightBetween(tiles, subtypes, 12, 27, 12, 33);
+  placeEnd(tiles, subtypes, 12, 34, "W");
+
+  
   
 
   // Final approach into the plaza with a T-intersection hub
@@ -423,7 +441,7 @@ export function buildTorchTown(): StoryRoom {
     id: "npc-fenna",
     name: "Old Fenna",
     sprite: "/images/npcs/torch-town/old-fenna.png",
-    y: centerY,
+    y: centerY-1,
     x: centerX,
     facing: Direction.DOWN,
     canMove: false,
