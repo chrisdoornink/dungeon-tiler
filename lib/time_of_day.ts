@@ -20,7 +20,7 @@ export interface DayPhaseConfig {
 export const DAY_PHASES: DayPhaseConfig[] = [
   {
     id: "day",
-    duration: 6, // Reduced from 300 for testing (50x faster)
+    duration: 300,
     label: "Day",
     icon: "\u2600\ufe0f",
     meterColor: "#f8d66d",
@@ -34,7 +34,7 @@ export const DAY_PHASES: DayPhaseConfig[] = [
   },
   {
     id: "dusk",
-    duration: 1, // Reduced from 50 for testing (50x faster)
+    duration: 50,
     label: "Dusk",
     icon: "\ud83c\udf05",
     meterColor: "#ff8a65",
@@ -48,7 +48,7 @@ export const DAY_PHASES: DayPhaseConfig[] = [
   },
   {
     id: "night",
-    duration: 6, // Reduced from 300 for testing (50x faster)
+    duration: 300,
     label: "Night",
     icon: "\ud83c\udf19",
     meterColor: "#4a64d8",
@@ -62,7 +62,7 @@ export const DAY_PHASES: DayPhaseConfig[] = [
   },
   {
     id: "dawn",
-    duration: 1, // Reduced from 50 for testing (50x faster)
+    duration: 50,
     label: "Dawn",
     icon: "\ud83c\udf04",
     meterColor: "#ffa65c",
