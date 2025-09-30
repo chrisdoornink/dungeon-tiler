@@ -9,9 +9,7 @@ import {
   findPlayerPosition,
   isWithinBounds,
   FLOOR,
-  WALL,
 } from "../map";
-import type { EnvironmentId } from "../environment";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
 import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
@@ -33,6 +31,10 @@ import {
   buildHaroAndLensCottage,
   buildFennaTaviAndArinsCottage,
   buildDarasCottage,
+  buildLibrary,
+  buildStore,
+  buildSmithy,
+  buildGuardTower,
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
 import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
@@ -289,57 +291,6 @@ export function buildStoryModeState(): GameState {
   const bluffCaves = buildBluffCaves();
   const bluffSerpentDen = buildBluffSerpentDen();
 
-  // Generic interior room builder: produces an enclosed room with floor size (wOut*2-1) x (hOut*2-1)
-  const buildInteriorRoom = (
-    id: RoomId,
-    outWidth: number,
-    outHeight: number,
-    environment: EnvironmentId
-  ): StoryRoom => {
-    const innerW = outWidth * 2 - 1;
-    const innerH = outHeight * 2 - 1;
-    const width = innerW + 2; // walls border
-    const height = innerH + 2;
-    const tiles: number[][] = Array.from({ length: height }, () =>
-      Array.from({ length: width }, () => WALL)
-    );
-    const subtypes: number[][][] = Array.from({ length: height }, () =>
-      Array.from({ length: width }, () => [] as number[])
-    );
-    // carve floor
-    for (let y = 1; y <= innerH; y++) {
-      for (let x = 1; x <= innerW; x++) {
-        tiles[y][x] = FLOOR;
-      }
-    }
-    // interior windows on top wall for flavor
-    if (width >= 6) {
-      const winCols = [2, width - 3];
-      for (const wx of winCols) {
-        if (tiles[0]?.[wx] === WALL) {
-          subtypes[0][wx] = [TileSubtype.WINDOW];
-        }
-      }
-    }
-    // door back to town at bottom middle
-    const doorX = 1 + Math.floor(innerW / 2);
-    const entryPoint: [number, number] = [innerH, doorX];
-    const transitionToPrevious: [number, number] = [innerH + 1, doorX];
-    subtypes[transitionToPrevious[0]][transitionToPrevious[1]] = [
-      TileSubtype.DOOR,
-      TileSubtype.ROOM_TRANSITION,
-    ];
-    const entryFromNext: [number, number] = [innerH - 1, doorX];
-
-    return {
-      id,
-      mapData: { tiles, subtypes, environment },
-      entryPoint,
-      transitionToPrevious,
-      entryFromNext,
-    };
-  };
-
   const transitions: RoomTransition[] = [];
 
   const pushTransition = (
@@ -497,18 +448,8 @@ export function buildStoryModeState(): GameState {
     (torchTown.metadata?.homes as Record<string, string>) || {};
 
   if (torchTownBuildings) {
-    // Library interior (environment uses 'house' palette for now)
-    const libraryRoom = buildInteriorRoom(
-      "story-torch-town-library" as RoomId,
-      torchTownBuildings.librarySize[0],
-      torchTownBuildings.librarySize[1],
-      "house"
-    );
-    // Friendly label for UI overlays
-    libraryRoom.metadata = {
-      ...(libraryRoom.metadata || {}),
-      displayLabel: "Torch Town — Library",
-    };
+    // Library interior - using individual builder
+    const libraryRoom = buildLibrary();
     // Place the town librarian inside the library
     const libNpcY = Math.max(2, libraryRoom.entryPoint[0] - 2);
     const libNpcX = libraryRoom.entryPoint[1];
@@ -553,18 +494,8 @@ export function buildStoryModeState(): GameState {
       libExitTarget
     );
 
-    // Store interior
-    const storeRoom = buildInteriorRoom(
-      "story-torch-town-store" as RoomId,
-      torchTownBuildings.storeSize[0],
-      torchTownBuildings.storeSize[1],
-      "house"
-    );
-    // Friendly label for UI overlays
-    storeRoom.metadata = {
-      ...(storeRoom.metadata || {}),
-      displayLabel: "Torch Town — Store",
-    };
+    // Store interior - using individual builder
+    const storeRoom = buildStore();
     extraRooms.push(storeRoom);
     pushTransition(
       torchTown.id,
@@ -584,17 +515,9 @@ export function buildStoryModeState(): GameState {
       storeExitTarget
     );
 
+    // Smithy interior - using individual builder
     if (torchTownBuildings.smithyDoor && torchTownBuildings.smithySize) {
-      const smithyRoom = buildInteriorRoom(
-        "story-torch-town-smithy" as RoomId,
-        torchTownBuildings.smithySize[0],
-        torchTownBuildings.smithySize[1],
-        "house"
-      );
-      smithyRoom.metadata = {
-        ...(smithyRoom.metadata || {}),
-        displayLabel: "Torch Town — Smithy",
-      };
+      const smithyRoom = buildSmithy();
       extraRooms.push(smithyRoom);
       pushTransition(
         torchTown.id,
@@ -614,17 +537,9 @@ export function buildStoryModeState(): GameState {
       );
     }
 
+    // Guard Tower interior - using individual builder
     if (torchTownBuildings.guardTowerDoor && torchTownBuildings.guardTowerSize) {
-      const guardTowerRoom = buildInteriorRoom(
-        "story-torch-town-guard-tower" as RoomId,
-        torchTownBuildings.guardTowerSize[0],
-        torchTownBuildings.guardTowerSize[1],
-        "house"
-      );
-      guardTowerRoom.metadata = {
-        ...(guardTowerRoom.metadata || {}),
-        displayLabel: "Torch Town — Guard Tower",
-      };
+      const guardTowerRoom = buildGuardTower();
       extraRooms.push(guardTowerRoom);
       pushTransition(
         torchTown.id,

@@ -19,3 +19,11 @@ export {
   buildFennaTaviAndArinsCottage,
   buildDarasCottage,
 } from "./houses";
+
+// Torch Town Buildings
+export {
+  buildLibrary,
+  buildStore,
+  buildSmithy,
+  buildGuardTower,
+} from "./buildings";
