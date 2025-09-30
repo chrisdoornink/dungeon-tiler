@@ -121,7 +121,7 @@ export function buildTorchTown(): StoryRoom {
     for (let x = centerX - 1; x <= centerX + 1; x++) {
       if (y === centerY && x === centerX) {
         tiles[y][x] = FLOOR;
-        subtypes[y][x] = [TileSubtype.CHECKPOINT, TileSubtype.WALL_TORCH];
+        subtypes[y][x] = [TileSubtype.CHECKPOINT];
       } else if (y === centerY || x === centerX) {
         tiles[y][x] = FLOOR;
         if (!subtypes[y][x]) subtypes[y][x] = [];

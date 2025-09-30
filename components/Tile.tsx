@@ -444,6 +444,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.WALL_TORCH &&
+        // Exclude checkpoint: it has a custom asset overlay
+        subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
@@ -512,11 +514,11 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render wall torch as a static sprite (no animation) */}
-        {hasWallTorch(subtypes) && (
+        {/* Render wall torch as a static sprite (no animation). Suppress on checkpoint tiles */}
+        {hasWallTorch(subtypes) && !(subtypes?.includes(TileSubtype.CHECKPOINT)) && (
           <div
             key="wall-torch"
-            data-testid="wall-torch"
+            data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
             className={`${styles.assetIcon} ${styles.torchSprite}`}
             style={{ backgroundImage: `url(/images/items/wall-torch-2.png)` }}
           />
@@ -804,6 +806,15 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Render checkpoint-unlit asset if present (full-tile overlay) */}
+          {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (
+            <div
+              key="checkpoint"
+              className={styles.checkpointOverlay}
+              style={{ backgroundImage: "url(/images/items/checkpoint-unlit.png)" }}
+              aria-label="checkpoint"
+            />
+          )}
           {/* Render dirt road overlay if this floor tile is marked as part of a road */}
           {hasRoad(subtype) && renderRoadOverlay(subtype)}
           {/* Render hero image on top of floor if this is a player tile */}

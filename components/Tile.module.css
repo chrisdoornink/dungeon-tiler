@@ -205,6 +205,18 @@
   transform-origin: 50% 50%;
 }
 
+/* Checkpoint full-tile overlay */
+.checkpointOverlay {
+  position: absolute;
+  inset: 0;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 120% 120%;
+  image-rendering: pixelated;
+  pointer-events: none;
+  z-index: 11050; /* above torch sprites and roads */
+}
+
 /* Special full-height asset icon for doors */
 .fullHeightAssetIcon {
   width: 28px;
