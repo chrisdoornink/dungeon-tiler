@@ -229,7 +229,16 @@ export function buildTorchTown(): StoryRoom {
   
 
   // From the plaza intersection to the library
-  layStraightBetween(tiles, subtypes, centerY, centerX + 3, centerY, centerX + 5);
+  layStraightBetween(tiles, subtypes, centerY -3, centerX, centerY - 7, centerX);
+
+  // From the plaza intersection to the store
+  layStraightBetween(tiles, subtypes, centerY, centerX + 3, centerY, centerX + 7);
+  placeCorner(tiles, subtypes, 17, 25, ["W", "N"]);
+
+  // From the plaza intersection to house area
+  layStraightBetween(tiles, subtypes, centerY +3, centerX, centerY + 5, centerX);
+  placeEnd(tiles, subtypes, 22, 17, "N");
+  
 
   // Final approach into the plaza with a T-intersection hub
   // placeStraight(tiles, subtypes, centerY + 1, middlePathCol, 90);

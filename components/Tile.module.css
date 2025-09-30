@@ -214,7 +214,7 @@
   background-size: 130% 115%;
   image-rendering: pixelated;
   pointer-events: none;
-  z-index: 11050; /* above torch sprites and roads */
+  z-index: 10900; /* below hero (11000) but above enemies/torches */
 }
 
 /* Pulsating teal glow behind lit checkpoint (shows through transparent center) */
@@ -226,7 +226,7 @@
   width: 8px;
   height: 30px;
   pointer-events: none;
-  z-index: 11049; /* just below checkpoint overlay */
+  z-index: 10899; /* just below checkpoint overlay */
   background: radial-gradient(
     circle at 50% 50%,
     rgba(80, 255, 180, 0.95),
