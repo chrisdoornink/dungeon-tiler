@@ -25,6 +25,14 @@ import {
   buildOutdoorHouse,
   buildSanctum,
   buildTorchTown,
+  buildEldrasCottage,
+  buildMaroAndKirasCottage,
+  buildJorinAndYannasCottage,
+  buildSerinsClinic,
+  buildRhettAndMirasCottage,
+  buildHaroAndLensCottage,
+  buildFennaTaviAndArinsCottage,
+  buildDarasCottage,
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
 import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
@@ -636,8 +644,18 @@ export function buildStoryModeState(): GameState {
       );
     }
 
-    // Homes interiors
-    const [homeW, homeH] = torchTownBuildings.homeSize;
+    // Homes interiors - using individual house builders
+    const houseBuilders = [
+      buildEldrasCottage,
+      buildMaroAndKirasCottage,
+      buildJorinAndYannasCottage,
+      buildSerinsClinic,
+      buildRhettAndMirasCottage,
+      buildHaroAndLensCottage,
+      buildFennaTaviAndArinsCottage,
+      buildDarasCottage,
+    ];
+    
     let homeIdx = 0;
     for (const key of Object.keys(torchTownHomes)) {
       const [yStr, xStr] = key.split(",");
@@ -645,14 +663,9 @@ export function buildStoryModeState(): GameState {
         parseInt(yStr, 10),
         parseInt(xStr, 10),
       ];
-      const homeId = `story-torch-town-home-${homeIdx}` as RoomId;
-      const homeRoom = buildInteriorRoom(homeId, homeW, homeH, "house");
-      // Use the specific label from homeAssignments
-      const homeLabel = torchTownHomes[key] || "Torch Town — Home";
-      homeRoom.metadata = {
-        ...(homeRoom.metadata || {}),
-        displayLabel: homeLabel,
-      };
+      
+      // Use the specific house builder for this index
+      const homeRoom = houseBuilders[homeIdx]();
       extraRooms.push(homeRoom);
       pushTransition(torchTown.id, homeRoom.id, doorPos, homeRoom.entryPoint);
       // Land outside each home door when exiting interior

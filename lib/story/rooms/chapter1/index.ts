@@ -7,3 +7,15 @@ export { buildSanctum } from "./sanctum";
 export { buildOutdoorClearing } from "./outdoor_clearing";
 export { buildOutdoorHouse } from "./outdoor_house";
 export { buildTorchTown } from "./torch_town";
+
+// Torch Town Houses
+export {
+  buildEldrasCottage,
+  buildMaroAndKirasCottage,
+  buildJorinAndYannasCottage,
+  buildSerinsClinic,
+  buildRhettAndMirasCottage,
+  buildHaroAndLensCottage,
+  buildFennaTaviAndArinsCottage,
+  buildDarasCottage,
+} from "./houses";
