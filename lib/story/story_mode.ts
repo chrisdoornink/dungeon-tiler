@@ -38,8 +38,6 @@ import {
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
 import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
-import type { DayPhaseId } from "../time_of_day";
-import { HOUSE_LABELS } from "./rooms/chapter1/torch_town";
 
 function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -62,167 +60,78 @@ export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
 }
 
 /**
- * Apply conditional NPC visibility based on story flags.
- * Modifies room snapshots to show/hide NPCs based on conditions.
+ * Determine which NPCs should be in a room based on current game conditions.
+ * This is called when entering a room or when conditions change.
+ * 
+ * @param baseNpcs - The base NPC list from the room definition
+ * @param conditionalNpcs - The conditional NPC rules from room metadata
+ * @param allRoomSnapshots - All room snapshots to search for NPCs
+ * @param flags - Current story flags
+ * @param currentTimeOfDay - Current time of day phase
+ * @returns The final NPC list for this room
  */
-function applyConditionalNpcs(roomSnapshots: GameState["rooms"], flags: StoryFlags): void {
-  if (!roomSnapshots) return;
-  for (const [, snapshot] of Object.entries(roomSnapshots)) {
-    const conditionalNpcs = snapshot.metadata?.conditionalNpcs;
-    if (!conditionalNpcs || typeof conditionalNpcs !== "object") continue;
+function determineRoomNpcs(
+  roomId: string,
+  baseNpcs: any[] | undefined,
+  conditionalNpcs: any,
+  allRoomSnapshots: GameState["rooms"],
+  flags: StoryFlags,
+  currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
+): any[] {
+  if (!conditionalNpcs || typeof conditionalNpcs !== "object") {
+    return baseNpcs || [];
+  }
 
-    const npcs = snapshot.npcs ? [...snapshot.npcs] : [];
-    let modified = false;
+  const finalNpcs: any[] = [];
+  const processedNpcIds = new Set<string>();
 
-    for (const [npcId, config] of Object.entries(conditionalNpcs)) {
-      const npcConfig = config as { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] };
-      const showWhen = npcConfig?.showWhen as StoryCondition[] | undefined;
-      const removeWhen = npcConfig?.removeWhen as StoryCondition[] | undefined;
+  // Process each conditional NPC rule
+  for (const [npcId, config] of Object.entries(conditionalNpcs)) {
+    const npcConfig = config as { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] };
+    const showWhen = npcConfig?.showWhen as StoryCondition[] | undefined;
+    const removeWhen = npcConfig?.removeWhen as StoryCondition[] | undefined;
 
-      const npcIndex = npcs.findIndex((npc) => npc.id === npcId);
-      const npcExists = npcIndex >= 0;
-
-      let shouldShow = npcExists; // default: keep current state
-
-      if (showWhen && !areStoryConditionsMet(flags, showWhen)) {
-        shouldShow = false;
-      }
-      if (removeWhen && areStoryConditionsMet(flags, removeWhen)) {
-        shouldShow = false;
-      }
-
-      if (!shouldShow && npcExists) {
-        npcs.splice(npcIndex, 1);
-        modified = true;
-      } else if (shouldShow && !npcExists && showWhen) {
-        // NPC should be shown but doesn't exist - this means it needs to be added
-        // For now, we'll handle this case by keeping the NPC in the original room definition
-        // and only removing when conditions are met
-      }
+    // Determine if NPC should be in this room
+    let shouldBeHere = true;
+    
+    if (showWhen && showWhen.length > 0) {
+      shouldBeHere = areStoryConditionsMet(flags, showWhen, currentTimeOfDay);
+    }
+    if (removeWhen && areStoryConditionsMet(flags, removeWhen, currentTimeOfDay)) {
+      shouldBeHere = false;
     }
 
-    if (modified) {
-      snapshot.npcs = npcs;
+    if (shouldBeHere) {
+      // Find the NPC - first in base NPCs, then search all rooms
+      let foundNpc = baseNpcs?.find((npc) => npc.id === npcId);
+      
+      if (!foundNpc && allRoomSnapshots) {
+        for (const snapshot of Object.values(allRoomSnapshots)) {
+          foundNpc = snapshot.npcs?.find((npc) => npc.id === npcId);
+          if (foundNpc) break;
+        }
+      }
+      
+      if (foundNpc) {
+        finalNpcs.push(foundNpc);
+        processedNpcIds.add(npcId);
+      }
     }
   }
-}
 
-/**
- * Apply day/night NPC positioning based on time of day.
- * Modifies NPC positions in Torch Town based on current phase.
- */
-function applyDayNightNpcPositioning(roomSnapshots: GameState["rooms"], phase: DayPhaseId): void {
-  if (!roomSnapshots) return;
-  
-  const torchTown = roomSnapshots["story-torch-town"];
-  if (!torchTown || !torchTown.npcs) return;
-
-  const isNight = phase === "night";
-  const buildings = torchTown.metadata?.buildings as Record<string, unknown> | undefined;
-  if (!buildings) return;
-
-  const guardTowerDoor = buildings.guardTowerDoor as [number, number] | undefined;
-
-  // Get house positions from the houses array in torch_town.ts
-  const houses = [
-    { top: 20, left: 18, label: HOUSE_LABELS.HOUSE_1 },
-    { top: 23, left: 19, label: HOUSE_LABELS.HOUSE_2 },
-    { top: 19, left: 24, label: HOUSE_LABELS.HOUSE_3 },
-    { top: 22, left: 25, label: HOUSE_LABELS.HOUSE_4 },
-    { top: 24, left: 22, label: HOUSE_LABELS.HOUSE_5 },
-    { top: 26, left: 25, label: HOUSE_LABELS.HOUSE_6 },
-    { top: 27, left: 22, label: HOUSE_LABELS.HOUSE_7 },
-    { top: 26, left: 18, label: HOUSE_LABELS.HOUSE_8 },
-  ];
-  const homeHeight = 2;
-
-  for (const npc of torchTown.npcs) {
-    const metadata = npc.metadata as Record<string, unknown> | undefined;
-    if (!metadata) continue;
-
-    const nightLocation = metadata.nightLocation as string | undefined;
-
-    if (isNight && nightLocation) {
-      // Move NPCs to their night positions
-      switch (nightLocation) {
-        case "house1":
-          npc.y = houses[0].top + homeHeight;
-          npc.x = houses[0].left + 1;
-          break;
-        case "house2":
-          if (npc.id === "npc-maro") {
-            npc.y = houses[1].top + homeHeight;
-            npc.x = houses[1].left + 1;
-          } else if (npc.id === "npc-kira") {
-            npc.y = houses[1].top + homeHeight;
-            npc.x = houses[1].left + 2;
-          }
-          break;
-        case "house3":
-          if (npc.id === "npc-jorin") {
-            npc.y = houses[2].top + homeHeight;
-            npc.x = houses[2].left + 1;
-          } else if (npc.id === "npc-yanna") {
-            npc.y = houses[2].top + homeHeight;
-            npc.x = houses[2].left + 2;
-          }
-          break;
-        case "house4":
-          // Serin stays at house 4 day and night
-          break;
-        case "house5":
-          if (npc.id === "npc-rhett") {
-            npc.y = houses[4].top + homeHeight;
-            npc.x = houses[4].left + 1;
-          } else if (npc.id === "npc-mira") {
-            npc.y = houses[4].top + homeHeight;
-            npc.x = houses[4].left + 2;
-          }
-          break;
-        case "house6":
-          if (npc.id === "npc-haro") {
-            npc.y = houses[5].top + homeHeight;
-            npc.x = houses[5].left + 1;
-          } else if (npc.id === "npc-len") {
-            npc.y = houses[5].top + homeHeight;
-            npc.x = houses[5].left + 2;
-          }
-          break;
-        case "house7":
-          if (npc.id === "npc-fenna") {
-            npc.y = houses[6].top + homeHeight;
-            npc.x = houses[6].left + 1;
-          } else if (npc.id === "npc-tavi") {
-            npc.y = houses[6].top + homeHeight - 1;
-            npc.x = houses[6].left + 2;
-          } else if (npc.id === "npc-arin") {
-            npc.y = houses[6].top + homeHeight;
-            npc.x = houses[6].left + 2;
-          }
-          break;
-        case "house8":
-          npc.y = houses[7].top + homeHeight;
-          npc.x = houses[7].left + 1;
-          break;
-        case "guardTower":
-          if (guardTowerDoor) {
-            if (npc.id === "npc-captain-bren") {
-              npc.y = guardTowerDoor[0] - 1;
-              npc.x = guardTowerDoor[1];
-            } else if (npc.id === "npc-sela") {
-              npc.y = guardTowerDoor[0] - 1;
-              npc.x = guardTowerDoor[1] + 1;
-            } else if (npc.id === "npc-thane") {
-              npc.y = guardTowerDoor[0] - 1;
-              npc.x = guardTowerDoor[1] - 1;
-            }
-          }
-          break;
+  // Add any base NPCs that aren't conditional (not processed)
+  if (baseNpcs) {
+    for (const npc of baseNpcs) {
+      if (!processedNpcIds.has(npc.id) && !(conditionalNpcs as Record<string, unknown>)[npc.id]) {
+        finalNpcs.push(npc);
       }
     }
-    // Day positions are the default positions set in torch_town.ts, so we don't need to change them
   }
+
+  console.log(`[determineRoomNpcs] ${roomId} at ${currentTimeOfDay}: ${finalNpcs.map(n => n.id).join(', ') || 'none'}`);
+  return finalNpcs;
 }
+
 
 function withoutPlayer(mapData: MapData): MapData {
   const clone = cloneMapData(mapData);
@@ -675,13 +584,21 @@ export function buildStoryModeState(): GameState {
     };
   }
 
-  // Apply conditional NPC filtering based on initial story flags
+  // Determine initial NPCs for the starting room based on initial conditions
   const initialFlags = createInitialStoryFlags();
-  applyConditionalNpcs(roomSnapshots, initialFlags);
+  const startingTimeOfDay = "day"; // Game starts at day
+  const initialNpcsPlain = determineRoomNpcs(
+    entrance.id,
+    serializeNPCs(entrance.npcs),
+    entrance.metadata?.conditionalNpcs,
+    roomSnapshots,
+    initialFlags,
+    startingTimeOfDay
+  );
 
   const startingMap = addPlayer(entrance.mapData, entrance.entryPoint);
   const initialEnemies = cloneEnemies(entrance.enemies);
-  const initialNpcs = cloneNPCs(entrance.npcs);
+  const initialNpcs = rehydrateNPCs(initialNpcsPlain);
   const initialPotOverrides = entrance.potOverrides
     ? { ...entrance.potOverrides }
     : undefined;
@@ -920,8 +837,21 @@ function applyStoryResetConfig(
   state.storyFlags = createInitialStoryFlags();
   state.diaryEntries = [];
 
-  // Apply conditional NPC filtering after resetting flags
-  applyConditionalNpcs(state.rooms, state.storyFlags);
+  // Reload the current room's NPCs based on reset conditions
+  if (state.currentRoomId && state.rooms) {
+    const currentRoom = state.rooms[state.currentRoomId];
+    if (currentRoom) {
+      const npcs = determineRoomNpcs(
+        state.currentRoomId,
+        currentRoom.npcs,
+        currentRoom.metadata?.conditionalNpcs,
+        state.rooms,
+        state.storyFlags,
+        state.timeOfDay?.phase ?? "day"
+      );
+      state.npcs = rehydrateNPCs(npcs);
+    }
+  }
 }
 
 export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
@@ -932,19 +862,41 @@ export function buildStoryStateFromConfig(config: StoryResetConfig): GameState {
 }
 
 /**
- * Update NPCs in room snapshots based on current story flags.
- * Call this when story flags change to show/hide conditional NPCs.
+ * Update NPCs in the current room based on current story flags and time of day.
+ * Call this when story flags change or time advances.
+ * This reloads the current room's NPCs dynamically based on conditions.
  */
 export function updateConditionalNpcs(state: GameState): void {
-  if (!state.storyFlags || !state.rooms) return;
-  applyConditionalNpcs(state.rooms, state.storyFlags);
+  if (!state.storyFlags || !state.rooms || !state.currentRoomId) return;
+  
+  const currentRoom = state.rooms[state.currentRoomId];
+  if (!currentRoom) return;
+  
+  // Determine which NPCs should be in the current room right now
+  const npcs = determineRoomNpcs(
+    state.currentRoomId,
+    currentRoom.npcs,
+    currentRoom.metadata?.conditionalNpcs,
+    state.rooms,
+    state.storyFlags,
+    state.timeOfDay?.phase
+  );
+  
+  // Update the active NPCs immediately
+  state.npcs = rehydrateNPCs(npcs);
+  console.log(`[updateConditionalNpcs] Reloaded ${state.currentRoomId} NPCs: ${state.npcs.map(n => n.id).join(', ')}`);
 }
 
 /**
- * Update NPC positions in Torch Town based on time of day.
- * Call this when the day/night phase changes.
+ * Export for room transitions - returns the NPC list for a room
  */
-export function updateDayNightNpcPositions(state: GameState): void {
-  if (!state.timeOfDay || !state.rooms) return;
-  applyDayNightNpcPositioning(state.rooms, state.timeOfDay.phase);
+export function determineRoomNpcsForTransition(
+  roomId: string,
+  baseNpcs: any[] | undefined,
+  conditionalNpcs: any,
+  allRoomSnapshots: GameState["rooms"],
+  flags: StoryFlags,
+  currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
+): any[] {
+  return determineRoomNpcs(roomId, baseNpcs, conditionalNpcs, allRoomSnapshots, flags, currentTimeOfDay);
 }

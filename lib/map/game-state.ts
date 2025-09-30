@@ -60,7 +60,14 @@ function incrementStepsAndTime(state: GameState, amount: number = 1): void {
     steps: currentStats.steps + amount,
   };
   state.stats = nextStats;
+  const previousPhase = state.timeOfDay?.phase;
   state.timeOfDay = advanceTimeOfDay(state.timeOfDay, amount);
+  const newPhase = state.timeOfDay?.phase;
+  
+  // Update conditional NPCs when time of day changes
+  if (previousPhase !== newPhase && state.mode === "story") {
+    updateConditionalNpcs(state);
+  }
 }
 
 export function performUseFood(gameState: GameState): GameState {
@@ -884,7 +891,26 @@ function applyRoomTransition(
 
   const sanitizedTarget = removePlayerFromMapData(targetRoom.mapData);
   const targetEnemiesPlain = clonePlainEnemies(targetRoom.enemies) ?? [];
-  const targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
+  
+  // CRITICAL: Determine NPCs dynamically based on current conditions
+  let targetNPCsPlain: PlainNPC[] = [];
+  if (state.mode === 'story' && state.storyFlags) {
+    // Import the function from story_mode
+    const { determineRoomNpcsForTransition } = require('../story/story_mode');
+    const npcs = determineRoomNpcsForTransition(
+      toId,
+      targetRoom.npcs,
+      targetRoom.metadata?.conditionalNpcs,
+      sourceRooms,
+      state.storyFlags,
+      state.timeOfDay?.phase
+    );
+    targetNPCsPlain = npcs;
+    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n: any) => n.id).join(', ') || 'none');
+  } else {
+    targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
+  }
+  
   updatedRooms[toId] = {
     ...targetRoom,
     mapData: sanitizedTarget,

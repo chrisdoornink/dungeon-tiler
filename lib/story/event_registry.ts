@@ -17,8 +17,9 @@ export interface StoryEventDefinition {
 export type StoryFlags = Record<string, boolean>;
 
 export interface StoryCondition {
-  eventId: string;
+  eventId?: string;
   value?: boolean;
+  timeOfDay?: "day" | "dusk" | "night" | "dawn";
 }
 
 export interface StoryEffect {
@@ -120,13 +121,22 @@ export function createInitialStoryFlags(): StoryFlags {
 
 export function areStoryConditionsMet(
   flags: StoryFlags | undefined,
-  conditions?: StoryCondition[]
+  conditions?: StoryCondition[],
+  currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
 ): boolean {
   if (!conditions || conditions.length === 0) return true;
   const source = flags ?? {};
   return conditions.every((condition) => {
-    const expected = condition.value ?? true;
-    return Boolean(source[condition.eventId]) === expected;
+    // Check time of day condition
+    if (condition.timeOfDay !== undefined) {
+      return currentTimeOfDay === condition.timeOfDay;
+    }
+    // Check event flag condition
+    if (condition.eventId !== undefined) {
+      const expected = condition.value ?? true;
+      return Boolean(source[condition.eventId]) === expected;
+    }
+    return true;
   });
 }
 
