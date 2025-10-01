@@ -117,6 +117,27 @@ export function createInitialTimeOfDay(): TimeOfDayState {
   };
 }
 
+/**
+ * Create a TimeOfDayState at the start of a specific phase.
+ */
+export function createTimeOfDayAtPhase(phaseId: DayPhaseId): TimeOfDayState {
+  // Calculate the cycleStep for the start of the requested phase
+  let cycleStep = 0;
+  for (const phase of DAY_PHASES) {
+    if (phase.id === phaseId) {
+      break;
+    }
+    cycleStep += phase.duration;
+  }
+
+  return {
+    phase: phaseId,
+    stepInPhase: 0,
+    cycleStep,
+    cycleCount: 0,
+  };
+}
+
 function resolvePhaseFromStep(step: number): { phase: DayPhaseConfig; stepInPhase: number } {
   let remaining = step;
   for (const phase of DAY_PHASES) {

@@ -46,6 +46,7 @@ function createDefaultResetConfig(
     runeCount: state.runeCount ?? 0,
     foodCount: state.foodCount ?? 0,
     potionCount: state.potionCount ?? 0,
+    timeOfDay: state.timeOfDay?.phase ?? "day",
   };
 }
 
