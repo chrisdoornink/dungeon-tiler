@@ -1,4 +1,4 @@
-import { FLOOR, WALL, TileSubtype, generateMap } from "../../../map";
+import { FLOOR, WALL, TileSubtype, generateMap, type RoomId } from "../../../map";
 import type { MapData } from "../../../map/types";
 import { Enemy } from "../../../enemy";
 import type { StoryRoom } from "../types";
@@ -141,16 +141,39 @@ function generateWildsEnemies(mapData: MapData): Enemy[] {
 
 export function buildTheWildsEntrance(): StoryRoom {
   const mapData = generateWildsMap();
+
+  // Seamless Torch Town linkage along the left edge: rows 19..23
+  // - Ensure [y,0] and [y,1] are floors
+  // - Mark [y,0] as ROOM_TRANSITION to Torch Town
+  for (let y = 19; y <= 23; y++) {
+    if (mapData.tiles[y]?.[0] !== undefined) {
+      mapData.tiles[y][0] = FLOOR;
+      mapData.subtypes[y][0] = [TileSubtype.ROOM_TRANSITION];
+    }
+    if (mapData.tiles[y]?.[1] !== undefined) {
+      mapData.tiles[y][1] = FLOOR;
+      // Keep any existing subtypes on [y,1] unless it was a wall; if wall, clear
+      if (mapData.subtypes[y][1] == null || mapData.subtypes[y][1].length === 0) {
+        mapData.subtypes[y][1] = [];
+      }
+    }
+  }
   
-  // Find the entry point we marked in the map
-  let entryPoint: [number, number] = [SIZE - 2, 1];
+  // Find the entry point: choose the tile just above the bottom-most ROOM_TRANSITION
+  let entryPoint: [number, number] = [SIZE - 2, 2];
+  let bottomMost: [number, number] | null = null;
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
       if (mapData.subtypes[y][x].includes(TileSubtype.ROOM_TRANSITION)) {
-        entryPoint = [y, x];
-        break;
+        if (!bottomMost || y > bottomMost[0]) {
+          bottomMost = [y, x];
+        }
       }
     }
+  }
+  if (bottomMost) {
+    const [by, bx] = bottomMost;
+    entryPoint = [Math.max(1, by - 1), bx];
   }
   
   const enemies = generateWildsEnemies(mapData);
@@ -186,5 +209,13 @@ export function buildTheWildsEntrance(): StoryRoom {
       displayLabel: "The Wilds — Entrance",
       description: "A dangerous wilderness area teeming with hostile creatures.",
     },
+    otherTransitions: [
+      // Map seam returns to Torch Town east gate columns at y=10..14, x=34
+      { roomId: "story-torch-town" as RoomId, position: [19, 0], targetEntryPoint: [10, 33], returnEntryPoint: [19, 1] },
+      { roomId: "story-torch-town" as RoomId, position: [20, 0], targetEntryPoint: [11, 33], returnEntryPoint: [20, 1] },
+      { roomId: "story-torch-town" as RoomId, position: [21, 0], targetEntryPoint: [12, 33], returnEntryPoint: [21, 1] },
+      { roomId: "story-torch-town" as RoomId, position: [22, 0], targetEntryPoint: [13, 33], returnEntryPoint: [22, 1] },
+      { roomId: "story-torch-town" as RoomId, position: [23, 0], targetEntryPoint: [14, 33], returnEntryPoint: [23, 1] },
+    ],
   };
 }

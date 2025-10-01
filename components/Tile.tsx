@@ -617,7 +617,7 @@ export const Tile: React.FC<TileProps> = ({
             }}
           />
         )}
-        {hasFood(subtypes) && (
+        {hasFood(subtypes) && !hasPot(subtypes) && (
           <div
             key="food"
             data-testid={`subtype-icon-${TileSubtype.FOOD}`}
@@ -631,7 +631,7 @@ export const Tile: React.FC<TileProps> = ({
             }}
           />
         )}
-        {hasMed(subtypes) && (
+        {hasMed(subtypes) && !hasPot(subtypes) && (
           <div
             key="med"
             data-testid={`subtype-icon-${TileSubtype.MED}`}
