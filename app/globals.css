@@ -10,6 +10,71 @@
   letter-spacing: 0.5px;
 }
 
+.pixel-button {
+  font-family: 'Press Start 2P', 'VT323', monospace !important;
+  background: linear-gradient(#2b2540, #1c1830);
+  color: #f5f3ff;
+  border: 4px solid #8b7fe0;
+  box-shadow:
+    0 0 0 4px #0d0b1a,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.12);
+  padding: 0.75rem 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+  image-rendering: pixelated;
+}
+
+.pixel-button:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 4px #0d0b1a,
+    0 6px 0 0 rgba(0, 0, 0, 0.35),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.18);
+}
+
+.pixel-button:active {
+  transform: translateY(1px);
+  box-shadow:
+    0 0 0 4px #0d0b1a,
+    inset 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.pixel-button:focus-visible {
+  outline: 2px solid #f9d65c;
+  outline-offset: 4px;
+}
+
+.pixel-window {
+  font-family: 'Press Start 2P', 'VT323', monospace !important;
+  background: linear-gradient(#1f1d2d, #161225);
+  color: #f5f3ff;
+  border: 4px solid #8b7fe0;
+  box-shadow: 0 0 0 4px #0d0b1a;
+  padding: 1.25rem;
+  max-width: 20rem;
+  image-rendering: pixelated;
+}
+
+.pixel-window p {
+  margin: 0 0 0.75rem;
+  line-height: 1.6;
+}
+
+.pixel-window p:last-of-type {
+  margin-bottom: 0;
+}
+
+.pixel-window a {
+  color: #9ad1ff;
+  text-decoration: underline;
+}
+
+.pixel-window a:hover {
+  color: #c0e6ff;
+}
+
 :root {
   --background: #1B1B1B;
   --foreground: #ededed;
