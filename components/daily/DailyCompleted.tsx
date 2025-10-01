@@ -237,7 +237,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
   return (
     <div
-      className="min-h-screen py-8 px-4"
+      className="relative min-h-screen py-8 px-4"
       style={{
         backgroundImage: "url(/images/presentational/wall-up-close.png)",
         backgroundRepeat: "repeat",
@@ -573,6 +573,25 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           </div>
         </div>
       </div>
+
+      <a
+        href="https://chrisdornink.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="group absolute bottom-4 right-4 flex items-center gap-3 rounded-sm px-3 py-2 bg-black/70 border-2 border-yellow-400 shadow-[4px_4px_0px_rgba(0,0,0,0.6)] text-yellow-200 hover:border-yellow-200 hover:text-yellow-100 transition-colors"
+        aria-label="Visit Chris Dornink's website"
+      >
+        <span
+          className="flex h-10 w-10 items-center justify-center rounded-sm bg-[#f5e6c8] text-2xl shadow-[inset_0_0_0_2px_rgba(0,0,0,0.25)] group-hover:shadow-[inset_0_0_0_2px_rgba(0,0,0,0.4)] transition-shadow"
+          aria-hidden="true"
+        >
+          📜
+        </span>
+        <div className="text-right leading-tight">
+          <p className="font-semibold pixel-text text-xs sm:text-sm">Meet the creator</p>
+          <p className="pixel-text text-[10px] sm:text-xs">chrisdornink.com</p>
+        </div>
+      </a>
     </div>
   );
 }
