@@ -523,7 +523,9 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
             className={`${styles.assetIcon} ${styles.torchSprite}`}
             style={{ backgroundImage: `url(/images/items/wall-torch-2.png)` }}
-          />
+          >
+            <span data-testid="wall-torch" style={{ position: "absolute", width: 0, height: 0, overflow: "hidden", clip: "rect(0 0 0 0)" }}>wall torch</span>
+          </div>
         )}
 
         {/* Render key with asset if present */}
