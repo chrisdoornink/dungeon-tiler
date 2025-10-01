@@ -63,8 +63,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const isWin = todayResult === "won";
   const [copied, setCopied] = useState(false);
 
-  const [showAbout, setShowAbout] = useState(false);
-
   useEffect(() => {
     try {
       Analytics.trackDailyChallenge?.("completed", {
@@ -576,32 +574,37 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         </div>
       </div>
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
-        {showAbout && (
-          <div
-            className="pixel-window pixel-text text-xs leading-relaxed flex flex-col gap-3 max-w-xs"
-            role="dialog"
-            id="about-torch-boy"
-            aria-label="About Torch Boy"
-          >
-            <p>Torch Boy was made by Chris Dornink, a web developer out of Seattle, Washington.</p>
-            <p>Hire me to craft your next adventure-ready experience.</p>
-            <div className="flex flex-col gap-2 text-[11px]">
-              <a href="https://chrisdornink.com" target="_blank" rel="noreferrer">Visit chrisdornink.com</a>
-              <a href="https://www.linkedin.com/in/chrisdornink/" target="_blank" rel="noreferrer">Connect on LinkedIn</a>
-              <a href="https://github.com/chrisdornink/dungeon-tiler" target="_blank" rel="noreferrer">View the GitHub repository</a>
-            </div>
+      <div className="max-w-2xl mx-auto mt-8">
+        <div className="pixel-window pixel-text text-xs leading-relaxed flex flex-col gap-3">
+          <p>
+            Torch Boy was made by Chris Dornink, a web developer out of Seattle,
+            Washington.
+          </p>
+          <p>Hire me to craft your next adventure-ready experience.</p>
+          <div className="flex flex-col gap-2 text-[11px]">
+            <a
+              href="https://chrisdornink.com"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Visit chrisdornink.com
+            </a>
+            <a
+              href="https://www.linkedin.com/in/chrisdornink/"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Connect on LinkedIn
+            </a>
+            <a
+              href="https://github.com/chrisdornink/dungeon-tiler"
+              target="_blank"
+              rel="noreferrer"
+            >
+              View the GitHub repository
+            </a>
           </div>
-        )}
-        <button
-          type="button"
-          onClick={() => setShowAbout((prev) => !prev)}
-          className="pixel-button pixel-text text-[10px] leading-none"
-          aria-expanded={showAbout}
-          aria-controls={showAbout ? "about-torch-boy" : undefined}
-        >
-          {showAbout ? 'Close' : 'About Torch Boy'}
-        </button>
+        </div>
       </div>
     </div>
   );
