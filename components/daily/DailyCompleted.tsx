@@ -574,35 +574,29 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto mt-8">
-        <div className="pixel-window pixel-text text-xs leading-relaxed flex flex-col gap-3">
-          <p>
+      <div className="max-w-lg mx-auto mt-8 text-center">
+        <div className="text-sm leading-relaxed space-y-3">
+          <p className="text-xs">
             Torch Boy was made by Chris Dornink, a web developer out of Seattle,
             Washington.
           </p>
-          <p>Hire me to craft your next adventure-ready experience.</p>
-          <div className="flex flex-col gap-2 text-[11px]">
-            <a
-              href="https://chrisdornink.com"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Visit chrisdornink.com
-            </a>
-            <a
-              href="https://www.linkedin.com/in/chrisdornink/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Connect on LinkedIn
-            </a>
-            <a
-              href="https://github.com/chrisdornink/dungeon-tiler"
-              target="_blank"
-              rel="noreferrer"
-            >
-              View the GitHub repository
-            </a>
+          <p className="text-sm text-purple-300">I'm looking for my next quest. Want to hire me?</p>
+          <div className="space-y-2">
+            <div>
+              <a href="https://chrisdoornink.com" target="_blank" rel="noreferrer">
+                Visit my website
+              </a>
+            </div>
+            <div>
+              <a href="https://www.linkedin.com/in/chrisdoornink/" target="_blank" rel="noreferrer">
+                Connect on LinkedIn
+              </a>
+            </div>
+            <div>
+              <a href="https://github.com/chrisdoornink/dungeon-tiler" target="_blank" rel="noreferrer">
+                View the GitHub repository
+              </a>
+            </div>
           </div>
         </div>
       </div>
