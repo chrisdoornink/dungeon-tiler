@@ -11,7 +11,7 @@ import {
   FLOOR,
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
-import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
+import { NPC, rehydrateNPCs, serializeNPCs, type PlainNPC } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
 import {
   buildAscentCorridor,
@@ -73,17 +73,17 @@ export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
  */
 function determineRoomNpcs(
   roomId: string,
-  baseNpcs: any[] | undefined,
-  conditionalNpcs: any,
+  baseNpcs: PlainNPC[] | undefined,
+  conditionalNpcs: Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
   allRoomSnapshots: GameState["rooms"],
   flags: StoryFlags,
   currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
-): any[] {
+): PlainNPC[] {
   if (!conditionalNpcs || typeof conditionalNpcs !== "object") {
     return baseNpcs || [];
   }
 
-  const finalNpcs: any[] = [];
+  const finalNpcs: PlainNPC[] = [];
   const processedNpcIds = new Set<string>();
 
   // Process each conditional NPC rule
@@ -184,11 +184,12 @@ function cloneEnemies(enemies?: Enemy[]): Enemy[] {
   return rehydrateEnemies(plain);
 }
 
-function cloneNPCs(npcs?: NPC[]): NPC[] {
-  if (!npcs) return [];
-  const plain = serializeNPCs(npcs) ?? [];
-  return rehydrateNPCs(plain);
-}
+// Unused function - keeping for potential future use
+// function cloneNPCs(npcs?: NPC[]): NPC[] {
+//   if (!npcs) return [];
+//   const plain = serializeNPCs(npcs) ?? [];
+//   return rehydrateNPCs(plain);
+// }
 
 export function buildStoryModeState(): GameState {
   const entrance = buildEntranceHall();
@@ -607,7 +608,7 @@ export function buildStoryModeState(): GameState {
   const initialNpcsPlain = determineRoomNpcs(
     entrance.id,
     serializeNPCs(entrance.npcs),
-    entrance.metadata?.conditionalNpcs,
+    entrance.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
     roomSnapshots,
     initialFlags,
     startingTimeOfDay
@@ -861,7 +862,7 @@ function applyStoryResetConfig(
       const npcs = determineRoomNpcs(
         state.currentRoomId,
         currentRoom.npcs,
-        currentRoom.metadata?.conditionalNpcs,
+        currentRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
         state.rooms,
         state.storyFlags,
         state.timeOfDay?.phase ?? "day"
@@ -893,7 +894,7 @@ export function updateConditionalNpcs(state: GameState): void {
   const npcs = determineRoomNpcs(
     state.currentRoomId,
     currentRoom.npcs,
-    currentRoom.metadata?.conditionalNpcs,
+    currentRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
     state.rooms,
     state.storyFlags,
     state.timeOfDay?.phase
@@ -909,11 +910,11 @@ export function updateConditionalNpcs(state: GameState): void {
  */
 export function determineRoomNpcsForTransition(
   roomId: string,
-  baseNpcs: any[] | undefined,
-  conditionalNpcs: any,
+  baseNpcs: PlainNPC[] | undefined,
+  conditionalNpcs: Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
   allRoomSnapshots: GameState["rooms"],
   flags: StoryFlags,
   currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
-): any[] {
+): PlainNPC[] {
   return determineRoomNpcs(roomId, baseNpcs, conditionalNpcs, allRoomSnapshots, flags, currentTimeOfDay);
 }

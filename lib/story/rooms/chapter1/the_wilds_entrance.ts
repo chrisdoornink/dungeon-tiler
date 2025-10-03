@@ -1,4 +1,4 @@
-import { FLOOR, WALL, TileSubtype, generateMap } from "../../../map";
+import { FLOOR, TileSubtype, generateMap } from "../../../map";
 import type { MapData } from "../../../map/types";
 import { Enemy } from "../../../enemy";
 import type { StoryRoom } from "../types";

@@ -896,6 +896,7 @@ function applyRoomTransition(
   let targetNPCsPlain: PlainNPC[] = [];
   if (state.mode === 'story' && state.storyFlags) {
     // Import the function from story_mode
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { determineRoomNpcsForTransition } = require('../story/story_mode');
     const npcs = determineRoomNpcsForTransition(
       toId,
@@ -906,7 +907,7 @@ function applyRoomTransition(
       state.timeOfDay?.phase
     );
     targetNPCsPlain = npcs;
-    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n: any) => n.id).join(', ') || 'none');
+    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n: { id: string }) => n.id).join(', ') || 'none');
   } else {
     targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
   }
