@@ -17,9 +17,11 @@ import { resolveNpcDialogueScript } from "../story/npc_script_registry";
 import {
   createInitialStoryFlags,
   type StoryFlags,
+  type StoryCondition,
 } from "../story/event_registry";
 import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-handler";
 import { updateConditionalNpcs } from "../story/story_mode";
+import { determineRoomNpcs } from "../story/npc_conditions";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -895,19 +897,16 @@ function applyRoomTransition(
   // CRITICAL: Determine NPCs dynamically based on current conditions
   let targetNPCsPlain: PlainNPC[] = [];
   if (state.mode === 'story' && state.storyFlags) {
-    // Import the function from story_mode
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { determineRoomNpcsForTransition } = require('../story/story_mode');
-    const npcs = determineRoomNpcsForTransition(
+    const npcs = determineRoomNpcs(
       toId,
       targetRoom.npcs,
-      targetRoom.metadata?.conditionalNpcs,
+      targetRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
       sourceRooms,
       state.storyFlags,
       state.timeOfDay?.phase
     );
     targetNPCsPlain = npcs;
-    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n: { id: string }) => n.id).join(', ') || 'none');
+    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n) => n.id).join(', ') || 'none');
   } else {
     targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
   }

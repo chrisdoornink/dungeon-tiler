@@ -11,7 +11,7 @@ import {
   FLOOR,
 } from "../map";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
-import { NPC, rehydrateNPCs, serializeNPCs, type PlainNPC } from "../npc";
+import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
 import {
   buildAscentCorridor,
@@ -38,7 +38,8 @@ import {
   buildGuardTower,
 } from "./rooms/chapter1";
 import type { StoryRoom } from "./rooms/types";
-import { areStoryConditionsMet, type StoryCondition, type StoryFlags } from "./event_registry";
+import { type StoryCondition } from "./event_registry";
+import { determineRoomNpcs } from "./npc_conditions";
 
 function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -60,78 +61,6 @@ export function getRoomDisplayLabel(state: GameState, roomId: RoomId): string {
   return roomId;
 }
 
-/**
- * Determine which NPCs should be in a room based on current game conditions.
- * This is called when entering a room or when conditions change.
- * 
- * @param baseNpcs - The base NPC list from the room definition
- * @param conditionalNpcs - The conditional NPC rules from room metadata
- * @param allRoomSnapshots - All room snapshots to search for NPCs
- * @param flags - Current story flags
- * @param currentTimeOfDay - Current time of day phase
- * @returns The final NPC list for this room
- */
-function determineRoomNpcs(
-  roomId: string,
-  baseNpcs: PlainNPC[] | undefined,
-  conditionalNpcs: Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
-  allRoomSnapshots: GameState["rooms"],
-  flags: StoryFlags,
-  currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
-): PlainNPC[] {
-  if (!conditionalNpcs || typeof conditionalNpcs !== "object") {
-    return baseNpcs || [];
-  }
-
-  const finalNpcs: PlainNPC[] = [];
-  const processedNpcIds = new Set<string>();
-
-  // Process each conditional NPC rule
-  for (const [npcId, config] of Object.entries(conditionalNpcs)) {
-    const npcConfig = config as { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] };
-    const showWhen = npcConfig?.showWhen as StoryCondition[] | undefined;
-    const removeWhen = npcConfig?.removeWhen as StoryCondition[] | undefined;
-
-    // Determine if NPC should be in this room
-    let shouldBeHere = true;
-    
-    if (showWhen && showWhen.length > 0) {
-      shouldBeHere = areStoryConditionsMet(flags, showWhen, currentTimeOfDay);
-    }
-    if (removeWhen && areStoryConditionsMet(flags, removeWhen, currentTimeOfDay)) {
-      shouldBeHere = false;
-    }
-
-    if (shouldBeHere) {
-      // Find the NPC - first in base NPCs, then search all rooms
-      let foundNpc = baseNpcs?.find((npc) => npc.id === npcId);
-      
-      if (!foundNpc && allRoomSnapshots) {
-        for (const snapshot of Object.values(allRoomSnapshots)) {
-          foundNpc = snapshot.npcs?.find((npc) => npc.id === npcId);
-          if (foundNpc) break;
-        }
-      }
-      
-      if (foundNpc) {
-        finalNpcs.push(foundNpc);
-        processedNpcIds.add(npcId);
-      }
-    }
-  }
-
-  // Add any base NPCs that aren't conditional (not processed)
-  if (baseNpcs) {
-    for (const npc of baseNpcs) {
-      if (!processedNpcIds.has(npc.id) && !(conditionalNpcs as Record<string, unknown>)[npc.id]) {
-        finalNpcs.push(npc);
-      }
-    }
-  }
-
-  console.log(`[determineRoomNpcs] ${roomId} at ${currentTimeOfDay}: ${finalNpcs.map(n => n.id).join(', ') || 'none'}`);
-  return finalNpcs;
-}
 
 
 function withoutPlayer(mapData: MapData): MapData {
@@ -905,16 +834,3 @@ export function updateConditionalNpcs(state: GameState): void {
   console.log(`[updateConditionalNpcs] Reloaded ${state.currentRoomId} NPCs: ${state.npcs.map(n => n.id).join(', ')}`);
 }
 
-/**
- * Export for room transitions - returns the NPC list for a room
- */
-export function determineRoomNpcsForTransition(
-  roomId: string,
-  baseNpcs: PlainNPC[] | undefined,
-  conditionalNpcs: Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
-  allRoomSnapshots: GameState["rooms"],
-  flags: StoryFlags,
-  currentTimeOfDay?: "day" | "dusk" | "night" | "dawn"
-): PlainNPC[] {
-  return determineRoomNpcs(roomId, baseNpcs, conditionalNpcs, allRoomSnapshots, flags, currentTimeOfDay);
-}
