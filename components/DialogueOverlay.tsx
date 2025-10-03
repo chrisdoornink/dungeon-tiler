@@ -82,7 +82,6 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
                     event.stopPropagation();
                     onSelectChoice?.(choice.id);
                   }}
-                  aria-selected={isSelected}
                 >
                   <span className={styles.choiceBadge}>{index + 1}</span>
                   <span className={styles.choiceLabel}>{choice.label}</span>

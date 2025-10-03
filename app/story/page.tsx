@@ -102,7 +102,7 @@ function StoryModeInner() {
       }
       return createDefaultResetConfig(initialState, options);
     });
-  }, [collectStoryCheckpointOptions, initialState]);
+  }, [initialState]);
 
   const handleResetApply = useCallback(
     (config: StoryResetConfig) => {
@@ -117,8 +117,6 @@ function StoryModeInner() {
       setShowResetModal(false);
     },
     [
-      buildStoryStateFromConfig,
-      collectStoryCheckpointOptions,
       setCheckpointOptions,
       setInitialState,
       setResetConfig,

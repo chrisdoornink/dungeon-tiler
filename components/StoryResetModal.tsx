@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   StoryCheckpointOption,
   StoryResetConfig,
@@ -24,7 +24,7 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
     return new Map(entries);
   }, [options]);
 
-  const findMatchingOptionId = (config: StoryResetConfig): string | null => {
+  const findMatchingOptionId = useCallback((config: StoryResetConfig): string | null => {
     for (const opt of options) {
       if (
         opt.roomId === config.targetRoomId &&
@@ -35,7 +35,7 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
       }
     }
     return null;
-  };
+  }, [options]);
 
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [config, setConfig] = useState<StoryResetConfig>(initialConfig);
@@ -43,7 +43,7 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
   useEffect(() => {
     setConfig(initialConfig);
     setSelectedOptionId(findMatchingOptionId(initialConfig));
-  }, [initialConfig, options]);
+  }, [initialConfig, findMatchingOptionId]);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
