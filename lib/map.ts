@@ -78,5 +78,6 @@ export {
   DAY_CYCLE_TOTAL_STEPS,
   advanceTimeOfDay,
   createInitialTimeOfDay,
+  createTimeOfDayAtPhase,
 } from "./time_of_day";
 export type { DayPhaseId, TimeOfDayState } from "./time_of_day";

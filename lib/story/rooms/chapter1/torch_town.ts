@@ -309,8 +309,8 @@ export function buildTorchTown(): StoryRoom {
     id: "npc-captain-bren",
     name: "Captain Bren",
     sprite: "/images/npcs/torch-town/captain-bren.png",
-    y: centerY - 2,
-    x: centerX + 2,
+    y: 11,
+    x: 30,
     facing: Direction.DOWN,
     canMove: false,
     metadata: { dayLocation: "patrol", nightLocation: "guardTower" },
@@ -393,8 +393,8 @@ export function buildTorchTown(): StoryRoom {
     id: "npc-lio",
     name: "Lio",
     sprite: "/images/npcs/torch-town/lio.png",
-    y: spawnRow - 3,
-    x: entryColumn + 3,
+    y: 15,
+    x: 29,
     facing: Direction.DOWN,
     canMove: false,
     metadata: { dayLocation: "gate", nightLocation: "gate" },
@@ -412,28 +412,52 @@ export function buildTorchTown(): StoryRoom {
     metadata: { dayLocation: "outskirts", nightLocation: "house8", house: HOUSE_LABELS.HOUSE_8 },
   }));
 
-  // 12. Sela (Night Guard) - Day: Training yard, Night: Guard Tower
+  // 12. Sela (Night Guard) - Day: Training yard, Night: North patrol
+  // Day version - at training yard
   npcs.push(new NPC({
-    id: "npc-sela",
+    id: "npc-sela-day",
     name: "Sela",
     sprite: "/images/npcs/torch-town/sela.png",
     y: guardTowerDoor[0] + 1,
     x: guardTowerDoor[1] + 1,
     facing: Direction.LEFT,
     canMove: false,
-    metadata: { dayLocation: "trainingYard", nightLocation: "guardTower" },
+    metadata: { dayLocation: "trainingYard" },
+  }));
+  // Night version - patrolling north wall near gate
+  npcs.push(new NPC({
+    id: "npc-sela-night",
+    name: "Sela",
+    sprite: "/images/npcs/torch-town/sela.png",
+    y: 11,
+    x: 28,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { nightLocation: "northPatrol" },
   }));
 
-  // 13. Thane (Guard) - Day: Training yard, Night: Guard Tower
+  // 13. Thane (Guard) - Day: Training yard, Night: South patrol
+  // Day version - at training yard
   npcs.push(new NPC({
-    id: "npc-thane",
+    id: "npc-thane-day",
     name: "Thane",
     sprite: "/images/npcs/torch-town/thane.png",
     y: guardTowerDoor[0] + 1,
     x: guardTowerDoor[1] - 1,
     facing: Direction.RIGHT,
     canMove: false,
-    metadata: { dayLocation: "trainingYard", nightLocation: "guardTower" },
+    metadata: { dayLocation: "trainingYard" },
+  }));
+  // Night version - patrolling south entrance
+  npcs.push(new NPC({
+    id: "npc-thane-night",
+    name: "Thane",
+    sprite: "/images/npcs/torch-town/thane.png",
+    y: guardTowerDoor[0] + 3,
+    x: guardTowerDoor[1] - 1,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { nightLocation: "southPatrol" },
   }));
 
   // 14. Old Fenna (Flame Caretaker) - Day: Central fire, Night: House 7
@@ -441,8 +465,8 @@ export function buildTorchTown(): StoryRoom {
     id: "npc-fenna",
     name: "Old Fenna",
     sprite: "/images/npcs/torch-town/old-fenna.png",
-    y: centerY-1,
-    x: centerX,
+    y: centerY,
+    x: centerX-1,
     facing: Direction.DOWN,
     canMove: false,
     metadata: { dayLocation: "centralFire", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
@@ -489,9 +513,9 @@ export function buildTorchTown(): StoryRoom {
     id: "npc-tavi",
     name: "Tavi",
     sprite: "/images/npcs/torch-town/tavi.png",
-    y: centerY + 2,
-    x: centerX + 1,
-    facing: Direction.UP,
+    y: 13,
+    x: 13,
+    facing: Direction.LEFT,
     canMove: false,
     metadata: { dayLocation: "plaza", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
   }));
@@ -534,8 +558,11 @@ export function buildTorchTown(): StoryRoom {
         "npc-haro": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-len": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-captain-bren": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-sela": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-thane": { removeWhen: [{ timeOfDay: "night" }] },
+        // Sela and Thane switch between day/night patrol positions
+        "npc-sela-day": { removeWhen: [{ timeOfDay: "night" }] },
+        "npc-sela-night": { showWhen: [{ timeOfDay: "night" }] },
+        "npc-thane-day": { removeWhen: [{ timeOfDay: "night" }] },
+        "npc-thane-night": { showWhen: [{ timeOfDay: "night" }] },
         // Lio stays out at night (wandering)
       },
     },

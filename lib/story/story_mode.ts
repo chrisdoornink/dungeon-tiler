@@ -10,6 +10,7 @@ import {
   isWithinBounds,
   FLOOR,
 } from "../map";
+import { createTimeOfDayAtPhase } from "../time_of_day";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
 import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
@@ -489,19 +490,28 @@ export function buildStoryModeState(): GameState {
     }
   }
 
-  // Torch Town -> The Wilds transitions
-  pushTransition(
-    torchTown.id,
-    wildsEntrance.id,
-    [12, 34], // Exit position from Torch Town (east side)
-    wildsEntrance.entryPoint
-  );
-  pushTransition(
-    wildsEntrance.id,
-    torchTown.id,
-    wildsEntrance.entryPoint, // Entry/exit at bottom-left [24, 1]
-    [12, 33] // Return to inside Torch Town, just before the exit
-  );
+  // Torch Town <-> The Wilds seam transitions (five adjacent tiles)
+  // Map left edge of Wilds rows 19..23 to Torch Town east gate rows 10..14 at col 34
+  for (let i = 0; i < 5; i++) {
+    const wildY = 19 + i;
+    const torchY = 10 + i;
+    const wildFrom: [number, number] = [wildY, 0];
+    const torchFrom: [number, number] = [torchY, 34];
+    // Wilds -> Torch Town
+    pushTransition(
+      wildsEntrance.id,
+      torchTown.id,
+      wildFrom,
+      [torchY, 33]
+    );
+    // Torch Town -> Wilds (land just inside at [y,1])
+    pushTransition(
+      torchTown.id,
+      wildsEntrance.id,
+      torchFrom,
+      [wildY, 1]
+    );
+  }
 
   const storyRooms: StoryRoom[] = [
     entrance,
@@ -712,6 +722,7 @@ export interface StoryResetConfig {
   runeCount: number;
   foodCount: number;
   potionCount: number;
+  timeOfDay?: "day" | "dusk" | "night" | "dawn";
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -773,6 +784,11 @@ function applyStoryResetConfig(
   state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
   state.potionCount = clamp(Math.floor(config.potionCount), 0, 99);
 
+  // Set time of day if specified
+  if (config.timeOfDay) {
+    state.timeOfDay = createTimeOfDayAtPhase(config.timeOfDay);
+  }
+
   state.stats = {
     ...state.stats,
     steps: 0,
@@ -794,7 +810,7 @@ function applyStoryResetConfig(
         currentRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
         state.rooms,
         state.storyFlags,
-        state.timeOfDay?.phase ?? "day"
+        state.timeOfDay?.phase ?? config.timeOfDay ?? "day"
       );
       state.npcs = rehydrateNPCs(npcs);
     }

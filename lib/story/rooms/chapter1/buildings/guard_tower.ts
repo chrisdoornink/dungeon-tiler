@@ -8,26 +8,19 @@ export function buildGuardTower(): StoryRoom {
   const id = "story-torch-town-guard-tower" as RoomId;
   const displayLabel = "Guard Tower";
   
-  // Create NPCs for the guard tower
+  // Create NPCs for the guard tower (inside building)
+  // Captain Bren goes inside at night, Sela and Thane patrol outside
   const npcs: NPC[] = [
-    new NPC({ id: "npc-captain-bren", name: "Captain Bren", sprite: "/images/npcs/torch-town/captain-bren.png", y: 4, x: 2, facing: Direction.DOWN, canMove: false, metadata: { location: "guard-tower" } }),
-    new NPC({ id: "npc-sela", name: "Sela", sprite: "/images/npcs/torch-town/sela.png", y: 4, x: 3, facing: Direction.DOWN, canMove: false, metadata: { location: "guard-tower" } }),
-    new NPC({ id: "npc-thane", name: "Thane", sprite: "/images/npcs/torch-town/thane.png", y: 4, x: 4, facing: Direction.DOWN, canMove: false, metadata: { location: "guard-tower" } }),
+    new NPC({ id: "npc-captain-bren-inside", name: "Captain Bren", sprite: "/images/npcs/torch-town/captain-bren.png", y: 4, x: 2, facing: Direction.DOWN, canMove: false, metadata: { location: "guard-tower" } }),
   ];
   
   const room = buildBuildingInterior(id, 3, 4, "house", displayLabel, npcs);
   
-  // Add conditional NPC visibility - Guards appear here at night
+  // Add conditional NPC visibility - Captain appears here at night
   room.metadata = {
     ...room.metadata,
     conditionalNpcs: {
-      "npc-captain-bren": {
-        showWhen: [{ timeOfDay: "night" }]
-      },
-      "npc-sela": {
-        showWhen: [{ timeOfDay: "night" }]
-      },
-      "npc-thane": {
+      "npc-captain-bren-inside": {
         showWhen: [{ timeOfDay: "night" }]
       }
     }
