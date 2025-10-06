@@ -37,8 +37,10 @@ export function buildOutdoorClearing(): StoryRoom {
   const entryPoint: [number, number] = [bottomOpeningY - 1, entryX];
   const transitionToPrevious: [number, number] = [bottomOpeningY, entryX];
 
-  const checkpointY = Math.max(1, entryPoint[0] - 7);
-  const checkpointX = entryPoint[1];
+  const roadJunctionY = Math.max(1, entryPoint[0] - 7);
+  const roadJunctionX = entryPoint[1];
+  const checkpointY = 11;
+  const checkpointX = 7;
   if (tiles[checkpointY]?.[checkpointX] === FLOOR) {
     subtypes[checkpointY][checkpointX] = [TileSubtype.CHECKPOINT];
   }
@@ -179,8 +181,8 @@ export function buildOutdoorClearing(): StoryRoom {
   // - From hub to Bluff exit (top-left)
 
   // Central hub at or near the checkpoint
-  const hubY = checkpointY;
-  const hubX = checkpointX;
+  const hubY = roadJunctionY;
+  const hubX = roadJunctionX;
   const topOfRoomY = 1;
 
   // 1) Entrance to hub: straight vertical path to the top of the room

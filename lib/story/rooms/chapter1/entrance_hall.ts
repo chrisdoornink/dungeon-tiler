@@ -52,8 +52,8 @@ export function buildEntranceHall(): StoryRoom {
 
   const potOverrides: Record<string, TileSubtype.FOOD | TileSubtype.MED> = {};
   const potPositions: Array<[number, number]> = [
-    [1, Math.max(3, Math.floor(width / 4))],
-    [1, Math.min(width - 2, Math.floor((width * 3) / 4))],
+    [1, Math.max(3, Math.floor(width / 4))], // Left
+    [3, 16], // Right
   ];
   for (const [py, px] of potPositions) {
     if (tiles[py]?.[px] === FLOOR) {
