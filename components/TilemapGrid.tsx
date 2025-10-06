@@ -48,6 +48,7 @@ import { ScreenShake } from "./ScreenShake";
 import ItemPickupAnimation from "./ItemPickupAnimation";
 import DialogueOverlay from "./DialogueOverlay";
 import { useTypewriter } from "../lib/dialogue/useTypewriter";
+import { DeathScreen } from "./DeathScreen";
 import {
   getDialogueScript,
   type DialogueChoice,
@@ -171,6 +172,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Track if game completion has already been processed to prevent duplicate saves
   const [gameCompletionProcessed, setGameCompletionProcessed] = useState(false);
+  
+  // Track if death screen should be shown
+  const [showDeathScreen, setShowDeathScreen] = useState(false);
 
   // Transient moving rock effect
   const [rockEffect, setRockEffect] = useState<null | {
@@ -750,6 +754,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     playerPosition,
     resolvedStorageSlot,
   ]);
+
+  // Handle restarting from last checkpoint
+  const handleRestartFromCheckpoint = useCallback(() => {
+    const revivedState = reviveFromLastCheckpoint(gameState);
+    if (revivedState) {
+      setShowDeathScreen(false);
+      setGameCompletionProcessed(false);
+      setGameState(revivedState);
+      CurrentGameStorage.saveCurrentGame(revivedState, resolvedStorageSlot);
+    }
+  }, [gameState, resolvedStorageSlot]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
@@ -1387,20 +1402,43 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => clearTimeout(timer);
   }, [checkpointFlash]);
 
-  // Redirect to end page OR signal completion (daily) and persist snapshot on death (heroHealth <= 0)
+  // Show death screen when hero dies (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth > 0 || gameCompletionProcessed) {
       return;
     }
 
-    const revivedState = reviveFromLastCheckpoint(gameState);
-    if (revivedState) {
+    // Check if there's a checkpoint to revive from
+    const hasCheckpoint = !!gameState.lastCheckpoint;
+    
+    if (hasCheckpoint) {
+      // Show death screen with option to restart from checkpoint
+      setGameCompletionProcessed(true);
       triggerScreenShake(400);
-      setGameState(revivedState);
-      CurrentGameStorage.saveCurrentGame(revivedState, resolvedStorageSlot);
+      setShowDeathScreen(true);
+      
+      // Track death analytics
+      try {
+        const mode = isDailyChallenge ? "daily" : "normal";
+        const mapId = computeMapId(gameState.mapData);
+        trackGameComplete({
+          outcome: "dead",
+          mode,
+          mapId,
+          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+          heroHealth: 0,
+          steps: gameState.stats.steps,
+          enemiesDefeated: gameState.stats.enemiesDefeated,
+          damageDealt: gameState.stats.damageDealt,
+          damageTaken: gameState.stats.damageTaken,
+          byKind: gameState.stats.byKind,
+          deathCause: gameState.deathCause?.type,
+        });
+      } catch {}
       return;
     }
 
+    // No checkpoint available - handle permanent death
     setGameCompletionProcessed(true);
     // Trigger screen shake on death
     triggerScreenShake(400);
@@ -1846,6 +1884,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   return (
     <div className="relative">
+      {showDeathScreen && (
+        <DeathScreen
+          deathCause={gameState.deathCause}
+          onRestart={handleRestartFromCheckpoint}
+        />
+      )}
       {isHeroDiaryOpen && (
         <HeroDiaryModal
           entries={diaryEntries}
