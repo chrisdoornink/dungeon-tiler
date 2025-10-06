@@ -520,7 +520,8 @@ export const Tile: React.FC<TileProps> = ({
         {hasWallTorch(subtypes) && !(subtypes?.includes(TileSubtype.CHECKPOINT)) && (
           <div
             key="wall-torch"
-            data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
+            data-testid="wall-torch"
+            data-subtype-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
             className={`${styles.assetIcon} ${styles.torchSprite}`}
             style={{ backgroundImage: `url(/images/items/wall-torch-2.png)` }}
           />
