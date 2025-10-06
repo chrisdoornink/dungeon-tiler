@@ -133,7 +133,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Caretaker Lysa",
-        text: "My companion went to look into it earlier—a boy who tends the inner torches. He hasn't returned.",
+        text: "Kalen went to look into it earlier. He hasn't returned.",
       },
       {
         speaker: "Caretaker Lysa",
@@ -167,7 +167,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
           },
           {
             id: "confirm",
-            prompt: "I'll go check on the boy",
+            prompt: "I'll go check on Kalen",
             response: [
               {
                 speaker: "Caretaker Lysa",
@@ -189,7 +189,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Caretaker Lysa",
-        text: "The bluff still thrums with that uneasy current. Please—find the boy and bring him back safely.",
+        text: "The bluff still thrums with that uneasy current. Please—find Kalen and bring him back safely.",
       },
       {
         speaker: "Caretaker Lysa",
@@ -224,7 +224,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Elder Rowan",
-        text: "The air has been restless all day. If Lysa sensed the bluff, go—find the boy and return together.",
+        text: "The air has been restless all day. If Lysa sensed the bluff, go—find Kalen and return together.",
       },
       {
         speaker: "Elder Rowan",
