@@ -1400,31 +1400,17 @@ export function movePlayer(
       return newGameState;
     }
 
-    // If it's FOOD or MED, handle based on current health
+    // If it's FOOD or MED, always add to inventory (no auto-heal on pickup)
     if (
       subtype.includes(TileSubtype.FOOD) ||
       subtype.includes(TileSubtype.MED)
     ) {
-      const heal = subtype.includes(TileSubtype.MED) ? 2 : 1;
-      
       if (subtype.includes(TileSubtype.FOOD)) {
-        // Food: auto-heal when health < 5, inventory when health = 5
-        if (newGameState.heroHealth < 5) {
-          newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
-        } else {
-          newGameState.foodCount = (newGameState.foodCount || 0) + 1;
-        }
+        // Food: always goes to inventory
+        newGameState.foodCount = (newGameState.foodCount || 0) + 1;
       } else {
-        // MED/Potion: auto-heal when health <= 3, inventory when health > 3
-        if (newGameState.heroHealth <= 3) {
-          newGameState.heroHealth = Math.min(5, newGameState.heroHealth + heal);
-          // Also cure poison when potion auto-heals on pickup
-          if (newGameState.conditions?.poisoned?.active) {
-            newGameState.conditions.poisoned.active = false;
-          }
-        } else {
-          newGameState.potionCount = (newGameState.potionCount || 0) + 1;
-        }
+        // MED/Potion: always goes to inventory
+        newGameState.potionCount = (newGameState.potionCount || 0) + 1;
       }
       moved = true;
     }
@@ -1685,14 +1671,14 @@ export function movePlayer(
   }
 
   if (checkpointTouched) {
+    // Ensure the hero's torch is lit when saving at a checkpoint
+    newGameState.heroTorchLit = true;
     newGameState.lastCheckpoint = createCheckpointSnapshot(newGameState);
   }
-
   // Handle poison damage over time
   if (newGameState.conditions?.poisoned?.active && moved) {
     const poison = newGameState.conditions.poisoned;
     poison.stepsSinceLastDamage += 1;
-    
     if (poison.stepsSinceLastDamage >= poison.stepInterval) {
       // Apply poison damage
       const poisonDamage = poison.damagePerInterval;

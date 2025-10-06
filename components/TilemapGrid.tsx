@@ -1854,17 +1854,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         />
       )}
       <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
-        <div
-          className="relative flex justify-center"
-          data-testid="tilemap-grid-wrapper"
-        >
-        {checkpointFlash && (
-          <div className="absolute top-4 right-4 z-50">
-            <div className="rounded-md bg-emerald-600/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/50">
-              Checkpoint reached
+        <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
+          {checkpointFlash && (
+            <div className="absolute top-4 right-4 z-50">
+              <div className="rounded-md bg-emerald-600/90 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-emerald-900/50">
+                Game saved
+              </div>
             </div>
-          </div>
-        )}
+          )}
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 flex items-center justify-center">
           <div className="game-scale relative" data-testid="game-scale">
