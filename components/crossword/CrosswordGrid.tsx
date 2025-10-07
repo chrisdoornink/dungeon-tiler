@@ -203,22 +203,22 @@ export default function CrosswordGrid({ puzzle }: Props) {
   }, [placements, cellNumbering]);
 
   return (
-    <div className="flex flex-col gap-10 lg:flex-row">
+    <div className="flex flex-col gap-10 lg:flex-row" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
       <section className="mx-auto w-full max-w-sm">
-        <div className="grid grid-cols-10 gap-[2px] rounded-lg bg-black p-[2px] shadow-lg shadow-slate-900/40">
+        <div className="grid grid-cols-10 gap-0 rounded-lg bg-white p-0">
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const k = keyFor(rowIndex, colIndex);
               const active = Boolean(cell);
               if (!active) {
                 return (
-                  <div key={k} className="h-10 w-10 bg-black" aria-hidden />
+                  <div key={k} className="h-10 w-10 bg-white" aria-hidden />
                 );
               }
               return (
                 <div key={k} className="relative h-10 w-10">
                   {startNumbers[k] ? (
-                    <span className="pointer-events-none absolute left-0.5 top-0.5 z-10 text-[10px] leading-none text-black">
+                    <span className="pointer-events-none absolute left-0.5 top-0.5 z-10 text-[9px] leading-none text-slate-600 font-medium">
                       {startNumbers[k]}
                     </span>
                   ) : null}
@@ -271,7 +271,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setDirection("down");
                       }
                     }}
-                    className="h-full w-full text-center text-lg font-semibold uppercase bg-white text-black focus:outline-none focus:ring-2 focus:ring-sky-400"
+                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black border border-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
               );
@@ -282,37 +282,37 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
       <section className="flex-1 space-y-6">
         <div>
-          <h2 className="text-xl font-semibold text-slate-100">Clues</h2>
-          <p className="text-sm text-slate-400">Organized by direction. Coordinates are one-indexed.</p>
+          <h2 className="text-xl font-semibold text-black">Clues</h2>
+          <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
         </div>
 
         {placements.length === 0 ? (
-          <p className="rounded-lg border border-slate-700 bg-slate-900/40 p-4 text-sm text-slate-300">
+          <p className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
             No crossword could be generated for this seed. Refresh to try again!
           </p>
         ) : (
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Across */}
             <div>
-              <h3 className="mb-2 text-lg font-semibold text-slate-100">Across</h3>
-              <ol className="space-y-3 text-slate-200">
+              <h3 className="mb-2 text-lg font-semibold text-black">Across</h3>
+              <ol className="space-y-3 text-black">
                 {numberedClues
                   .filter((p) => p.direction === "across")
                   .map((clue) => (
                     <li
                       key={`A-${clue.number}-${clue.word}`}
-                      className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow shadow-slate-950/50"
+                      className="rounded-lg border border-slate-300 bg-slate-50 p-4 shadow-sm"
                     >
                       <div className="flex items-baseline justify-between gap-3">
                         <div className="flex items-baseline gap-3">
-                          <span className="text-lg font-semibold text-slate-100">{clue.number}.</span>
-                          <span className="font-semibold text-sky-300">Across</span>
+                          <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                          <span className="font-semibold text-blue-600">Across</span>
                         </div>
                         <span className="text-xs uppercase tracking-wide text-slate-500">
                           Row {clue.row + 1}, Col {clue.col + 1}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-slate-300">{clue.clue}</p>
+                      <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
                     </li>
                   ))}
               </ol>
@@ -320,25 +320,25 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
             {/* Down */}
             <div>
-              <h3 className="mb-2 text-lg font-semibold text-slate-100">Down</h3>
-              <ol className="space-y-3 text-slate-200">
+              <h3 className="mb-2 text-lg font-semibold text-black">Down</h3>
+              <ol className="space-y-3 text-black">
                 {numberedClues
                   .filter((p) => p.direction === "down")
                   .map((clue) => (
                     <li
                       key={`D-${clue.number}-${clue.word}`}
-                      className="rounded-lg border border-slate-800 bg-slate-900/60 p-4 shadow shadow-slate-950/50"
+                      className="rounded-lg border border-slate-300 bg-slate-50 p-4 shadow-sm"
                     >
                       <div className="flex items-baseline justify-between gap-3">
                         <div className="flex items-baseline gap-3">
-                          <span className="text-lg font-semibold text-slate-100">{clue.number}.</span>
-                          <span className="font-semibold text-sky-300">Down</span>
+                          <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                          <span className="font-semibold text-blue-600">Down</span>
                         </div>
                         <span className="text-xs uppercase tracking-wide text-slate-500">
                           Row {clue.row + 1}, Col {clue.col + 1}
                         </span>
                       </div>
-                      <p className="mt-2 text-sm text-slate-300">{clue.clue}</p>
+                      <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
                     </li>
                   ))}
               </ol>
