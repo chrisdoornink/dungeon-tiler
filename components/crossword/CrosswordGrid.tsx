@@ -205,20 +205,41 @@ export default function CrosswordGrid({ puzzle }: Props) {
   return (
     <div className="flex flex-col gap-10 lg:flex-row" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
       <section className="mx-auto w-full max-w-sm">
-        <div className="grid grid-cols-10 gap-0 rounded-lg bg-white p-0">
+        <div className="grid grid-cols-10 gap-0 bg-white">
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const k = keyFor(rowIndex, colIndex);
               const active = Boolean(cell);
+              
               if (!active) {
                 return (
                   <div key={k} className="h-10 w-10 bg-white" aria-hidden />
                 );
               }
+              
+              const r = rowIndex;
+              const c = colIndex;
+              
+              // Check for adjacent active cells
+              const hasLeft = c > 0 && isActive[keyFor(r, c - 1)];
+              const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
+              const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
+              const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
+              
+              // Use 2px on shared sides (so 2px + 2px = 4px total), 4px on outer sides
+              const borderStyle: React.CSSProperties = {
+                borderLeftWidth: hasLeft ? '2px' : '4px',
+                borderRightWidth: hasRight ? '2px' : '4px',
+                borderTopWidth: hasTop ? '2px' : '4px',
+                borderBottomWidth: hasBottom ? '2px' : '4px',
+                borderColor: 'black',
+                borderStyle: 'solid',
+              };
+              
               return (
                 <div key={k} className="relative h-10 w-10">
                   {startNumbers[k] ? (
-                    <span className="pointer-events-none absolute left-0.5 top-0.5 z-10 text-[9px] leading-none text-slate-600 font-medium">
+                    <span className="pointer-events-none absolute left-1 top-1 z-10 text-[9px] leading-none text-slate-600 font-medium">
                       {startNumbers[k]}
                     </span>
                   ) : null}
@@ -235,8 +256,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     onChange={(e) => onInput(rowIndex, colIndex, e.target.value)}
                     onKeyDown={onKeyDown}
                     onClick={() => {
-                      const r = rowIndex;
-                      const c = colIndex;
                       const startsAcross = isStart(r, c, "across");
                       const startsDown = isStart(r, c, "down");
 
@@ -271,7 +290,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setDirection("down");
                       }
                     }}
-                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black border border-black focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    style={borderStyle}
+                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500 box-border"
                   />
                 </div>
               );
