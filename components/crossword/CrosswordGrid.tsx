@@ -32,16 +32,48 @@ export default function CrosswordGrid({ puzzle }: Props) {
     return active;
   }, [grid]);
 
-  // Map of cell key -> array of clue numbers that start at that cell
+  // Assign standard crossword numbers (top-left to bottom-right)
+  // A cell gets a number if it starts at least one word (across or down)
+  const cellNumbering = React.useMemo(() => {
+    const cellToNumber: Record<string, number> = {};
+    let currentNumber = 1;
+
+    for (let r = 0; r < grid.length; r += 1) {
+      for (let c = 0; c < grid[r].length; c += 1) {
+        const k = keyFor(r, c);
+        if (!isActive[k]) continue;
+
+        // Check if this cell starts a word in either direction
+        const startsAcross = (() => {
+          const leftActive = c - 1 >= 0 && isActive[keyFor(r, c - 1)];
+          const rightActive = c + 1 < grid[0].length && isActive[keyFor(r, c + 1)];
+          return !leftActive && rightActive;
+        })();
+
+        const startsDown = (() => {
+          const upActive = r - 1 >= 0 && isActive[keyFor(r - 1, c)];
+          const downActive = r + 1 < grid.length && isActive[keyFor(r + 1, c)];
+          return !upActive && downActive;
+        })();
+
+        if (startsAcross || startsDown) {
+          cellToNumber[k] = currentNumber;
+          currentNumber += 1;
+        }
+      }
+    }
+
+    return cellToNumber;
+  }, [grid, isActive]);
+
+  // Map of cell key -> display number (for rendering on grid)
   const startNumbers = React.useMemo(() => {
-    const map: Record<string, number[]> = {};
-    placements.forEach((p, idx) => {
-      const k = keyFor(p.row, p.col);
-      if (!map[k]) map[k] = [];
-      map[k].push(idx + 1);
+    const map: Record<string, number> = {};
+    Object.entries(cellNumbering).forEach(([k, num]) => {
+      map[k] = num;
     });
     return map;
-  }, [placements]);
+  }, [cellNumbering]);
 
   const tryFocus = (r: number, c: number) => {
     const k = keyFor(r, c);
@@ -158,10 +190,17 @@ export default function CrosswordGrid({ puzzle }: Props) {
     }
   };
 
-  const numberedClues = placements.map((placement, index) => ({
-    number: index + 1,
-    ...placement,
-  }));
+  // Map each placement to its proper crossword number based on grid position
+  const numberedClues = React.useMemo(() => {
+    return placements.map((placement) => {
+      const k = keyFor(placement.row, placement.col);
+      const number = cellNumbering[k];
+      return {
+        ...placement,
+        number,
+      };
+    }).sort((a, b) => a.number - b.number);
+  }, [placements, cellNumbering]);
 
   return (
     <div className="flex flex-col gap-10 lg:flex-row">
@@ -180,7 +219,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                 <div key={k} className="relative h-10 w-10">
                   {startNumbers[k] ? (
                     <span className="pointer-events-none absolute left-0.5 top-0.5 z-10 text-[10px] leading-none text-black">
-                      {startNumbers[k].join(",")}
+                      {startNumbers[k]}
                     </span>
                   ) : null}
                   <input
@@ -257,8 +296,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
             <div>
               <h3 className="mb-2 text-lg font-semibold text-slate-100">Across</h3>
               <ol className="space-y-3 text-slate-200">
-                {placements
-                  .map((p, i) => ({ ...p, number: i + 1 }))
+                {numberedClues
                   .filter((p) => p.direction === "across")
                   .map((clue) => (
                     <li
@@ -284,8 +322,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
             <div>
               <h3 className="mb-2 text-lg font-semibold text-slate-100">Down</h3>
               <ol className="space-y-3 text-slate-200">
-                {placements
-                  .map((p, i) => ({ ...p, number: i + 1 }))
+                {numberedClues
                   .filter((p) => p.direction === "down")
                   .map((clue) => (
                     <li
