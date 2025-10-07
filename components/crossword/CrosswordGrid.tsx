@@ -220,22 +220,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const r = rowIndex;
               const c = colIndex;
               
-              // Check for adjacent active cells
-              const hasLeft = c > 0 && isActive[keyFor(r, c - 1)];
-              const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
-              const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
-              const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
-              
-              // Use 2px on shared sides (so 2px + 2px = 4px total), 4px on outer sides
-              const borderStyle: React.CSSProperties = {
-                borderLeftWidth: hasLeft ? '2px' : '4px',
-                borderRightWidth: hasRight ? '2px' : '4px',
-                borderTopWidth: hasTop ? '2px' : '4px',
-                borderBottomWidth: hasBottom ? '2px' : '4px',
-                borderColor: 'black',
-                borderStyle: 'solid',
-              };
-              
               return (
                 <div key={k} className="relative h-10 w-10">
                   {startNumbers[k] ? (
@@ -290,8 +274,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setDirection("down");
                       }
                     }}
-                    style={borderStyle}
-                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:ring-2 focus:ring-blue-500 box-border"
+                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black border-2 border-black focus:outline-none focus:bg-blue-100 focus:ring-blue-500 box-border"
                   />
                 </div>
               );
