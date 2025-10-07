@@ -220,6 +220,12 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const r = rowIndex;
               const c = colIndex;
               
+              // Determine neighbors
+              const hasLeft = c > 0 && isActive[keyFor(r, c - 1)];
+              const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
+              const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
+              const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
+
               return (
                 <div key={k} className="relative h-10 w-10">
                   {startNumbers[k] ? (
@@ -227,6 +233,15 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       {startNumbers[k]}
                     </span>
                   ) : null}
+                  {/* Edge lines: 4px thick via absolutely positioned elements */}
+                  <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-black" aria-hidden />
+                  <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-black" aria-hidden />
+                  {!hasRight && (
+                    <span className="pointer-events-none absolute inset-y-0 right-0 w-1 bg-black" aria-hidden />
+                  )}
+                  {!hasBottom && (
+                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-black" aria-hidden />
+                  )}
                   <input
                     ref={(el) => {
                       cellRefs.current[k] = el;
@@ -274,7 +289,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setDirection("down");
                       }
                     }}
-                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black border-2 border-black focus:outline-none focus:bg-blue-100 focus:ring-blue-500 box-border"
+                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100 focus:ring-blue-500"
                   />
                 </div>
               );
