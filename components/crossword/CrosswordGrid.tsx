@@ -205,7 +205,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   return (
     <div className="flex flex-col gap-10 lg:flex-row" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
       <section className="mx-auto w-full max-w-sm">
-        <div className="grid grid-cols-10 gap-0 bg-white">
+        <div className="grid grid-cols-10 bg-white" style={{ gap: 0, lineHeight: 0 }}>
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const k = keyFor(rowIndex, colIndex);
@@ -220,28 +220,48 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const r = rowIndex;
               const c = colIndex;
               
-              // Determine neighbors
+              // Check for adjacent active cells
               const hasLeft = c > 0 && isActive[keyFor(r, c - 1)];
               const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
               const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
               const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
-
+              
               return (
-                <div key={k} className="relative h-10 w-10">
+                <div key={k} className="relative h-10 w-10" style={{ display: 'block', lineHeight: 0 }}>
+                  {/* Draw borders for edges next to inactive cells as overlays */}
+                  {!hasLeft && (
+                    <span 
+                      className="pointer-events-none absolute bg-black" 
+                      style={{ top: 0, bottom: 0, left: 0, width: '2px' }}
+                      aria-hidden 
+                    />
+                  )}
+                  {!hasTop && (
+                    <span 
+                      className="pointer-events-none absolute bg-black" 
+                      style={{ left: 0, right: 0, top: 0, height: '2px' }}
+                      aria-hidden 
+                    />
+                  )}
+                  {!hasRight && (
+                    <span 
+                      className="pointer-events-none absolute bg-black" 
+                      style={{ top: 0, bottom: 0, right: 0, width: '2px' }}
+                      aria-hidden 
+                    />
+                  )}
+                  {!hasBottom && (
+                    <span 
+                      className="pointer-events-none absolute bg-black" 
+                      style={{ left: 0, right: 0, bottom: 0, height: '2px' }}
+                      aria-hidden 
+                    />
+                  )}
                   {startNumbers[k] ? (
                     <span className="pointer-events-none absolute left-1 top-1 z-10 text-[9px] leading-none text-slate-600 font-medium">
                       {startNumbers[k]}
                     </span>
                   ) : null}
-                  {/* Edge lines: 4px thick via absolutely positioned elements */}
-                  <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-black" aria-hidden />
-                  <span className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-black" aria-hidden />
-                  {!hasRight && (
-                    <span className="pointer-events-none absolute inset-y-0 right-0 w-1 bg-black" aria-hidden />
-                  )}
-                  {!hasBottom && (
-                    <span className="pointer-events-none absolute inset-x-0 bottom-0 h-1 bg-black" aria-hidden />
-                  )}
                   <input
                     ref={(el) => {
                       cellRefs.current[k] = el;
@@ -289,7 +309,15 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setDirection("down");
                       }
                     }}
-                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100 focus:ring-blue-500"
+                    style={{
+                      boxSizing: 'border-box',
+                      display: 'block',
+                      borderTop: hasTop ? '2px solid black' : 'none',
+                      borderLeft: hasLeft ? '2px solid black' : 'none',
+                      borderRight: 'none',
+                      borderBottom: 'none'
+                    }}
+                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100"
                   />
                 </div>
               );
