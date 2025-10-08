@@ -105,14 +105,18 @@ export default function CrosswordGrid({ puzzle }: Props) {
   
   // Track which cells were revealed by hints (using cell key)
   const [hintRevealedCells, setHintRevealedCells] = React.useState<Set<string>>(new Set());
+  
+  // Track completion animation and modal
+  const [isAnimating, setIsAnimating] = React.useState(false);
+  const [showCompletionModal, setShowCompletionModal] = React.useState(false);
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   
   // Update cell backgrounds when focused clue changes
   React.useEffect(() => {
-    // Only update if we're not in check mode
-    if (incorrectCells.size > 0) return;
+    // Skip during animation or check mode
+    if (isAnimating || incorrectCells.size > 0) return;
     
     // Reset all cells to white or hint-revealed color first
     Object.entries(cellRefs.current).forEach(([key, cell]) => {
@@ -168,11 +172,11 @@ export default function CrosswordGrid({ puzzle }: Props) {
         }
       });
     }
-  }, [focusedClue, COLORS.cellWordHighlight, COLORS.cellHintRevealed, placements, incorrectCells.size, hintRevealedCells]);
+  }, [focusedClue, COLORS.cellWordHighlight, COLORS.cellHintRevealed, placements, incorrectCells.size, hintRevealedCells, isAnimating]);
   
   // Apply terracotta highlighting when check is triggered
   React.useEffect(() => {
-    if (incorrectCells.size > 0) {
+    if (incorrectCells.size > 0 && !isAnimating) {
       incorrectCells.forEach(cellKey => {
         const cell = cellRefs.current[cellKey];
         if (cell) {
@@ -180,7 +184,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
         }
       });
     }
-  }, [incorrectCells]);
+  }, [incorrectCells, isAnimating]);
 
   // Precompute active cells for quick lookup
   const isActive = React.useMemo(() => {
@@ -361,6 +365,91 @@ export default function CrosswordGrid({ puzzle }: Props) {
     setAnswers((prev) => ({ ...prev, [cellKey]: value }));
     if (value) moveNext(r, c);
   };
+  
+  // Check for puzzle completion
+  React.useEffect(() => {
+    // Don't check if already animating
+    if (isAnimating || showCompletionModal) return;
+    
+    // Check if all cells are filled
+    let allFilled = true;
+    let allCorrect = true;
+    
+    for (const placement of placements) {
+      const { row, col, direction, word } = placement;
+      
+      for (let i = 0; i < word.length; i++) {
+        const cellRow = direction === 'across' ? row : row + i;
+        const cellCol = direction === 'across' ? col + i : col;
+        const cellKey = keyFor(cellRow, cellCol);
+        const userAnswer = answers[cellKey]?.toUpperCase();
+        const correctLetter = word[i].toUpperCase();
+        
+        if (!userAnswer) {
+          allFilled = false;
+          break;
+        }
+        if (userAnswer !== correctLetter) {
+          allCorrect = false;
+          break;
+        }
+      }
+      
+      if (!allFilled || !allCorrect) break;
+    }
+    
+    // If puzzle is complete and correct, trigger animation
+    if (allFilled && allCorrect) {
+      setIsAnimating(true);
+      
+      // Animation colors (alternating sage and ocean)
+      const animationColors = [
+        COLOR_SCHEMES.sage.cellFocused,
+        COLOR_SCHEMES.sage.cellWordHighlight,
+        COLOR_SCHEMES.ocean.cellFocused,
+        COLOR_SCHEMES.ocean.cellWordHighlight,
+        COLOR_SCHEMES.sage.cellFocused,
+        COLOR_SCHEMES.ocean.cellFocused,
+      ];
+      
+      // Animate each cell with position-based delay
+      Object.entries(cellRefs.current).forEach(([key, cell]) => {
+        if (!cell) return;
+        
+        const [rowStr, colStr] = key.split('-');
+        const row = parseInt(rowStr, 10);
+        const col = parseInt(colStr, 10);
+        
+        // Delay based on position (diagonal wave effect)
+        const delay = (row + col) * 50; // 50ms per step
+        
+        setTimeout(() => {
+          let colorIndex = 0;
+          const interval = setInterval(() => {
+            if (cell) {
+              cell.style.backgroundColor = animationColors[colorIndex % animationColors.length];
+              cell.style.transition = 'background-color 0.3s ease';
+            }
+            colorIndex++;
+            
+            // Stop after cycling through colors for 3 seconds
+            if (colorIndex >= 12) {
+              clearInterval(interval);
+            }
+          }, 250); // Change color every 250ms
+          
+          // Clean up interval after 3 seconds
+          setTimeout(() => clearInterval(interval), 3000);
+        }, delay);
+      });
+      
+      // Show modal after 3 seconds + max delay
+      const maxDelay = (grid.length + grid[0].length) * 50;
+      setTimeout(() => {
+        setShowCompletionModal(true);
+      }, 3000 + maxDelay);
+    }
+  }, [answers, placements, isAnimating, showCompletionModal, grid.length, grid]);
 
   const onKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (e) => {
     const target = e.target as HTMLInputElement;
@@ -790,9 +879,14 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       backgroundColor: hintRevealedCells.has(k) ? COLORS.cellHintRevealed : '#FFFFFF',
                     }}
                     onFocus={(e) => {
-                      e.target.style.backgroundColor = COLORS.cellFocused;
+                      if (!isAnimating) {
+                        e.target.style.backgroundColor = COLORS.cellFocused;
+                      }
                     }}
                     onBlur={(e) => {
+                      // Don't change colors during animation
+                      if (isAnimating) return;
+                      
                       // Always restore hint-revealed cells to lavender, regardless of focus state
                       if (hintRevealedCells.has(k)) {
                         e.target.style.backgroundColor = COLORS.cellHintRevealed;
@@ -834,6 +928,36 @@ export default function CrosswordGrid({ puzzle }: Props) {
         </div>
       </section>
       </div>
+      
+      {/* Completion Modal */}
+      {showCompletionModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowCompletionModal(false)}
+        >
+          <div 
+            className="bg-white rounded-lg shadow-2xl p-8 max-w-md mx-4 text-center"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 text-6xl">🎉</div>
+            <h2 className="text-3xl font-bold mb-4" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
+              Congratulations!
+            </h2>
+            <p className="text-lg text-slate-700 mb-6">
+              You completed the puzzle!
+            </p>
+            <button
+              onClick={() => setShowCompletionModal(false)}
+              className="px-6 py-3 rounded-lg font-semibold text-white transition-colors"
+              style={{ backgroundColor: COLOR_SCHEMES.sage.clueFocusedBorder }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.badgeText}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.clueFocusedBorder}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
