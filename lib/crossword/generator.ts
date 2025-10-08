@@ -173,6 +173,7 @@ function tryPlaceWord(
     const placement: CrosswordPlacement = {
       word,
       clue: entry.clue,
+      hint: entry.hint,
       row,
       col,
       direction: "across",
@@ -182,6 +183,11 @@ function tryPlaceWord(
   }
 
   const candidates = collectCandidatePlacements(grid, word, entry.clue, placements);
+  
+  // Add hint to the selected candidate
+  if (candidates.length > 0) {
+    candidates.forEach(c => c.hint = entry.hint);
+  }
   const candidate = randomChoice(candidates, random);
 
   if (!candidate) {

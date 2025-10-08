@@ -15,13 +15,14 @@ function keyFor(row: number, col: number) {
 const COLOR_SCHEMES = {
   sage: {
     name: 'Sage',
-    cellFocused: '#D4E7D4',           // Soft sage (darker)
-    cellWordHighlight: '#F5FAF5',      // Very light sage
+    cellFocused: '#B5D4B5',           // Darker sage (for actively focused cell)
+    cellWordHighlight: '#D4E7D4',      // Soft sage (for word highlight & hint-revealed cells)
+    clueBackgroundTint: '#F5FAF5',     // Very light sage (for clue card backgrounds)
     clueFocusedBorder: '#7C9473',     // Muted sage green
-    clueFocusedBg: '#F5FAF5',         
+    clueFocusedBg: '#F5FAF5',         // Very light sage for focused clue
     clueFocusedRing: '#A8C5A0',       // Light sage
     clueHoverBorder: '#90A889',       
-    clueHoverBg: '#F5FAF5',           
+    clueHoverBg: '#F5FAF5',           // Very light sage for hover
     clueDefaultBorder: '#D1D5DB',
     clueDefaultBg: '#FAFAFA',
     badgeText: '#5D7C55',             // Deep sage
@@ -97,6 +98,12 @@ export default function CrosswordGrid({ puzzle }: Props) {
   
   // Track incorrect cells (for check feature)
   const [incorrectCells, setIncorrectCells] = React.useState<Set<string>>(new Set());
+  
+  // Track which hints are revealed (using clue number as key)
+  const [revealedHints, setRevealedHints] = React.useState<Set<number>>(new Set());
+  
+  // Track which cells were revealed by hints (using cell key)
+  const [hintRevealedCells, setHintRevealedCells] = React.useState<Set<string>>(new Set());
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
@@ -303,6 +310,42 @@ export default function CrosswordGrid({ puzzle }: Props) {
     setIncorrectCells(incorrect);
   };
 
+  // Reveal a random unfilled letter for a clue
+  const revealRandomLetter = (clueNumber: number) => {
+    const clue = numberedClues.find(c => c.number === clueNumber);
+    if (!clue) return;
+
+    const { row, col, direction, word } = clue;
+    const unfilledCells: Array<{ key: string; letter: string; index: number }> = [];
+
+    for (let i = 0; i < word.length; i++) {
+      const cellRow = direction === 'across' ? row : row + i;
+      const cellCol = direction === 'across' ? col + i : col;
+      const cellKey = keyFor(cellRow, cellCol);
+      
+      // Only include cells that don't have a user answer yet
+      if (!answers[cellKey]) {
+        unfilledCells.push({
+          key: cellKey,
+          letter: word[i],
+          index: i
+        });
+      }
+    }
+
+    // If all cells are filled, do nothing
+    if (unfilledCells.length === 0) return;
+
+    // Pick a random unfilled cell
+    const randomCell = unfilledCells[Math.floor(Math.random() * unfilledCells.length)];
+
+    // Set the answer for this cell
+    setAnswers(prev => ({ ...prev, [randomCell.key]: randomCell.letter }));
+
+    // Mark this cell as hint-revealed
+    setHintRevealedCells(prev => new Set([...prev, randomCell.key]));
+  };
+
   const onInput = (r: number, c: number, v: string) => {
     const value = (v || "").toUpperCase().slice(-1).replace(/[^A-Z]/g, "");
     const cellKey = keyFor(r, c);
@@ -440,6 +483,34 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                        {clue.hint && (
+                          <div className="mt-2 space-y-1">
+                            {!revealedHints.has(clue.number) ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRevealedHints(prev => new Set([...prev, clue.number]));
+                                }}
+                                className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                              >
+                                Hint
+                              </button>
+                            ) : (
+                              <>
+                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    revealRandomLetter(clue.number);
+                                  }}
+                                  className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                                >
+                                  More hints...
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -492,6 +563,34 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                        {clue.hint && (
+                          <div className="mt-2 space-y-1">
+                            {!revealedHints.has(clue.number) ? (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setRevealedHints(prev => new Set([...prev, clue.number]));
+                                }}
+                                className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                              >
+                                Hint
+                              </button>
+                            ) : (
+                              <>
+                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    revealRandomLetter(clue.number);
+                                  }}
+                                  className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                                >
+                                  More hints...
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -667,7 +766,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderRight: 'none',
                       borderBottom: 'none',
                       fontSize: `${FONT_SIZE}px`,
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: hintRevealedCells.has(k) ? COLORS.cellWordHighlight : '#FFFFFF',
                     }}
                     onFocus={(e) => {
                       e.target.style.backgroundColor = COLORS.cellFocused;
@@ -695,6 +794,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       })();
                       
                       if (isCellPartOfWord) {
+                        e.target.style.backgroundColor = COLORS.cellWordHighlight;
+                      } else if (hintRevealedCells.has(k)) {
                         e.target.style.backgroundColor = COLORS.cellWordHighlight;
                       } else {
                         e.target.style.backgroundColor = '#FFFFFF';
