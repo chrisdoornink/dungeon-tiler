@@ -19,6 +19,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
+  const [focusedClue, setFocusedClue] = React.useState<{ row: number; col: number; direction: "across" | "down" } | null>(null);
 
   // Track user-entered letters per active cell
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
@@ -317,35 +318,48 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       const startsAcross = isStart(r, c, "across");
                       const startsDown = isStart(r, c, "down");
 
+                      let newDirection: "across" | "down" = direction;
+
                       if (startsAcross && startsDown) {
                         const acrossBlank = wordHasBlanksFrom(r, c, "across");
                         const downBlank = wordHasBlanksFrom(r, c, "down");
-                        if (acrossBlank && !downBlank) setDirection("across");
-                        else if (!acrossBlank && downBlank) setDirection("down");
-                        else setDirection("across");
-                        return;
+                        if (acrossBlank && !downBlank) newDirection = "across";
+                        else if (!acrossBlank && downBlank) newDirection = "down";
+                        else newDirection = "across";
+                      } else if (startsAcross) {
+                        newDirection = "across";
+                      } else if (startsDown) {
+                        newDirection = "down";
+                      } else {
+                        // Not a start cell: infer possible directions from neighbors
+                        const hasAcross =
+                          (c - 1 >= 0 && isActive[keyFor(r, c - 1)]) ||
+                          (c + 1 < grid[0].length && isActive[keyFor(r, c + 1)]);
+                        const hasDown =
+                          (r - 1 >= 0 && isActive[keyFor(r - 1, c)]) ||
+                          (r + 1 < grid.length && isActive[keyFor(r + 1, c)]);
+
+                        if (hasAcross && !hasDown) {
+                          newDirection = "across";
+                        } else if (!hasAcross && hasDown) {
+                          newDirection = "down";
+                        }
                       }
 
-                      if (startsAcross) {
-                        setDirection("across");
-                        return;
-                      }
-                      if (startsDown) {
-                        setDirection("down");
-                        return;
-                      }
-                      // Not a start cell: infer possible directions from neighbors
-                      const hasAcross =
-                        (c - 1 >= 0 && isActive[keyFor(r, c - 1)]) ||
-                        (c + 1 < grid[0].length && isActive[keyFor(r, c + 1)]);
-                      const hasDown =
-                        (r - 1 >= 0 && isActive[keyFor(r - 1, c)]) ||
-                        (r + 1 < grid.length && isActive[keyFor(r + 1, c)]);
+                      setDirection(newDirection);
 
-                      if (hasAcross && !hasDown) {
-                        setDirection("across");
-                      } else if (!hasAcross && hasDown) {
-                        setDirection("down");
+                      // Find the clue this cell belongs to
+                      const clueForCell = placements.find(p => {
+                        if (p.direction !== newDirection) return false;
+                        if (newDirection === "across") {
+                          return p.row === r && c >= p.col && c < p.col + p.word.length;
+                        } else {
+                          return p.col === c && r >= p.row && r < p.row + p.word.length;
+                        }
+                      });
+
+                      if (clueForCell) {
+                        setFocusedClue({ row: clueForCell.row, col: clueForCell.col, direction: clueForCell.direction });
                       }
                     }}
                     style={{
@@ -384,23 +398,36 @@ export default function CrosswordGrid({ puzzle }: Props) {
               <ol className="space-y-3 text-black">
                 {numberedClues
                   .filter((p) => p.direction === "across")
-                  .map((clue) => (
-                    <li
-                      key={`A-${clue.number}-${clue.word}`}
-                      className="rounded-lg border border-slate-300 bg-slate-50 p-4 shadow-sm"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                          <span className="font-semibold text-blue-600">Across</span>
+                  .map((clue) => {
+                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
+                    return (
+                      <li
+                        key={`A-${clue.number}-${clue.word}`}
+                        className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
+                          isFocused 
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-300' 
+                            : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
+                        onClick={() => {
+                          setDirection("across");
+                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
+                          const firstCellKey = keyFor(clue.row, clue.col);
+                          cellRefs.current[firstCellKey]?.focus();
+                        }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                            <span className="font-semibold text-blue-600">Across</span>
+                          </div>
+                          <span className="text-xs uppercase tracking-wide text-slate-500">
+                            Row {clue.row + 1}, Col {clue.col + 1}
+                          </span>
                         </div>
-                        <span className="text-xs uppercase tracking-wide text-slate-500">
-                          Row {clue.row + 1}, Col {clue.col + 1}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                    </li>
-                  ))}
+                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                      </li>
+                    );
+                  })}
               </ol>
             </div>
 
@@ -410,23 +437,36 @@ export default function CrosswordGrid({ puzzle }: Props) {
               <ol className="space-y-3 text-black">
                 {numberedClues
                   .filter((p) => p.direction === "down")
-                  .map((clue) => (
-                    <li
-                      key={`D-${clue.number}-${clue.word}`}
-                      className="rounded-lg border border-slate-300 bg-slate-50 p-4 shadow-sm"
-                    >
-                      <div className="flex items-baseline justify-between gap-3">
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                          <span className="font-semibold text-blue-600">Down</span>
+                  .map((clue) => {
+                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
+                    return (
+                      <li
+                        key={`D-${clue.number}-${clue.word}`}
+                        className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
+                          isFocused 
+                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-300' 
+                            : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                        }`}
+                        onClick={() => {
+                          setDirection("down");
+                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
+                          const firstCellKey = keyFor(clue.row, clue.col);
+                          cellRefs.current[firstCellKey]?.focus();
+                        }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                            <span className="font-semibold text-blue-600">Down</span>
+                          </div>
+                          <span className="text-xs uppercase tracking-wide text-slate-500">
+                            Row {clue.row + 1}, Col {clue.col + 1}
+                          </span>
                         </div>
-                        <span className="text-xs uppercase tracking-wide text-slate-500">
-                          Row {clue.row + 1}, Col {clue.col + 1}
-                        </span>
-                      </div>
-                      <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                    </li>
-                  ))}
+                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                      </li>
+                    );
+                  })}
               </ol>
             </div>
           </div>

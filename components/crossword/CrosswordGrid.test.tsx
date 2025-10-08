@@ -400,6 +400,390 @@ describe('CrosswordGrid', () => {
     });
   });
   
+  describe('Focus Synchronization', () => {
+    describe('Grid to Clue Focus', () => {
+      it('highlights the associated clue when clicking a cell', () => {
+        const puzzle = createPuzzle([
+          [true, true, true],
+          [null, null, null],
+          [true, true, true],
+        ]);
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Click the first cell (which starts an across word)
+        const inputs = screen.getAllByRole('textbox');
+        fireEvent.click(inputs[0]);
+        
+        // Check that a clue has the focused styling
+        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
+        expect(focusedClue).toBeInTheDocument();
+      });
+      
+      it('highlights the correct clue for cells in the middle of a word', () => {
+        const puzzle = createPuzzle([
+          [true, true, true],
+          [null, null, null],
+        ]);
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const inputs = screen.getAllByRole('textbox');
+        // Click the middle cell of the word
+        fireEvent.click(inputs[1]);
+        
+        // Should still highlight the clue for the word starting at 0,0
+        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
+        expect(focusedClue).toBeInTheDocument();
+      });
+      
+      it('updates focus when clicking different cells', () => {
+        const puzzle = createPuzzle([
+          [true, true, true],
+          [null, null, null],
+          [true, true, true],
+        ]);
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const inputs = screen.getAllByRole('textbox');
+        
+        // Click first word
+        fireEvent.click(inputs[0]);
+        let focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        expect(focusedClues).toHaveLength(1);
+        
+        // Click second word
+        fireEvent.click(inputs[3]); // First cell of second word
+        focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        expect(focusedClues).toHaveLength(1);
+      });
+      
+      it('highlights down clue when clicking vertical word cell', () => {
+        const puzzle = createPuzzle([
+          [true, null],
+          [true, null],
+          [true, null],
+        ]);
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const inputs = screen.getAllByRole('textbox');
+        fireEvent.click(inputs[0]);
+        
+        // Should highlight a clue (will be the down clue)
+        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
+        expect(focusedClue).toBeInTheDocument();
+      });
+    });
+    
+    describe('Clue to Grid Focus', () => {
+      it('focuses the first cell when clicking a clue', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'A feline animal'
+            }
+          ]
+        };
+        
+        render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Find and click the clue
+        const clueText = screen.getByText(/A feline animal/);
+        const clueBox = clueText.closest('li');
+        
+        expect(clueBox).toBeInTheDocument();
+        fireEvent.click(clueBox!);
+        
+        // Check that the first input is now focused
+        const inputs = screen.getAllByRole('textbox');
+        expect(document.activeElement).toBe(inputs[0]);
+      });
+      
+      it('highlights the clue when clicked', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'A feline animal'
+            }
+          ]
+        };
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const clueText = screen.getByText(/A feline animal/);
+        const clueBox = clueText.closest('li');
+        
+        fireEvent.click(clueBox!);
+        
+        // Check that the clue has focused styling
+        expect(clueBox).toHaveClass('border-blue-500');
+        expect(clueBox).toHaveClass('bg-blue-50');
+        expect(clueBox).toHaveClass('ring-2');
+      });
+      
+      it('sets the correct direction when clicking across clue', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['X', '', ''],
+            ['X', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'Horizontal word'
+            },
+            {
+              row: 0,
+              col: 0,
+              direction: 'down',
+              word: 'CAN',
+              clue: 'Vertical word'
+            }
+          ]
+        };
+        
+        render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Click the across clue
+        const acrossClue = screen.getByText(/Horizontal word/);
+        fireEvent.click(acrossClue.closest('li')!);
+        
+        // Verify the cell is focused (direction is set internally)
+        const inputs = screen.getAllByRole('textbox');
+        expect(document.activeElement).toBe(inputs[0]);
+      });
+      
+      it('sets the correct direction when clicking down clue', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['X', '', ''],
+            ['X', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'Horizontal word'
+            },
+            {
+              row: 0,
+              col: 0,
+              direction: 'down',
+              word: 'CAN',
+              clue: 'Vertical word'
+            }
+          ]
+        };
+        
+        render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Click the down clue
+        const downClue = screen.getByText(/Vertical word/);
+        fireEvent.click(downClue.closest('li')!);
+        
+        // Verify the cell is focused
+        const inputs = screen.getAllByRole('textbox');
+        expect(document.activeElement).toBe(inputs[0]);
+      });
+      
+      it('switches focus between different clues', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+            ['Y', 'Y', 'Y'],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'First word'
+            },
+            {
+              row: 2,
+              col: 0,
+              direction: 'across',
+              word: 'DOG',
+              clue: 'Second word'
+            }
+          ]
+        };
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Click first clue
+        const firstClue = screen.getByText(/First word/).closest('li');
+        fireEvent.click(firstClue!);
+        expect(firstClue).toHaveClass('ring-2');
+        
+        // Click second clue
+        const secondClue = screen.getByText(/Second word/).closest('li');
+        fireEvent.click(secondClue!);
+        
+        // First should no longer be focused
+        expect(firstClue).not.toHaveClass('ring-2');
+        // Second should be focused
+        expect(secondClue).toHaveClass('ring-2');
+      });
+    });
+    
+    describe('Bidirectional Sync', () => {
+      it('maintains sync when navigating between grid and clues', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+            ['Y', 'Y', 'Y'],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'First word'
+            },
+            {
+              row: 2,
+              col: 0,
+              direction: 'across',
+              word: 'DOG',
+              clue: 'Second word'
+            }
+          ]
+        };
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        // Click a cell
+        const inputs = screen.getAllByRole('textbox');
+        fireEvent.click(inputs[0]);
+        
+        // Verify clue is highlighted
+        let focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        expect(focusedClues.length).toBeGreaterThan(0);
+        
+        // Click a different clue
+        const secondClue = screen.getByText(/Second word/).closest('li');
+        fireEvent.click(secondClue!);
+        
+        // Verify the second clue is now focused and input changed
+        expect(secondClue).toHaveClass('ring-2');
+        expect(document.activeElement).toBe(inputs[3]); // First cell of second word
+      });
+      
+      it('updates clue focus when typing and moving to next cell', () => {
+        const puzzle = createPuzzle([
+          [true, true, true],
+          [null, null, null],
+        ]);
+        
+        const { container } = render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const inputs = screen.getAllByRole('textbox');
+        
+        // Click first cell
+        fireEvent.click(inputs[0]);
+        
+        // Type a letter (should advance to next cell in same word)
+        fireEvent.change(inputs[0], { target: { value: 'A' } });
+        
+        // The same clue should still be focused
+        const focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        expect(focusedClues).toHaveLength(1);
+      });
+    });
+    
+    describe('Visual Feedback', () => {
+      it('shows hover state on non-focused clues', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'A feline animal'
+            }
+          ]
+        };
+        
+        render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const clueText = screen.getByText(/A feline animal/);
+        const clueBox = clueText.closest('li');
+        
+        // Check that clue has hover classes
+        expect(clueBox).toHaveClass('hover:border-blue-400');
+        expect(clueBox).toHaveClass('cursor-pointer');
+      });
+      
+      it('applies transition classes for smooth animations', () => {
+        const puzzle: CrosswordPuzzle = {
+          dateKey: '2025-01-01',
+          grid: [
+            ['X', 'X', 'X'],
+            ['', '', ''],
+          ] as string[][],
+          placements: [
+            {
+              row: 0,
+              col: 0,
+              direction: 'across',
+              word: 'CAT',
+              clue: 'A feline animal'
+            }
+          ]
+        };
+        
+        render(<CrosswordGrid puzzle={puzzle} />);
+        
+        const clueText = screen.getByText(/A feline animal/);
+        const clueBox = clueText.closest('li');
+        
+        expect(clueBox).toHaveClass('transition-colors');
+      });
+    });
+  });
+  
   describe('Clue Display', () => {
     it('displays across clues', () => {
       const puzzle = createPuzzle([
