@@ -208,8 +208,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
   }, [placements, cellNumbering]);
 
   return (
-    <div className="flex flex-col gap-10 lg:flex-row" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
-      <section className="mx-auto w-full max-w-sm">
+    <div className="flex flex-col gap-10 lg:flex-row lg:items-start" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
+      <section className="mx-auto lg:mx-0 flex-shrink-0">
         <div className="grid bg-white" style={{ gap: 0, lineHeight: 0, gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)` }}>
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
