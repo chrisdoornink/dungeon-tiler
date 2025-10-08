@@ -12,6 +12,10 @@ function keyFor(row: number, col: number) {
 }
 
 export default function CrosswordGrid({ puzzle }: Props) {
+  // Design constants - adjust these to tweak the appearance
+  const CELL_SIZE = 50; // pixels
+  const BORDER_WIDTH = 3; // pixels
+  
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
 
@@ -205,7 +209,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   return (
     <div className="flex flex-col gap-10 lg:flex-row" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
       <section className="mx-auto w-full max-w-sm">
-        <div className="grid grid-cols-10 bg-white" style={{ gap: 0, lineHeight: 0 }}>
+        <div className="grid bg-white" style={{ gap: 0, lineHeight: 0, gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)` }}>
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const k = keyFor(rowIndex, colIndex);
@@ -217,18 +221,18 @@ export default function CrosswordGrid({ puzzle }: Props) {
                 const hasActiveLeft = colIndex > 0 && isActive[keyFor(rowIndex, colIndex - 1)];
                 
                 return (
-                  <div key={k} className="relative h-10 w-10 bg-white" aria-hidden>
+                  <div key={k} className="relative bg-white" style={{ width: CELL_SIZE, height: CELL_SIZE }} aria-hidden>
                     {hasActiveAbove && (
                       <span 
                         className="pointer-events-none absolute bg-black" 
-                        style={{ left: 0, right: 0, top: 0, height: '2px' }}
+                        style={{ left: 0, right: 0, top: 0, height: `${BORDER_WIDTH}px` }}
                         aria-hidden 
                       />
                     )}
                     {hasActiveLeft && (
                       <span 
                         className="pointer-events-none absolute bg-black" 
-                        style={{ top: 0, bottom: 0, left: 0, width: '2px' }}
+                        style={{ top: 0, bottom: 0, left: 0, width: `${BORDER_WIDTH}px` }}
                         aria-hidden 
                       />
                     )}
@@ -246,34 +250,34 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
               
               return (
-                <div key={k} className="relative h-10 w-10" style={{ display: 'block', lineHeight: 0 }}>
+                <div key={k} className="relative" style={{ width: CELL_SIZE, height: CELL_SIZE, display: 'block', lineHeight: 0 }}>
                   {/* Draw borders where there's no active neighbor */}
                   {/* Don't draw bottom/right if inactive cell is there (it will draw top/left) */}
                   {!hasLeft && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
-                      style={{ top: 0, bottom: 0, left: 0, width: '2px' }}
+                      style={{ top: 0, bottom: 0, left: 0, width: `${BORDER_WIDTH}px` }}
                       aria-hidden 
                     />
                   )}
                   {!hasTop && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
-                      style={{ left: 0, right: 0, top: 0, height: '2px' }}
+                      style={{ left: 0, right: 0, top: 0, height: `${BORDER_WIDTH}px` }}
                       aria-hidden 
                     />
                   )}
                   {!hasRight && c === grid[0].length - 1 && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
-                      style={{ top: 0, bottom: 0, right: 0, width: '2px' }}
+                      style={{ top: 0, bottom: 0, right: 0, width: `${BORDER_WIDTH}px` }}
                       aria-hidden 
                     />
                   )}
                   {!hasBottom && r === grid.length - 1 && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
-                      style={{ left: 0, right: 0, bottom: 0, height: '2px' }}
+                      style={{ left: 0, right: 0, bottom: 0, height: `${BORDER_WIDTH}px` }}
                       aria-hidden 
                     />
                   )}
@@ -332,8 +336,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     style={{
                       boxSizing: 'border-box',
                       display: 'block',
-                      borderTop: hasTop ? '2px solid black' : 'none',
-                      borderLeft: hasLeft ? '2px solid black' : 'none',
+                      borderTop: hasTop ? `${BORDER_WIDTH}px solid black` : 'none',
+                      borderLeft: hasLeft ? `${BORDER_WIDTH}px solid black` : 'none',
                       borderRight: 'none',
                       borderBottom: 'none'
                     }}
