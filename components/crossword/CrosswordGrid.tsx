@@ -15,6 +15,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   // Design constants - adjust these to tweak the appearance
   const CELL_SIZE = 50; // pixels
   const BORDER_WIDTH = 3; // pixels
+  const FONT_SIZE = 30; // pixels (text-lg is ~18px)
   
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
@@ -219,20 +220,34 @@ export default function CrosswordGrid({ puzzle }: Props) {
                 // Check if there's an active cell above - if so, we need a top border
                 const hasActiveAbove = rowIndex > 0 && isActive[keyFor(rowIndex - 1, colIndex)];
                 const hasActiveLeft = colIndex > 0 && isActive[keyFor(rowIndex, colIndex - 1)];
+                const hasActiveRight = colIndex < grid[0].length - 1 && isActive[keyFor(rowIndex, colIndex + 1)];
+                const hasActiveBelow = rowIndex < grid.length - 1 && isActive[keyFor(rowIndex + 1, colIndex)];
                 
                 return (
-                  <div key={k} className="relative bg-white" style={{ width: CELL_SIZE, height: CELL_SIZE }} aria-hidden>
+                  <div key={k} className="relative bg-white" style={{ width: CELL_SIZE, height: CELL_SIZE, zIndex: 1 }} aria-hidden>
                     {hasActiveAbove && (
                       <span 
                         className="pointer-events-none absolute bg-black" 
-                        style={{ left: 0, right: 0, top: 0, height: `${BORDER_WIDTH}px` }}
+                        style={{ 
+                          left: 0, 
+                          right: hasActiveRight ? `-${BORDER_WIDTH}px` : 0, 
+                          top: 0, 
+                          height: `${BORDER_WIDTH}px`, 
+                          zIndex: 2 
+                        }}
                         aria-hidden 
                       />
                     )}
                     {hasActiveLeft && (
                       <span 
                         className="pointer-events-none absolute bg-black" 
-                        style={{ top: 0, bottom: 0, left: 0, width: `${BORDER_WIDTH}px` }}
+                        style={{ 
+                          top: 0, 
+                          bottom: hasActiveBelow ? `-${BORDER_WIDTH}px` : 0, 
+                          left: 0, 
+                          width: `${BORDER_WIDTH}px`, 
+                          zIndex: 2 
+                        }}
                         aria-hidden 
                       />
                     )}
@@ -339,9 +354,10 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderTop: hasTop ? `${BORDER_WIDTH}px solid black` : 'none',
                       borderLeft: hasLeft ? `${BORDER_WIDTH}px solid black` : 'none',
                       borderRight: 'none',
-                      borderBottom: 'none'
+                      borderBottom: 'none',
+                      fontSize: `${FONT_SIZE}px`
                     }}
-                    className="h-full w-full text-center text-lg font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100"
+                    className="h-full w-full text-center font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100"
                   />
                 </div>
               );
