@@ -11,31 +11,83 @@ function keyFor(row: number, col: number) {
   return `${row}-${col}`;
 }
 
+// Predefined color schemes - Modern 2025 palettes
+const COLOR_SCHEMES = {
+  sage: {
+    name: 'Sage',
+    cellFocused: '#D4E7D4',           // Soft sage (darker)
+    cellWordHighlight: '#F5FAF5',      // Very light sage
+    clueFocusedBorder: '#7C9473',     // Muted sage green
+    clueFocusedBg: '#F5FAF5',         
+    clueFocusedRing: '#A8C5A0',       // Light sage
+    clueHoverBorder: '#90A889',       
+    clueHoverBg: '#F5FAF5',           
+    clueDefaultBorder: '#D1D5DB',
+    clueDefaultBg: '#FAFAFA',
+    badgeText: '#5D7C55',             // Deep sage
+  },
+  lavender: {
+    name: 'Lavender',
+    cellFocused: '#DDD5EF',           // Soft lavender (darker)
+    cellWordHighlight: '#F7F5FB',      // Very light lavender
+    clueFocusedBorder: '#9B87C4',     // Muted lavender
+    clueFocusedBg: '#F7F5FB',         
+    clueFocusedRing: '#C4B5E3',       // Light lavender
+    clueHoverBorder: '#B09DD4',       
+    clueHoverBg: '#F7F5FB',           
+    clueDefaultBorder: '#D1D5DB',
+    clueDefaultBg: '#FAFAFA',
+    badgeText: '#7B6BA0',             // Deep lavender
+  },
+  ocean: {
+    name: 'Ocean',
+    cellFocused: '#CCE8F0',           // Soft ocean blue (darker)
+    cellWordHighlight: '#F0F9FB',      // Very light ocean
+    clueFocusedBorder: '#5BA5C3',     // Ocean teal
+    clueFocusedBg: '#F0F9FB',         
+    clueFocusedRing: '#8EBFD5',       // Light ocean
+    clueHoverBorder: '#6FB5CC',       
+    clueHoverBg: '#F0F9FB',           
+    clueDefaultBorder: '#D1D5DB',
+    clueDefaultBg: '#FAFAFA',
+    badgeText: '#4A8DA8',             // Deep ocean
+  },
+  terracotta: {
+    name: 'Terracotta',
+    cellFocused: '#EBD4CA',           // Soft terracotta (darker)
+    cellWordHighlight: '#FAF5F3',      // Very light terracotta
+    clueFocusedBorder: '#C17E6B',     // Warm terracotta
+    clueFocusedBg: '#FAF5F3',         
+    clueFocusedRing: '#D9A394',       // Light terracotta
+    clueHoverBorder: '#CC9180',       
+    clueHoverBg: '#FAF5F3',           
+    clueDefaultBorder: '#D1D5DB',
+    clueDefaultBg: '#FAFAFA',
+    badgeText: '#A8614F',             // Deep terracotta
+  },
+  slate: {
+    name: 'Slate',
+    cellFocused: '#D6DEE6',           // Soft slate blue (darker)
+    cellWordHighlight: '#F5F7FA',      // Very light slate
+    clueFocusedBorder: '#6B7D8F',     // Cool slate
+    clueFocusedBg: '#F5F7FA',         
+    clueFocusedRing: '#9BAAB8',       // Light slate
+    clueHoverBorder: '#7D8FA1',       
+    clueHoverBg: '#F5F7FA',           
+    clueDefaultBorder: '#D1D5DB',
+    clueDefaultBg: '#FAFAFA',
+    badgeText: '#54647A',             // Deep slate
+  },
+};
+
 export default function CrosswordGrid({ puzzle }: Props) {
   // Design constants - adjust these to tweak the appearance
   const CELL_SIZE = 50; // pixels
   const BORDER_WIDTH = 3; // pixels
   const FONT_SIZE = 30; // pixels (text-lg is ~18px)
   
-  // Color palette - adjust these to change the theme
-  const COLORS = {
-    // Cell colors
-    cellFocused: 'bg-blue-100',           // Currently focused cell
-    cellWordHighlight: 'bg-blue-50',       // Other cells in the same word
-    cellFocusedRing: 'ring-blue-500',      // Ring around focused cell (optional)
-    
-    // Clue colors
-    clueFocusedBorder: 'border-blue-500',
-    clueFocusedBg: 'bg-blue-50',
-    clueFocusedRing: 'ring-blue-300',
-    clueHoverBorder: 'hover:border-blue-400',
-    clueHoverBg: 'hover:bg-blue-50',
-    clueDefaultBorder: 'border-slate-300',
-    clueDefaultBg: 'bg-slate-50',
-    
-    // Badge colors (Across/Down labels)
-    badgeText: 'text-blue-600',
-  };
+  const [colorScheme, setColorScheme] = React.useState<keyof typeof COLOR_SCHEMES>('sage');
+  const COLORS = COLOR_SCHEMES[colorScheme];
   
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
@@ -229,7 +281,33 @@ export default function CrosswordGrid({ puzzle }: Props) {
   }, [placements, cellNumbering]);
 
   return (
-    <div className="flex flex-col gap-10 lg:flex-row lg:items-start" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
+    <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
+      {/* Color Scheme Selector */}
+      <div className="mb-6 flex items-center gap-3 bg-slate-100 p-4 rounded-lg">
+        <label className="text-sm font-semibold text-slate-700">Color Scheme:</label>
+        <div className="flex gap-2">
+          {(Object.keys(COLOR_SCHEMES) as Array<keyof typeof COLOR_SCHEMES>).map((scheme) => (
+            <button
+              key={scheme}
+              onClick={() => setColorScheme(scheme)}
+              className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${
+                colorScheme === scheme
+                  ? 'bg-white shadow-md'
+                  : 'bg-white/50 hover:bg-white hover:shadow'
+              }`}
+              style={{
+                color: COLOR_SCHEMES[scheme].badgeText,
+                outline: colorScheme === scheme ? `2px solid ${COLOR_SCHEMES[scheme].badgeText}` : undefined,
+                outlineOffset: colorScheme === scheme ? '2px' : undefined,
+              }}
+            >
+              {COLOR_SCHEMES[scheme].name}
+            </button>
+          ))}
+        </div>
+      </div>
+      
+      <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
       <section className="mx-auto lg:mx-0 flex-shrink-0">
         <div className="grid bg-white" style={{ gap: 0, lineHeight: 0, gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)` }}>
           {grid.map((row, rowIndex) =>
@@ -403,6 +481,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         setFocusedClue({ row: clueForCell.row, col: clueForCell.col, direction: clueForCell.direction });
                       }
                     }}
+                    className="h-full w-full text-center font-medium uppercase text-black focus:outline-none"
                     style={{
                       boxSizing: 'border-box',
                       display: 'block',
@@ -410,11 +489,19 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderLeft: hasLeft ? `${BORDER_WIDTH}px solid black` : 'none',
                       borderRight: 'none',
                       borderBottom: 'none',
-                      fontSize: `${FONT_SIZE}px`
+                      fontSize: `${FONT_SIZE}px`,
+                      backgroundColor: isPartOfFocusedWord ? COLORS.cellWordHighlight : '#FFFFFF',
                     }}
-                    className={`h-full w-full text-center font-medium uppercase text-black focus:outline-none ${
-                      isPartOfFocusedWord ? COLORS.cellWordHighlight : 'bg-white'
-                    } focus:${COLORS.cellFocused}`}
+                    onFocus={(e) => {
+                      e.target.style.backgroundColor = COLORS.cellFocused;
+                    }}
+                    onBlur={(e) => {
+                      if (isPartOfFocusedWord) {
+                        e.target.style.backgroundColor = COLORS.cellWordHighlight;
+                      } else {
+                        e.target.style.backgroundColor = '#FFFFFF';
+                      }
+                    }}
                   />
                 </div>
               );
@@ -446,11 +533,24 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     return (
                       <li
                         key={`A-${clue.number}-${clue.word}`}
-                        className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
-                          isFocused 
-                            ? `${COLORS.clueFocusedBorder} ${COLORS.clueFocusedBg} ring-2 ${COLORS.clueFocusedRing}` 
-                            : `${COLORS.clueDefaultBorder} ${COLORS.clueDefaultBg} ${COLORS.clueHoverBorder} ${COLORS.clueHoverBg}`
-                        }`}
+                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
+                        style={{
+                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
+                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
+                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
+                          }
+                        }}
                         onClick={() => {
                           setDirection("across");
                           setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
@@ -461,7 +561,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="flex items-baseline gap-3">
                             <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className={`font-semibold ${COLORS.badgeText}`}>Across</span>
+                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Across</span>
                           </div>
                           <span className="text-xs uppercase tracking-wide text-slate-500">
                             Row {clue.row + 1}, Col {clue.col + 1}
@@ -485,11 +585,24 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     return (
                       <li
                         key={`D-${clue.number}-${clue.word}`}
-                        className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
-                          isFocused 
-                            ? `${COLORS.clueFocusedBorder} ${COLORS.clueFocusedBg} ring-2 ${COLORS.clueFocusedRing}` 
-                            : `${COLORS.clueDefaultBorder} ${COLORS.clueDefaultBg} ${COLORS.clueHoverBorder} ${COLORS.clueHoverBg}`
-                        }`}
+                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
+                        style={{
+                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
+                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
+                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
+                          }
+                        }}
                         onClick={() => {
                           setDirection("down");
                           setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
@@ -500,7 +613,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="flex items-baseline gap-3">
                             <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className={`font-semibold ${COLORS.badgeText}`}>Down</span>
+                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Down</span>
                           </div>
                           <span className="text-xs uppercase tracking-wide text-slate-500">
                             Row {clue.row + 1}, Col {clue.col + 1}
@@ -515,6 +628,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
           </div>
         )}
       </section>
+      </div>
     </div>
   );
 }
