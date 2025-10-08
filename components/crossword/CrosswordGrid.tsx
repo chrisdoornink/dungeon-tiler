@@ -492,34 +492,40 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                        {clue.hint && (
-                          <div className="mt-2 space-y-1">
-                            {!revealedHints.has(clue.number) ? (
+                        <div className="mt-2 space-y-1">
+                          {clue.hint && !revealedHints.has(clue.number) ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRevealedHints(prev => new Set([...prev, clue.number]));
+                              }}
+                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                              style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                            >
+                              Hint
+                            </button>
+                          ) : (
+                            <>
+                              {clue.hint && revealedHints.has(clue.number) && (
+                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setRevealedHints(prev => new Set([...prev, clue.number]));
+                                  revealRandomLetter(clue.number);
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                                style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
                               >
-                                Hint
+                                More hints...
                               </button>
-                            ) : (
-                              <>
-                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    revealRandomLetter(clue.number);
-                                  }}
-                                  className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
-                                >
-                                  More hints...
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </li>
                     );
                   })}
@@ -572,34 +578,40 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           </span>
                         </div>
                         <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                        {clue.hint && (
-                          <div className="mt-2 space-y-1">
-                            {!revealedHints.has(clue.number) ? (
+                        <div className="mt-2 space-y-1">
+                          {clue.hint && !revealedHints.has(clue.number) ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRevealedHints(prev => new Set([...prev, clue.number]));
+                              }}
+                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                              style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                            >
+                              Hint
+                            </button>
+                          ) : (
+                            <>
+                              {clue.hint && revealedHints.has(clue.number) && (
+                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setRevealedHints(prev => new Set([...prev, clue.number]));
+                                  revealRandomLetter(clue.number);
                                 }}
-                                className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
+                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                                style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
                               >
-                                Hint
+                                More hints...
                               </button>
-                            ) : (
-                              <>
-                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    revealRandomLetter(clue.number);
-                                  }}
-                                  className="text-xs px-2 py-1 rounded bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium transition-colors"
-                                >
-                                  More hints...
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </>
+                          )}
+                        </div>
                       </li>
                     );
                   })}
