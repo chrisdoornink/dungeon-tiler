@@ -16,7 +16,8 @@ const COLOR_SCHEMES = {
   sage: {
     name: 'Sage',
     cellFocused: '#B5D4B5',           // Darker sage (for actively focused cell)
-    cellWordHighlight: '#D4E7D4',      // Soft sage (for word highlight & hint-revealed cells)
+    cellWordHighlight: '#D4E7D4',      // Soft sage (for word highlight)
+    cellHintRevealed: '#E6D4F5',       // Lavender (for hint-revealed cells)
     clueBackgroundTint: '#F5FAF5',     // Very light sage (for clue card backgrounds)
     clueFocusedBorder: '#7C9473',     // Muted sage green
     clueFocusedBg: '#F5FAF5',         // Very light sage for focused clue
@@ -113,10 +114,10 @@ export default function CrosswordGrid({ puzzle }: Props) {
     // Only update if we're not in check mode
     if (incorrectCells.size > 0) return;
     
-    // Reset all cells to white first
-    Object.values(cellRefs.current).forEach(cell => {
+    // Reset all cells to white or hint-revealed color first
+    Object.entries(cellRefs.current).forEach(([key, cell]) => {
       if (cell && cell !== document.activeElement) {
-        cell.style.backgroundColor = '#FFFFFF';
+        cell.style.backgroundColor = hintRevealedCells.has(key) ? COLORS.cellHintRevealed : '#FFFFFF';
       }
     });
     
@@ -154,12 +155,20 @@ export default function CrosswordGrid({ puzzle }: Props) {
         }
       }
       
-      // Apply highlight to word cells
-      wordCells.forEach(cell => {
-        cell.style.backgroundColor = COLORS.cellWordHighlight;
+      // Apply highlight to word cells (but keep hint-revealed cells with their lavender color)
+      wordCells.forEach((cell, idx) => {
+        const cellKey = cell.dataset.pos ? keyFor(
+          parseInt(cell.dataset.pos.split('-')[0], 10),
+          parseInt(cell.dataset.pos.split('-')[1], 10)
+        ) : null;
+        if (cellKey && hintRevealedCells.has(cellKey)) {
+          cell.style.backgroundColor = COLORS.cellHintRevealed;
+        } else {
+          cell.style.backgroundColor = COLORS.cellWordHighlight;
+        }
       });
     }
-  }, [focusedClue, COLORS.cellWordHighlight, placements, incorrectCells.size]);
+  }, [focusedClue, COLORS.cellWordHighlight, COLORS.cellHintRevealed, placements, incorrectCells.size, hintRevealedCells]);
   
   // Apply terracotta highlighting when check is triggered
   React.useEffect(() => {
@@ -766,12 +775,18 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderRight: 'none',
                       borderBottom: 'none',
                       fontSize: `${FONT_SIZE}px`,
-                      backgroundColor: hintRevealedCells.has(k) ? COLORS.cellWordHighlight : '#FFFFFF',
+                      backgroundColor: hintRevealedCells.has(k) ? COLORS.cellHintRevealed : '#FFFFFF',
                     }}
                     onFocus={(e) => {
                       e.target.style.backgroundColor = COLORS.cellFocused;
                     }}
                     onBlur={(e) => {
+                      // Always restore hint-revealed cells to lavender, regardless of focus state
+                      if (hintRevealedCells.has(k)) {
+                        e.target.style.backgroundColor = COLORS.cellHintRevealed;
+                        return;
+                      }
+                      
                       // Check if still part of focused word after blur
                       const isCellPartOfWord = focusedClue && (() => {
                         if (focusedClue.direction === 'across') {
@@ -794,8 +809,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       })();
                       
                       if (isCellPartOfWord) {
-                        e.target.style.backgroundColor = COLORS.cellWordHighlight;
-                      } else if (hintRevealedCells.has(k)) {
                         e.target.style.backgroundColor = COLORS.cellWordHighlight;
                       } else {
                         e.target.style.backgroundColor = '#FFFFFF';
