@@ -86,8 +86,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   const BORDER_WIDTH = 3; // pixels
   const FONT_SIZE = 30; // pixels (text-lg is ~18px)
   
-  const [colorScheme, setColorScheme] = React.useState<keyof typeof COLOR_SCHEMES>('sage');
-  const COLORS = COLOR_SCHEMES[colorScheme];
+  const COLORS = COLOR_SCHEMES.sage;
   
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
@@ -556,27 +555,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
               const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
               const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
-              
-              // Determine if this cell is part of the currently focused word
-              const isPartOfFocusedWord = focusedClue && (() => {
-                if (focusedClue.direction === 'across') {
-                  return focusedClue.row === r && 
-                         c >= focusedClue.col && 
-                         c < focusedClue.col + (placements.find(p => 
-                           p.row === focusedClue.row && 
-                           p.col === focusedClue.col && 
-                           p.direction === focusedClue.direction
-                         )?.word.length || 0);
-                } else {
-                  return focusedClue.col === c && 
-                         r >= focusedClue.row && 
-                         r < focusedClue.row + (placements.find(p => 
-                           p.row === focusedClue.row && 
-                           p.col === focusedClue.col && 
-                           p.direction === focusedClue.direction
-                         )?.word.length || 0);
-                }
-              })();
               
               return (
                 <div key={k} className="relative" style={{ width: CELL_SIZE, height: CELL_SIZE, display: 'block', lineHeight: 0 }}>
