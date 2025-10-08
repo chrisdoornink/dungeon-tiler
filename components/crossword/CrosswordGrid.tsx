@@ -212,8 +212,27 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const active = Boolean(cell);
               
               if (!active) {
+                // Check if there's an active cell above - if so, we need a top border
+                const hasActiveAbove = rowIndex > 0 && isActive[keyFor(rowIndex - 1, colIndex)];
+                const hasActiveLeft = colIndex > 0 && isActive[keyFor(rowIndex, colIndex - 1)];
+                
                 return (
-                  <div key={k} className="h-10 w-10 bg-white" aria-hidden />
+                  <div key={k} className="relative h-10 w-10 bg-white" aria-hidden>
+                    {hasActiveAbove && (
+                      <span 
+                        className="pointer-events-none absolute bg-black" 
+                        style={{ left: 0, right: 0, top: 0, height: '2px' }}
+                        aria-hidden 
+                      />
+                    )}
+                    {hasActiveLeft && (
+                      <span 
+                        className="pointer-events-none absolute bg-black" 
+                        style={{ top: 0, bottom: 0, left: 0, width: '2px' }}
+                        aria-hidden 
+                      />
+                    )}
+                  </div>
                 );
               }
               
@@ -228,7 +247,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
               
               return (
                 <div key={k} className="relative h-10 w-10" style={{ display: 'block', lineHeight: 0 }}>
-                  {/* Draw borders for edges next to inactive cells as overlays */}
+                  {/* Draw borders where there's no active neighbor */}
+                  {/* Don't draw bottom/right if inactive cell is there (it will draw top/left) */}
                   {!hasLeft && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
@@ -243,14 +263,14 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       aria-hidden 
                     />
                   )}
-                  {!hasRight && (
+                  {!hasRight && c === grid[0].length - 1 && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
                       style={{ top: 0, bottom: 0, right: 0, width: '2px' }}
                       aria-hidden 
                     />
                   )}
-                  {!hasBottom && (
+                  {!hasBottom && r === grid.length - 1 && (
                     <span 
                       className="pointer-events-none absolute bg-black" 
                       style={{ left: 0, right: 0, bottom: 0, height: '2px' }}
