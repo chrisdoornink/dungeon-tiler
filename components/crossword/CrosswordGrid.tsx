@@ -17,6 +17,26 @@ export default function CrosswordGrid({ puzzle }: Props) {
   const BORDER_WIDTH = 3; // pixels
   const FONT_SIZE = 30; // pixels (text-lg is ~18px)
   
+  // Color palette - adjust these to change the theme
+  const COLORS = {
+    // Cell colors
+    cellFocused: 'bg-blue-100',           // Currently focused cell
+    cellWordHighlight: 'bg-blue-50',       // Other cells in the same word
+    cellFocusedRing: 'ring-blue-500',      // Ring around focused cell (optional)
+    
+    // Clue colors
+    clueFocusedBorder: 'border-blue-500',
+    clueFocusedBg: 'bg-blue-50',
+    clueFocusedRing: 'ring-blue-300',
+    clueHoverBorder: 'hover:border-blue-400',
+    clueHoverBg: 'hover:bg-blue-50',
+    clueDefaultBorder: 'border-slate-300',
+    clueDefaultBg: 'bg-slate-50',
+    
+    // Badge colors (Across/Down labels)
+    badgeText: 'text-blue-600',
+  };
+  
   const { grid, placements } = puzzle;
   const [direction, setDirection] = React.useState<"across" | "down">("across");
   const [focusedClue, setFocusedClue] = React.useState<{ row: number; col: number; direction: "across" | "down" } | null>(null);
@@ -265,6 +285,27 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
               const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
               
+              // Determine if this cell is part of the currently focused word
+              const isPartOfFocusedWord = focusedClue && (() => {
+                if (focusedClue.direction === 'across') {
+                  return focusedClue.row === r && 
+                         c >= focusedClue.col && 
+                         c < focusedClue.col + (placements.find(p => 
+                           p.row === focusedClue.row && 
+                           p.col === focusedClue.col && 
+                           p.direction === focusedClue.direction
+                         )?.word.length || 0);
+                } else {
+                  return focusedClue.col === c && 
+                         r >= focusedClue.row && 
+                         r < focusedClue.row + (placements.find(p => 
+                           p.row === focusedClue.row && 
+                           p.col === focusedClue.col && 
+                           p.direction === focusedClue.direction
+                         )?.word.length || 0);
+                }
+              })();
+              
               return (
                 <div key={k} className="relative" style={{ width: CELL_SIZE, height: CELL_SIZE, display: 'block', lineHeight: 0 }}>
                   {/* Draw borders where there's no active neighbor */}
@@ -371,7 +412,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderBottom: 'none',
                       fontSize: `${FONT_SIZE}px`
                     }}
-                    className="h-full w-full text-center font-medium uppercase bg-white text-black focus:outline-none focus:bg-blue-100"
+                    className={`h-full w-full text-center font-medium uppercase text-black focus:outline-none ${
+                      isPartOfFocusedWord ? COLORS.cellWordHighlight : 'bg-white'
+                    } focus:${COLORS.cellFocused}`}
                   />
                 </div>
               );
@@ -405,8 +448,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         key={`A-${clue.number}-${clue.word}`}
                         className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
                           isFocused 
-                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-300' 
-                            : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                            ? `${COLORS.clueFocusedBorder} ${COLORS.clueFocusedBg} ring-2 ${COLORS.clueFocusedRing}` 
+                            : `${COLORS.clueDefaultBorder} ${COLORS.clueDefaultBg} ${COLORS.clueHoverBorder} ${COLORS.clueHoverBg}`
                         }`}
                         onClick={() => {
                           setDirection("across");
@@ -418,7 +461,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="flex items-baseline gap-3">
                             <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold text-blue-600">Across</span>
+                            <span className={`font-semibold ${COLORS.badgeText}`}>Across</span>
                           </div>
                           <span className="text-xs uppercase tracking-wide text-slate-500">
                             Row {clue.row + 1}, Col {clue.col + 1}
@@ -444,8 +487,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         key={`D-${clue.number}-${clue.word}`}
                         className={`rounded-lg border p-4 shadow-sm cursor-pointer transition-colors ${
                           isFocused 
-                            ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-300' 
-                            : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50'
+                            ? `${COLORS.clueFocusedBorder} ${COLORS.clueFocusedBg} ring-2 ${COLORS.clueFocusedRing}` 
+                            : `${COLORS.clueDefaultBorder} ${COLORS.clueDefaultBg} ${COLORS.clueHoverBorder} ${COLORS.clueHoverBg}`
                         }`}
                         onClick={() => {
                           setDirection("down");
@@ -457,7 +500,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         <div className="flex items-baseline justify-between gap-3">
                           <div className="flex items-baseline gap-3">
                             <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold text-blue-600">Down</span>
+                            <span className={`font-semibold ${COLORS.badgeText}`}>Down</span>
                           </div>
                           <span className="text-xs uppercase tracking-wide text-slate-500">
                             Row {clue.row + 1}, Col {clue.col + 1}
