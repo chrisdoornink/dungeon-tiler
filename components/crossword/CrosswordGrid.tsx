@@ -98,6 +98,56 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
+  
+  // Update cell backgrounds when focused clue changes
+  React.useEffect(() => {
+    // Reset all cells to white first
+    Object.values(cellRefs.current).forEach(cell => {
+      if (cell && cell !== document.activeElement) {
+        cell.style.backgroundColor = '#FFFFFF';
+      }
+    });
+    
+    // Apply word highlight to cells in focused word (except the focused cell)
+    if (focusedClue) {
+      const wordCells: HTMLInputElement[] = [];
+      
+      if (focusedClue.direction === 'across') {
+        const wordLength = placements.find(p => 
+          p.row === focusedClue.row && 
+          p.col === focusedClue.col && 
+          p.direction === focusedClue.direction
+        )?.word.length || 0;
+        
+        for (let c = focusedClue.col; c < focusedClue.col + wordLength; c++) {
+          const key = keyFor(focusedClue.row, c);
+          const cell = cellRefs.current[key];
+          if (cell && cell !== document.activeElement) {
+            wordCells.push(cell);
+          }
+        }
+      } else {
+        const wordLength = placements.find(p => 
+          p.row === focusedClue.row && 
+          p.col === focusedClue.col && 
+          p.direction === focusedClue.direction
+        )?.word.length || 0;
+        
+        for (let r = focusedClue.row; r < focusedClue.row + wordLength; r++) {
+          const key = keyFor(r, focusedClue.col);
+          const cell = cellRefs.current[key];
+          if (cell && cell !== document.activeElement) {
+            wordCells.push(cell);
+          }
+        }
+      }
+      
+      // Apply highlight to word cells
+      wordCells.forEach(cell => {
+        cell.style.backgroundColor = COLORS.cellWordHighlight;
+      });
+    }
+  }, [focusedClue, COLORS.cellWordHighlight, placements]);
 
   // Precompute active cells for quick lookup
   const isActive = React.useMemo(() => {
@@ -490,13 +540,34 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       borderRight: 'none',
                       borderBottom: 'none',
                       fontSize: `${FONT_SIZE}px`,
-                      backgroundColor: isPartOfFocusedWord ? COLORS.cellWordHighlight : '#FFFFFF',
+                      backgroundColor: '#FFFFFF',
                     }}
                     onFocus={(e) => {
                       e.target.style.backgroundColor = COLORS.cellFocused;
                     }}
                     onBlur={(e) => {
-                      if (isPartOfFocusedWord) {
+                      // Check if still part of focused word after blur
+                      const isCellPartOfWord = focusedClue && (() => {
+                        if (focusedClue.direction === 'across') {
+                          return focusedClue.row === rowIndex && 
+                                 colIndex >= focusedClue.col && 
+                                 colIndex < focusedClue.col + (placements.find(p => 
+                                   p.row === focusedClue.row && 
+                                   p.col === focusedClue.col && 
+                                   p.direction === focusedClue.direction
+                                 )?.word.length || 0);
+                        } else {
+                          return focusedClue.col === colIndex && 
+                                 rowIndex >= focusedClue.row && 
+                                 rowIndex < focusedClue.row + (placements.find(p => 
+                                   p.row === focusedClue.row && 
+                                   p.col === focusedClue.col && 
+                                   p.direction === focusedClue.direction
+                                 )?.word.length || 0);
+                        }
+                      })();
+                      
+                      if (isCellPartOfWord) {
                         e.target.style.backgroundColor = COLORS.cellWordHighlight;
                       } else {
                         e.target.style.backgroundColor = '#FFFFFF';
