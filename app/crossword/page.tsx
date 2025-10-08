@@ -15,18 +15,6 @@ export default function CrosswordPage() {
   return (
     <div className="min-h-screen bg-white px-6 py-10 text-black" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
       <div className="mx-auto flex max-w-5xl flex-col gap-10">
-        <header className="space-y-3">
-          <p className="text-sm uppercase tracking-wide text-slate-600">
-            Prototype experiment
-          </p>
-          <h1 className="text-3xl font-bold">Mini Crossword Prototype</h1>
-          <p className="max-w-2xl text-slate-700">
-            A tiny five-word crossword idea generator. Each refresh generates a
-            completely random puzzle. All words are six letters or shorter and the full
-            layout fits in a 10 by 10 board.
-          </p>
-        </header>
-
         <CrosswordGrid puzzle={puzzle} />
       </div>
     </div>

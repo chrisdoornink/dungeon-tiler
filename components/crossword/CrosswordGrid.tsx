@@ -374,33 +374,135 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
-      {/* Color Scheme Selector */}
-      <div className="mb-6 flex items-center gap-3 bg-slate-100 p-4 rounded-lg">
-        <label className="text-sm font-semibold text-slate-700">Color Scheme:</label>
-        <div className="flex gap-2">
-          {(Object.keys(COLOR_SCHEMES) as Array<keyof typeof COLOR_SCHEMES>).map((scheme) => (
-            <button
-              key={scheme}
-              onClick={() => setColorScheme(scheme)}
-              className={`px-4 py-2 rounded-md font-medium text-sm transition-all ${
-                colorScheme === scheme
-                  ? 'bg-white shadow-md'
-                  : 'bg-white/50 hover:bg-white hover:shadow'
-              }`}
-              style={{
-                color: COLOR_SCHEMES[scheme].badgeText,
-                outline: colorScheme === scheme ? `2px solid ${COLOR_SCHEMES[scheme].badgeText}` : undefined,
-                outlineOffset: colorScheme === scheme ? '2px' : undefined,
-              }}
-            >
-              {COLOR_SCHEMES[scheme].name}
-            </button>
-          ))}
-        </div>
-      </div>
-      
       <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
-      <section className="mx-auto lg:mx-0 flex-shrink-0">
+      <section className="flex-1 space-y-6 order-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-black">Clues</h2>
+            <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
+          </div>
+          <button
+            onClick={checkAnswers}
+            className="px-4 py-2 rounded-md font-medium text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+          >
+            Check
+          </button>
+        </div>
+
+        {placements.length === 0 ? (
+          <p className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
+            No crossword could be generated for this seed. Refresh to try again!
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {/* Across */}
+            <div>
+              <h3 className="mb-2 text-lg font-semibold text-black">Across</h3>
+              <ol className="space-y-3 text-black">
+                {numberedClues
+                  .filter((p) => p.direction === "across")
+                  .map((clue) => {
+                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
+                    return (
+                      <li
+                        key={`A-${clue.number}-${clue.word}`}
+                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
+                        style={{
+                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
+                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
+                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
+                          }
+                        }}
+                        onClick={() => {
+                          setDirection("across");
+                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
+                          const firstCellKey = keyFor(clue.row, clue.col);
+                          cellRefs.current[firstCellKey]?.focus();
+                        }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Across</span>
+                          </div>
+                          <span className="text-xs uppercase tracking-wide text-slate-500">
+                            Row {clue.row + 1}, Col {clue.col + 1}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                      </li>
+                    );
+                  })}
+              </ol>
+            </div>
+
+            {/* Down */}
+            <div>
+              <h3 className="mb-2 text-lg font-semibold text-black">Down</h3>
+              <ol className="space-y-3 text-black">
+                {numberedClues
+                  .filter((p) => p.direction === "down")
+                  .map((clue) => {
+                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
+                    return (
+                      <li
+                        key={`D-${clue.number}-${clue.word}`}
+                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
+                        style={{
+                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
+                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
+                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isFocused) {
+                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
+                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
+                          }
+                        }}
+                        onClick={() => {
+                          setDirection("down");
+                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
+                          const firstCellKey = keyFor(clue.row, clue.col);
+                          cellRefs.current[firstCellKey]?.focus();
+                        }}
+                      >
+                        <div className="flex items-baseline justify-between gap-3">
+                          <div className="flex items-baseline gap-3">
+                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
+                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Down</span>
+                          </div>
+                          <span className="text-xs uppercase tracking-wide text-slate-500">
+                            Row {clue.row + 1}, Col {clue.col + 1}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                      </li>
+                    );
+                  })}
+              </ol>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="mx-auto lg:mx-0 flex-shrink-0 order-2">
         <div className="grid bg-white" style={{ gap: 0, lineHeight: 0, gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)` }}>
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
@@ -626,133 +728,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
             })
           )}
         </div>
-      </section>
-
-      <section className="flex-1 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-black">Clues</h2>
-            <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
-          </div>
-          <button
-            onClick={checkAnswers}
-            className="px-4 py-2 rounded-md font-medium text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors"
-          >
-            Check
-          </button>
-        </div>
-
-        {placements.length === 0 ? (
-          <p className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
-            No crossword could be generated for this seed. Refresh to try again!
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            {/* Across */}
-            <div>
-              <h3 className="mb-2 text-lg font-semibold text-black">Across</h3>
-              <ol className="space-y-3 text-black">
-                {numberedClues
-                  .filter((p) => p.direction === "across")
-                  .map((clue) => {
-                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
-                    return (
-                      <li
-                        key={`A-${clue.number}-${clue.word}`}
-                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
-                        style={{
-                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
-                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
-                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isFocused) {
-                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
-                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isFocused) {
-                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
-                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
-                          }
-                        }}
-                        onClick={() => {
-                          setDirection("across");
-                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
-                          const firstCellKey = keyFor(clue.row, clue.col);
-                          cellRefs.current[firstCellKey]?.focus();
-                        }}
-                      >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Across</span>
-                          </div>
-                          <span className="text-xs uppercase tracking-wide text-slate-500">
-                            Row {clue.row + 1}, Col {clue.col + 1}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                      </li>
-                    );
-                  })}
-              </ol>
-            </div>
-
-            {/* Down */}
-            <div>
-              <h3 className="mb-2 text-lg font-semibold text-black">Down</h3>
-              <ol className="space-y-3 text-black">
-                {numberedClues
-                  .filter((p) => p.direction === "down")
-                  .map((clue) => {
-                    const isFocused = focusedClue?.row === clue.row && focusedClue?.col === clue.col && focusedClue?.direction === clue.direction;
-                    return (
-                      <li
-                        key={`D-${clue.number}-${clue.word}`}
-                        className="rounded-lg border p-4 shadow-sm cursor-pointer transition-colors"
-                        style={{
-                          borderColor: isFocused ? COLORS.clueFocusedBorder : COLORS.clueDefaultBorder,
-                          backgroundColor: isFocused ? COLORS.clueFocusedBg : COLORS.clueDefaultBg,
-                          boxShadow: isFocused ? `0 0 0 2px ${COLORS.clueFocusedRing}` : undefined,
-                        }}
-                        onMouseEnter={(e) => {
-                          if (!isFocused) {
-                            e.currentTarget.style.borderColor = COLORS.clueHoverBorder;
-                            e.currentTarget.style.backgroundColor = COLORS.clueHoverBg;
-                          }
-                        }}
-                        onMouseLeave={(e) => {
-                          if (!isFocused) {
-                            e.currentTarget.style.borderColor = COLORS.clueDefaultBorder;
-                            e.currentTarget.style.backgroundColor = COLORS.clueDefaultBg;
-                          }
-                        }}
-                        onClick={() => {
-                          setDirection("down");
-                          setFocusedClue({ row: clue.row, col: clue.col, direction: clue.direction });
-                          const firstCellKey = keyFor(clue.row, clue.col);
-                          cellRefs.current[firstCellKey]?.focus();
-                        }}
-                      >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Down</span>
-                          </div>
-                          <span className="text-xs uppercase tracking-wide text-slate-500">
-                            Row {clue.row + 1}, Col {clue.col + 1}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
-                      </li>
-                    );
-                  })}
-              </ol>
-            </div>
-          </div>
-        )}
       </section>
       </div>
     </div>
