@@ -415,9 +415,12 @@ describe('CrosswordGrid', () => {
         const inputs = screen.getAllByRole('textbox');
         fireEvent.click(inputs[0]);
         
-        // Check that a clue has the focused styling
-        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
-        expect(focusedClue).toBeInTheDocument();
+        // Check that a clue has the focused styling (inline styles now)
+        const clues = container.querySelectorAll('li');
+        const focusedClue = Array.from(clues).find(clue => 
+          clue.style.boxShadow && clue.style.boxShadow.includes('2px')
+        );
+        expect(focusedClue).toBeTruthy();
       });
       
       it('highlights the correct clue for cells in the middle of a word', () => {
@@ -433,8 +436,11 @@ describe('CrosswordGrid', () => {
         fireEvent.click(inputs[1]);
         
         // Should still highlight the clue for the word starting at 0,0
-        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
-        expect(focusedClue).toBeInTheDocument();
+        const clues = container.querySelectorAll('li');
+        const focusedClue = Array.from(clues).find(clue => 
+          clue.style.boxShadow && clue.style.boxShadow.includes('2px')
+        );
+        expect(focusedClue).toBeTruthy();
       });
       
       it('updates focus when clicking different cells', () => {
@@ -450,12 +456,18 @@ describe('CrosswordGrid', () => {
         
         // Click first word
         fireEvent.click(inputs[0]);
-        let focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        let cluesList = Array.from(container.querySelectorAll('li'));
+        let focusedClues = cluesList.filter(clue => 
+          clue.style.boxShadow && clue.style.boxShadow.includes('2px')
+        );
         expect(focusedClues).toHaveLength(1);
         
         // Click second word
         fireEvent.click(inputs[3]); // First cell of second word
-        focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        cluesList = Array.from(container.querySelectorAll('li'));
+        focusedClues = cluesList.filter(clue => 
+          clue.style.boxShadow && clue.style.boxShadow.includes('2px')
+        );
         expect(focusedClues).toHaveLength(1);
       });
       
@@ -472,8 +484,11 @@ describe('CrosswordGrid', () => {
         fireEvent.click(inputs[0]);
         
         // Should highlight a clue (will be the down clue)
-        const focusedClue = container.querySelector('.ring-2.ring-blue-300');
-        expect(focusedClue).toBeInTheDocument();
+        const clues = container.querySelectorAll('li');
+        const focusedClue = Array.from(clues).find(clue => 
+          clue.style.boxShadow && clue.style.boxShadow.includes('2px')
+        );
+        expect(focusedClue).toBeTruthy();
       });
     });
     
@@ -535,10 +550,9 @@ describe('CrosswordGrid', () => {
         
         fireEvent.click(clueBox!);
         
-        // Check that the clue has focused styling
-        expect(clueBox).toHaveClass('border-blue-500');
-        expect(clueBox).toHaveClass('bg-blue-50');
-        expect(clueBox).toHaveClass('ring-2');
+        // Check that the clue has focused styling (inline styles now)
+        expect(clueBox?.style.boxShadow).toBeTruthy();
+        expect(clueBox?.style.boxShadow).toContain('2px');
       });
       
       it('sets the correct direction when clicking across clue', () => {
@@ -644,18 +658,18 @@ describe('CrosswordGrid', () => {
         const { container } = render(<CrosswordGrid puzzle={puzzle} />);
         
         // Click first clue
-        const firstClue = screen.getByText(/First word/).closest('li');
+        const firstClue = screen.getByText(/First word/).closest('li') as HTMLElement;
         fireEvent.click(firstClue!);
-        expect(firstClue).toHaveClass('ring-2');
+        expect(firstClue.style.boxShadow).toBeTruthy();
         
         // Click second clue
-        const secondClue = screen.getByText(/Second word/).closest('li');
+        const secondClue = screen.getByText(/Second word/).closest('li') as HTMLElement;
         fireEvent.click(secondClue!);
         
         // First should no longer be focused
-        expect(firstClue).not.toHaveClass('ring-2');
+        expect(firstClue.style.boxShadow).toBeFalsy();
         // Second should be focused
-        expect(secondClue).toHaveClass('ring-2');
+        expect(secondClue.style.boxShadow).toBeTruthy();
       });
     });
     
@@ -693,7 +707,10 @@ describe('CrosswordGrid', () => {
         fireEvent.click(inputs[0]);
         
         // Verify clue is highlighted
-        let focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        const cluesList = Array.from(container.querySelectorAll('li'));
+        const focusedClues = cluesList.filter(clue => 
+          (clue as HTMLElement).style.boxShadow && (clue as HTMLElement).style.boxShadow.includes('2px')
+        );
         expect(focusedClues.length).toBeGreaterThan(0);
         
         // Click a different clue
@@ -701,7 +718,7 @@ describe('CrosswordGrid', () => {
         fireEvent.click(secondClue!);
         
         // Verify the second clue is now focused and input changed
-        expect(secondClue).toHaveClass('ring-2');
+        expect((secondClue as HTMLElement).style.boxShadow).toBeTruthy();
         expect(document.activeElement).toBe(inputs[3]); // First cell of second word
       });
       
@@ -722,7 +739,10 @@ describe('CrosswordGrid', () => {
         fireEvent.change(inputs[0], { target: { value: 'A' } });
         
         // The same clue should still be focused
-        const focusedClues = container.querySelectorAll('.ring-2.ring-blue-300');
+        const cluesList = Array.from(container.querySelectorAll('li'));
+        const focusedClues = cluesList.filter(clue => 
+          (clue as HTMLElement).style.boxShadow && (clue as HTMLElement).style.boxShadow.includes('2px')
+        );
         expect(focusedClues).toHaveLength(1);
       });
     });
@@ -751,8 +771,7 @@ describe('CrosswordGrid', () => {
         const clueText = screen.getByText(/A feline animal/);
         const clueBox = clueText.closest('li');
         
-        // Check that clue has hover classes
-        expect(clueBox).toHaveClass('hover:border-blue-400');
+        // Check that clue has cursor pointer
         expect(clueBox).toHaveClass('cursor-pointer');
       });
       
@@ -856,8 +875,8 @@ describe('CrosswordGrid', () => {
       
       const { container } = render(<CrosswordGrid puzzle={puzzle} />);
       
-      const mainContainer = container.querySelector('.flex');
-      expect(mainContainer).toHaveClass('lg:flex-row');
+      const mainContainer = container.querySelector('.lg\\:flex-row');
+      expect(mainContainer).toBeInTheDocument();
     });
   });
   

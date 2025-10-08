@@ -95,12 +95,18 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
   // Track user-entered letters per active cell
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
+  
+  // Track incorrect cells (for check feature)
+  const [incorrectCells, setIncorrectCells] = React.useState<Set<string>>(new Set());
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
   
   // Update cell backgrounds when focused clue changes
   React.useEffect(() => {
+    // Only update if we're not in check mode
+    if (incorrectCells.size > 0) return;
+    
     // Reset all cells to white first
     Object.values(cellRefs.current).forEach(cell => {
       if (cell && cell !== document.activeElement) {
@@ -147,7 +153,19 @@ export default function CrosswordGrid({ puzzle }: Props) {
         cell.style.backgroundColor = COLORS.cellWordHighlight;
       });
     }
-  }, [focusedClue, COLORS.cellWordHighlight, placements]);
+  }, [focusedClue, COLORS.cellWordHighlight, placements, incorrectCells.size]);
+  
+  // Apply terracotta highlighting when check is triggered
+  React.useEffect(() => {
+    if (incorrectCells.size > 0) {
+      incorrectCells.forEach(cellKey => {
+        const cell = cellRefs.current[cellKey];
+        if (cell) {
+          cell.style.backgroundColor = COLOR_SCHEMES.terracotta.cellFocused;
+        }
+      });
+    }
+  }, [incorrectCells]);
 
   // Precompute active cells for quick lookup
   const isActive = React.useMemo(() => {
@@ -263,9 +281,33 @@ export default function CrosswordGrid({ puzzle }: Props) {
     }
   };
 
+  // Check answers and highlight incorrect cells
+  const checkAnswers = () => {
+    const incorrect = new Set<string>();
+    
+    placements.forEach(placement => {
+      const { row, col, direction, word } = placement;
+      
+      for (let i = 0; i < word.length; i++) {
+        const cellRow = direction === 'across' ? row : row + i;
+        const cellCol = direction === 'across' ? col + i : col;
+        const cellKey = keyFor(cellRow, cellCol);
+        const userAnswer = answers[cellKey]?.toUpperCase();
+        const correctLetter = word[i].toUpperCase();
+        
+        if (userAnswer && userAnswer !== correctLetter) {
+          incorrect.add(cellKey);
+        }
+      }
+    });
+    
+    setIncorrectCells(incorrect);
+  };
+
   const onInput = (r: number, c: number, v: string) => {
     const value = (v || "").toUpperCase().slice(-1).replace(/[^A-Z]/g, "");
-    setAnswers((prev) => ({ ...prev, [keyFor(r, c)]: value }));
+    const cellKey = keyFor(r, c);
+    setAnswers((prev) => ({ ...prev, [cellKey]: value }));
     if (value) moveNext(r, c);
   };
 
@@ -484,6 +526,11 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     onChange={(e) => onInput(rowIndex, colIndex, e.target.value)}
                     onKeyDown={onKeyDown}
                     onClick={() => {
+                      // Clear check mode when clicking any cell
+                      if (incorrectCells.size > 0) {
+                        setIncorrectCells(new Set());
+                      }
+                      
                       const startsAcross = isStart(r, c, "across");
                       const startsDown = isStart(r, c, "down");
 
@@ -582,9 +629,17 @@ export default function CrosswordGrid({ puzzle }: Props) {
       </section>
 
       <section className="flex-1 space-y-6">
-        <div>
-          <h2 className="text-xl font-semibold text-black">Clues</h2>
-          <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-semibold text-black">Clues</h2>
+            <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
+          </div>
+          <button
+            onClick={checkAnswers}
+            className="px-4 py-2 rounded-md font-medium text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors"
+          >
+            Check
+          </button>
         </div>
 
         {placements.length === 0 ? (
