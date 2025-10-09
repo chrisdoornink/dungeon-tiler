@@ -25,8 +25,10 @@ describe('Wall Torch rendering', () => {
       />
     );
 
-    const torch = screen.getByTestId('wall-torch');
+    // Wall torch is rendered as subtype-icon-16
+    const torch = screen.getByTestId('subtype-icon-16');
     expect(torch).toBeInTheDocument();
+    expect(torch).toHaveClass('torchSprite');
     // No animation metadata should be present
     expect(torch.getAttribute('data-duration-ms')).toBeNull();
     expect(torch.getAttribute('data-frame')).toBeNull();

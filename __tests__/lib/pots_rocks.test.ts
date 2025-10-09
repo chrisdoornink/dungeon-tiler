@@ -14,7 +14,7 @@ describe('TileSubtype additions for Pots and Rocks', () => {
     expect(new Set(values).size).toBe(values.length);
   });
 
-  it('stepping onto FOOD heals +1 hp, capped at 5', () => {
+  it('stepping onto FOOD adds to inventory', () => {
     const base = generateMapWithSubtypes();
     for (let y = 0; y < base.tiles.length; y++) {
       for (let x = 0; x < base.tiles[y].length; x++) {
@@ -42,14 +42,15 @@ describe('TileSubtype additions for Pots and Rocks', () => {
       heroAttack: 1,
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
       recentDeaths: [],
+      foodCount: 0,
     };
 
     const after = movePlayer(gameState, Direction.RIGHT);
-    expect(after.heroHealth).toBe(5);
+    expect(after.foodCount).toBe(1);
     expect(after.mapData.subtypes[py][px + 1]).toContain(TileSubtype.PLAYER);
   });
 
-  it('stepping onto MED heals +2 hp, capped at 5', () => {
+  it('stepping onto MED adds to inventory', () => {
     const base = generateMapWithSubtypes();
     for (let y = 0; y < base.tiles.length; y++) {
       for (let x = 0; x < base.tiles[y].length; x++) {
@@ -77,10 +78,11 @@ describe('TileSubtype additions for Pots and Rocks', () => {
       heroAttack: 1,
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
       recentDeaths: [],
+      potionCount: 0,
     };
 
     const after = movePlayer(gameState, Direction.RIGHT);
-    expect(after.heroHealth).toBe(5);
+    expect(after.potionCount).toBe(1);
     expect(after.mapData.subtypes[py][px + 1]).toContain(TileSubtype.PLAYER);
   });
 
