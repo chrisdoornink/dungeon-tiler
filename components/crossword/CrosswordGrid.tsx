@@ -109,6 +109,13 @@ export default function CrosswordGrid({ puzzle }: Props) {
   // Track completion animation and modal
   const [isAnimating, setIsAnimating] = React.useState(false);
   const [showCompletionModal, setShowCompletionModal] = React.useState(false);
+  
+  // Timer state
+  const [timerSeconds, setTimerSeconds] = React.useState(0);
+  const [timerRunning, setTimerRunning] = React.useState(false);
+  const [showTimer, setShowTimer] = React.useState(false);
+  const [timerJustStarted, setTimerJustStarted] = React.useState(false);
+  const [countdown, setCountdown] = React.useState(5);
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
@@ -173,6 +180,33 @@ export default function CrosswordGrid({ puzzle }: Props) {
       });
     }
   }, [focusedClue, COLORS.cellWordHighlight, COLORS.cellHintRevealed, placements, incorrectCells.size, hintRevealedCells, isAnimating]);
+  
+  // Countdown effect on mount
+  React.useEffect(() => {
+    if (countdown > 0) {
+      const timeout = setTimeout(() => {
+        setCountdown(prev => prev - 1);
+      }, 1000);
+      return () => clearTimeout(timeout);
+    } else if (countdown === 0 && !timerRunning) {
+      // Countdown finished, start the timer
+      setTimerRunning(true);
+      setTimerJustStarted(true);
+      setShowTimer(false); // Hide time display after countdown
+      setTimeout(() => setTimerJustStarted(false), 600);
+    }
+  }, [countdown, timerRunning]);
+  
+  // Timer increment effect
+  React.useEffect(() => {
+    if (!timerRunning) return;
+    
+    const interval = setInterval(() => {
+      setTimerSeconds(prev => prev + 1);
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [timerRunning]);
   
   // Apply terracotta highlighting when check is triggered
   React.useEffect(() => {
@@ -401,6 +435,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
     // If puzzle is complete and correct, trigger animation
     if (allFilled && allCorrect) {
       setIsAnimating(true);
+      setTimerRunning(false); // Stop timer
       
       // Animation colors (alternating sage and ocean)
       const animationColors = [
@@ -500,6 +535,16 @@ export default function CrosswordGrid({ puzzle }: Props) {
     }
   };
 
+  // Format timer display
+  const formatTime = (seconds: number): string => {
+    if (seconds < 60) {
+      return `${seconds}s`;
+    }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   // Map each placement to its proper crossword number based on grid position
   const numberedClues = React.useMemo(() => {
     return placements.map((placement) => {
@@ -514,6 +559,57 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
+      {/* Timer Icon - Always visible */}
+      <div 
+        className="fixed top-4 right-4 z-40 select-none"
+        onClick={() => countdown === 0 && setShowTimer(!showTimer)}
+        style={{
+          animation: timerJustStarted ? 'shake 0.6s ease-in-out' : undefined,
+          cursor: countdown === 0 ? 'pointer' : 'default',
+        }}
+      >
+          <div className="flex items-center gap-2 bg-white rounded-lg shadow-lg px-3 py-2 border border-slate-200 hover:border-slate-300 transition-colors">
+            {countdown > 0 ? (
+              <span className="text-sm font-semibold text-slate-700">
+                Starting in {countdown}...
+              </span>
+            ) : (
+              <>
+                <svg 
+                  width="20" 
+                  height="20" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                  style={{
+                    transform: timerJustStarted ? 'scale(1.2)' : 'scale(1)',
+                    transition: 'transform 0.3s ease-out'
+                  }}
+                >
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12 6 12 12 16 14"/>
+                </svg>
+                {showTimer && (
+                  <span className="font-mono text-sm font-semibold text-slate-700">
+                    {formatTime(timerSeconds)}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+      </div>
+      
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0) rotate(0deg); }
+          10%, 30%, 50%, 70%, 90% { transform: translateX(-4px) rotate(-5deg); }
+          20%, 40%, 60%, 80% { transform: translateX(4px) rotate(5deg); }
+        }
+      `}</style>
+      
       <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
       <section className="flex-1 space-y-6 order-1">
         <div className="flex items-center justify-between">
@@ -571,7 +667,13 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           cellRefs.current[firstCellKey]?.focus();
                         }}
                       >
-                        <p className="text-sm text-slate-700">
+                        <p 
+                          className="text-sm text-slate-700 transition-all duration-500"
+                          style={{
+                            filter: countdown > 0 ? 'blur(5px)' : 'none',
+                            userSelect: countdown > 0 ? 'none' : 'auto',
+                          }}
+                        >
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
                         <div className="mt-2 space-y-1">
@@ -650,7 +752,13 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           cellRefs.current[firstCellKey]?.focus();
                         }}
                       >
-                        <p className="text-sm text-slate-700">
+                        <p 
+                          className="text-sm text-slate-700 transition-all duration-500"
+                          style={{
+                            filter: countdown > 0 ? 'blur(5px)' : 'none',
+                            userSelect: countdown > 0 ? 'none' : 'auto',
+                          }}
+                        >
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
                         <div className="mt-2 space-y-1">
@@ -697,7 +805,15 @@ export default function CrosswordGrid({ puzzle }: Props) {
       </section>
 
       <section className="mx-auto lg:mx-0 flex-shrink-0 order-2">
-        <div className="grid bg-white" style={{ gap: 0, lineHeight: 0, gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)` }}>
+        <div 
+          className="grid bg-white" 
+          style={{ 
+            gap: 0, 
+            lineHeight: 0, 
+            gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)`,
+            pointerEvents: countdown > 0 ? 'none' : 'auto',
+          }}
+        >
           {grid.map((row, rowIndex) =>
             row.map((cell, colIndex) => {
               const k = keyFor(rowIndex, colIndex);
@@ -930,9 +1046,14 @@ export default function CrosswordGrid({ puzzle }: Props) {
             <h2 className="text-3xl font-bold mb-4" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
               Congratulations!
             </h2>
-            <p className="text-lg text-slate-700 mb-6">
+            <p className="text-lg text-slate-700 mb-2">
               You completed the puzzle!
             </p>
+            {timerSeconds > 0 && (
+              <p className="text-md text-slate-600 mb-6 font-mono">
+                Time: {formatTime(timerSeconds)}
+              </p>
+            )}
             <button
               onClick={() => setShowCompletionModal(false)}
               className="px-6 py-3 rounded-lg font-semibold text-white transition-colors"
