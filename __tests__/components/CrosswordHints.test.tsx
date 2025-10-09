@@ -31,10 +31,11 @@ describe('CrosswordGrid Hint System', () => {
   };
 
   describe('Hint Button Display', () => {
-    it('should show hint button when clue has a hint', () => {
+    it('should show hint buttons when clue has a hint', () => {
       render(<CrosswordGrid puzzle={mockPuzzle} />);
-      const hintButton = screen.getByText('Hint');
-      expect(hintButton).toBeInTheDocument();
+      const hintButtons = screen.getAllByText('Hint');
+      // Should have 2 buttons: clue hint + letter reveal
+      expect(hintButtons).toHaveLength(2);
     });
 
     it('should not show hint button when clue has no hint', () => {
@@ -51,8 +52,9 @@ describe('CrosswordGrid Hint System', () => {
         ],
       };
       render(<CrosswordGrid puzzle={puzzleWithoutHint} />);
-      const hintButton = screen.queryByText('Hint');
-      expect(hintButton).not.toBeInTheDocument();
+      // Should only have letter reveal hint button, not clue hint button
+      const hintButtons = screen.getAllByText('Hint');
+      expect(hintButtons).toHaveLength(1); // Only letter reveal button
     });
   });
 
@@ -60,52 +62,41 @@ describe('CrosswordGrid Hint System', () => {
     it('should reveal hint text when hint button is clicked', () => {
       render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
+      const hintButtons = screen.getAllByText('Hint');
+      // Click the first button (clue hint)
+      fireEvent.click(hintButtons[0]);
 
       expect(screen.getByText(/Keeps the doctor away/i)).toBeInTheDocument();
     });
 
-    it('should show "Hint" button after hint is revealed', () => {
+    it('should show only letter reveal button after clue hint is revealed', () => {
       render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
+      const hintButtons = screen.getAllByText('Hint');
+      // Click the first button (clue hint)
+      fireEvent.click(hintButtons[0]);
 
-      const moreHintsButton = screen.getByText('Hint');
-      expect(moreHintsButton).toBeInTheDocument();
-    });
-
-    it('should show letter reveal hint button after clue hint is revealed', () => {
-      render(<CrosswordGrid puzzle={mockPuzzle} />);
-      
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      // After revealing clue hint, letter reveal hint button should still be present
-      expect(screen.getByText('Hint')).toBeInTheDocument();
+      // After revealing clue hint, should only have 1 button (letter reveal)
+      const remainingButtons = screen.getAllByText('Hint');
+      expect(remainingButtons).toHaveLength(1);
       // And the clue hint text should be visible
       expect(screen.getByText(/Keeps the doctor away/i)).toBeInTheDocument();
     });
   });
 
   describe('Letter Reveal Functionality', () => {
-    it('should reveal a letter when "Hint" is clicked', () => {
+    it('should reveal a letter when letter reveal hint is clicked', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // First reveal the hint
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
       // Get all input cells before revealing
       const inputs = container.querySelectorAll('input[type="text"]');
       const filledBefore = Array.from(inputs).filter(
         (input) => (input as HTMLInputElement).value !== ''
       ).length;
 
-      // Click "Hint"
-      const moreHintsButton = screen.getByText('Hint');
-      fireEvent.click(moreHintsButton);
+      // Click the letter reveal hint button (second button)
+      const hintButtons = screen.getAllByText('Hint');
+      fireEvent.click(hintButtons[1]);
 
       // Count filled cells after
       const filledAfter = Array.from(inputs).filter(
@@ -118,13 +109,9 @@ describe('CrosswordGrid Hint System', () => {
     it('should reveal correct letters from the word', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // Reveal the hint
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      // Click "Hint" to reveal a letter
-      const moreHintsButton = screen.getByText('Hint');
-      fireEvent.click(moreHintsButton);
+      // Click the letter reveal button (second button)
+      const hintButtons = screen.getAllByText('Hint');
+      fireEvent.click(hintButtons[1]);
 
       // Get all input values
       const inputs = container.querySelectorAll('input[type="text"]');
@@ -145,16 +132,13 @@ describe('CrosswordGrid Hint System', () => {
     it('should reveal multiple different letters on repeated clicks', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // Reveal the hint
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      const moreHintsButton = screen.getByText('Hint');
+      const hintButtons = screen.getAllByText('Hint');
+      const letterRevealButton = hintButtons[1];
       
       // Click multiple times
-      fireEvent.click(moreHintsButton);
-      fireEvent.click(moreHintsButton);
-      fireEvent.click(moreHintsButton);
+      fireEvent.click(letterRevealButton);
+      fireEvent.click(letterRevealButton);
+      fireEvent.click(letterRevealButton);
 
       const inputs = container.querySelectorAll('input[type="text"]');
       const values = Array.from(inputs)
@@ -168,15 +152,12 @@ describe('CrosswordGrid Hint System', () => {
     it('should not reveal more letters when word is complete', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // Reveal the hint
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      const moreHintsButton = screen.getByText('Hint');
+      const hintButtons = screen.getAllByText('Hint');
+      const letterRevealButton = hintButtons[1];
       
       // Click 5 times to reveal all letters
       for (let i = 0; i < 5; i++) {
-        fireEvent.click(moreHintsButton);
+        fireEvent.click(letterRevealButton);
       }
 
       const inputs = container.querySelectorAll('input[type="text"]');
@@ -185,7 +166,7 @@ describe('CrosswordGrid Hint System', () => {
         .map((input) => (input as HTMLInputElement).value);
 
       // Try clicking again
-      fireEvent.click(moreHintsButton);
+      fireEvent.click(letterRevealButton);
 
       const valuesAfter = Array.from(inputs)
         .slice(0, 5)
@@ -200,12 +181,9 @@ describe('CrosswordGrid Hint System', () => {
     it('should apply lavender background to hint-revealed cells', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // Reveal the hint and a letter
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      const moreHintsButton = screen.getByText('Hint');
-      fireEvent.click(moreHintsButton);
+      // Click letter reveal button
+      const hintButtons = screen.getAllByText('Hint');
+      fireEvent.click(hintButtons[1]);
 
       // Check that at least one cell has the lavender background color
       const inputs = container.querySelectorAll('input[type="text"]');
@@ -221,12 +199,9 @@ describe('CrosswordGrid Hint System', () => {
     it('should maintain sage background after blur', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
-      // Reveal hint and letter
-      const hintButton = screen.getByText('Hint');
-      fireEvent.click(hintButton);
-
-      const moreHintsButton = screen.getByText('Hint');
-      fireEvent.click(moreHintsButton);
+      // Click letter reveal button
+      const hintButtons = screen.getAllByText('Hint');
+      fireEvent.click(hintButtons[1]);
 
       // Find a revealed cell
       const inputs = Array.from(container.querySelectorAll('input[type="text"]')) as HTMLInputElement[];
@@ -285,31 +260,25 @@ describe('CrosswordGrid Hint System', () => {
       render(<CrosswordGrid puzzle={multiCluePuzzle} />);
       
       const hintButtons = screen.getAllByText('Hint');
-      expect(hintButtons).toHaveLength(2);
+      // Should have 4 buttons: 2 clue hints + 2 letter reveals
+      expect(hintButtons).toHaveLength(4);
 
-      // Reveal first hint
+      // Reveal first clue hint (button 0)
       fireEvent.click(hintButtons[0]);
       expect(screen.getByText(/Keeps the doctor away/i)).toBeInTheDocument();
 
-      // Reveal second hint
-      fireEvent.click(hintButtons[1]);
+      // Reveal second clue hint (button 2 - after first clue's letter reveal button)
+      fireEvent.click(hintButtons[2]);
       expect(screen.getByText(/Robin Hood's weapon/i)).toBeInTheDocument();
     });
 
     it('should reveal letters independently for each clue', () => {
       const { container } = render(<CrosswordGrid puzzle={multiCluePuzzle} />);
       
-      // Reveal both hints
       const hintButtons = screen.getAllByText('Hint');
-      fireEvent.click(hintButtons[0]);
+      
+      // Click letter reveal button for first clue (button 1)
       fireEvent.click(hintButtons[1]);
-
-      // Get both "Hint" buttons
-      const moreHintsButtons = screen.getAllByText('Hint');
-      expect(moreHintsButtons).toHaveLength(2);
-
-      // Reveal a letter from first clue
-      fireEvent.click(moreHintsButtons[0]);
 
       const inputs = container.querySelectorAll('input[type="text"]');
       const filledCount = Array.from(inputs).filter(

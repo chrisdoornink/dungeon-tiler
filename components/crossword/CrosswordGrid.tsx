@@ -120,6 +120,47 @@ export default function CrosswordGrid({ puzzle }: Props) {
   // Hint tracking
   const [clueHintClicks, setClueHintClicks] = React.useState(0);
   const [letterRevealClicks, setLetterRevealClicks] = React.useState(0);
+  
+  // Congratulatory messages
+  const congratsMessages = React.useMemo(() => [
+    "Nicely Done!",
+    "Great Job!",
+    "Excellent Work!",
+    "Fantastic!",
+    "Well Played!",
+    "Impressive!",
+    "Outstanding!",
+    "Brilliant!",
+    "Superb!",
+    "Magnificent!",
+    "Stellar Work!",
+    "Bravo!",
+    "Amazing!",
+    "You Nailed It!",
+    "Perfect!",
+    "Exceptional!",
+    "Wonderful!",
+    "Terrific!",
+    "Marvelous!",
+    "Spectacular!",
+    "You Crushed It!",
+    "Phenomenal!",
+    "Well Done!",
+    "Top Notch!",
+    "Ace!",
+    "Champion!",
+    "Master Solver!",
+    "Puzzle Pro!",
+    "Word Wizard!",
+    "Crossword King!",
+  ], []);
+  
+  const [completionMessage] = React.useState(() => 
+    congratsMessages[Math.floor(Math.random() * congratsMessages.length)]
+  );
+  
+  const [shareText, setShareText] = React.useState<string>("");
+  const [copied, setCopied] = React.useState(false);
 
   // Build refs for focus management
   const cellRefs = React.useRef<Record<string, HTMLInputElement | null>>({});
@@ -548,6 +589,45 @@ export default function CrosswordGrid({ puzzle }: Props) {
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
+  
+  // Generate shareable text
+  const generateShareText = React.useCallback(() => {
+    // Create emoji grid
+    const emojiGrid = grid.map((row, rowIndex) => 
+      row.map((cell, colIndex) => {
+        if (!cell) return '⬛';
+        const cellKey = keyFor(rowIndex, colIndex);
+        return hintRevealedCells.has(cellKey) ? '🟪' : '🟩';
+      }).join('')
+    ).join('\n');
+    
+    // Build share text
+    const lines = [
+      `Crossword ${puzzle.dateKey}`,
+      '',
+      emojiGrid,
+      '',
+      `⏱️ ${formatTime(timerSeconds)}`,
+      `💡 Clue hints: ${clueHintClicks}`,
+      `🔤 Letter reveals: ${letterRevealClicks}`,
+    ];
+    
+    return lines.join('\n');
+  }, [grid, hintRevealedCells, puzzle.dateKey, timerSeconds, clueHintClicks, letterRevealClicks, formatTime]);
+  
+  // Copy to clipboard
+  const handleShare = async () => {
+    const text = generateShareText();
+    setShareText(text);
+    
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
 
   // Map each placement to its proper crossword number based on grid position
   const numberedClues = React.useMemo(() => {
@@ -680,42 +760,39 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         >
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
-                        {clue.hint && (
-                          <div className="mt-2 space-y-1">
-                            {!revealedHints.has(clue.number) ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRevealedHints(prev => new Set([...prev, clue.number]));
-                                  setClueHintClicks(prev => prev + 1);
-                                }}
-                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                                style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
-                              >
-                                Hint
-                              </button>
-                            ) : (
-                              <>
-                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    revealRandomLetter(clue.number);
-                                    setLetterRevealClicks(prev => prev + 1);
-                                  }}
-                                  className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                                  style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
-                                >
-                                  Hint
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                        <div className="mt-2 space-y-1">
+                          {clue.hint && !revealedHints.has(clue.number) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRevealedHints(prev => new Set([...prev, clue.number]));
+                                setClueHintClicks(prev => prev + 1);
+                              }}
+                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                              style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                            >
+                              Hint
+                            </button>
+                          )}
+                          {clue.hint && revealedHints.has(clue.number) && (
+                            <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              revealRandomLetter(clue.number);
+                              setLetterRevealClicks(prev => prev + 1);
+                            }}
+                            className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                            style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                          >
+                            Hint
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
@@ -767,42 +844,39 @@ export default function CrosswordGrid({ puzzle }: Props) {
                         >
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
-                        {clue.hint && (
-                          <div className="mt-2 space-y-1">
-                            {!revealedHints.has(clue.number) ? (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setRevealedHints(prev => new Set([...prev, clue.number]));
-                                  setClueHintClicks(prev => prev + 1);
-                                }}
-                                className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                                style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
-                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
-                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
-                              >
-                                Hint
-                              </button>
-                            ) : (
-                              <>
-                                <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    revealRandomLetter(clue.number);
-                                    setLetterRevealClicks(prev => prev + 1);
-                                  }}
-                                  className="text-xs px-2 py-1 rounded font-medium transition-colors"
-                                  style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
-                                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
-                                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
-                                >
-                                  Hint
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                        <div className="mt-2 space-y-1">
+                          {clue.hint && !revealedHints.has(clue.number) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRevealedHints(prev => new Set([...prev, clue.number]));
+                                setClueHintClicks(prev => prev + 1);
+                              }}
+                              className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                              style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                            >
+                              Hint
+                            </button>
+                          )}
+                          {clue.hint && revealedHints.has(clue.number) && (
+                            <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              revealRandomLetter(clue.number);
+                              setLetterRevealClicks(prev => prev + 1);
+                            }}
+                            className="text-xs px-2 py-1 rounded font-medium transition-colors"
+                            style={{ backgroundColor: '#E6D4F5', color: '#7B6BA0' }}
+                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
+                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
+                          >
+                            Hint
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
@@ -1050,13 +1124,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
             className="bg-white rounded-lg shadow-2xl p-8 max-w-lg mx-4 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="mb-4 text-6xl">🎉</div>
-            <h2 className="text-3xl font-bold mb-4" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
-              Congratulations!
+            <h2 className="text-3xl font-bold mb-6" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
+              {completionMessage}
             </h2>
-            <p className="text-lg text-slate-700 mb-4">
-              You completed the puzzle!
-            </p>
             
             {/* Mini emoji grid */}
             <div className="mb-6 inline-block">
@@ -1122,15 +1192,30 @@ export default function CrosswordGrid({ puzzle }: Props) {
               </div>
             </div>
 
-            <button
-              onClick={() => setShowCompletionModal(false)}
-              className="px-6 py-3 rounded-lg font-semibold text-white transition-colors"
-              style={{ backgroundColor: COLOR_SCHEMES.sage.clueFocusedBorder }}
-              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.badgeText}
-              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.clueFocusedBorder}
-            >
-              Close
-            </button>
+            <div className="flex gap-3">
+              <button
+                onClick={handleShare}
+                className="flex-1 px-6 py-3 rounded-lg font-semibold transition-colors"
+                style={{ 
+                  backgroundColor: copied ? '#10b981' : COLOR_SCHEMES.sage.clueFocusedBorder,
+                  color: 'white'
+                }}
+                onMouseEnter={(e) => {
+                  if (!copied) e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.badgeText;
+                }}
+                onMouseLeave={(e) => {
+                  if (!copied) e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.clueFocusedBorder;
+                }}
+              >
+                {copied ? '✓ Copied!' : 'Share'}
+              </button>
+              <button
+                onClick={() => setShowCompletionModal(false)}
+                className="flex-1 px-6 py-3 rounded-lg font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
