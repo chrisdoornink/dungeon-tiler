@@ -1222,9 +1222,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       target="_blank" 
                       rel="noreferrer"
                       className="underline transition-colors"
-                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
-                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                      style={{ color: COLOR_SCHEMES.lavender.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.clueFocusedBorder}
                     >
                       Visit my website
                     </a>
@@ -1235,9 +1235,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       target="_blank" 
                       rel="noreferrer"
                       className="underline transition-colors"
-                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
-                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                      style={{ color: COLOR_SCHEMES.lavender.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.clueFocusedBorder}
                     >
                       Connect on LinkedIn
                     </a>
@@ -1248,9 +1248,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                       target="_blank" 
                       rel="noreferrer"
                       className="underline transition-colors"
-                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
-                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
-                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                      style={{ color: COLOR_SCHEMES.lavender.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.lavender.clueFocusedBorder}
                     >
                       View the GitHub repository
                     </a>
