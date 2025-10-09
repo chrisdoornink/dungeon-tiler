@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { usePathname } from "next/navigation";
 import { trackFeedback } from "../lib/posthog_analytics";
 
 const INITIAL_STATE = {
@@ -10,16 +9,10 @@ const INITIAL_STATE = {
 };
 
 export default function FeedbackButton() {
-  const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const [formValues, setFormValues] = useState(INITIAL_STATE);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  
-  // Hide feedback button on crossword page
-  if (pathname === "/crossword") {
-    return null;
-  }
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
