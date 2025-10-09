@@ -3,7 +3,7 @@ import { createSeededRandom, randomChoice, shuffleInPlace } from "./random";
 import { CrosswordPlacement, CrosswordPuzzle, Direction } from "./types";
 
 const GRID_SIZE = 10;
-const MAX_WORDS = 5;
+const MAX_WORDS = 6;
 
 const directionVectors: Record<Direction, { dr: number; dc: number }> = {
   across: { dr: 0, dc: 1 },
