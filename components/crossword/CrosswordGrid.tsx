@@ -199,14 +199,14 @@ export default function CrosswordGrid({ puzzle }: Props) {
   
   // Timer increment effect
   React.useEffect(() => {
-    if (!timerRunning) return;
+    if (!timerRunning || isAnimating || showCompletionModal) return;
     
     const interval = setInterval(() => {
       setTimerSeconds(prev => prev + 1);
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [timerRunning]);
+  }, [timerRunning, isAnimating, showCompletionModal]);
   
   // Apply terracotta highlighting when check is triggered
   React.useEffect(() => {
