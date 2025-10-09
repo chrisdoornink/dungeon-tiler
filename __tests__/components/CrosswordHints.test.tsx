@@ -76,14 +76,16 @@ describe('CrosswordGrid Hint System', () => {
       expect(moreHintsButton).toBeInTheDocument();
     });
 
-    it('should not allow clicking hint button again after revealed', () => {
+    it('should show letter reveal hint button after clue hint is revealed', () => {
       render(<CrosswordGrid puzzle={mockPuzzle} />);
       
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      // Original hint button should be gone
-      expect(screen.queryByText('Hint')).not.toBeInTheDocument();
+      // After revealing clue hint, letter reveal hint button should still be present
+      expect(screen.getByText('Hint')).toBeInTheDocument();
+      // And the clue hint text should be visible
+      expect(screen.getByText(/Keeps the doctor away/i)).toBeInTheDocument();
     });
   });
 
