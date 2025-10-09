@@ -195,7 +195,7 @@ describe('CrosswordGrid Hint System', () => {
   });
 
   describe('Hint-Revealed Cell Styling', () => {
-    it('should apply sage background to hint-revealed cells', () => {
+    it('should apply lavender background to hint-revealed cells', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
       // Reveal the hint and a letter
@@ -205,15 +205,15 @@ describe('CrosswordGrid Hint System', () => {
       const moreHintsButton = screen.getByText('More hints...');
       fireEvent.click(moreHintsButton);
 
-      // Check that at least one cell has the sage background color
+      // Check that at least one cell has the lavender background color
       const inputs = container.querySelectorAll('input[type="text"]');
-      const cellsWithSageBackground = Array.from(inputs).filter((input) => {
+      const cellsWithLavenderBackground = Array.from(inputs).filter((input) => {
         const style = window.getComputedStyle(input);
-        // The sage color is #F5FAF5 (cellWordHighlight)
-        return style.backgroundColor.toLowerCase().includes('245, 250, 245');
+        // The lavender color is #E6D4F5 which is rgb(230, 212, 245)
+        return style.backgroundColor.toLowerCase().includes('230, 212, 245');
       });
 
-      expect(cellsWithSageBackground.length).toBeGreaterThan(0);
+      expect(cellsWithLavenderBackground.length).toBeGreaterThan(0);
     });
 
     it('should maintain sage background after blur', () => {

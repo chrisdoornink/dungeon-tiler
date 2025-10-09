@@ -859,12 +859,13 @@ describe('CrosswordGrid', () => {
       
       const { container } = render(<CrosswordGrid puzzle={puzzle} />);
       
-      const gridContainer = container.querySelector('.grid');
+      // Find the div with grid styling - look for one with gridTemplateColumns in style
+      const gridContainer = container.querySelector('div[style*="grid-template-columns"]');
       expect(gridContainer).toBeInTheDocument();
       
-      // Check that gridTemplateColumns is set
-      const style = (gridContainer as HTMLElement)?.style;
-      expect(style?.gridTemplateColumns).toContain('repeat(10');
+      // Check that gridTemplateColumns is set (use getAttribute for inline styles)
+      const styleAttr = (gridContainer as HTMLElement)?.getAttribute('style');
+      expect(styleAttr).toContain('repeat(10');
     });
     
     it('uses flex layout for desktop with grid and clues side-by-side', () => {

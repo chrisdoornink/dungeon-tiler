@@ -803,6 +803,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     </span>
                   ) : null}
                   <input
+                    type="text"
                     ref={(el) => {
                       cellRefs.current[k] = el;
                     }}
