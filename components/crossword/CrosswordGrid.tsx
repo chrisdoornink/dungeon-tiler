@@ -885,14 +885,13 @@ export default function CrosswordGrid({ puzzle }: Props) {
           </div>
         )}
       </section>
-
       <section className="mx-auto lg:mx-0 flex-shrink-0 order-2">
         <div 
           className="grid bg-white" 
-          style={{ 
-            gap: 0, 
-            lineHeight: 0, 
+          style={{
+            display: 'grid',
             gridTemplateColumns: `repeat(10, ${CELL_SIZE}px)`,
+            gap: '4px',
             pointerEvents: countdown > 0 ? 'none' : 'auto',
           }}
         >
@@ -902,85 +901,16 @@ export default function CrosswordGrid({ puzzle }: Props) {
               const active = Boolean(cell);
               
               if (!active) {
-                // Check if there's an active cell above - if so, we need a top border
-                const hasActiveAbove = rowIndex > 0 && isActive[keyFor(rowIndex - 1, colIndex)];
-                const hasActiveLeft = colIndex > 0 && isActive[keyFor(rowIndex, colIndex - 1)];
-                const hasActiveRight = colIndex < grid[0].length - 1 && isActive[keyFor(rowIndex, colIndex + 1)];
-                const hasActiveBelow = rowIndex < grid.length - 1 && isActive[keyFor(rowIndex + 1, colIndex)];
-                
                 return (
-                  <div key={k} className="relative bg-white" style={{ width: CELL_SIZE, height: CELL_SIZE, zIndex: 1 }} aria-hidden>
-                    {hasActiveAbove && (
-                      <span 
-                        className="pointer-events-none absolute bg-black" 
-                        style={{ 
-                          left: 0, 
-                          right: hasActiveRight ? `-${BORDER_WIDTH}px` : 0, 
-                          top: 0, 
-                          height: `${BORDER_WIDTH}px`, 
-                          zIndex: 2 
-                        }}
-                        aria-hidden 
-                      />
-                    )}
-                    {hasActiveLeft && (
-                      <span 
-                        className="pointer-events-none absolute bg-black" 
-                        style={{ 
-                          top: 0, 
-                          bottom: hasActiveBelow ? `-${BORDER_WIDTH}px` : 0, 
-                          left: 0, 
-                          width: `${BORDER_WIDTH}px`, 
-                          zIndex: 2 
-                        }}
-                        aria-hidden 
-                      />
-                    )}
-                  </div>
+                  <div key={k} style={{ width: CELL_SIZE, height: CELL_SIZE }} aria-hidden />
                 );
               }
               
               const r = rowIndex;
               const c = colIndex;
               
-              // Check for adjacent active cells
-              const hasLeft = c > 0 && isActive[keyFor(r, c - 1)];
-              const hasRight = c < grid[0].length - 1 && isActive[keyFor(r, c + 1)];
-              const hasTop = r > 0 && isActive[keyFor(r - 1, c)];
-              const hasBottom = r < grid.length - 1 && isActive[keyFor(r + 1, c)];
-              
               return (
                 <div key={k} className="relative" style={{ width: CELL_SIZE, height: CELL_SIZE, display: 'block', lineHeight: 0 }}>
-                  {/* Draw borders where there's no active neighbor */}
-                  {/* Don't draw bottom/right if inactive cell is there (it will draw top/left) */}
-                  {!hasLeft && (
-                    <span 
-                      className="pointer-events-none absolute bg-black" 
-                      style={{ top: 0, bottom: 0, left: 0, width: `${BORDER_WIDTH}px` }}
-                      aria-hidden 
-                    />
-                  )}
-                  {!hasTop && (
-                    <span 
-                      className="pointer-events-none absolute bg-black" 
-                      style={{ left: 0, right: 0, top: 0, height: `${BORDER_WIDTH}px` }}
-                      aria-hidden 
-                    />
-                  )}
-                  {!hasRight && c === grid[0].length - 1 && (
-                    <span 
-                      className="pointer-events-none absolute bg-black" 
-                      style={{ top: 0, bottom: 0, right: 0, width: `${BORDER_WIDTH}px` }}
-                      aria-hidden 
-                    />
-                  )}
-                  {!hasBottom && r === grid.length - 1 && (
-                    <span 
-                      className="pointer-events-none absolute bg-black" 
-                      style={{ left: 0, right: 0, bottom: 0, height: `${BORDER_WIDTH}px` }}
-                      aria-hidden 
-                    />
-                  )}
                   {startNumbers[k] ? (
                     <span className="pointer-events-none absolute left-1 top-1 z-10 text-[9px] leading-none text-slate-600 font-medium">
                       {startNumbers[k]}
@@ -1056,10 +986,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                     style={{
                       boxSizing: 'border-box',
                       display: 'block',
-                      borderTop: hasTop ? `${BORDER_WIDTH}px solid black` : 'none',
-                      borderLeft: hasLeft ? `${BORDER_WIDTH}px solid black` : 'none',
-                      borderRight: 'none',
-                      borderBottom: 'none',
+                      border: `${BORDER_WIDTH}px solid black`,
+                      borderRadius: '4px',
                       fontSize: `${FONT_SIZE}px`,
                       backgroundColor: hintRevealedCells.has(k) ? COLORS.cellHintRevealed : '#FFFFFF',
                     }}

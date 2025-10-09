@@ -182,7 +182,7 @@ describe('CrosswordGrid', () => {
   });
   
   describe('Border Rendering', () => {
-    it('draws borders on active cells without adjacent active neighbors', () => {
+    it('applies rounded borders to active cells', () => {
       const puzzle = createPuzzle([
         [true, null],
         [null, null],
@@ -190,12 +190,22 @@ describe('CrosswordGrid', () => {
       
       const { container } = render(<CrosswordGrid puzzle={puzzle} />);
       
-      // Active cell should have overlay border spans
-      const borderSpans = container.querySelectorAll('.bg-black[aria-hidden="true"]');
-      expect(borderSpans.length).toBeGreaterThan(0);
+      // Active cell input should have border and border-radius styles
+      const inputCells = container.querySelectorAll('input[type="text"]');
+      expect(inputCells.length).toBeGreaterThan(0);
+      
+      const firstInput = inputCells[0] as HTMLInputElement;
+      const styles = window.getComputedStyle(firstInput);
+      
+      // Check for border (should have border on all sides)
+      expect(styles.border).toContain('3px');
+      expect(styles.border).toContain('solid');
+      
+      // Check for border radius
+      expect(styles.borderRadius).toBe('4px');
     });
     
-    it('draws top borders on inactive cells below active cells', () => {
+    it('has gaps between cells in the grid', () => {
       const puzzle = createPuzzle([
         [true, true],
         [null, null],
@@ -203,12 +213,16 @@ describe('CrosswordGrid', () => {
       
       const { container } = render(<CrosswordGrid puzzle={puzzle} />);
       
-      // Inactive cells in row 1 should have top borders
-      const inactiveCellsWithBorders = container.querySelectorAll('div[aria-hidden="true"] > .bg-black');
-      expect(inactiveCellsWithBorders.length).toBeGreaterThan(0);
+      // Grid container should have gap styling - it has both 'grid' and 'bg-white' classes
+      const gridContainer = container.querySelector('.grid.bg-white');
+      expect(gridContainer).toBeInTheDocument();
+      
+      // Check the inline style attribute contains gap
+      const styleAttr = gridContainer!.getAttribute('style');
+      expect(styleAttr).toContain('gap: 4px');
     });
     
-    it('draws left borders on inactive cells to the right of active cells', () => {
+    it('inactive cells have no borders', () => {
       const puzzle = createPuzzle([
         [true, null],
         [true, null],
@@ -216,9 +230,13 @@ describe('CrosswordGrid', () => {
       
       const { container } = render(<CrosswordGrid puzzle={puzzle} />);
       
-      // Inactive cells in column 1 should have left borders
-      const inactiveCellsWithBorders = container.querySelectorAll('div[aria-hidden="true"] > .bg-black');
-      expect(inactiveCellsWithBorders.length).toBeGreaterThan(0);
+      // Inactive cells should not have input elements
+      const inputCells = container.querySelectorAll('input[type="text"]');
+      expect(inputCells.length).toBe(2); // Only 2 active cells
+      
+      // All inactive divs should have aria-hidden
+      const inactiveCells = container.querySelectorAll('div[aria-hidden="true"]');
+      expect(inactiveCells.length).toBeGreaterThan(0);
     });
   });
   
