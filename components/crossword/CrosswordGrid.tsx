@@ -705,7 +705,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
                               >
-                                More hints...
+                                Hint
                               </button>
                             </>
                           )}
@@ -790,7 +790,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#DDD5EF'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#E6D4F5'}
                               >
-                                More hints...
+                                Hint
                               </button>
                             </>
                           )}

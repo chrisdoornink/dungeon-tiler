@@ -66,13 +66,13 @@ describe('CrosswordGrid Hint System', () => {
       expect(screen.getByText(/Keeps the doctor away/i)).toBeInTheDocument();
     });
 
-    it('should show "More hints..." button after hint is revealed', () => {
+    it('should show "Hint" button after hint is revealed', () => {
       render(<CrosswordGrid puzzle={mockPuzzle} />);
       
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      const moreHintsButton = screen.getByText('More hints...');
+      const moreHintsButton = screen.getByText('Hint');
       expect(moreHintsButton).toBeInTheDocument();
     });
 
@@ -88,7 +88,7 @@ describe('CrosswordGrid Hint System', () => {
   });
 
   describe('Letter Reveal Functionality', () => {
-    it('should reveal a letter when "More hints..." is clicked', () => {
+    it('should reveal a letter when "Hint" is clicked', () => {
       const { container } = render(<CrosswordGrid puzzle={mockPuzzle} />);
       
       // First reveal the hint
@@ -101,8 +101,8 @@ describe('CrosswordGrid Hint System', () => {
         (input) => (input as HTMLInputElement).value !== ''
       ).length;
 
-      // Click "More hints..."
-      const moreHintsButton = screen.getByText('More hints...');
+      // Click "Hint"
+      const moreHintsButton = screen.getByText('Hint');
       fireEvent.click(moreHintsButton);
 
       // Count filled cells after
@@ -120,8 +120,8 @@ describe('CrosswordGrid Hint System', () => {
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      // Click "More hints..." to reveal a letter
-      const moreHintsButton = screen.getByText('More hints...');
+      // Click "Hint" to reveal a letter
+      const moreHintsButton = screen.getByText('Hint');
       fireEvent.click(moreHintsButton);
 
       // Get all input values
@@ -147,7 +147,7 @@ describe('CrosswordGrid Hint System', () => {
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      const moreHintsButton = screen.getByText('More hints...');
+      const moreHintsButton = screen.getByText('Hint');
       
       // Click multiple times
       fireEvent.click(moreHintsButton);
@@ -170,7 +170,7 @@ describe('CrosswordGrid Hint System', () => {
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      const moreHintsButton = screen.getByText('More hints...');
+      const moreHintsButton = screen.getByText('Hint');
       
       // Click 5 times to reveal all letters
       for (let i = 0; i < 5; i++) {
@@ -202,7 +202,7 @@ describe('CrosswordGrid Hint System', () => {
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      const moreHintsButton = screen.getByText('More hints...');
+      const moreHintsButton = screen.getByText('Hint');
       fireEvent.click(moreHintsButton);
 
       // Check that at least one cell has the lavender background color
@@ -223,7 +223,7 @@ describe('CrosswordGrid Hint System', () => {
       const hintButton = screen.getByText('Hint');
       fireEvent.click(hintButton);
 
-      const moreHintsButton = screen.getByText('More hints...');
+      const moreHintsButton = screen.getByText('Hint');
       fireEvent.click(moreHintsButton);
 
       // Find a revealed cell
@@ -302,8 +302,8 @@ describe('CrosswordGrid Hint System', () => {
       fireEvent.click(hintButtons[0]);
       fireEvent.click(hintButtons[1]);
 
-      // Get both "More hints..." buttons
-      const moreHintsButtons = screen.getAllByText('More hints...');
+      // Get both "Hint" buttons
+      const moreHintsButtons = screen.getAllByText('Hint');
       expect(moreHintsButtons).toHaveLength(2);
 
       // Reveal a letter from first clue
