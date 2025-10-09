@@ -641,16 +641,24 @@ export default function CrosswordGrid({ puzzle }: Props) {
 
   return (
     <div style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Helvetica Neue", Arial, sans-serif' }}>
-      {/* Timer Icon - Always visible */}
+      {/* Timer Icon and Check Button - Always visible */}
       <div 
-        className="fixed top-4 right-4 z-40 select-none"
-        onClick={() => countdown === 0 && setShowTimer(!showTimer)}
-        style={{
-          animation: timerJustStarted ? 'shake 0.6s ease-in-out' : undefined,
-          cursor: countdown === 0 ? 'pointer' : 'default',
-        }}
+        className="fixed top-4 right-4 z-40 select-none flex items-center gap-2"
       >
-          <div className="flex items-center gap-2 bg-white rounded-lg shadow-lg px-3 py-2 border border-slate-200 hover:border-slate-300 transition-colors">
+          <button
+            onClick={checkAnswers}
+            className="px-4 py-2 rounded-lg font-medium text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors shadow-lg"
+          >
+            Verify
+          </button>
+          <div 
+            className="flex items-center gap-2 bg-white rounded-lg shadow-lg px-3 py-2 border border-slate-200 hover:border-slate-300 transition-colors"
+            onClick={() => countdown === 0 && setShowTimer(!showTimer)}
+            style={{
+              animation: timerJustStarted ? 'shake 0.6s ease-in-out' : undefined,
+              cursor: countdown === 0 ? 'pointer' : 'default',
+            }}
+          >
             {countdown > 0 ? (
               <span className="text-sm font-semibold text-slate-700">
                 Starting in {countdown}...
@@ -693,7 +701,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
       `}</style>
       
       {/* Logo Title */}
-      <div className="w-full flex justify-center mb-8">
+      <div className="w-full flex justify-center mb-8 lg:mb-12">
         <div className="flex gap-1 items-center">
           {/* C R ⬜ S S W ⬜ R D L ⬜ */}
           {['C', 'R', '', 'S', 'S', 'W', '', 'R', 'D', 'L', ''].map((letter, idx) => {
@@ -732,18 +740,6 @@ export default function CrosswordGrid({ puzzle }: Props) {
       
       <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
       <section className="flex-1 space-y-6 order-1">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-semibold text-black">Clues</h2>
-            <p className="text-sm text-slate-600">Organized by direction. Coordinates are one-indexed.</p>
-          </div>
-          <button
-            onClick={checkAnswers}
-            className="px-4 py-2 rounded-md font-medium text-sm bg-slate-800 text-white hover:bg-slate-700 transition-colors"
-          >
-            Check
-          </button>
-        </div>
 
         {placements.length === 0 ? (
           <p className="rounded-lg border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
