@@ -692,6 +692,44 @@ export default function CrosswordGrid({ puzzle }: Props) {
         }
       `}</style>
       
+      {/* Logo Title */}
+      <div className="w-full flex justify-center mb-8">
+        <div className="flex gap-1 items-center">
+          {/* C R ⬜ S S W ⬜ R D L ⬜ */}
+          {['C', 'R', '', 'S', 'S', 'W', '', 'R', 'D', 'L', ''].map((letter, idx) => {
+            // Color scheme: First tile green, one lavender accent, rest light sage
+            let bgColor = '#F3F4F6'; // Empty tiles (gray)
+            if (letter) {
+              if (idx === 0) {
+                bgColor = COLORS.cellFocused; // First tile: Sage green
+              } else if (idx === 5) {
+                bgColor = COLOR_SCHEMES.lavender.cellFocused; // 'W' tile: Lavender accent
+              } else {
+                bgColor = '#EEF2ED'; // Other tiles: Light sage
+              }
+            }
+            
+            return (
+              <div
+                key={idx}
+                className="flex items-center justify-center font-bold"
+                style={{
+                  width: '40px',
+                  height: '40px',
+                  border: '3px solid black',
+                  borderRadius: '4px',
+                  backgroundColor: bgColor,
+                  fontSize: '24px',
+                  color: 'black',
+                }}
+              >
+                {letter}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      
       <div className="flex flex-col gap-10 lg:flex-row lg:items-start">
       <section className="flex-1 space-y-6 order-1">
         <div className="flex items-center justify-between">
