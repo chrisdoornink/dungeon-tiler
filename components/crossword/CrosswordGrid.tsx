@@ -595,7 +595,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
     // Create emoji grid
     const emojiGrid = grid.map((row, rowIndex) => 
       row.map((cell, colIndex) => {
-        if (!cell) return '⬛';
+        if (!cell) return '⬜';
         const cellKey = keyFor(rowIndex, colIndex);
         return hintRevealedCells.has(cellKey) ? '🟪' : '🟩';
       }).join('')
@@ -608,8 +608,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
       emojiGrid,
       '',
       `⏱️ ${formatTime(timerSeconds)}`,
-      `💡 Clue hints: ${clueHintClicks}`,
-      `🔤 Letter reveals: ${letterRevealClicks}`,
+      // `💡 Clue hints: ${clueHintClicks}`, // Commented out for now
+      `💡 Hints: ${letterRevealClicks}`,
     ];
     
     return lines.join('\n');
@@ -761,7 +761,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
                         <div className="mt-2 space-y-1">
-                          {clue.hint && !revealedHints.has(clue.number) && (
+                          {/* Clue hint button - commented out for now */}
+                          {/* {clue.hint && !revealedHints.has(clue.number) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -778,7 +779,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           )}
                           {clue.hint && revealedHints.has(clue.number) && (
                             <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                          )}
+                          )} */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -845,7 +846,8 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
                         </p>
                         <div className="mt-2 space-y-1">
-                          {clue.hint && !revealedHints.has(clue.number) && (
+                          {/* Clue hint button - commented out for now */}
+                          {/* {clue.hint && !revealedHints.has(clue.number) && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -862,7 +864,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           )}
                           {clue.hint && revealedHints.has(clue.number) && (
                             <p className="text-xs text-slate-600 italic">💡 {clue.hint}</p>
-                          )}
+                          )} */}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1182,12 +1184,13 @@ export default function CrosswordGrid({ puzzle }: Props) {
                   <span className="font-mono font-semibold text-slate-800">{formatTime(timerSeconds)}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm">
+              {/* Clue hints stat - commented out for now */}
+              {/* <div className="flex justify-between text-sm">
                 <span className="text-slate-600">Clue hints:</span>
                 <span className="font-semibold text-slate-800">{clueHintClicks}</span>
-              </div>
+              </div> */}
               <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Letter reveals:</span>
+                <span className="text-slate-600">Hints used:</span>
                 <span className="font-semibold text-slate-800">{letterRevealClicks}</span>
               </div>
             </div>
