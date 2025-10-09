@@ -115,7 +115,7 @@ export default function CrosswordGrid({ puzzle }: Props) {
   const [timerRunning, setTimerRunning] = React.useState(false);
   const [showTimer, setShowTimer] = React.useState(false);
   const [timerJustStarted, setTimerJustStarted] = React.useState(false);
-  const [countdown, setCountdown] = React.useState(5);
+  const [countdown, setCountdown] = React.useState(3);
   
   // Hint tracking
   const [clueHintClicks, setClueHintClicks] = React.useState(0);
