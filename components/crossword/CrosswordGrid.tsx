@@ -604,12 +604,10 @@ export default function CrosswordGrid({ puzzle }: Props) {
     // Build share text
     const lines = [
       `Crossword ${puzzle.dateKey}`,
-      '',
+      `⏱️ ${formatTime(timerSeconds)}`,
       emojiGrid,
       '',
-      `⏱️ ${formatTime(timerSeconds)}`,
-      // `💡 Clue hints: ${clueHintClicks}`, // Commented out for now
-      `💡 Hints: ${letterRevealClicks}`,
+      
     ];
     
     return lines.join('\n');
@@ -1123,12 +1121,19 @@ export default function CrosswordGrid({ puzzle }: Props) {
           onClick={() => setShowCompletionModal(false)}
         >
           <div 
-            className="bg-white rounded-lg shadow-2xl p-8 max-w-lg mx-4 text-center"
+            className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-xl mx-4 text-center"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-3xl font-bold mb-6" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
               {completionMessage}
             </h2>
+            
+            {/* Timer display */}
+            {timerSeconds > 0 && (
+              <div className="mb-4 text-2xl font-mono font-bold text-slate-700">
+                ⏱️ {formatTime(timerSeconds)}
+              </div>
+            )}
             
             {/* Mini emoji grid */}
             <div className="mb-6 inline-block">
@@ -1176,31 +1181,12 @@ export default function CrosswordGrid({ puzzle }: Props) {
               </div>
             </div>
 
-            {/* Stats */}
-            <div className="mb-6 space-y-2 text-left bg-slate-50 rounded-lg p-4">
-              {timerSeconds > 0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-600">Time:</span>
-                  <span className="font-mono font-semibold text-slate-800">{formatTime(timerSeconds)}</span>
-                </div>
-              )}
-              {/* Clue hints stat - commented out for now */}
-              {/* <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Clue hints:</span>
-                <span className="font-semibold text-slate-800">{clueHintClicks}</span>
-              </div> */}
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600">Hints used:</span>
-                <span className="font-semibold text-slate-800">{letterRevealClicks}</span>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
+            <div className="flex gap-3 mb-6">
               <button
                 onClick={handleShare}
-                className="flex-1 px-6 py-3 rounded-lg font-semibold transition-colors"
+                className="flex-1 min-w-[120px] px-6 py-3 rounded-lg font-semibold transition-colors whitespace-nowrap"
                 style={{ 
-                  backgroundColor: copied ? '#10b981' : COLOR_SCHEMES.sage.clueFocusedBorder,
+                  backgroundColor: copied ? COLOR_SCHEMES.sage.badgeText : COLOR_SCHEMES.sage.clueFocusedBorder,
                   color: 'white'
                 }}
                 onMouseEnter={(e) => {
@@ -1210,14 +1196,67 @@ export default function CrosswordGrid({ puzzle }: Props) {
                   if (!copied) e.currentTarget.style.backgroundColor = COLOR_SCHEMES.sage.clueFocusedBorder;
                 }}
               >
-                {copied ? '✓ Copied!' : 'Share'}
+                {copied ? 'Copied!' : 'Share'}
               </button>
               <button
                 onClick={() => setShowCompletionModal(false)}
-                className="flex-1 px-6 py-3 rounded-lg font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                className="flex-1 min-w-[120px] px-6 py-3 rounded-lg font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
               >
                 Close
               </button>
+            </div>
+
+            {/* Creator info */}
+            <div className="border-t border-slate-200 pt-6 text-center">
+              <div className="text-sm leading-relaxed space-y-2">
+                <p className="text-xs text-slate-600">
+                  Made by Chris Doornink, a web developer out of Seattle, Washington.
+                </p>
+                <p className="text-sm font-medium" style={{ color: COLOR_SCHEMES.sage.badgeText }}>
+                  I&apos;m looking for the perfect fit. Want to hire me?
+                </p>
+                <div className="space-y-1 text-sm">
+                  <div>
+                    <a 
+                      href="https://chrisdoornink.com" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="underline transition-colors"
+                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                    >
+                      Visit my website
+                    </a>
+                  </div>
+                  <div>
+                    <a 
+                      href="https://www.linkedin.com/in/chrisdoornink/" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="underline transition-colors"
+                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                    >
+                      Connect on LinkedIn
+                    </a>
+                  </div>
+                  <div>
+                    <a 
+                      href="https://github.com/chrisdoornink/dungeon-tiler" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="underline transition-colors"
+                      style={{ color: COLOR_SCHEMES.ocean.clueFocusedBorder }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.badgeText}
+                      onMouseLeave={(e) => e.currentTarget.style.color = COLOR_SCHEMES.ocean.clueFocusedBorder}
+                    >
+                      View the GitHub repository
+                    </a>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
