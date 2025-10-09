@@ -571,16 +571,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           cellRefs.current[firstCellKey]?.focus();
                         }}
                       >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Across</span>
-                          </div>
-                          <span className="text-xs uppercase tracking-wide text-slate-500">
-                            Row {clue.row + 1}, Col {clue.col + 1}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                        <p className="text-sm text-slate-700">
+                          <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
+                        </p>
                         <div className="mt-2 space-y-1">
                           {clue.hint && !revealedHints.has(clue.number) ? (
                             <button
@@ -657,16 +650,9 @@ export default function CrosswordGrid({ puzzle }: Props) {
                           cellRefs.current[firstCellKey]?.focus();
                         }}
                       >
-                        <div className="flex items-baseline justify-between gap-3">
-                          <div className="flex items-baseline gap-3">
-                            <span className="text-lg font-semibold text-black">{clue.number}.</span>
-                            <span className="font-semibold" style={{ color: COLORS.badgeText }}>Down</span>
-                          </div>
-                          <span className="text-xs uppercase tracking-wide text-slate-500">
-                            Row {clue.row + 1}, Col {clue.col + 1}
-                          </span>
-                        </div>
-                        <p className="mt-2 text-sm text-slate-700">{clue.clue}</p>
+                        <p className="text-sm text-slate-700">
+                          <span className="font-bold text-black">{clue.number}.</span> {clue.clue}
+                        </p>
                         <div className="mt-2 space-y-1">
                           {clue.hint && !revealedHints.has(clue.number) ? (
                             <button
