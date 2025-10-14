@@ -71,6 +71,16 @@ type DialogueSession = {
 
 const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["goblin"]);
 
+type HeroDeathPhase = "spinning" | "falling" | "spirit" | "finished";
+
+type HeroDeathAnimationState = {
+  phase: HeroDeathPhase;
+  direction: Direction;
+  extraTransform?: string;
+  torchLit: boolean;
+  restrictVisibility: boolean;
+};
+
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
     ...line,
@@ -198,6 +208,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     itemType: string;
   }>>([]);
 
+  const [heroDeathAnimation, setHeroDeathAnimation] =
+    useState<HeroDeathAnimationState | null>(null);
+  const heroDeathTimeouts = useRef<Array<ReturnType<typeof setTimeout>>>([]);
+  const heroInputLocked = heroDeathAnimation !== null;
+
+  const clearHeroDeathTimeouts = useCallback(() => {
+    for (const timeoutId of heroDeathTimeouts.current) {
+      clearTimeout(timeoutId);
+    }
+    heroDeathTimeouts.current = [];
+  }, []);
+
   const [isHeroDiaryOpen, setHeroDiaryOpen] = useState(false);
 
   // Developer hover coordinates for story mode (dev only)
@@ -265,6 +287,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
+    if (heroInputLocked) {
+      return;
+    }
     try {
       trackUse("food");
     } catch {}
@@ -273,10 +298,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [heroInputLocked, resolvedStorageSlot]);
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
+    if (heroInputLocked) {
+      return;
+    }
     try {
       trackUse("potion");
     } catch {}
@@ -285,7 +313,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [heroInputLocked, resolvedStorageSlot]);
 
   const handleDiaryToggle = useCallback(
     (entryId: string, completed: boolean) => {
@@ -321,6 +349,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
+    if (heroInputLocked) {
+      return;
+    }
     try {
       trackUse("rune");
     } catch {}
@@ -490,7 +521,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       return next;
     });
-  }, [playerPosition, resolvedStorageSlot]);
+  }, [heroInputLocked, playerPosition, resolvedStorageSlot]);
 
   const applyDialogueCompletionEffects = useCallback(
     (session: DialogueSession) => {
@@ -657,6 +688,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [activeDialogueChoices, selectedChoiceIndex, handleDialogueChoiceSelect]);
 
   const handleInteract = useCallback(() => {
+    if (heroInputLocked) {
+      return;
+    }
     if (dialogueActive) {
       handleDialogueAdvance();
       return;
@@ -751,6 +785,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [
     dialogueActive,
     handleDialogueAdvance,
+    heroInputLocked,
     playerPosition,
     resolvedStorageSlot,
   ]);
@@ -759,15 +794,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const handleRestartFromCheckpoint = useCallback(() => {
     const revivedState = reviveFromLastCheckpoint(gameState);
     if (revivedState) {
+      clearHeroDeathTimeouts();
+      setHeroDeathAnimation(null);
+      setSpirits((curr) => curr.filter((s) => !s.id.startsWith("hero-")));
       setShowDeathScreen(false);
       setGameCompletionProcessed(false);
       setGameState(revivedState);
       CurrentGameStorage.saveCurrentGame(revivedState, resolvedStorageSlot);
     }
-  }, [gameState, resolvedStorageSlot]);
+  }, [
+    clearHeroDeathTimeouts,
+    gameState,
+    resolvedStorageSlot,
+  ]);
 
   // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
   const handleThrowRock = useCallback(() => {
+    if (heroInputLocked) {
+      return;
+    }
     try {
       trackUse("rock");
     } catch {}
@@ -989,7 +1034,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       return next;
     });
-  }, [playerPosition, resolvedStorageSlot]);
+  }, [heroInputLocked, playerPosition, resolvedStorageSlot]);
 
   useEffect(() => {
     if (dialogueSession) return;
@@ -1080,11 +1125,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const visualPhaseAllowsFull = DAY_PHASE_CONFIG[visualPhaseId]?.allowsFullVisibility ?? false;
   const autoPhaseVisibility =
     environment === "outdoor" ? visualPhaseAllowsFull : environmentDaylight;
-  const heroTorchLitState = gameState.heroTorchLit ?? true;
-  const suppressDarknessOverlay =
-    autoPhaseVisibility || (forceDaylight && heroTorchLitState);
+  const heroTorchLitState = heroDeathAnimation
+    ? heroDeathAnimation.torchLit
+    : gameState.heroTorchLit ?? true;
+  const suppressDarknessOverlay = heroDeathAnimation?.restrictVisibility
+    ? false
+    : autoPhaseVisibility || (forceDaylight && heroTorchLitState);
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
+
+  const heroVisualOverride = React.useMemo<HeroVisualOverride | null>(() => {
+    if (!heroDeathAnimation) return null;
+    return {
+      direction: heroDeathAnimation.direction,
+      extraTransform: heroDeathAnimation.extraTransform,
+      restrictVisibility: heroDeathAnimation.restrictVisibility,
+    };
+  }, [heroDeathAnimation]);
 
   // Determine the currently active checkpoint tile from the lastCheckpoint snapshot
   const activeCheckpoint: [number, number] | null = React.useMemo(() => {
@@ -1327,6 +1384,139 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     setTimeout(() => setIsShaking(false), duration);
   };
 
+  const spawnHeroSpirit = useCallback(() => {
+    if (!playerPosition) return;
+    const [y, x] = playerPosition;
+    const now = Date.now();
+    const id = `hero-${y},${x}-${now}-${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+    setSpirits((prev) => {
+      const next = [...prev, { id, y, x, createdAt: now }];
+      return next;
+    });
+    const removal = setTimeout(() => {
+      setSpirits((curr) => curr.filter((s) => s.id !== id));
+    }, 2000);
+    heroDeathTimeouts.current.push(removal);
+  }, [playerPosition]);
+
+  const startHeroDeathSequence = useCallback(() => {
+    if (!playerPosition) return;
+    clearHeroDeathTimeouts();
+    const baseDirection =
+      gameState.playerDirection === Direction.LEFT
+        ? Direction.LEFT
+        : Direction.RIGHT;
+    setHeroDeathAnimation({
+      phase: "spinning",
+      direction: baseDirection,
+      torchLit: false,
+      restrictVisibility: true,
+    });
+
+    const spinSequence =
+      baseDirection === Direction.LEFT
+        ? [Direction.RIGHT, Direction.LEFT, Direction.RIGHT, Direction.LEFT]
+        : [Direction.LEFT, Direction.RIGHT, Direction.LEFT, Direction.RIGHT];
+    const stepMs = 120;
+
+    spinSequence.forEach((dir, index) => {
+      const timeoutId = setTimeout(() => {
+        setHeroDeathAnimation((prev) =>
+          prev ? { ...prev, direction: dir } : prev
+        );
+      }, stepMs * (index + 1));
+      heroDeathTimeouts.current.push(timeoutId);
+    });
+
+    const fallDelay = stepMs * (spinSequence.length + 1);
+    heroDeathTimeouts.current.push(
+      setTimeout(() => {
+        setHeroDeathAnimation((prev) =>
+          prev
+            ? {
+                ...prev,
+                phase: "falling",
+                direction: Direction.RIGHT,
+                extraTransform: "rotate(-90deg)",
+              }
+            : prev
+        );
+      }, fallDelay)
+    );
+
+    const spiritDelay = fallDelay + 400;
+    heroDeathTimeouts.current.push(
+      setTimeout(() => {
+        setHeroDeathAnimation((prev) =>
+          prev
+            ? {
+                ...prev,
+                phase: "spirit",
+                direction: Direction.RIGHT,
+                extraTransform: "rotate(-90deg)",
+              }
+            : prev
+        );
+        spawnHeroSpirit();
+      }, spiritDelay)
+    );
+
+    const finishDelay = spiritDelay + 800;
+    heroDeathTimeouts.current.push(
+      setTimeout(() => {
+        setHeroDeathAnimation((prev) =>
+          prev
+            ? {
+                ...prev,
+                phase: "finished",
+                direction: Direction.RIGHT,
+                extraTransform: "rotate(-90deg)",
+              }
+            : prev
+        );
+      }, finishDelay)
+    );
+  }, [
+    clearHeroDeathTimeouts,
+    gameState.playerDirection,
+    playerPosition,
+    spawnHeroSpirit,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      clearHeroDeathTimeouts();
+    };
+  }, [clearHeroDeathTimeouts]);
+
+  const eligibleForDeathAnimation =
+    gameState.heroHealth <= 0 && gameState.deathCause?.type !== "faulty_floor";
+
+  useEffect(() => {
+    if (!eligibleForDeathAnimation) {
+      if (heroDeathAnimation) {
+        clearHeroDeathTimeouts();
+        setHeroDeathAnimation(null);
+        setSpirits((curr) => curr.filter((s) => !s.id.startsWith("hero-")));
+      }
+      return;
+    }
+    if (!playerPosition) {
+      return;
+    }
+    if (!heroDeathAnimation) {
+      startHeroDeathSequence();
+    }
+  }, [
+    eligibleForDeathAnimation,
+    heroDeathAnimation,
+    playerPosition,
+    startHeroDeathSequence,
+    clearHeroDeathTimeouts,
+  ]);
+
   useEffect(() => {
     try {
       if (!gameState) return;
@@ -1405,6 +1595,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Show death screen when hero dies (heroHealth <= 0)
   useEffect(() => {
     if (gameState.heroHealth > 0 || gameCompletionProcessed) {
+      return;
+    }
+
+    if (
+      heroDeathAnimation &&
+      heroDeathAnimation.phase !== "spirit" &&
+      heroDeathAnimation.phase !== "finished"
+    ) {
       return;
     }
 
@@ -1522,6 +1720,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.heroHealth,
     gameState.lastCheckpoint,
     gameCompletionProcessed,
+    heroDeathAnimation,
     gameState.hasKey,
     gameState.hasExitKey,
     gameState.hasSword,
@@ -1539,6 +1738,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Handle player movement
   const handlePlayerMove = useCallback(
     (direction: Direction) => {
+      if (heroInputLocked) {
+        return;
+      }
       // Detect potential combat: moving into an adjacent enemy tile
       const prePlayerY = playerPosition ? playerPosition[0] : null;
       const prePlayerX = playerPosition ? playerPosition[1] : null;
@@ -1739,18 +1941,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       setGameState(newGameState);
     },
-    [gameState, playerPosition, resolvedStorageSlot]
+    [gameState, heroInputLocked, playerPosition, resolvedStorageSlot]
   );
 
   const handleMoveInput = useCallback(
     (direction: Direction) => {
+      if (heroInputLocked) {
+        return;
+      }
       if (dialogueActive) {
         handleDialogueAdvance();
         return;
       }
       handlePlayerMove(direction);
     },
-    [dialogueActive, handleDialogueAdvance, handlePlayerMove]
+    [dialogueActive, handleDialogueAdvance, handlePlayerMove, heroInputLocked]
   );
 
   // Handle mobile control button clicks
@@ -2400,7 +2605,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
                     timeOfDayState,
-                    activeCheckpoint
+                    activeCheckpoint,
+                    heroVisualOverride
                   )}
                 </div>
               </div>
@@ -2567,6 +2773,12 @@ function calculateVisibility(
 }
 
 // Render the grid of tiles
+type HeroVisualOverride = {
+  direction?: Direction;
+  extraTransform?: string;
+  restrictVisibility?: boolean;
+};
+
 function renderTileGrid(
   grid: number[][],
   tileTypes: Record<number, TileType>,
@@ -2583,7 +2795,8 @@ function renderTileGrid(
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
   timeOfDay?: TimeOfDayState,
-  activeCheckpoint?: [number, number] | null
+  activeCheckpoint?: [number, number] | null,
+  heroVisualOverride?: HeroVisualOverride | null
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   const resolvedTimeOfDay = timeOfDay ?? createInitialTimeOfDay();
@@ -2612,6 +2825,15 @@ function renderTileGrid(
     showFullMap,
     heroTorchLitForVisibility
   );
+
+  if (heroVisualOverride?.restrictVisibility && playerPosition) {
+    const [py, px] = playerPosition;
+    for (let y = 0; y < visibility.length; y++) {
+      for (let x = 0; x < visibility[y].length; x++) {
+        visibility[y][x] = y === py && x === px ? 3 : 0;
+      }
+    }
+  }
 
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
   const glowMap = new Map<string, number>();
@@ -2687,8 +2909,6 @@ function renderTileGrid(
       } else if (g === DIAGONAL_GLOW) {
         tier = Math.max(tier, 1);
       }
-      const isVisible = tier > 0;
-
       // Get neighboring tiles
       const neighbors = {
         top: getTileAt(rowIndex - 1, colIndex),
@@ -2699,6 +2919,11 @@ function renderTileGrid(
 
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
+
+      if (heroVisualOverride?.restrictVisibility && !isPlayerTile) {
+        tier = 0;
+      }
+      const isVisible = tier > 0;
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
@@ -2733,9 +2958,16 @@ function renderTileGrid(
             isVisible={isVisible}
             visibilityTier={tier}
             neighbors={neighbors}
-            playerDirection={isPlayerTile ? playerDirection : undefined}
+            playerDirection={
+              isPlayerTile
+                ? heroVisualOverride?.direction ?? playerDirection
+                : undefined
+            }
             heroTorchLit={heroTorchLit}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
+            heroVisualOverride={
+              isPlayerTile ? heroVisualOverride ?? undefined : undefined
+            }
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
