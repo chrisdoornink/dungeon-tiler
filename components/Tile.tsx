@@ -31,6 +31,10 @@ interface TileProps {
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
+  heroVisualOverride?: {
+    direction?: Direction;
+    extraTransform?: string;
+  };
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -61,6 +65,7 @@ export const Tile: React.FC<TileProps> = ({
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
   heroPoisoned = false,
+  heroVisualOverride,
   hasEnemy = false,
   enemyVisible = undefined,
   enemyFacing,
@@ -684,6 +689,9 @@ export const Tile: React.FC<TileProps> = ({
     );
   };
 
+  // Resolve hero direction taking overrides into account
+  const resolvedHeroDirection = heroVisualOverride?.direction ?? playerDirection;
+
   // Get the appropriate hero image based on player direction, equipment, and torch state if this is a player tile
   const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER)
     ? (() => {
@@ -696,8 +704,9 @@ export const Tile: React.FC<TileProps> = ({
           if (s) return '-sword';
           return '';
         };
+        const directionForSprite = resolvedHeroDirection ?? Direction.DOWN;
         let dir = 'front';
-        switch (playerDirection) {
+        switch (directionForSprite) {
           case Direction.UP:
             dir = 'back';
             break;
@@ -713,9 +722,19 @@ export const Tile: React.FC<TileProps> = ({
         return `/images/hero/hero-${dir}${equip()}${snuff}-static.png`;
       })()
     : '';
-  
+
   // Determine if we need to flip the hero image for left-facing direction
-  const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
+  const heroTransform = (() => {
+    const transforms: string[] = [];
+    if (isPlayerTile && resolvedHeroDirection === Direction.LEFT) {
+      transforms.push('scaleX(-1)');
+    }
+    if (heroVisualOverride?.extraTransform) {
+      transforms.push(heroVisualOverride.extraTransform);
+    }
+    if (transforms.length === 0) return 'none';
+    return transforms.join(' ');
+  })();
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
   const npcTransform = (() => {
