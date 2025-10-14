@@ -17,7 +17,7 @@ import {
 import type { Enemy } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
-import { Tile } from "./Tile";
+import { Tile, type HeroDeathPhase, type HeroDeathState } from "./Tile";
 import {
   getEnemyIcon,
   createEmptyByKind,
@@ -115,6 +115,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     : isDailyChallenge
     ? 'daily'
     : 'default';
+
+  const shouldAnimateHeroDeath = resolvedStorageSlot === 'story';
 
   // Router removed; daily flow handled via onDailyComplete callback
 
@@ -1063,6 +1065,41 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       createdAt: number;
     }>
   >([]);
+  const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>("idle");
+  const [heroDeathOrientation, setHeroDeathOrientation] = useState<Direction>(Direction.RIGHT);
+  const heroDeathPositionRef = useRef<[number, number] | null>(null);
+  const heroDeathTimeouts = useRef<number[]>([]);
+  const previousHeroHealth = useRef<number>(gameState.heroHealth);
+  const clearHeroDeathTimeouts = useCallback(() => {
+    if (typeof window === "undefined") return;
+    heroDeathTimeouts.current.forEach((id) => window.clearTimeout(id));
+    heroDeathTimeouts.current = [];
+  }, []);
+  const spawnHeroSpirit = useCallback(() => {
+    const pos = heroDeathPositionRef.current;
+    if (!pos) return;
+    const [y, x] = pos;
+    const now = Date.now();
+    setSpirits((prev) => {
+      const id = `hero-${y},${x}-${now}-${Math.random().toString(36).slice(2, 7)}`;
+      const next = [
+        ...prev,
+        {
+          id,
+          y,
+          x,
+          createdAt: now,
+        },
+      ];
+      if (typeof window !== "undefined") {
+        const timeoutId = window.setTimeout(() => {
+          setSpirits((curr) => curr.filter((s) => s.id !== id));
+        }, 2000);
+        heroDeathTimeouts.current.push(timeoutId);
+      }
+      return next;
+    });
+  }, [setSpirits]);
   const lastCheckpointSignature = useRef<string | null>(null);
   const [checkpointFlash, setCheckpointFlash] = useState<number | null>(null);
   const environment: EnvironmentId =
@@ -1085,6 +1122,99 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     autoPhaseVisibility || (forceDaylight && heroTorchLitState);
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
+  const heroDeathStateForTiles: HeroDeathState | undefined =
+    shouldAnimateHeroDeath && heroDeathPhase !== "idle"
+      ? { phase: heroDeathPhase, orientation: heroDeathOrientation }
+      : undefined;
+
+  useEffect(() => {
+    return () => {
+      clearHeroDeathTimeouts();
+    };
+  }, [clearHeroDeathTimeouts]);
+
+  useEffect(() => {
+    if (gameState.heroHealth > 0 && heroDeathPhase !== "idle") {
+      clearHeroDeathTimeouts();
+      heroDeathPositionRef.current = null;
+      setHeroDeathPhase("idle");
+      const facing =
+        gameState.playerDirection === Direction.LEFT ? Direction.LEFT : Direction.RIGHT;
+      setHeroDeathOrientation(facing);
+    }
+  }, [gameState.heroHealth, heroDeathPhase, clearHeroDeathTimeouts, gameState.playerDirection]);
+
+  useEffect(() => {
+    const prev = previousHeroHealth.current;
+    if (
+      gameState.heroHealth <= 0 &&
+      prev > 0 &&
+      heroDeathPhase === "idle"
+    ) {
+      heroDeathPositionRef.current = playerPosition ?? null;
+      const initialFacing =
+        gameState.playerDirection === Direction.LEFT ? Direction.LEFT : Direction.RIGHT;
+      setHeroDeathOrientation(initialFacing);
+
+      if (!shouldAnimateHeroDeath || !playerPosition || typeof window === "undefined") {
+        setHeroDeathPhase("complete");
+      } else {
+        clearHeroDeathTimeouts();
+        setHeroDeathPhase("spinning");
+        const opposite =
+          initialFacing === Direction.LEFT ? Direction.RIGHT : Direction.LEFT;
+        const sequence: Direction[] = [
+          opposite,
+          initialFacing,
+          opposite,
+          initialFacing,
+        ];
+        const stepMs = 160;
+        sequence.forEach((dir, index) => {
+          const timeoutId = window.setTimeout(() => {
+            setHeroDeathOrientation(dir);
+          }, (index + 1) * stepMs);
+          heroDeathTimeouts.current.push(timeoutId);
+        });
+        const fallDelay = sequence.length * stepMs + 220;
+        heroDeathTimeouts.current.push(
+          window.setTimeout(() => {
+            setHeroDeathOrientation(Direction.RIGHT);
+            setHeroDeathPhase("fallen");
+          }, fallDelay)
+        );
+        const spiritDelay = fallDelay + 350;
+        heroDeathTimeouts.current.push(
+          window.setTimeout(() => {
+            setHeroDeathPhase("spirit");
+            spawnHeroSpirit();
+          }, spiritDelay)
+        );
+        const completeDelay = spiritDelay + 900;
+        heroDeathTimeouts.current.push(
+          window.setTimeout(() => {
+            setHeroDeathPhase("complete");
+          }, completeDelay)
+        );
+      }
+    }
+    previousHeroHealth.current = gameState.heroHealth;
+  }, [
+    gameState.heroHealth,
+    gameState.playerDirection,
+    playerPosition,
+    heroDeathPhase,
+    shouldAnimateHeroDeath,
+    clearHeroDeathTimeouts,
+    spawnHeroSpirit,
+  ]);
+
+  useEffect(() => {
+    if (!shouldAnimateHeroDeath) return;
+    if (heroDeathPhase === "spirit") {
+      setShowDeathScreen(true);
+    }
+  }, [heroDeathPhase, shouldAnimateHeroDeath]);
 
   // Determine the currently active checkpoint tile from the lastCheckpoint snapshot
   const activeCheckpoint: [number, number] | null = React.useMemo(() => {
@@ -1408,9 +1538,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return;
     }
 
+    if (shouldAnimateHeroDeath && heroDeathPhase !== "complete") {
+      return;
+    }
+
     // Check if there's a checkpoint to revive from
     const hasCheckpoint = !!gameState.lastCheckpoint;
-    
+
     if (hasCheckpoint) {
       // Show death screen with option to restart from checkpoint
       setGameCompletionProcessed(true);
@@ -1534,6 +1668,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     onDailyComplete,
     router,
     resolvedStorageSlot,
+    heroDeathPhase,
+    shouldAnimateHeroDeath,
   ]);
 
   // Handle player movement
@@ -1744,13 +1880,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const handleMoveInput = useCallback(
     (direction: Direction) => {
+      if (gameState.heroHealth <= 0 || heroDeathPhase !== "idle") {
+        return;
+      }
       if (dialogueActive) {
         handleDialogueAdvance();
         return;
       }
       handlePlayerMove(direction);
     },
-    [dialogueActive, handleDialogueAdvance, handlePlayerMove]
+    [
+      dialogueActive,
+      handleDialogueAdvance,
+      handlePlayerMove,
+      gameState.heroHealth,
+      heroDeathPhase,
+    ]
   );
 
   // Handle mobile control button clicks
@@ -1777,6 +1922,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Add keyboard event listener
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (gameState.heroHealth <= 0 || heroDeathPhase !== "idle") {
+        return;
+      }
       if (dialogueActive) {
         if (activeDialogueChoices && activeDialogueChoices.length > 0) {
           if (event.key === "ArrowUp" || event.key === "ArrowLeft") {
@@ -1880,6 +2028,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleInteract,
     handleDialogueChoiceNavigate,
     handleDialogueChoiceConfirm,
+    heroDeathPhase,
   ]);
 
   return (
@@ -2201,6 +2350,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     : "none",
                 }}
               >
+                {/* Death vignette overlay - darkens everything except spotlight on hero */}
+                {shouldAnimateHeroDeath && heroDeathPhase !== "idle" && heroDeathPhase !== "complete" && heroDeathPositionRef.current && (
+                  <div
+                    aria-hidden="true"
+                    className={styles.deathVignette}
+                    style={{
+                      opacity: heroDeathPhase === "spirit" ? 0 : 1,
+                      transition: heroDeathPhase === "spirit" ? "opacity 900ms ease-out" : "opacity 400ms ease-in",
+                    }}
+                  />
+                )}
                 {rockEffect &&
                   (() => {
                     const tileSize = 40;
@@ -2400,7 +2560,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
                     timeOfDayState,
-                    activeCheckpoint
+                    activeCheckpoint,
+                    heroDeathStateForTiles
                   )}
                 </div>
               </div>
@@ -2583,7 +2744,8 @@ function renderTileGrid(
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
   timeOfDay?: TimeOfDayState,
-  activeCheckpoint?: [number, number] | null
+  activeCheckpoint?: [number, number] | null,
+  heroDeathState?: HeroDeathState
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   const resolvedTimeOfDay = timeOfDay ?? createInitialTimeOfDay();
@@ -2775,6 +2937,7 @@ function renderTileGrid(
             environment={resolvedEnvironment}
             suppressDarknessOverlay={suppressDarknessOverlay}
             activeCheckpoint={activeCheckpoint}
+            heroDeathState={isPlayerTile ? heroDeathState : undefined}
           />
         </div>
       );
