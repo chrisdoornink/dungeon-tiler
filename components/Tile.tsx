@@ -19,6 +19,13 @@ type NeighborInfo = {
   left: number | null;
 };
 
+export type HeroDeathPhase = "idle" | "spinning" | "fallen" | "spirit" | "complete";
+
+export interface HeroDeathState {
+  phase: HeroDeathPhase;
+  orientation: Direction;
+}
+
 interface TileProps {
   tileId: number;
   tileType: TileType;
@@ -47,6 +54,7 @@ interface TileProps {
   environment?: EnvironmentId;
   suppressDarknessOverlay?: boolean;
   activeCheckpoint?: [number, number] | null; // Active checkpoint position for lit/unlit rendering
+  heroDeathState?: HeroDeathState;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -77,6 +85,7 @@ export const Tile: React.FC<TileProps> = ({
   environment = DEFAULT_ENVIRONMENT,
   suppressDarknessOverlay = false,
   activeCheckpoint = null,
+  heroDeathState,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Torch animations disabled for performance: render static torch sprite when present.
@@ -685,6 +694,17 @@ export const Tile: React.FC<TileProps> = ({
   };
 
   // Get the appropriate hero image based on player direction, equipment, and torch state if this is a player tile
+  const deathPhase = heroDeathState?.phase ?? "idle";
+  const heroDirectionForSprite = (() => {
+    if (!heroDeathState || deathPhase === "idle") {
+      return playerDirection;
+    }
+    if (deathPhase === "fallen" || deathPhase === "spirit" || deathPhase === "complete") {
+      return Direction.RIGHT;
+    }
+    return heroDeathState.orientation;
+  })();
+
   const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER)
     ? (() => {
         const equip = () => {
@@ -697,7 +717,7 @@ export const Tile: React.FC<TileProps> = ({
           return '';
         };
         let dir = 'front';
-        switch (playerDirection) {
+        switch (heroDirectionForSprite) {
           case Direction.UP:
             dir = 'back';
             break;
@@ -713,9 +733,26 @@ export const Tile: React.FC<TileProps> = ({
         return `/images/hero/hero-${dir}${equip()}${snuff}-static.png`;
       })()
     : '';
-  
+
   // Determine if we need to flip the hero image for left-facing direction
-  const heroTransform = isPlayerTile && playerDirection === Direction.LEFT ? 'scaleX(-1)' : 'none';
+  const heroTransform = (() => {
+    const transforms: string[] = [];
+    if (isPlayerTile) {
+      const directionForTransform = heroDeathState && deathPhase !== "idle"
+        ? heroDeathState.orientation
+        : playerDirection;
+      if (directionForTransform === Direction.LEFT && (!heroDeathState || deathPhase === "spinning")) {
+        transforms.push('scaleX(-1)');
+      }
+      if (
+        heroDeathState &&
+        (deathPhase === "fallen" || deathPhase === "spirit" || deathPhase === "complete")
+      ) {
+        transforms.push('rotate(-90deg)');
+      }
+    }
+    return transforms.length > 0 ? transforms.join(' ') : 'none';
+  })();
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
   const npcTransform = (() => {
