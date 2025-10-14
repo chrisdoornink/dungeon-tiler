@@ -2350,6 +2350,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     : "none",
                 }}
               >
+                {/* Death vignette overlay - darkens everything except spotlight on hero */}
+                {shouldAnimateHeroDeath && heroDeathPhase !== "idle" && heroDeathPhase !== "complete" && heroDeathPositionRef.current && (
+                  <div
+                    aria-hidden="true"
+                    className={styles.deathVignette}
+                    style={{
+                      opacity: heroDeathPhase === "spirit" ? 0 : 1,
+                      transition: heroDeathPhase === "spirit" ? "opacity 900ms ease-out" : "opacity 400ms ease-in",
+                    }}
+                  />
+                )}
                 {rockEffect &&
                   (() => {
                     const tileSize = 40;
