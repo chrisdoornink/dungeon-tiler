@@ -226,6 +226,17 @@ export function buildStoryModeState(): GameState {
     }
   }
 
+  if (depthsRoom1.otherTransitions) {
+    for (const link of depthsRoom1.otherTransitions) {
+      pushTransition(
+        depthsRoom1.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint ?? entrance.entryPoint
+      );
+    }
+  }
+
   if (depthsRoom1.transitionToNext) {
     pushTransition(
       depthsRoom1.id,
@@ -233,6 +244,17 @@ export function buildStoryModeState(): GameState {
       depthsRoom1.transitionToNext,
       depthsRoom2.entryPoint
     );
+  }
+
+  if (depthsRoom2.otherTransitions) {
+    for (const link of depthsRoom2.otherTransitions) {
+      pushTransition(
+        depthsRoom2.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint ?? depthsRoom1.returnEntryPoint ?? depthsRoom1.entryPoint
+      );
+    }
   }
 
   // Outdoor -> Bluff Passageway transitions

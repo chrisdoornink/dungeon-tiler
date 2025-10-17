@@ -1,6 +1,6 @@
 import { Enemy } from "../../../enemy";
 import { FLOOR, WALL, TileSubtype, type RoomId } from "../../../map";
-import type { StoryRoom } from "../types";
+import type { StoryRoom, StoryRoomLink } from "../types";
 
 type EnemyConfig = {
   kind: Enemy["kind"];
@@ -118,78 +118,117 @@ function createForbiddenSet(
   return forbidden;
 }
 
-function buildDepthsRoomBase(
-  id: RoomId,
-  displayLabel: string,
-  configs: EnemyConfig[],
-  { includeExit }: { includeExit: boolean }
-): StoryRoom {
+export function buildDepthsOfDespairRoom1(): StoryRoom {
   const { tiles, subtypes, height, width } = createEmptyRoom();
   const entryRow = Math.floor(height / 2);
-  const entryPoint: [number, number] = [entryRow, 1];
+  
+  // Entry point from Entrance Hall on the right side at [21, 41]
+  const entryPoint: [number, number] = [entryRow, width - 1];
   tiles[entryPoint[0]][entryPoint[1]] = FLOOR;
+  markTransition(subtypes, entryPoint);
 
-  const exitPoint: [number, number] | undefined = includeExit
-    ? ([entryRow, width - 1] as [number, number])
-    : undefined;
-  if (exitPoint) {
-    tiles[exitPoint[0]][exitPoint[1]] = FLOOR;
-    markTransition(subtypes, exitPoint);
-  }
+  // Transition to next Depths room at top (12, 0)
+  const exitPoint: [number, number] = [12, 0];
+  tiles[exitPoint[0]][exitPoint[1]] = FLOOR;
+  markTransition(subtypes, exitPoint);
 
-  carveRandomObstacles(
-    tiles,
-    includeExit ? 140 : 180,
-    entryRow
-  );
+  // Return entry point for coming back from next Depths room
+  const returnEntryPoint: [number, number] = [13, 1];
+  tiles[returnEntryPoint[0]][returnEntryPoint[1]] = FLOOR;
+
+  carveRandomObstacles(tiles, 140, entryRow);
 
   const forbidden = createForbiddenSet(entryPoint, exitPoint);
+  const configs: EnemyConfig[] = [
+    { kind: "goblin", count: 20 },
+    { kind: "ghost", count: 3 },
+    { kind: "stone-exciter", count: 5 },
+  ];
   const enemies = placeEnemies(configs, tiles, forbidden);
 
-  const room: StoryRoom = {
-    id,
+  return {
+    id: "story-depths-despair-1",
     mapData: {
       tiles,
       subtypes,
-      environment: "dungeon",
+      environment: "cave",
     },
     entryPoint,
+    returnEntryPoint,
+    transitionToNext: exitPoint,
     enemies,
     metadata: {
-      displayLabel,
+      displayLabel: "Depths of Despair Room 1",
     },
-  };
-
-  if (exitPoint) {
-    room.transitionToNext = exitPoint;
-  }
-
-  return room;
-}
-
-export function buildDepthsOfDespairRoom1(): StoryRoom {
-  return buildDepthsRoomBase(
-    "story-depths-despair-1",
-    "Depths of Despair Room 1",
-    [
-      { kind: "goblin", count: 20 },
-      { kind: "ghost", count: 3 },
-      { kind: "stone-exciter", count: 5 },
+    otherTransitions: [
+      {
+        roomId: "story-hall-entrance" as RoomId,
+        position: entryPoint,
+        targetEntryPoint: [2, 1], // Where to appear in entrance hall (just inside from left wall)
+        returnEntryPoint: [entryRow, width - 2], // Where to appear when coming back to depths
+      },
     ],
-    { includeExit: true }
-  );
+  };
 }
 
 export function buildDepthsOfDespairRoom2(): StoryRoom {
-  return buildDepthsRoomBase(
-    "story-depths-despair-2",
-    "Depths of Despair Room 2",
-    [
-      { kind: "goblin", count: 40 },
-      { kind: "ghost", count: 6 },
-      { kind: "stone-exciter", count: 10 },
+  const { tiles, subtypes, height, width } = createEmptyRoom();
+  
+  // Entry point from previous Depths room on the right side at [21, 41]
+  const entryPoint: [number, number] = [21, 41];
+  tiles[entryPoint[0]][entryPoint[1]] = FLOOR;
+  
+  // Mark the entry point as a transition back to entrance hall
+  markTransition(subtypes, entryPoint);
+  
+  // No exit - this is a dead end room
+  const entryRow = 21;
+  
+  carveRandomObstacles(tiles, 180, entryRow);
+  
+  // Place treasure chest at [4, 4] with a sword inside
+  tiles[4][4] = FLOOR;
+  subtypes[4][4] = [TileSubtype.CHEST, TileSubtype.SWORD, TileSubtype.LOCK];
+  
+  // Place key at [34, 6]
+  tiles[34][6] = FLOOR;
+  subtypes[34][6] = [TileSubtype.KEY];
+  
+  const forbidden = createForbiddenSet(entryPoint);
+  // Add chest and key positions to forbidden set
+  forbidden.add("4,4");
+  forbidden.add("34,6");
+  
+  const configs: EnemyConfig[] = [
+    { kind: "goblin", count: 40 },
+    { kind: "ghost", count: 6 },
+    { kind: "stone-exciter", count: 10 },
+  ];
+  const enemies = placeEnemies(configs, tiles, forbidden);
+  
+  // Return entry point for coming back from Depths room 1
+  const returnEntryPoint: [number, number] = [21, width - 2];
+  tiles[returnEntryPoint[0]][returnEntryPoint[1]] = FLOOR;
+  
+  return {
+    id: "story-depths-despair-2",
+    mapData: {
+      tiles,
+      subtypes,
+      environment: "cave",
+    },
+    entryPoint,
+    returnEntryPoint,
+    enemies,
+    metadata: {
+      displayLabel: "Depths of Despair Room 2",
+    },
+    otherTransitions: [
+      {
+        roomId: "story-depths-despair-1" as RoomId,
+        position: entryPoint,
+      },
     ],
-    { includeExit: false }
-  );
+  };
 }
 

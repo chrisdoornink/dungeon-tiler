@@ -21,6 +21,10 @@ export function buildEntranceHall(): StoryRoom {
     }
   }
 
+  // Keep tiles at (1,1) and (3,1) as walls
+  tiles[1][1] = WALL;
+  tiles[3][1] = WALL;
+
   const midRow = 1 + Math.floor(HALL_WIDTH / 2);
   const entryPoint: [number, number] = [midRow, 2];
   const returnEntryPoint: [number, number] = [
@@ -32,6 +36,9 @@ export function buildEntranceHall(): StoryRoom {
     tiles[y][leftWallX] = FLOOR;
     subtypes[y][leftWallX] = [];
   }
+  // Keep tiles at (1,0) and (3,0) as walls
+  tiles[1][0] = WALL;
+  tiles[3][0] = WALL;
   const depthsTransition: [number, number] = [midRow, leftWallX];
   subtypes[depthsTransition[0]][depthsTransition[1]] = [
     TileSubtype.ROOM_TRANSITION,
