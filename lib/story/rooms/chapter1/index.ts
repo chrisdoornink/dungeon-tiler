@@ -8,6 +8,10 @@ export { buildOutdoorClearing } from "./outdoor_clearing";
 export { buildOutdoorHouse } from "./outdoor_house";
 export { buildTorchTown } from "./torch_town";
 export { buildTheWildsEntrance } from "./the_wilds_entrance";
+export {
+  buildDepthsOfDespairRoom1,
+  buildDepthsOfDespairRoom2,
+} from "./depths_of_despair";
 
 // Torch Town Houses
 export {

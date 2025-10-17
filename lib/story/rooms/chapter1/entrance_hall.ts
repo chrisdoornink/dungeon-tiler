@@ -1,5 +1,5 @@
-import { FLOOR, WALL, TileSubtype } from "../../../map";
-import type { StoryRoom } from "../types";
+import { FLOOR, WALL, TileSubtype, type RoomId } from "../../../map";
+import type { StoryRoom, StoryRoomLink } from "../types";
 import type { NPC } from "../../../npc";
 
 export function buildEntranceHall(): StoryRoom {
@@ -26,6 +26,15 @@ export function buildEntranceHall(): StoryRoom {
   const returnEntryPoint: [number, number] = [
     midRow,
     Math.max(2, HALL_LENGTH - 1),
+  ];
+  const leftWallX = 0;
+  for (let y = 1; y <= HALL_WIDTH; y++) {
+    tiles[y][leftWallX] = FLOOR;
+    subtypes[y][leftWallX] = [];
+  }
+  const depthsTransition: [number, number] = [midRow, leftWallX];
+  subtypes[depthsTransition[0]][depthsTransition[1]] = [
+    TileSubtype.ROOM_TRANSITION,
   ];
   const rightWallX = width - 1;
   for (let y = 1; y <= HALL_WIDTH; y++) {
@@ -65,6 +74,13 @@ export function buildEntranceHall(): StoryRoom {
   // No mentor in the entrance hall; elder is placed outside in the clearing
   const npcs: NPC[] = [];
 
+  const otherTransitions: StoryRoomLink[] = [
+    {
+      roomId: "story-depths-despair-1" as RoomId,
+      position: depthsTransition,
+    },
+  ];
+
   return {
     id: "story-hall-entrance",
     mapData: { tiles, subtypes, environment: "cave" },
@@ -73,6 +89,7 @@ export function buildEntranceHall(): StoryRoom {
     transitionToNext,
     potOverrides,
     npcs,
+    otherTransitions,
   };
 }
 

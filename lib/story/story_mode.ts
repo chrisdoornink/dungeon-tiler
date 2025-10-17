@@ -25,6 +25,8 @@ import {
   buildSanctum,
   buildTorchTown,
   buildTheWildsEntrance,
+  buildDepthsOfDespairRoom1,
+  buildDepthsOfDespairRoom2,
   buildEldrasCottage,
   buildMaroAndKirasCottage,
   buildJorinAndYannasCottage,
@@ -132,6 +134,8 @@ export function buildStoryModeState(): GameState {
   const bluffCaves = buildBluffCaves();
   const bluffSerpentDen = buildBluffSerpentDen();
   const wildsEntrance = buildTheWildsEntrance();
+  const depthsRoom1 = buildDepthsOfDespairRoom1();
+  const depthsRoom2 = buildDepthsOfDespairRoom2();
 
   const transitions: RoomTransition[] = [];
 
@@ -206,6 +210,29 @@ export function buildStoryModeState(): GameState {
         );
       }
     }
+  }
+
+  if (entrance.otherTransitions) {
+    for (const link of entrance.otherTransitions) {
+      pushTransition(
+        entrance.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint ??
+          (link.roomId === depthsRoom1.id
+            ? depthsRoom1.entryPoint
+            : undefined)
+      );
+    }
+  }
+
+  if (depthsRoom1.transitionToNext) {
+    pushTransition(
+      depthsRoom1.id,
+      depthsRoom2.id,
+      depthsRoom1.transitionToNext,
+      depthsRoom2.entryPoint
+    );
   }
 
   // Outdoor -> Bluff Passageway transitions
@@ -524,6 +551,8 @@ export function buildStoryModeState(): GameState {
     outdoorHouse,
     torchTown,
     wildsEntrance,
+    depthsRoom1,
+    depthsRoom2,
     ...extraRooms,
   ];
 
@@ -606,6 +635,8 @@ const STORY_ROOM_LABELS: Partial<Record<RoomId, string>> = {
   "story-outdoor-clearing": "Outdoor Clearing",
   "story-outdoor-house": "Caretaker's House",
   "story-torch-town": "Torch Town",
+  "story-depths-despair-1": "Depths of Despair Room 1",
+  "story-depths-despair-2": "Depths of Despair Room 2",
 };
 
 function findSubtypePositions(
