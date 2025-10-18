@@ -280,17 +280,7 @@ export function buildTorchTown(): StoryRoom {
   // NPCs - Day and Night positions
   const npcs: NPC[] = [];
 
-  // 1. Eldra (Librarian) - Day: Library, Night: House 1
-  npcs.push(new NPC({
-    id: "npc-eldra",
-    name: "Eldra",
-    sprite: "/images/npcs/torch-town/eldra.png",
-    y: libraryDoor[0] - 1,
-    x: libraryDoor[1],
-    facing: Direction.DOWN,
-    canMove: false,
-    metadata: { dayLocation: "library", nightLocation: "house1", house: HOUSE_LABELS.HOUSE_1 },
-  }));
+  // 1. Eldra (Librarian) - Inside the library building (not on outdoor map)
 
   // 2. Maro (Storekeeper) - Day: Store, Night: House 2
   npcs.push(new NPC({
@@ -543,7 +533,6 @@ export function buildTorchTown(): StoryRoom {
       },
       // Hide NPCs from Torch Town when they go to their houses/buildings at night
       conditionalNpcs: {
-        "npc-eldra": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-maro": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-kira": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-jorin": { removeWhen: [{ timeOfDay: "night" }] },

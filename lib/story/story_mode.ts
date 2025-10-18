@@ -341,31 +341,6 @@ export function buildStoryModeState(): GameState {
   if (torchTownBuildings) {
     // Library interior - using individual builder
     const libraryRoom = buildLibrary();
-    // Place the town librarian inside the library
-    const libNpcY = Math.max(2, libraryRoom.entryPoint[0] - 2);
-    const libNpcX = libraryRoom.entryPoint[1];
-    const librarian = new NPC({
-      id: "npc-librarian",
-      name: "Town Librarian",
-      sprite: "/images/npcs/boy-2.png",
-      y: libNpcY,
-      x: libNpcX,
-      facing: Direction.DOWN,
-      canMove: false,
-      interactionHooks: [
-        {
-          id: "librarian-greet",
-          type: "dialogue",
-          description: "Greet the librarian",
-          payload: {
-            dialogueId: "town-librarian-default",
-          },
-        },
-      ],
-      actions: ["talk"],
-      metadata: { archetype: "librarian" },
-    });
-    libraryRoom.npcs = [librarian];
     extraRooms.push(libraryRoom);
     pushTransition(
       torchTown.id,

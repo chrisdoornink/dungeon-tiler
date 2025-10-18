@@ -81,19 +81,6 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     conditions: [{ eventId: "met-caretaker-lysa", value: false }],
   },
 
-  // Librarian
-  {
-    npcId: "npc-librarian",
-    scriptId: "librarian-missing-boy",
-    priority: 15,
-    conditions: [{ eventId: "heard-missing-boy", value: true }],
-  },
-  {
-    npcId: "npc-librarian",
-    scriptId: "librarian-default",
-    priority: 0,
-  },
-
   // Kalen (sanctum boy) - at sanctum after entering cave (highest priority)
   {
     npcId: "npc-sanctum-boy",
