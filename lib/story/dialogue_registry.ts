@@ -388,6 +388,87 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Tavi", text: "Wanna play? Grandma says I can't go near the walls, but we could explore the square!" },
     ],
   },
+
+  // Bluff Cave Awareness - NPCs who know about the cave and hint at library resources
+  "eldra-cave-hint": {
+    id: "eldra-cave-hint",
+    lines: [
+      { speaker: "Eldra", text: "Word travels fast in a small town. I heard you ventured into the cave at the bluff." },
+      { speaker: "Eldra", text: "If you're looking for context about what you found there, the archives might hold something. Old maps, geological surveys... the usual dusty treasures." },
+    ],
+  },
+  "captain-bren-cave-hint": {
+    id: "captain-bren-cave-hint",
+    lines: [
+      { speaker: "Captain Bren", text: "So you found a cave up at the bluff. I've heard rumors of passages in those cliffs for years." },
+      { speaker: "Captain Bren", text: "If you want to know more, Eldra keeps records of old expeditions in the library. Might be worth a look." },
+    ],
+  },
+  "dara-cave-hint": {
+    id: "dara-cave-hint",
+    lines: [
+      { speaker: "Dara", text: "A cave at the bluff? I've traveled many roads, but I hadn't heard of that one." },
+      { speaker: "Dara", text: "In my experience, caves like that often have histories. Check the town's library—old places like this usually keep records." },
+    ],
+  },
+  "lio-cave-hint": {
+    id: "lio-cave-hint",
+    lines: [
+      { speaker: "Lio", text: "I've hunted near the bluff for years. Never knew there was a cave up there." },
+      { speaker: "Lio", text: "If you're curious about what's inside, the library might have old survey maps. Eldra's good at digging up that sort of thing." },
+    ],
+  },
+
+  // Kalen Rescue Awareness - NPCs who heard about the rescue
+  "maro-kalen-rescue": {
+    id: "maro-kalen-rescue",
+    lines: [
+      { speaker: "Maro", text: "I heard you pulled Kalen out of trouble at the bluff. Good work—that boy's got more curiosity than sense." },
+      { speaker: "Maro", text: "If you need supplies for your next venture, you know where to find me." },
+    ],
+  },
+  "yanna-kalen-rescue": {
+    id: "yanna-kalen-rescue",
+    lines: [
+      { speaker: "Yanna", text: "The herbs told me someone was in danger near the bluff. I'm glad you found Kalen in time." },
+      { speaker: "Yanna", text: "The land speaks to those who listen. You listened well." },
+    ],
+  },
+  "serin-kalen-rescue": {
+    id: "serin-kalen-rescue",
+    lines: [
+      { speaker: "Serin", text: "I heard you rescued Kalen from the bluff. Thank you for bringing him back safely." },
+      { speaker: "Serin", text: "If you ever need healing after your adventures, my door is always open." },
+    ],
+  },
+  "mira-kalen-rescue": {
+    id: "mira-kalen-rescue",
+    lines: [
+      { speaker: "Mira", text: "Word is you saved Kalen from a goblin at the bluff. That's quite the tale to weave!" },
+      { speaker: "Mira", text: "Every thread tells a story, and yours is becoming quite interesting." },
+    ],
+  },
+  "kira-kalen-rescue": {
+    id: "kira-kalen-rescue",
+    lines: [
+      { speaker: "Kira", text: "You rescued Kalen? That's amazing! I wish I could go on adventures like that." },
+      { speaker: "Kira", text: "Maybe one day I'll get to see what's beyond these walls too." },
+    ],
+  },
+  "fenna-kalen-rescue": {
+    id: "fenna-kalen-rescue",
+    lines: [
+      { speaker: "Old Fenna", text: "The flame showed me your deed at the bluff—bringing Kalen back from danger." },
+      { speaker: "Old Fenna", text: "The flame honors those who protect the young. You have its blessing." },
+    ],
+  },
+  "rhett-kalen-rescue": {
+    id: "rhett-kalen-rescue",
+    lines: [
+      { speaker: "Rhett", text: "Heard you saved the sanctum boy from trouble. Good on you." },
+      { speaker: "Rhett", text: "Hard work and helping others—that's what keeps a community strong." },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {

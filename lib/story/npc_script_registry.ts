@@ -119,7 +119,77 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     conditions: [{ eventId: "rescued-kalen", value: false }],
   },
 
-  // Torch Town NPCs
+  // Torch Town NPCs - Cave Awareness (priority 25)
+  {
+    npcId: "npc-eldra",
+    scriptId: "eldra-cave-hint",
+    priority: 25,
+    conditions: [{ eventId: "entered-bluff-cave", value: true }],
+  },
+  {
+    npcId: "npc-captain-bren",
+    scriptId: "captain-bren-cave-hint",
+    priority: 25,
+    conditions: [{ eventId: "entered-bluff-cave", value: true }],
+  },
+  {
+    npcId: "npc-dara",
+    scriptId: "dara-cave-hint",
+    priority: 25,
+    conditions: [{ eventId: "entered-bluff-cave", value: true }],
+  },
+  {
+    npcId: "npc-lio",
+    scriptId: "lio-cave-hint",
+    priority: 25,
+    conditions: [{ eventId: "entered-bluff-cave", value: true }],
+  },
+
+  // Torch Town NPCs - Kalen Rescue Awareness (priority 20)
+  {
+    npcId: "npc-maro",
+    scriptId: "maro-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-yanna",
+    scriptId: "yanna-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-serin",
+    scriptId: "serin-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-mira",
+    scriptId: "mira-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-kira",
+    scriptId: "kira-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-fenna",
+    scriptId: "fenna-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+  {
+    npcId: "npc-rhett",
+    scriptId: "rhett-kalen-rescue",
+    priority: 20,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
+
+  // Torch Town NPCs - Defaults (priority 0)
   { npcId: "npc-eldra", scriptId: "eldra-default", priority: 0 },
   { npcId: "npc-maro", scriptId: "maro-default", priority: 0 },
   { npcId: "npc-captain-bren", scriptId: "captain-bren-default", priority: 0 },
