@@ -751,6 +751,7 @@ export interface StoryResetConfig {
   foodCount: number;
   potionCount: number;
   timeOfDay?: "day" | "dusk" | "night" | "dawn";
+  storyFlags?: Record<string, boolean>;
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -825,7 +826,13 @@ function applyStoryResetConfig(
   state.npcInteractionQueue = [];
   state.deathCause = undefined;
   state.conditions = undefined;
-  state.storyFlags = createInitialStoryFlags();
+  
+  // Apply story flags from config, or reset to defaults
+  if (config.storyFlags) {
+    state.storyFlags = { ...createInitialStoryFlags(), ...config.storyFlags };
+  } else {
+    state.storyFlags = createInitialStoryFlags();
+  }
   state.diaryEntries = [];
 
   // Reload the current room's NPCs based on reset conditions

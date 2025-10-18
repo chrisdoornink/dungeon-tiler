@@ -3,6 +3,7 @@ import type {
   StoryCheckpointOption,
   StoryResetConfig,
 } from "../lib/story/story_mode";
+import { listStoryEvents } from "../lib/story/event_registry";
 
 interface StoryResetModalProps {
   open: boolean;
@@ -88,6 +89,20 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
       timeOfDay: value,
     }));
   };
+
+  const updateStoryFlag = (flagId: string) =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = event.target.checked;
+      setConfig((prev) => ({
+        ...prev,
+        storyFlags: {
+          ...(prev.storyFlags || {}),
+          [flagId]: checked,
+        },
+      }));
+    };
+
+  const storyEvents = useMemo(() => listStoryEvents(), []);
 
   const sortedOptions = options;
 
@@ -274,6 +289,34 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
                 onChange={updateNumeric("potionCount")}
                 className="w-full rounded border border-white/30 bg-black/60 px-2 py-1 focus:border-emerald-400 focus:outline-none"
               />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-2 block text-xs uppercase tracking-wide text-gray-400">
+              Story Flags (for testing dialogue)
+            </label>
+            <div className="max-h-48 overflow-y-auto rounded border border-white/20 bg-black/40 p-3">
+              <div className="grid grid-cols-1 gap-2">
+                {storyEvents.map((event) => (
+                  <label
+                    key={event.id}
+                    className="flex items-start gap-2 text-xs text-gray-300"
+                    title={event.description}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={config.storyFlags?.[event.id] ?? false}
+                      onChange={updateStoryFlag(event.id)}
+                      className="mt-0.5 h-4 w-4 flex-shrink-0"
+                    />
+                    <span className="flex-1">
+                      <span className="font-mono text-emerald-400">{event.id}</span>
+                      <span className="ml-2 text-gray-500">— {event.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           </div>
         </div>
