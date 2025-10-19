@@ -655,6 +655,31 @@
   pointer-events: none; /* Allow clicks to pass through */
 }
 
+/* Roof overhang overlay for floor tiles above roof tiles AND front walls with roof behind */
+.roofOverhangOverlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 33%; /* Bottom third of the tile (or top third when inline style overrides) */
+  background-position: center top;
+  background-size: 100% 300%;
+  background-repeat: no-repeat;
+  z-index: 12000; /* Above fog and hero to occlude properly */
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
+/* Roof tile styling */
+.roof {
+  background-color: #8b4513;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  position: relative;
+  image-rendering: pixelated;
+}
+
 /* candleFlicker keyframes removed */
 
 .invisible {

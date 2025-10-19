@@ -3,6 +3,7 @@ export {
   type TileType,
   FLOOR,
   WALL,
+  ROOF,
   DEFAULT_ROOM_ID,
   type RoomId,
   dx,

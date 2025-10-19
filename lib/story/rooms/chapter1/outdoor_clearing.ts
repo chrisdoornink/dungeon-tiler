@@ -1,4 +1,4 @@
-import { FLOOR, WALL, TileSubtype, Direction, type RoomId } from "../../../map";
+import { FLOOR, WALL, ROOF, TileSubtype, Direction, type RoomId } from "../../../map";
 import {
   placeStraight,
   placeCorner,
@@ -82,7 +82,10 @@ export function buildOutdoorClearing(): StoryRoom {
     for (let x = 0; x < 3; x++) {
       const col = houseLeftX + x;
       if (tiles[row]?.[col] !== undefined) {
-        tiles[row][col] = WALL;
+        // Front wall (highest y value, furthest south) stays as WALL
+        // All other walls become ROOF tiles
+        const isFrontWall = y === houseHeight - 1;
+        tiles[row][col] = isFrontWall ? WALL : ROOF;
         subtypes[row][col] = [];
       }
     }

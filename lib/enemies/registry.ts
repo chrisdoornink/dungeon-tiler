@@ -151,6 +151,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           } else {
             e.facing = py > e.y ? "DOWN" : "UP";
           }
+          console.log(`[ENEMY ATTACK] Snake at (${e.y},${e.x}) attacking player at (${py},${px}) - distance: ${manhattan}, base damage: ${ctx.enemy.attack}`);
           return ctx.enemy.attack; // deal base attack; engine applies variance/defense
         }
 

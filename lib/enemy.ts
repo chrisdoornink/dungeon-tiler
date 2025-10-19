@@ -145,6 +145,7 @@ export class Enemy {
           // Attack the player instead of moving
           // Facing was already aligned above
           this.state = EnemyState.HUNTING;
+          console.log(`[ENEMY ATTACK] ${this.kind} at (${this.y},${this.x}) attacking player at (${player.y},${player.x}) - distance: ${Math.abs(this.y - player.y) + Math.abs(this.x - player.x)}, base damage: ${this.attack}`);
           return this.attack;
         }
         if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
@@ -179,6 +180,7 @@ export class Enemy {
                 this.x = adjX;
               }
               this.state = EnemyState.HUNTING;
+              console.log(`[ENEMY ATTACK] Ghost ${this.kind} at (${this.y},${this.x}) attacking player at (${player.y},${player.x}) after phasing - distance: ${Math.abs(this.y - player.y) + Math.abs(this.x - player.x)}, base damage: ${this.attack}`);
               return this.attack;
             }
             if (isSafeFloorForEnemy(grid, subtypes, ty, tx, this.kind)) {

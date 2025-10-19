@@ -1,4 +1,4 @@
-import { FLOOR, WALL, TileSubtype, Direction } from "../../../map";
+import { FLOOR, WALL, ROOF, TileSubtype, Direction } from "../../../map";
 import {
   placeCorner,
   placeT,
@@ -118,7 +118,10 @@ export function buildTorchTown(): StoryRoom {
   ): [number, number] => {
     for (let y = top; y < top + height; y++) {
       for (let x = left; x < left + width; x++) {
-        tiles[y][x] = WALL;
+        // Front wall (highest y value, furthest south) stays as WALL
+        // All other walls become ROOF tiles
+        const isFrontWall = y === top + height - 1;
+        tiles[y][x] = isFrontWall ? WALL : ROOF;
         subtypes[y][x] = [];
       }
     }

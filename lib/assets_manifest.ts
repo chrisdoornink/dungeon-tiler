@@ -57,6 +57,9 @@ export const ASSET_URLS: string[] = [
   "/images/wall/outdoor-wall-0101.png",
   "/images/wall/outdoor-wall-0110.png",
   "/images/wall/outdoor-wall-0111.png",
+  "/images/roof/spanish-roof-main.png",
+  "/images/roof/spanish-roof-back-overhang.png",
+  "/images/roof/spanish-roof-front-overhang.png",
 
   // Lock (large file - load later)
   "/images/door/gold-chain-lock.png",

@@ -806,6 +806,10 @@ export const Tile: React.FC<TileProps> = ({
 
       // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
       const hasWallBelow = neighbors.bottom === 1;
+      // Check if bottom neighbor is a roof - if so, we'll render the roof overhang overlay (not used currently, kept for future)
+      const hasRoofBelow = neighbors.bottom === 4;
+      // Check if this floor tile is behind a front wall (wall below) - for back overhang
+      const hasWallBelowForBackOverhang = neighbors.bottom === 1 && neighbors.top !== 1;
       
       // Determine which wall image to use for the overlay based on neighboring walls
       let wallPattern = '0111';
@@ -830,6 +834,7 @@ export const Tile: React.FC<TileProps> = ({
         }
       }
       const wallTopImage = getWallAsset(environment, wallPattern);
+      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
 
       return (
         <div
@@ -990,6 +995,17 @@ export const Tile: React.FC<TileProps> = ({
               data-testid="wall-top-overlay"
             />
           )}
+          
+          {/* Render roof back overhang overlay if this floor tile is behind a front wall */}
+          {hasWallBelowForBackOverhang && (
+            <div 
+              className={styles.roofOverhangOverlay}
+              style={{
+                backgroundImage: `url(${roofBackOverhangImage})`,
+              }}
+              data-testid="roof-back-overhang-overlay"
+            />
+          )}
         </div>
       );
     } else {
@@ -1036,6 +1052,10 @@ export const Tile: React.FC<TileProps> = ({
       if (!rightNeighbor) {
         highlightClasses += ` ${styles.wallRightHighlight}`;
       }
+
+      // Check if there's a roof tile behind (north of) this wall - for roof overhang
+      const hasRoofBehind = neighbors.top === 4;
+      const roofFrontOverhangImage = '/images/roof/spanish-roof-front-overhang.png';
 
       // Forced perspective: if the tile below is a FLOOR (0), make the bottom border thicker/darker
       const isFloorBelow = neighbors.bottom === 0;
@@ -1146,12 +1166,58 @@ export const Tile: React.FC<TileProps> = ({
             />
           )}
 
+          {/* Render roof front overhang overlay if there's a roof behind (north of) this wall */}
+          {hasRoofBehind && (
+            <div 
+              className={styles.roofOverhangOverlay}
+              style={{
+                backgroundImage: `url(${roofFrontOverhangImage})`,
+                top: 0,
+                bottom: 'auto',
+                height: '33%',
+              }}
+              data-testid="wall-roof-overhang-overlay"
+            />
+          )}
+
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
         </div>
       );
     } else {
       // Invisible wall - same style as invisible floor
+      return (
+        <div
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
+          data-testid={`tile-${tileId}`}
+        />
+      );
+    }
+  }
+
+  // If this is a roof tile
+  if (tileId === 4) {
+    if (isVisible) {
+      const roofClasses = `${styles.tileContainer} ${styles.roof} ${tierClass}`;
+      const roofAsset = '/images/roof/spanish-roof-main.png';
+
+      return (
+        <div
+          className={roofClasses}
+          data-testid={`tile-${tileId}`}
+          style={{
+            backgroundImage: `url(${roofAsset})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat"
+          }}
+        >
+          {/* Render all subtypes as standardized icons */}
+          {renderSubtypeIcons(subtype)}
+        </div>
+      );
+    } else {
+      // Invisible roof - same style as invisible floor
       return (
         <div
           className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
