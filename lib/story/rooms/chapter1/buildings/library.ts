@@ -1,5 +1,5 @@
 import type { RoomId } from "../../../../map";
-import { Direction } from "../../../../map";
+import { Direction, TileSubtype } from "../../../../map";
 import type { StoryRoom } from "../../types";
 import { NPC } from "../../../../npc";
 import { buildBuildingInterior } from "./building_builder";
@@ -9,6 +9,22 @@ export function buildLibrary(): StoryRoom {
   const displayLabel = "Library";
   
   const room = buildBuildingInterior(id, 5, 4, "house", displayLabel, []);
+  
+  // Add bookshelves as overlays on floor tiles
+  // Top row (1, 1-9)
+  for (let x = 1; x <= 9; x++) {
+    room.mapData.subtypes[1][x] = [TileSubtype.BOOKSHELF];
+  }
+  
+  // Middle row left side (4, 1-3)
+  for (let x = 1; x <= 3; x++) {
+    room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
+  }
+  
+  // Middle row right side (4, 6-9)
+  for (let x = 6; x <= 9; x++) {
+    room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
+  }
   
   // Place Eldra (the librarian) inside during the day
   const eldraY = Math.max(2, room.entryPoint[0] - 2);

@@ -473,7 +473,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.ROAD_ROTATE_270 &&
         subtype !== TileSubtype.SIGN_STORE &&
         subtype !== TileSubtype.SIGN_LIBRARY &&
-        subtype !== TileSubtype.SIGN_SMITHY // Filter out subtypes with custom rendering
+        subtype !== TileSubtype.SIGN_SMITHY &&
+        subtype !== TileSubtype.BOOKSHELF // Filter out subtypes with custom rendering
     );
   };
 
@@ -983,6 +984,25 @@ export const Tile: React.FC<TileProps> = ({
               )}
             </>
           )}
+
+          {/* Render bookshelf if present */}
+          {subtype.includes(TileSubtype.BOOKSHELF) && (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                backgroundImage: "url(/images/items/bookshelf.png)",
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+                backgroundRepeat: "no-repeat",
+                imageRendering: "pixelated",
+                zIndex: 1,
+              }}
+              data-testid="bookshelf-overlay"
+              aria-hidden="true"
+            />
+          )}
+
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
           

@@ -102,6 +102,9 @@ export const ASSET_URLS: string[] = [
   "/images/hanging-signs/library.png",
   "/images/hanging-signs/workshop.png",
 
+  // Furniture
+  "/images/items/bookshelf.png",
+
   // Remaining enemies (large files - load later)
   "/images/enemies/fire-goblin/fire-goblin-right.png",
   "/images/enemies/fire-goblin/fire-goblin-back.png",

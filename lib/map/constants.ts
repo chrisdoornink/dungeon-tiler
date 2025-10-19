@@ -74,6 +74,7 @@ export enum TileSubtype {
   SIGN_STORE = 33,
   SIGN_LIBRARY = 34,
   SIGN_SMITHY = 35,
+  BOOKSHELF = 36,
 }
 
 /**

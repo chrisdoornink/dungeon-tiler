@@ -86,6 +86,9 @@ export default function PreloadImages() {
       "/images/hanging-signs/library.png",
       "/images/hanging-signs/workshop.png",
 
+      // Furniture
+      "/images/items/bookshelf.png",
+
       // Enemy sprites (all angles as defined in registry)
       "/images/enemies/fire-goblin/fire-goblin-front.png",
       "/images/enemies/fire-goblin/fire-goblin-right.png",
