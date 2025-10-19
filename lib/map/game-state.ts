@@ -1261,6 +1261,11 @@ export function movePlayer(
     const subtype = newMapData.subtypes[newY][newX];
     const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
 
+    // Check if tile has a bookshelf - blocks movement
+    if (subtype.includes(TileSubtype.BOOKSHELF)) {
+      return newGameState;
+    }
+
     const blockingNpc = newGameState.npcs?.find(
       (npc) => npc.y === newY && npc.x === newX && !npc.isDead()
     );

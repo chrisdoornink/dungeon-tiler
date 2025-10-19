@@ -21,8 +21,8 @@ export function buildLibrary(): StoryRoom {
     room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
   }
   
-  // Middle row right side (4, 6-9)
-  for (let x = 6; x <= 9; x++) {
+  // Middle row right side (4, 7-9)
+  for (let x = 7; x <= 9; x++) {
     room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
   }
   
