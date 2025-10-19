@@ -680,6 +680,22 @@
   image-rendering: pixelated;
 }
 
+/* Hanging sign overlay for walls */
+.hangingSign {
+  position: absolute;
+  top: 33%; /* Position so chain starts at bottom of roof overhang */
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 32px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center top;
+  z-index: 12001; /* Above roof overhang */
+  pointer-events: none;
+  image-rendering: pixelated;
+}
+
 /* candleFlicker keyframes removed */
 
 .invisible {

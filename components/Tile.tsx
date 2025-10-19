@@ -470,7 +470,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.ROAD_END &&
         subtype !== TileSubtype.ROAD_ROTATE_90 &&
         subtype !== TileSubtype.ROAD_ROTATE_180 &&
-        subtype !== TileSubtype.ROAD_ROTATE_270 // Filter out subtypes with custom rendering
+        subtype !== TileSubtype.ROAD_ROTATE_270 &&
+        subtype !== TileSubtype.SIGN_STORE &&
+        subtype !== TileSubtype.SIGN_LIBRARY &&
+        subtype !== TileSubtype.SIGN_SMITHY // Filter out subtypes with custom rendering
     );
   };
 
@@ -1177,6 +1180,38 @@ export const Tile: React.FC<TileProps> = ({
                 height: '33%',
               }}
               data-testid="wall-roof-overhang-overlay"
+            />
+          )}
+
+          {/* Render hanging signs if present */}
+          {subtype.includes(TileSubtype.SIGN_STORE) && (
+            <div
+              className={styles.hangingSign}
+              style={{
+                backgroundImage: "url(/images/hanging-signs/store.png)",
+              }}
+              data-testid="hanging-sign-store"
+              aria-hidden="true"
+            />
+          )}
+          {subtype.includes(TileSubtype.SIGN_LIBRARY) && (
+            <div
+              className={styles.hangingSign}
+              style={{
+                backgroundImage: "url(/images/hanging-signs/library.png)",
+              }}
+              data-testid="hanging-sign-library"
+              aria-hidden="true"
+            />
+          )}
+          {subtype.includes(TileSubtype.SIGN_SMITHY) && (
+            <div
+              className={styles.hangingSign}
+              style={{
+                backgroundImage: "url(/images/hanging-signs/workshop.png)",
+              }}
+              data-testid="hanging-sign-smithy"
+              aria-hidden="true"
             />
           )}
 

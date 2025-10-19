@@ -71,6 +71,9 @@ export enum TileSubtype {
   ROAD_ROTATE_90 = 30,
   ROAD_ROTATE_180 = 31,
   ROAD_ROTATE_270 = 32,
+  SIGN_STORE = 33,
+  SIGN_LIBRARY = 34,
+  SIGN_SMITHY = 35,
 }
 
 /**

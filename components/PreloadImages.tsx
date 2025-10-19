@@ -81,6 +81,11 @@ export default function PreloadImages() {
       "/images/flowers/flowers-5.png",
       "/images/flowers/bush.png",
 
+      // Hanging signs
+      "/images/hanging-signs/store.png",
+      "/images/hanging-signs/library.png",
+      "/images/hanging-signs/workshop.png",
+
       // Enemy sprites (all angles as defined in registry)
       "/images/enemies/fire-goblin/fire-goblin-front.png",
       "/images/enemies/fire-goblin/fire-goblin-right.png",

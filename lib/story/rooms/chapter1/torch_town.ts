@@ -199,7 +199,13 @@ export function buildTorchTown(): StoryRoom {
     guardTowerHeight
   );
 
-
+  // Add hanging signs to building walls
+  // Store sign at wall tile [16, 8] - left wall next to roof
+  ensureSubtype(16, 8, TileSubtype.SIGN_STORE);
+  // Library sign at wall tile [10, 18]
+  ensureSubtype(10, 18, TileSubtype.SIGN_LIBRARY);
+  // Smithy sign at wall tile [16, 24]
+  ensureSubtype(16, 24, TileSubtype.SIGN_SMITHY);
 
   const homeAssignments: Record<string, string> = {};
   const homeWidth = 3;
@@ -208,10 +214,10 @@ export function buildTorchTown(): StoryRoom {
     { top: 20, left: 18, label: HOUSE_LABELS.HOUSE_1 },
     { top: 23, left: 19, label: HOUSE_LABELS.HOUSE_2 },
     { top: 19, left: 24, label: HOUSE_LABELS.HOUSE_3 },
-    { top: 22, left: 25, label: HOUSE_LABELS.HOUSE_4 },
-    { top: 24, left: 22, label: HOUSE_LABELS.HOUSE_5 },
-    { top: 26, left: 25, label: HOUSE_LABELS.HOUSE_6 },
-    { top: 27, left: 22, label: HOUSE_LABELS.HOUSE_7 },
+    { top: 22, left: 27, label: HOUSE_LABELS.HOUSE_4 },
+    { top: 24, left: 23, label: HOUSE_LABELS.HOUSE_5 },
+    { top: 26, left: 27, label: HOUSE_LABELS.HOUSE_6 },
+    { top: 27, left: 23, label: HOUSE_LABELS.HOUSE_7 },
     { top: 26, left: 18, label: HOUSE_LABELS.HOUSE_8 },
   ];
 
