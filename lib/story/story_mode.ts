@@ -124,6 +124,10 @@ function cloneEnemies(enemies?: Enemy[]): Enemy[] {
 // }
 
 export function buildStoryModeState(): GameState {
+  // Initialize library content registry
+  const { initializeLibraryContent } = require('./library_content');
+  initializeLibraryContent();
+
   const entrance = buildEntranceHall();
   const ascent = buildAscentCorridor();
   const sanctum = buildSanctum();

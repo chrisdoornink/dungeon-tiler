@@ -643,6 +643,10 @@ export interface GameState {
     behaviorMemory?: Record<string, unknown>;
   }>;
   npcInteractionQueue?: NPCInteractionEvent[];
+  bookshelfInteractionQueue?: Array<{
+    bookshelfId: string;
+    position: [number, number];
+  }>;
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
@@ -1261,8 +1265,18 @@ export function movePlayer(
     const subtype = newMapData.subtypes[newY][newX];
     const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
 
-    // Check if tile has a bookshelf - blocks movement
+    // Check if tile has a bookshelf - blocks movement but triggers interaction
     if (subtype.includes(TileSubtype.BOOKSHELF)) {
+      // Queue bookshelf interaction
+      if (newGameState.currentRoomId) {
+        const bookshelfId = `${newGameState.currentRoomId}-shelf-${newY}-${newX}`;
+        const queue = newGameState.bookshelfInteractionQueue ?? [];
+        queue.push({
+          bookshelfId,
+          position: [newY, newX],
+        });
+        newGameState.bookshelfInteractionQueue = queue;
+      }
       return newGameState;
     }
 

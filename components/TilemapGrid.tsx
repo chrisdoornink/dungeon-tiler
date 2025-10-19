@@ -48,6 +48,7 @@ import { ScreenShake } from "./ScreenShake";
 import ItemPickupAnimation from "./ItemPickupAnimation";
 import DialogueOverlay from "./DialogueOverlay";
 import { useTypewriter } from "../lib/dialogue/useTypewriter";
+import { BookshelfMenu } from "./BookshelfMenu";
 import { DeathScreen } from "./DeathScreen";
 import {
   getDialogueScript,
@@ -207,6 +208,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
+  const [activeBookshelfId, setActiveBookshelfId] = useState<string | null>(null);
   const activeDialogueLine = dialogueSession
     ? dialogueSession.script[dialogueSession.lineIndex] ?? null
     : null;
@@ -992,6 +994,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return next;
     });
   }, [playerPosition, resolvedStorageSlot]);
+
+  // Handle bookshelf interactions
+  useEffect(() => {
+    if (dialogueSession || activeBookshelfId) return;
+    const queue = gameState.bookshelfInteractionQueue;
+    if (!queue || queue.length === 0) return;
+    const nextBookshelf = queue[0];
+    if (!nextBookshelf) return;
+
+    setActiveBookshelfId(nextBookshelf.bookshelfId);
+    
+    // Clear the queue
+    setGameState((prev) => ({
+      ...prev,
+      bookshelfInteractionQueue: [],
+    }));
+  }, [gameState.bookshelfInteractionQueue, dialogueSession, activeBookshelfId]);
 
   useEffect(() => {
     if (dialogueSession) return;
@@ -2635,6 +2654,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           }))}
           selectedChoiceIndex={selectedChoiceIndex}
           onSelectChoice={handleDialogueChoiceSelect}
+        />
+      )}
+
+      {activeBookshelfId && (
+        <BookshelfMenu
+          bookshelfId={activeBookshelfId}
+          storyFlags={gameState.storyFlags ?? {}}
+          onClose={() => setActiveBookshelfId(null)}
         />
       )}
       
