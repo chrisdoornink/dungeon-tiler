@@ -73,6 +73,14 @@ export default function PreloadImages() {
       "/images/items/wall-torch-2.png",
       "/images/items/wall-torch-3.png",
 
+      // Flowers and bushes
+      "/images/flowers/flowers-1.png",
+      "/images/flowers/flowers-2.png",
+      "/images/flowers/flowers-3.png",
+      "/images/flowers/flowers-4.png",
+      "/images/flowers/flowers-5.png",
+      "/images/flowers/bush.png",
+
       // Enemy sprites (all angles as defined in registry)
       "/images/enemies/fire-goblin/fire-goblin-front.png",
       "/images/enemies/fire-goblin/fire-goblin-right.png",

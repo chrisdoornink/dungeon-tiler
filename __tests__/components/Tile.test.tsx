@@ -288,4 +288,84 @@ describe('Tile component', () => {
     // Instead of checking the exact style, just verify the element exists
     expect(heroImage).not.toBeNull();
   });
+
+  describe('Flower tiles', () => {
+    it('should render flower tiles with floor background and flower sprite', () => {
+      const mockTileType = { id: 5, name: 'flowers', color: '#90EE90', walkable: true };
+      render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          isVisible={true}
+          row={7}
+          col={11}
+        />
+      );
+
+      const tile = screen.getByTestId('tile-5');
+      expect(tile).toBeInTheDocument();
+      expect(tile.className).toContain('floor');
+      
+      // Verify it has a floor background image
+      expect(tile.style.backgroundImage).toContain('floor');
+    });
+
+    it('should use deterministic flower asset selection based on coordinates', () => {
+      const mockTileType = { id: 5, name: 'flowers', color: '#90EE90', walkable: true };
+      
+      // Render at same coordinates twice
+      const { unmount } = render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          isVisible={true}
+          row={12}
+          col={3}
+        />
+      );
+      
+      const tile1 = screen.getByTestId('tile-5');
+      const firstRender = tile1.innerHTML;
+      
+      unmount();
+      
+      render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          isVisible={true}
+          row={12}
+          col={3}
+        />
+      );
+      
+      const tile2 = screen.getByTestId('tile-5');
+      const secondRender = tile2.innerHTML;
+      
+      // Same coordinates should produce identical output
+      expect(firstRender).toBe(secondRender);
+    });
+
+    it('should render hero on top of flowers when player is on a flower tile', () => {
+      const mockTileType = { id: 5, name: 'flowers', color: '#90EE90', walkable: true };
+      render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          subtype={[TileSubtype.PLAYER]}
+          isVisible={true}
+          playerDirection={Direction.DOWN}
+          row={8}
+          col={11}
+        />
+      );
+
+      const tile = screen.getByTestId('tile-5');
+      expect(tile).toBeInTheDocument();
+      
+      // Should have hero image
+      const heroImage = tile.querySelector('.heroImage');
+      expect(heroImage).toBeInTheDocument();
+    });
+  });
 });

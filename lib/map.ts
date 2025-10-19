@@ -4,6 +4,7 @@ export {
   FLOOR,
   WALL,
   ROOF,
+  FLOWERS,
   DEFAULT_ROOM_ID,
   type RoomId,
   dx,

@@ -1227,6 +1227,86 @@ export const Tile: React.FC<TileProps> = ({
     }
   }
 
+  // If this is a flowers tile
+  if (tileId === 5) {
+    if (isVisible) {
+      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      const floorAsset =
+        process.env.NODE_ENV === 'test'
+          ? environmentConfig.floorDefault
+          : getFloorAsset(environment, { hasNorthNeighbor: Boolean(topNeighbor) });
+
+      // Deterministically pick a flower/bush asset based on tile coordinates
+      const y = typeof row === 'number' ? row : 0;
+      const x = typeof col === 'number' ? col : 0;
+      const seed = (y * 37 + x * 101);
+      const flowerAssets = [
+        '/images/flowers/flowers-1.png',
+        '/images/flowers/flowers-2.png',
+        '/images/flowers/flowers-3.png',
+        '/images/flowers/flowers-4.png',
+        '/images/flowers/flowers-5.png',
+        '/images/flowers/bush.png',
+      ];
+      const flowerAsset = flowerAssets[Math.abs(seed) % flowerAssets.length];
+
+      return (
+        <div
+          className={floorClasses}
+          style={{
+            backgroundImage: `url(${floorAsset})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            position: "relative",
+            backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent'
+          }}
+          data-testid={`tile-${tileId}`}
+          data-neighbor-code={neighborCode}
+        >
+          {/* Render flower/bush sprite on top of floor */}
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${flowerAsset})`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              imageRendering: 'pixelated',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+            aria-hidden="true"
+          />
+          
+          {/* Render hero image on top if this is a player tile */}
+          {isPlayerTile && (
+            <div
+              className={styles.heroImage}
+              style={{
+                backgroundImage: `url(${heroImage})`,
+                transform: heroTransform,
+                backgroundColor: 'transparent'
+              }}
+            />
+          )}
+
+          {/* Render all subtypes as standardized icons */}
+          {renderSubtypeIcons(subtype)}
+        </div>
+      );
+    } else {
+      // Invisible flowers - same style as invisible floor
+      return (
+        <div
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
+          data-testid={`tile-${tileId}`}
+        />
+      );
+    }
+  }
+
   // Fallback for any other tile type
   return (
     <div

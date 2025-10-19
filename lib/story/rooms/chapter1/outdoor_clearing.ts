@@ -1,4 +1,4 @@
-import { FLOOR, WALL, ROOF, TileSubtype, Direction, type RoomId } from "../../../map";
+import { FLOOR, WALL, ROOF, FLOWERS, TileSubtype, Direction, type RoomId } from "../../../map";
 import {
   placeStraight,
   placeCorner,
@@ -70,6 +70,23 @@ export function buildOutdoorClearing(): StoryRoom {
       if (subtypes[y][x].length > 0) continue; // keep clear of other features/NPCs/etc
       subtypes[y][x] = [TileSubtype.ROCK];
       placed++;
+    }
+  }
+
+  // Place flower tiles at specific coordinates
+  const flowerCoords: Array<[number, number]> = [
+    [14, 2],
+    [13, 2],
+    [12, 2],
+    [13, 3],
+    [12, 3],
+    [8, 11],
+    [7, 11],
+  ];
+  for (const [y, x] of flowerCoords) {
+    if (tiles[y]?.[x] !== undefined) {
+      tiles[y][x] = FLOWERS;
+      subtypes[y][x] = [];
     }
   }
 
