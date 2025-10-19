@@ -1005,12 +1005,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
     setActiveBookshelfId(nextBookshelf.bookshelfId);
     
-    // Clear the queue
-    setGameState((prev) => ({
-      ...prev,
-      bookshelfInteractionQueue: [],
-    }));
-  }, [gameState.bookshelfInteractionQueue, dialogueSession, activeBookshelfId]);
+    // Clear the queue and save
+    setGameState((prev) => {
+      const next = {
+        ...prev,
+        bookshelfInteractionQueue: [],
+      };
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      return next;
+    });
+  }, [gameState.bookshelfInteractionQueue, dialogueSession, activeBookshelfId, resolvedStorageSlot]);
 
   useEffect(() => {
     if (dialogueSession) return;

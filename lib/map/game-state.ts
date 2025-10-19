@@ -1270,12 +1270,15 @@ export function movePlayer(
       // Queue bookshelf interaction
       if (newGameState.currentRoomId) {
         const bookshelfId = `${newGameState.currentRoomId}-shelf-${newY}-${newX}`;
-        const queue = newGameState.bookshelfInteractionQueue ?? [];
-        queue.push({
-          bookshelfId,
-          position: [newY, newX],
-        });
-        newGameState.bookshelfInteractionQueue = queue;
+        const existingQueue = newGameState.bookshelfInteractionQueue ?? [];
+        // Create a new array to avoid mutation issues
+        newGameState.bookshelfInteractionQueue = [
+          ...existingQueue,
+          {
+            bookshelfId,
+            position: [newY, newX],
+          }
+        ];
       }
       return newGameState;
     }
