@@ -176,6 +176,19 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
+  // Ancient Serpent (Coiled Snake)
+  {
+    npcId: "npc-bluff-coiled-snake",
+    scriptId: "snake-already-completed",
+    priority: 10,
+    conditions: [{ eventId: "snake-riddles-completed", value: true }],
+  },
+  {
+    npcId: "npc-bluff-coiled-snake",
+    scriptId: "bluff-coiled-snake",
+    priority: 0,
+  },
+
   // Torch Town NPCs - Defaults (priority 0)
   { npcId: "npc-eldra", scriptId: "eldra-default", priority: 0 },
   { npcId: "npc-maro", scriptId: "maro-default", priority: 0 },

@@ -101,6 +101,16 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
     defaultValue: false,
     // No diary entry - this is just for NPC positioning
   },
+  "snake-riddles-completed": {
+    id: "snake-riddles-completed",
+    description: "Hero successfully answered all five riddles from the Ancient Serpent.",
+    defaultValue: false,
+    diaryEntry: {
+      id: "snake-riddles-completed",
+      title: "Wisdom of the Serpent",
+      summary: "I answered the Ancient Serpent's riddles and earned a teleportation rune. The serpent tested my knowledge of silence, shadow, light, time, and echo.",
+    },
+  },
 };
 
 export function listStoryEvents(): StoryEventDefinition[] {

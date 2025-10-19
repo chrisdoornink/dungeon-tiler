@@ -249,8 +249,200 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     id: "bluff-coiled-snake",
     lines: [
       {
-        speaker: "Coiled Snake",
-        text: "You found me.",
+        speaker: "Ancient Serpent",
+        text: "Sssso... you have found me, traveler. Few venture thisss far into the eassstern cavesss.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "I possess something you sssseek—a gift that bends sssspace itself. But wisdom, not sssteel, earns my favor.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Answer my riddles three, and the power to traverse great dissstances shall be yoursss. Fail, and you mussst leave empty-handed.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "First riddle: I am answered when unspoken, broken when you build me. What am I?",
+        options: [
+          { id: "promise", prompt: "A promise", nextDialogueId: "snake-riddle-1-wrong" },
+          { id: "secret", prompt: "A secret", nextDialogueId: "snake-riddle-1-wrong" },
+          { id: "silence", prompt: "Silence", nextDialogueId: "snake-riddle-1-correct" },
+          { id: "trust", prompt: "Trust", nextDialogueId: "snake-riddle-1-wrong" },
+        ],
+      },
+    ],
+  },
+  "snake-riddle-1-correct": {
+    id: "snake-riddle-1-correct",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Yesss... ssilence indeed. You understand the firssst lesssson.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Second riddle: I follow without sssteps, flee without fear, and die at midnight. What am I?",
+        options: [
+          { id: "dream", prompt: "A dream", nextDialogueId: "snake-riddle-2-wrong" },
+          { id: "fear", prompt: "Fear", nextDialogueId: "snake-riddle-2-wrong" },
+          { id: "ghost", prompt: "A ghost", nextDialogueId: "snake-riddle-2-wrong" },
+          { id: "shadow", prompt: "Shadow", nextDialogueId: "snake-riddle-2-correct" },
+        ],
+      },
+    ],
+  },
+  "snake-riddle-1-wrong": {
+    id: "snake-riddle-1-wrong",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "No... that isss not the answer. You have not yet learned to lisssen.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Return when you have gained more wisssdom, traveler.",
+      },
+    ],
+  },
+  "snake-riddle-2-correct": {
+    id: "snake-riddle-2-correct",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Correct again. The ssshadow knows no fear, yet flees from light.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Third riddle: I fill a room yet take no sssspace. What am I?",
+        options: [
+          { id: "air", prompt: "Air", nextDialogueId: "snake-riddle-3-wrong" },
+          { id: "darkness", prompt: "Darkness", nextDialogueId: "snake-riddle-3-wrong" },
+          { id: "light", prompt: "Light", nextDialogueId: "snake-riddle-3-correct" },
+          { id: "sound", prompt: "Sound", nextDialogueId: "snake-riddle-3-wrong" },
+          ],
+      },
+    ],
+  },
+  "snake-riddle-2-wrong": {
+    id: "snake-riddle-2-wrong",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Incorrect. You have failed the sssecond test.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Sssseek more knowledge before you return, traveler.",
+      },
+    ],
+  },
+  "snake-riddle-3-correct": {
+    id: "snake-riddle-3-correct",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Excellent. Light indeed fillsss all, yet weighs nothing.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Fourth riddle: I move without legsss, ssspend without coin, and eat all thingsss. What am I?",
+        options: [
+          { id: "fire", prompt: "Fire", nextDialogueId: "snake-riddle-4-wrong" },
+          { id: "time", prompt: "Time", nextDialogueId: "snake-riddle-4-correct" },
+          { id: "water", prompt: "Water", nextDialogueId: "snake-riddle-4-wrong" },
+          { id: "wind", prompt: "Wind", nextDialogueId: "snake-riddle-4-wrong" },
+        ],
+      },
+    ],
+  },
+  "snake-riddle-3-wrong": {
+    id: "snake-riddle-3-wrong",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "No. You were sssso close, yet you have failed.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Return when you can sssee what isss before you.",
+      },
+    ],
+  },
+  "snake-riddle-4-correct": {
+    id: "snake-riddle-4-correct",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Wissse indeed. Time consumesss all, yet cannot be held.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Final riddle: I ssspeak when you don't, but only after you do. What am I?",
+        options: [
+          { id: "conscience", prompt: "Conscience", nextDialogueId: "snake-riddle-5-wrong" },
+          { id: "echo", prompt: "Echo", nextDialogueId: "snake-riddle-5-correct" },
+          { id: "memory", prompt: "Memory", nextDialogueId: "snake-riddle-5-wrong" },
+          { id: "reflection", prompt: "Reflection", nextDialogueId: "snake-riddle-5-wrong" },
+        ],
+      },
+    ],
+  },
+  "snake-riddle-4-wrong": {
+    id: "snake-riddle-4-wrong",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Wrong. Time hasss not taught you enough.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Come back when you have learned more, traveler.",
+      },
+    ],
+  },
+  "snake-riddle-5-correct": {
+    id: "snake-riddle-5-correct",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "Yesss! The echo... the final lesssson. You have proven your wisssdom.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "You have earned the gift I guard. Take thisss rune of teleportation—it will carry you acrosss great dissstances in an instant.",
+        effects: [
+          { eventId: "snake-riddles-completed", value: true },
+        ],
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Use it wisely, traveler. May your journey be sswift.",
+      },
+    ],
+  },
+  "snake-riddle-5-wrong": {
+    id: "snake-riddle-5-wrong",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "No... you were sssso close. The final answer eludesss you.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "Return when the echo of wisssdom ssspeaks to you.",
+      },
+    ],
+  },
+  "snake-already-completed": {
+    id: "snake-already-completed",
+    lines: [
+      {
+        speaker: "Ancient Serpent",
+        text: "You have already proven your wisssdom, traveler.",
+      },
+      {
+        speaker: "Ancient Serpent",
+        text: "The gift hasss been given. Use it well.",
       },
     ],
   },
