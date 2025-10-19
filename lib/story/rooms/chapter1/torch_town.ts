@@ -1,4 +1,4 @@
-import { FLOOR, WALL, ROOF, TileSubtype, Direction } from "../../../map";
+import { FLOOR, WALL, ROOF, FLOWERS, TileSubtype, Direction } from "../../../map";
 import {
   placeCorner,
   placeT,
@@ -270,6 +270,37 @@ export function buildTorchTown(): StoryRoom {
   layStraightBetween(tiles, subtypes, 12, 27, 12, 33);
   placeEnd(tiles, subtypes, 12, 34, "W");
 
+  // Add flowers to 70% of tiles in the residential square [18,3] to [25,11]
+  {
+    const minY = 18;
+    const maxY = 25;
+    const minX = 3;
+    const maxX = 11;
+    const targetPercent = 0.7;
+    
+    const candidateTiles: Array<[number, number]> = [];
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        // Only place flowers on empty floor tiles (not roads, not already occupied)
+        if (tiles[y]?.[x] === FLOOR && subtypes[y][x].length === 0) {
+          candidateTiles.push([y, x]);
+        }
+      }
+    }
+    
+    const flowerCount = Math.floor(candidateTiles.length * targetPercent);
+    // Shuffle candidates deterministically using simple seed
+    const shuffled = candidateTiles.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.abs((i * 37 + shuffled[i][0] * 101 + shuffled[i][1] * 73) % (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    
+    for (let i = 0; i < Math.min(flowerCount, shuffled.length); i++) {
+      const [y, x] = shuffled[i];
+      tiles[y][x] = FLOWERS;
+    }
+  }
   
   
 

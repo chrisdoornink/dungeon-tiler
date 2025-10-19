@@ -806,10 +806,8 @@ export const Tile: React.FC<TileProps> = ({
 
       // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
       const hasWallBelow = neighbors.bottom === 1;
-      // Check if bottom neighbor is a roof - if so, we'll render the roof overhang overlay (not used currently, kept for future)
-      const hasRoofBelow = neighbors.bottom === 4;
-      // Check if this floor tile is behind a front wall (wall below) - for back overhang
-      const hasWallBelowForBackOverhang = neighbors.bottom === 1 && neighbors.top !== 1;
+      // Check if bottom neighbor is a roof - floor tiles behind the house have ROOF tiles below them
+      const hasRoofBelowForBackOverhang = neighbors.bottom === 4;
       
       // Determine which wall image to use for the overlay based on neighboring walls
       let wallPattern = '0111';
@@ -996,12 +994,14 @@ export const Tile: React.FC<TileProps> = ({
             />
           )}
           
-          {/* Render roof back overhang overlay if this floor tile is behind a front wall */}
-          {hasWallBelowForBackOverhang && (
+          {/* Render roof back overhang overlay if this floor tile has a roof below it */}
+          {hasRoofBelowForBackOverhang && (
             <div 
               className={styles.roofOverhangOverlay}
               style={{
                 backgroundImage: `url(${roofBackOverhangImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center bottom',
               }}
               data-testid="roof-back-overhang-overlay"
             />
