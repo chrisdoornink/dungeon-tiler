@@ -26,6 +26,7 @@ import {
   DEFAULT_ROOM_ID,
   Direction,
   FLOOR,
+  FLOWERS,
   TileSubtype,
   WALL,
   type RoomId,
@@ -1255,8 +1256,8 @@ export function movePlayer(
     return newGameState;
   }
 
-  // If the new position is a floor tile
-  if (newMapData.tiles[newY][newX] === FLOOR) {
+  // If the new position is a floor or flowers tile
+  if (newMapData.tiles[newY][newX] === FLOOR || newMapData.tiles[newY][newX] === FLOWERS) {
     const subtype = newMapData.subtypes[newY][newX];
     const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
 

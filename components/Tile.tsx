@@ -1264,6 +1264,34 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Render checkpoint asset if present (full-tile overlay) */}
+          {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (() => {
+            const isActive = Array.isArray(activeCheckpoint) &&
+              typeof row === 'number' && typeof col === 'number' &&
+              activeCheckpoint[0] === row && activeCheckpoint[1] === col;
+            return (
+              <>
+                {isActive && (
+                  <div
+                    key="checkpoint-glow"
+                    className={styles.checkpointGlow}
+                    aria-hidden="true"
+                  />
+                )}
+                <div
+                  key="checkpoint"
+                  className={styles.checkpointOverlay}
+                  style={{
+                    backgroundImage: `url(${isActive ? '/images/items/checkpoint-lit.png' : '/images/items/checkpoint-unlit.png'})`
+                  }}
+                  aria-label="checkpoint"
+                />
+              </>
+            );
+          })()}
+          {/* Render dirt road overlay if this flower tile is marked as part of a road */}
+          {hasRoad(subtype) && renderRoadOverlay(subtype)}
+          
           {/* Render flower/bush sprite on top of floor */}
           <div
             style={{
@@ -1290,6 +1318,100 @@ export const Tile: React.FC<TileProps> = ({
                 backgroundColor: 'transparent'
               }}
             />
+          )}
+          {/* Hero poison visuals: glow + stench wisps */}
+          {isPlayerTile && heroPoisoned && (
+            <>
+              {/* multiple wisps with slight offsets for variety */}
+              <div className="poison-stench" style={{ left: '42%' }} aria-hidden="true" />
+              <div className="poison-stench" style={{ left: '58%', animationDelay: '200ms' }} aria-hidden="true" />
+              <div className="poison-stench" style={{ left: '50%', animationDelay: '400ms', width: '10px' }} aria-hidden="true" />
+            </>
+          )}
+
+          {shouldShowNpc && npc && (
+            <div
+              className={styles.npcImage}
+              style={{
+                backgroundImage: `url(${npc.sprite})`,
+                transform: npcTransformWithScale,
+                transformOrigin: npcTransformOrigin,
+              }}
+              aria-hidden="true"
+              data-testid="npc-sprite"
+            />
+          )}
+          {showNpcPrompt && (
+            <div className={styles.npcDialogueIcon} aria-hidden="true">
+              💬
+            </div>
+          )}
+
+          {/* Enemy rendering: sprite (when visible) */}
+          {hasEnemy && (
+            <>
+              {enemyAura && (
+                <div
+                  className={styles.exitGlow}
+                  aria-hidden="true"
+                />
+              )}
+              {((enemyVisible ?? isVisible) === true) && (
+                <div
+                  className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
+                  style={{
+                    backgroundImage: `url(${(() => {
+                      // Map Tile.tsx enemyFacing to registry Facing
+                      const toFacing = (f: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' | undefined): Facing => {
+                        switch (f) {
+                          case 'UP':
+                            return 'back';
+                          case 'RIGHT':
+                            return 'right';
+                          case 'LEFT':
+                            return 'left';
+                          case 'DOWN':
+                          default:
+                            return 'front';
+                        }
+                      };
+                      const kind: EnemyKind = (enemyKind ?? 'goblin');
+                      // For snakes: use moving sprite when enemyMoved, else coiled
+                      if (kind === 'snake') {
+                        const f = enemyFacing;
+                        // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
+                        const useMoving = !!enemyMoved;
+                        if (useMoving) {
+                          return getEnemyIcon('snake', 'left');
+                        }
+                        // coiled sprite follows facing (front/back/right are coiled)
+                        return getEnemyIcon('snake', toFacing(f));
+                      }
+                      const facing: Facing = toFacing(enemyFacing);
+                      return getEnemyIcon(kind, facing);
+                    })()})`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                    zIndex: 10500, // above fog (10000), below wall tops (12000)
+                    transform: (() => {
+                      // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
+                      if (enemyKind !== 'snake') {
+                        return enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none');
+                      }
+                      // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
+                      const baseScale = 'scale(0.5)';
+                      const moved = !!enemyMoved;
+                      if (moved && enemyFacing === 'RIGHT') {
+                        return 'scaleX(-1) ' + baseScale;
+                      }
+                      return baseScale;
+                    })(),
+                  }}
+                  data-testid="enemy-sprite"
+                />
+              )}
+            </>
           )}
 
           {/* Render all subtypes as standardized icons */}

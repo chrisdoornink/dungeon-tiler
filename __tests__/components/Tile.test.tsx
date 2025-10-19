@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { Tile } from '../../components/Tile';
 import '@testing-library/jest-dom';
 import { TileSubtype, Direction } from '../../lib/map';
+import { NPC } from '../../lib/npc';
 
 describe('Tile component', () => {
   it('should render the tile with correct background color', () => {
@@ -366,6 +367,68 @@ describe('Tile component', () => {
       // Should have hero image
       const heroImage = tile.querySelector('.heroImage');
       expect(heroImage).toBeInTheDocument();
+    });
+
+    it('should render NPC with dialogue prompt on flower tiles', () => {
+      const mockTileType = { id: 5, name: 'flowers', color: '#90EE90', walkable: true };
+      const mockNpc = new NPC({
+        id: 'test-npc',
+        name: 'Test NPC',
+        sprite: '/images/npcs/boy-1.png',
+        y: 12,
+        x: 3,
+        facing: Direction.DOWN,
+        canMove: false,
+      });
+      
+      render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          isVisible={true}
+          npc={mockNpc}
+          npcVisible={true}
+          npcInteractable={true}
+          row={12}
+          col={3}
+        />
+      );
+
+      const tile = screen.getByTestId('tile-5');
+      expect(tile).toBeInTheDocument();
+      
+      // Should have NPC sprite
+      const npcSprite = screen.getByTestId('npc-sprite');
+      expect(npcSprite).toBeInTheDocument();
+      
+      // Should have dialogue prompt
+      const dialoguePrompt = tile.textContent;
+      expect(dialoguePrompt).toContain('💬');
+    });
+
+    it('should render enemies on flower tiles', () => {
+      const mockTileType = { id: 5, name: 'flowers', color: '#90EE90', walkable: true };
+      
+      render(
+        <Tile
+          tileId={5}
+          tileType={mockTileType}
+          isVisible={true}
+          hasEnemy={true}
+          enemyVisible={true}
+          enemyFacing="DOWN"
+          enemyKind="goblin"
+          row={13}
+          col={2}
+        />
+      );
+
+      const tile = screen.getByTestId('tile-5');
+      expect(tile).toBeInTheDocument();
+      
+      // Should have enemy sprite
+      const enemySprite = screen.getByTestId('enemy-sprite');
+      expect(enemySprite).toBeInTheDocument();
     });
   });
 });

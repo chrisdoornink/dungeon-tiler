@@ -225,7 +225,7 @@ export type PlaceEnemiesArgs = {
 };
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
-  return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && grid[y][x] === 0;
+  return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && (grid[y][x] === 0 || grid[y][x] === 5);
 }
 
 function isInBounds(grid: number[][], y: number, x: number): boolean {
