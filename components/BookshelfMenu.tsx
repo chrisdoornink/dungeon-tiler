@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { BookExcerpt } from "../lib/story/library_registry";
-import { getBookshelf, getAvailableExcerpts } from "../lib/story/library_registry";
+import { getAvailableExcerpts } from "../lib/story/library_registry";
 import type { StoryFlags } from "../lib/story/event_registry";
 
 interface BookshelfMenuProps {

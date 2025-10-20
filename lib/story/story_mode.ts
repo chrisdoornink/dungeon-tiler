@@ -12,7 +12,7 @@ import {
 } from "../map";
 import { createTimeOfDayAtPhase } from "../time_of_day";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
-import { NPC, rehydrateNPCs, serializeNPCs } from "../npc";
+import { rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
 import {
   buildAscentCorridor,
@@ -44,6 +44,7 @@ import {
 import type { StoryRoom } from "./rooms/types";
 import { type StoryCondition } from "./event_registry";
 import { determineRoomNpcs } from "./npc_conditions";
+import { initializeLibraryContent } from "./library_content";
 
 function cloneMapData(mapData: MapData): MapData {
   return JSON.parse(JSON.stringify(mapData)) as MapData;
@@ -126,7 +127,6 @@ function cloneEnemies(enemies?: Enemy[]): Enemy[] {
 
 export function buildStoryModeState(): GameState {
   // Initialize library content registry
-  const { initializeLibraryContent } = require('./library_content');
   initializeLibraryContent();
 
   const entrance = buildEntranceHall();

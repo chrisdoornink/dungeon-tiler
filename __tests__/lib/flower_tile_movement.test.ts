@@ -1,5 +1,5 @@
 import { movePlayer, initializeGameStateFromMap, type GameState } from '../../lib/map/game-state';
-import { Direction, FLOOR, FLOWERS, TileSubtype } from '../../lib/map';
+import { Direction, FLOOR, FLOWERS, TileSubtype, type MapData } from '../../lib/map';
 
 describe('Flower tile movement', () => {
   it('should allow hero to walk onto flower tiles', () => {
@@ -16,13 +16,12 @@ describe('Flower tile movement', () => {
     // Place player at (1, 1) - on floor tile
     subtypes[1][1] = [TileSubtype.PLAYER];
     
-    const mapData = { tiles, subtypes, environment: 'dungeon' as const };
+    const mapData: MapData = { tiles, subtypes, environment: 'cave' };
     const gameState = initializeGameStateFromMap(mapData);
     
     // Move right onto flower tile at (1, 2)
     const newState = movePlayer(gameState, Direction.RIGHT);
     
-    // Verify player moved
     expect(newState.mapData.subtypes[1][1]).not.toContain(TileSubtype.PLAYER);
     expect(newState.mapData.subtypes[1][2]).toContain(TileSubtype.PLAYER);
   });
@@ -39,7 +38,7 @@ describe('Flower tile movement', () => {
     const subtypes = tiles.map(row => row.map(() => [] as number[]));
     subtypes[1][1] = [TileSubtype.PLAYER];
     
-    const mapData = { tiles, subtypes, environment: 'dungeon' as const };
+    const mapData: MapData = { tiles, subtypes, environment: 'cave' };
     let gameState = initializeGameStateFromMap(mapData);
     
     // Move right onto first flower (1, 2)
@@ -67,7 +66,7 @@ describe('Flower tile movement', () => {
     const subtypes = tiles.map(row => row.map(() => [] as number[]));
     subtypes[2][2] = [TileSubtype.PLAYER];
     
-    const mapData = { tiles, subtypes, environment: 'dungeon' as const };
+    const mapData: MapData = { tiles, subtypes, environment: 'cave' };
     const gameState = initializeGameStateFromMap(mapData);
     
     // Verify the isFloor function recognizes flower tiles for enemy placement
