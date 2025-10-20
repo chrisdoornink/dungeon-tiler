@@ -29,6 +29,7 @@ import {
   FLOWERS,
   TileSubtype,
   WALL,
+  tileTypes,
   type RoomId,
 } from "./constants";
 import type { MapData, RoomSnapshot, RoomTransition } from "./types";
@@ -54,6 +55,218 @@ import {
   createInitialTimeOfDay,
   type TimeOfDayState,
 } from "../time_of_day";
+import { canSee } from "../line_of_sight";
+
+const DOG_TAG = "dog";
+const DOG_TYPE = "dog";
+const DOG_FOLLOW_CHANCE_DEFAULT = 0.75;
+const DOG_FRONT_FRAME_MEMORY_KEY = "dogFrontFrameIndex";
+const DOG_BACK_FRAME_MEMORY_KEY = "dogBackFrameIndex";
+const DOG_HEART_MEMORY_KEY = "dogHeartTriggerId";
+
+const DOG_FRONT_FRAMES_DEFAULT = [
+  "/images/dog-golden/dog-front-1.png",
+  "/images/dog-golden/dog-front-2.png",
+  "/images/dog-golden/dog-front-3.png",
+  "/images/dog-golden/dog-front-4.png",
+];
+
+const DOG_BACK_FRAMES_DEFAULT = [
+  "/images/dog-golden/dog-back-1.png",
+  "/images/dog-golden/dog-back-2.png",
+];
+
+type DogMetadata = Record<string, unknown> | undefined;
+
+function getDogMetadata(npc: NPC): DogMetadata {
+  return npc.metadata as DogMetadata;
+}
+
+function isDogNpc(npc: NPC | undefined | null): npc is NPC {
+  if (!npc) return false;
+  if (Array.isArray(npc.tags) && npc.tags.includes(DOG_TAG)) return true;
+  const metadata = getDogMetadata(npc);
+  const typeValue = metadata?.["type"];
+  if (typeof typeValue === "string" && typeValue === DOG_TYPE) return true;
+  const speciesValue = metadata?.["species"];
+  return typeof speciesValue === "string" && speciesValue === DOG_TYPE;
+}
+
+function getDogFramesFromMetadata(
+  npc: NPC,
+  key: "dogFrontFrames" | "dogBackFrames",
+  fallback: string[],
+): string[] {
+  const metadata = getDogMetadata(npc);
+  const value = metadata?.[key];
+  if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+    return value as string[];
+  }
+  return fallback;
+}
+
+function pickDogFrame(
+  npc: NPC,
+  frames: string[],
+  memoryKey: string,
+): { sprite: string; changed: boolean } {
+  if (frames.length === 0) {
+    return { sprite: npc.sprite, changed: false };
+  }
+
+  const memoryValue = npc.getMemory(memoryKey);
+  const previousIndex = typeof memoryValue === "number" ? memoryValue : -1;
+
+  let index = frames.length === 1 ? 0 : Math.floor(Math.random() * frames.length);
+  if (frames.length > 1) {
+    const limit = frames.length * 2;
+    let attempts = 0;
+    while (index === previousIndex && attempts < limit) {
+      index = Math.floor(Math.random() * frames.length);
+      attempts++;
+    }
+  }
+
+  npc.setMemory(memoryKey, index);
+  const sprite = frames[index] ?? npc.sprite;
+  const changed = index !== previousIndex || sprite !== npc.sprite;
+  return { sprite, changed };
+}
+
+function isDogTileWalkable(mapData: MapData, y: number, x: number): boolean {
+  if (!isWithinBounds(mapData, y, x)) return false;
+  const row = mapData.tiles[y];
+  if (!row) return false;
+  const tileId = row[x];
+  if (tileId === undefined) return false;
+
+  const tileInfo = tileTypes[tileId];
+  const isBaseWalkable = tileInfo ? tileInfo.walkable : tileId === FLOOR || tileId === FLOWERS;
+  if (!isBaseWalkable) return false;
+
+  const subtypes = mapData.subtypes[y]?.[x] ?? [];
+  const blocked = new Set<number>([
+    TileSubtype.DOOR,
+    TileSubtype.EXIT,
+    TileSubtype.LOCK,
+    TileSubtype.CHEST,
+    TileSubtype.POT,
+    TileSubtype.SWORD,
+    TileSubtype.SHIELD,
+    TileSubtype.BOOKSHELF,
+    TileSubtype.PLAYER,
+    TileSubtype.ROOM_TRANSITION,
+  ]);
+  for (const subtype of subtypes) {
+    if (blocked.has(subtype)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function updateDogNpcsBeforeTurn(
+  state: GameState,
+  mapData: MapData,
+  heroPosition: [number, number],
+): void {
+  const npcs = state.npcs;
+  if (!npcs || npcs.length === 0) return;
+
+  const losGrid = mapData.tiles.map((row) =>
+    row.map((tileId) => {
+      const tileInfo = tileTypes[tileId];
+      return tileInfo && tileInfo.walkable ? 0 : 1;
+    }),
+  );
+
+  let mutated = false;
+
+  for (const npc of npcs) {
+    if (!isDogNpc(npc)) continue;
+
+    let dogChanged = false;
+
+    const seesHero = canSee(losGrid, [npc.y, npc.x], heroPosition);
+    let followChance = DOG_FOLLOW_CHANCE_DEFAULT;
+    const metadata = getDogMetadata(npc);
+    const rawChance = metadata?.["dogFollowChance"];
+    if (typeof rawChance === "number" && Number.isFinite(rawChance)) {
+      followChance = Math.min(Math.max(rawChance, 0), 1);
+    }
+
+    if (npc.canMove && seesHero && Math.random() < followChance) {
+      const deltas: Array<{ dy: number; dx: number; dir: Direction }> = [
+        { dy: -1, dx: 0, dir: Direction.UP },
+        { dy: 1, dx: 0, dir: Direction.DOWN },
+        { dy: 0, dx: -1, dir: Direction.LEFT },
+        { dy: 0, dx: 1, dir: Direction.RIGHT },
+      ];
+
+      deltas.sort((a, b) => {
+        const nextAY = npc.y + a.dy;
+        const nextAX = npc.x + a.dx;
+        const nextBY = npc.y + b.dy;
+        const nextBX = npc.x + b.dx;
+        const distA = Math.abs(heroPosition[0] - nextAY) + Math.abs(heroPosition[1] - nextAX);
+        const distB = Math.abs(heroPosition[0] - nextBY) + Math.abs(heroPosition[1] - nextBX);
+        return distA - distB;
+      });
+
+      for (const delta of deltas) {
+        const targetY = npc.y + delta.dy;
+        const targetX = npc.x + delta.dx;
+        if (!isDogTileWalkable(mapData, targetY, targetX)) continue;
+        if (targetY === heroPosition[0] && targetX === heroPosition[1]) continue;
+        const occupiedByNpc = npcs.some(
+          (other) =>
+            other !== npc &&
+            !other.isDead() &&
+            other.y === targetY &&
+            other.x === targetX,
+        );
+        if (occupiedByNpc) continue;
+        const occupiedByEnemy = state.enemies?.some(
+          (enemy) => enemy.y === targetY && enemy.x === targetX,
+        );
+        if (occupiedByEnemy) continue;
+
+        npc.moveTo(targetY, targetX);
+        npc.face(delta.dir);
+        dogChanged = true;
+        break;
+      }
+    }
+
+    const dyToHero = heroPosition[0] - npc.y;
+    const facing = dyToHero < 0 ? Direction.UP : Direction.DOWN;
+    if (npc.facing !== facing) {
+      npc.face(facing);
+      dogChanged = true;
+    }
+
+    const frameKey = facing === Direction.UP ? DOG_BACK_FRAME_MEMORY_KEY : DOG_FRONT_FRAME_MEMORY_KEY;
+    const frames = facing === Direction.UP
+      ? getDogFramesFromMetadata(npc, "dogBackFrames", DOG_BACK_FRAMES_DEFAULT)
+      : getDogFramesFromMetadata(npc, "dogFrontFrames", DOG_FRONT_FRAMES_DEFAULT);
+    const { sprite, changed } = pickDogFrame(npc, frames, frameKey);
+    if (sprite !== npc.sprite) {
+      npc.sprite = sprite;
+      dogChanged = true;
+    } else if (changed) {
+      // Memory changed even if sprite stayed the same (single-frame fallback)
+      dogChanged = true;
+    }
+
+    if (dogChanged) {
+      mutated = true;
+    }
+  }
+
+  if (mutated) {
+    state.npcs = [...npcs];
+  }
+}
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
   if (amount <= 0) return;
@@ -1057,6 +1270,7 @@ export function movePlayer(
     mapData: newMapData,
     playerDirection: direction,
   };
+  updateDogNpcsBeforeTurn(newGameState, newMapData, [currentY, currentX]);
   // Reset transient deaths for this tick
   newGameState.recentDeaths = [];
   // Track if player actually changed tiles this turn
@@ -1304,6 +1518,18 @@ export function movePlayer(
       blockingNpc.setMemory("lastBumpAt", Date.now());
       blockingNpc.setMemory("lastHeroDirection", direction);
       blockingNpc.setMemory("lastManualInteract", Date.now());
+      if (isDogNpc(blockingNpc)) {
+        const currentHeart = blockingNpc.getMemory(DOG_HEART_MEMORY_KEY);
+        const nextTrigger =
+          (typeof currentHeart === "number" && Number.isFinite(currentHeart)
+            ? currentHeart
+            : 0) + 1;
+        blockingNpc.setMemory(DOG_HEART_MEMORY_KEY, nextTrigger);
+        if (newGameState.npcs) {
+          newGameState.npcs = [...newGameState.npcs];
+        }
+        return newGameState;
+      }
       if (newGameState.npcs) {
         newGameState.npcs = [...newGameState.npcs];
       }

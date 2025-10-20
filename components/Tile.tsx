@@ -11,6 +11,7 @@ import {
   getFloorAsset,
   getWallAsset,
 } from "../lib/environment";
+import HeartPopAnimation from "./HeartPopAnimation";
 
 type NeighborInfo = {
   top: number | null;
@@ -794,6 +795,19 @@ export const Tile: React.FC<TileProps> = ({
   })();
   const showNpcPrompt = shouldShowNpc && npcInteractable;
 
+  const isDogNpc = (() => {
+    if (!npc) return false;
+    if (Array.isArray(npc.tags) && npc.tags.includes('dog')) return true;
+    const metadata = npc.metadata as Record<string, unknown> | undefined;
+    const typeValue = metadata?.['type'];
+    if (typeof typeValue === 'string' && typeValue === 'dog') return true;
+    const speciesValue = metadata?.['species'];
+    return typeof speciesValue === 'string' && speciesValue === 'dog';
+  })();
+  const dogHeartTrigger = isDogNpc ? npc?.memory?.['dogHeartTriggerId'] : undefined;
+  const showDogHeart =
+    isDogNpc && typeof dogHeartTrigger === 'number' && dogHeartTrigger > 0;
+
   // If this is a floor tile
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
@@ -910,6 +924,13 @@ export const Tile: React.FC<TileProps> = ({
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
+            />
+          )}
+          {shouldShowNpc && npc && showDogHeart && (
+            <HeartPopAnimation
+              key={`${npc.id}-heart-${dogHeartTrigger}`}
+              isTriggered={true}
+              className="left-1/2 top-0 -translate-x-1/2 -translate-y-2"
             />
           )}
           {showNpcPrompt && (
