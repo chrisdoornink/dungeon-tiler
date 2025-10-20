@@ -107,6 +107,26 @@ export function buildBluffCaves(): StoryRoom {
   const transitionToNext: [number, number] = [exitDoorY, width - 1];
   const entryFromNext: [number, number] = [exitDoorY, width - 2];
 
+  // Create north passage area with torches
+  ensureFloor(2, 25);
+  ensureFloor(2, 26);
+  ensureFloor(2, 27);
+  ensureFloor(3, 25);
+  ensureFloor(3, 26);
+  ensureFloor(3, 27);
+  ensureFloor(1, 26);
+  
+  // Add floor tile at 0,26 for transition
+  tiles[0][26] = FLOOR;
+  
+  // Add torches at 2,25 and 2,27
+  subtypes[2][25] = [TileSubtype.WALL_TORCH];
+  subtypes[2][27] = [TileSubtype.WALL_TORCH];
+  
+  // Add transition to serpent den north at 1,26
+  tiles[1][26] = FLOOR;
+  subtypes[1][26] = [TileSubtype.ROOM_TRANSITION];
+
   const torchPositions: Array<[number, number]> = [
     [exitDoorY - 1, width - 2],
     [exitDoorY + 1, width - 2],

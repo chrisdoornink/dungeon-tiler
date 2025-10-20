@@ -4,21 +4,22 @@ import { NPC } from "../../../npc";
 import type { StoryRoom } from "../types";
 
 export function buildBluffSerpentDen(): StoryRoom {
-  const size = 12;
-  const tiles: number[][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => WALL)
+  const height = 12;
+  const width = 30;
+  const tiles: number[][] = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => WALL)
   );
-  const subtypes: number[][][] = Array.from({ length: size }, () =>
-    Array.from({ length: size }, () => [] as number[])
+  const subtypes: number[][][] = Array.from({ length: height }, () =>
+    Array.from({ length: width }, () => [] as number[])
   );
 
-  for (let y = 1; y < size - 1; y++) {
-    for (let x = 1; x < size - 1; x++) {
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
       tiles[y][x] = FLOOR;
     }
   }
 
-  const entryY = Math.floor(size / 2);
+  const entryY = Math.floor(height / 2);
   const entryPoint: [number, number] = [entryY, 1];
   const transitionToPrevious: [number, number] = [entryY, 0];
   tiles[entryY][0] = FLOOR;
@@ -31,10 +32,25 @@ export function buildBluffSerpentDen(): StoryRoom {
     [entryY + 1, 1],
   ];
   for (const [ty, tx] of entranceTorches) {
-    if (ty > 0 && ty < size - 1) {
+    if (ty > 0 && ty < height - 1) {
       subtypes[ty][tx] = [TileSubtype.WALL_TORCH];
     }
   }
+
+  // Add torch area at far right (columns 25-27)
+  // Floor tiles at 2,25-27 and 3,25-27
+  for (let y = 2; y <= 3; y++) {
+    for (let x = 25; x <= 27; x++) {
+      tiles[y][x] = FLOOR;
+    }
+  }
+  // Torches at 2,25 and 2,27
+  subtypes[2][25] = [TileSubtype.WALL_TORCH];
+  subtypes[2][27] = [TileSubtype.WALL_TORCH];
+
+  // Transition to dangerous snake room at 1,26
+  tiles[1][26] = FLOOR;
+  subtypes[1][26] = [TileSubtype.ROOM_TRANSITION];
 
   // Place coiled snake NPC at a specific tile
   const npcY = 3;
@@ -63,9 +79,10 @@ export function buildBluffSerpentDen(): StoryRoom {
   const enemies: Enemy[] = [];
   // Build candidate floor tiles away from the left wall and actor entry/npc tiles
   const candidates: Array<[number, number]> = [];
-  for (let y = 1; y < size - 1; y++) {
-    for (let x = 1; x < size - 1; x++) {
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
       if (x <= 2) continue; // leave some breathing room near entrance
+      if (x >= 25) continue; // avoid torch area
       if ((y === entryPoint[0] && x <= entryPoint[1] + 2) || (y === npcY && x === npcX)) continue;
       if (tiles[y][x] === FLOOR) candidates.push([y, x]);
     }

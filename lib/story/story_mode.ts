@@ -19,6 +19,7 @@ import {
   buildBluffCaves,
   buildBluffPassageway,
   buildBluffSerpentDen,
+  buildBluffSerpentDenNorth,
   buildEntranceHall,
   buildOutdoorClearing,
   buildOutdoorHouse,
@@ -137,6 +138,7 @@ export function buildStoryModeState(): GameState {
   const bluffPassage = buildBluffPassageway();
   const bluffCaves = buildBluffCaves();
   const bluffSerpentDen = buildBluffSerpentDen();
+  const bluffSerpentDenNorth = buildBluffSerpentDenNorth();
   const wildsEntrance = buildTheWildsEntrance();
   const depthsRoom1 = buildDepthsOfDespairRoom1();
   const depthsRoom2 = buildDepthsOfDespairRoom2();
@@ -322,6 +324,29 @@ export function buildStoryModeState(): GameState {
     bluffCaves.id,
     bluffSerpentDen.transitionToPrevious!,
     bluffCaves.entryFromNext ?? bluffCaves.entryPoint
+  );
+  
+  // Transition to Serpent Den North from Bluff Caves
+  // Entrance at the bottom
+  pushTransition(
+    bluffCaves.id,
+    bluffSerpentDenNorth.id,
+    [1, 26],
+    bluffSerpentDenNorth.entryPoint
+  );
+  // Exit from bottom of serpent den
+  pushTransition(
+    bluffSerpentDenNorth.id,
+    bluffCaves.id,
+    bluffSerpentDenNorth.transitionToPrevious!,
+    [1, 26]
+  );
+  // Exit from (13, 10) in serpent den
+  pushTransition(
+    bluffSerpentDenNorth.id,
+    bluffCaves.id,
+    [13, 10],
+    [1, 26]
   );
 
   // Build Torch Town interior rooms and transitions
@@ -549,6 +574,7 @@ export function buildStoryModeState(): GameState {
     bluffPassage,
     bluffCaves,
     bluffSerpentDen,
+    bluffSerpentDenNorth,
     outdoorHouse,
     torchTown,
     wildsEntrance,
