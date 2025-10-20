@@ -37,6 +37,7 @@ The town has grown from a small outpost to a thriving community, with a library,
         content: `I ventured into the eastmost cave today, where silence dwells in stone and shadows linger in every corner. There I found one who remains still among us—a guardian of some kind. It spoke of riddles, testing whether I could see light in darkness, hear what speaks without sound, and grasp what moves yet cannot be held.
 
 I fled before answering, but the echo of its words haunts me. It guards something powerful, I'm certain—perhaps a means to traverse great distances. Time seems to stand still in that place. If you seek this treasure, bring patience. Silence is the first lesson, it said, and the echo of your thoughts the final test.`,
+        onReadEventId: "read-bluff-cave-secret",
       },
     ],
   });

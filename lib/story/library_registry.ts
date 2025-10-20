@@ -13,6 +13,8 @@ export interface BookExcerpt {
     value?: boolean | string | number;
     timeOfDay?: "day" | "night";
   }>;
+  /** Optional story event ID to trigger when this excerpt is read */
+  onReadEventId?: string;
 }
 
 /**

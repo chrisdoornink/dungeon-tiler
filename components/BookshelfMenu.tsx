@@ -9,9 +9,10 @@ interface BookshelfMenuProps {
   bookshelfId: string;
   storyFlags: StoryFlags;
   onClose: () => void;
+  onReadExcerpt?: (eventId: string) => void;
 }
 
-export function BookshelfMenu({ bookshelfId, storyFlags, onClose }: BookshelfMenuProps) {
+export function BookshelfMenu({ bookshelfId, storyFlags, onClose, onReadExcerpt }: BookshelfMenuProps) {
   const [selectedExcerpt, setSelectedExcerpt] = useState<BookExcerpt | null>(null);
   const [availableExcerpts, setAvailableExcerpts] = useState<BookExcerpt[]>([]);
 
@@ -19,6 +20,13 @@ export function BookshelfMenu({ bookshelfId, storyFlags, onClose }: BookshelfMen
     const excerpts = getAvailableExcerpts(bookshelfId, storyFlags);
     setAvailableExcerpts(excerpts);
   }, [bookshelfId, storyFlags]);
+
+  // Trigger story event when an excerpt is selected
+  useEffect(() => {
+    if (selectedExcerpt?.onReadEventId && onReadExcerpt) {
+      onReadExcerpt(selectedExcerpt.onReadEventId);
+    }
+  }, [selectedExcerpt, onReadExcerpt]);
 
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {

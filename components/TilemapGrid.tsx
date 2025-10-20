@@ -2695,6 +2695,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           bookshelfId={activeBookshelfId}
           storyFlags={gameState.storyFlags ?? {}}
           onClose={() => setActiveBookshelfId(null)}
+          onReadExcerpt={(eventId) => {
+            setGameState((prev) => {
+              const next = applyStoryEffectsWithDiary(
+                prev.storyFlags,
+                prev.diaryEntries,
+                [{ eventId, value: true }]
+              );
+              const updated = {
+                ...prev,
+                storyFlags: next.flags,
+                diaryEntries: next.diaryEntries,
+              };
+              CurrentGameStorage.saveCurrentGame(updated, resolvedStorageSlot);
+              return updated;
+            });
+          }}
         />
       )}
       

@@ -111,6 +111,16 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
       summary: "I answered the Ancient Serpent's riddles and earned a teleportation rune. The serpent tested my knowledge of silence, shadow, light, time, and echo.",
     },
   },
+  "read-bluff-cave-secret": {
+    id: "read-bluff-cave-secret",
+    description: "Hero read the book about the secret of the bluff caves.",
+    defaultValue: false,
+    diaryEntry: {
+      id: "read-bluff-cave-secret",
+      title: "Secret of the Bluff Caves",
+      summary: "This passage says the eastmost cave contains a secret, 'where silence dwells in stone and shadows linger in every corner. There I found one who remains still among us—a guardian of some kind. It spoke of riddles, testing whether I could see light in darkness, hear what speaks without sound, and grasp what moves yet cannot be held.\n\nI fled before answering, but the echo of its words haunts me. It guards something powerful, I'm certain—perhaps a means to traverse great distances. Time seems to stand still in that place. If you seek this treasure, bring patience. Silence is the first lesson, it said, and the echo of your thoughts the final test.",
+    },
+  },
 };
 
 export function listStoryEvents(): StoryEventDefinition[] {
