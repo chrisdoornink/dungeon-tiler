@@ -347,16 +347,16 @@ export function buildTorchTown(): StoryRoom {
   }));
 
   // 4. Jorin (Blacksmith) - Day: Smithy, Night: House 3
-  npcs.push(new NPC({
-    id: "npc-jorin",
-    name: "Jorin",
-    sprite: "/images/npcs/torch-town/jorin.png",
-    y: smithyDoor[0] - 1,
-    x: smithyDoor[1],
-    facing: Direction.DOWN,
-    canMove: false,
-    metadata: { dayLocation: "smithy", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
-  }));
+  // npcs.push(new NPC({
+  //   id: "npc-jorin",
+  //   name: "Jorin",
+  //   sprite: "/images/npcs/torch-town/jorin.png",
+  //   y: smithyDoor[0] - 1,
+  //   x: smithyDoor[1],
+  //   facing: Direction.DOWN,
+  //   canMove: false,
+  //   metadata: { dayLocation: "smithy", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
+  // }));
 
   // 5. Yanna (Herbalist) - Day: Forest edge (near gate), Night: House 3
   npcs.push(new NPC({

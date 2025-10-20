@@ -11,12 +11,24 @@ export interface NPCDialogueRule {
   conditions?: StoryCondition[];
 }
 
+const PRIORITIES = {
+  CONDITIONALLY_HIGHEST: 1000,
+  NPC_INTRO: 100,
+  TOWN_GOBLIN_ACTIVITY_COMPLETED: 66, // story event TBD
+  TOWN_GOBLIN_ACTIVITY_DETECTED: 65, // eventID: met-old-fenna-torch-town
+  MISSING_BOY: 60, // eventID: heard-missing-boy
+  SNAKE_RIDDLES_COMPLETED: 31, // eventID: snake-riddles-completed
+  ENTERED_BLUFF_CAVE: 30, // eventID: entered-bluff-cave
+  KALEN_RESCUED_AT_BLUFF: 25, // eventID: kalen-rescued-at-bluff
+  DEFAULT: 0,
+}
+
 const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   // Missing boy reactions take precedence where applicable
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-missing-boy",
-    priority: 60,
+    priority: PRIORITIES.MISSING_BOY,
     conditions: [
       { eventId: "heard-missing-boy", value: true },
       { eventId: "kalen-rescued-at-bluff", value: false },
@@ -26,18 +38,18 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-default",
-    priority: 0,
+    priority: PRIORITIES.DEFAULT,
   },
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-intro",
-    priority: 30,
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST,
     conditions: [{ eventId: "met-elder-rowan", value: false }],
   },
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-awaiting-warning",
-    priority: 35,
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST,
     conditions: [
       { eventId: "met-elder-rowan", value: true },
       { eventId: "heard-missing-boy", value: false },
@@ -47,7 +59,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-warning-response",
-    priority: 40,
+    priority: PRIORITIES.NPC_INTRO,
     conditions: [
       { eventId: "met-elder-rowan", value: true },
       { eventId: "heard-missing-boy", value: true },
@@ -58,13 +70,16 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-post-warning",
-    priority: 20,
-    conditions: [{ eventId: "elder-rowan-acknowledged-warning", value: true }],
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST,
+    conditions: [
+      { eventId: "elder-rowan-acknowledged-warning", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: false },
+    ],
   },
   {
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-kalen-rescued",
-    priority: 25,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
@@ -72,27 +87,28 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-default",
-    priority: 0,
+    priority: PRIORITIES.DEFAULT,
   },
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-reminder",
-    priority: 5,
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST,
     conditions: [
       { eventId: "met-caretaker-lysa", value: true },
       { eventId: "heard-missing-boy", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: false },
     ],
   },
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-intro",
-    priority: 10,
+    priority: PRIORITIES.NPC_INTRO,
     conditions: [{ eventId: "met-caretaker-lysa", value: false }],
   },
   {
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-kalen-rescued",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
@@ -100,14 +116,14 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-sanctum-default",
-    priority: 30,
+    priority: PRIORITIES.ENTERED_BLUFF_CAVE,
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
   // Kalen at bluff - grateful after rescue but before entering cave
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-thanks-cave",
-    priority: 20,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [
       { eventId: "rescued-kalen", value: true },
       { eventId: "entered-bluff-cave", value: false }
@@ -117,7 +133,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-sanctum-boy",
     scriptId: "kalen-distressed",
-    priority: 10,
+    priority: PRIORITIES.MISSING_BOY,
     conditions: [{ eventId: "rescued-kalen", value: false }],
   },
 
@@ -125,25 +141,25 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-eldra",
     scriptId: "eldra-cave-hint",
-    priority: 25,
+    priority: PRIORITIES.ENTERED_BLUFF_CAVE,
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
   {
     npcId: "npc-captain-bren",
     scriptId: "captain-bren-cave-hint",
-    priority: 25,
+    priority: PRIORITIES.ENTERED_BLUFF_CAVE,
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
   {
     npcId: "npc-dara",
     scriptId: "dara-cave-hint",
-    priority: 25,
+    priority: PRIORITIES.ENTERED_BLUFF_CAVE,
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
   {
     npcId: "npc-lio",
     scriptId: "lio-cave-hint",
-    priority: 25,
+    priority: PRIORITIES.ENTERED_BLUFF_CAVE,
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
 
@@ -151,43 +167,37 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-maro",
     scriptId: "maro-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-yanna",
     scriptId: "yanna-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-serin",
     scriptId: "serin-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-mira",
     scriptId: "mira-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-kira",
     scriptId: "kira-kalen-rescue",
-    priority: 15,
-    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
-  },
-  {
-    npcId: "npc-fenna",
-    scriptId: "fenna-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-rhett",
     scriptId: "rhett-kalen-rescue",
-    priority: 15,
+    priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
@@ -195,20 +205,20 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-bluff-coiled-snake",
     scriptId: "snake-already-completed",
-    priority: 10,
+    priority: PRIORITIES.SNAKE_RIDDLES_COMPLETED,
     conditions: [{ eventId: "snake-riddles-completed", value: true }],
   },
   {
     npcId: "npc-bluff-coiled-snake",
     scriptId: "bluff-coiled-snake",
-    priority: 0,
+    priority: PRIORITIES.DEFAULT,
   },
 
   // Torch Town NPCs - Goblin Activity (priority 20, after meeting Old Fenna + Kalen rescue + cave found)
   {
     npcId: "npc-eldra",
     scriptId: "eldra-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -218,7 +228,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-maro",
     scriptId: "maro-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -228,7 +238,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-captain-bren",
     scriptId: "captain-bren-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -238,7 +248,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-captain-bren-inside",
     scriptId: "captain-bren-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -248,7 +258,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-jorin",
     scriptId: "jorin-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -258,7 +268,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-yanna",
     scriptId: "yanna-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -268,7 +278,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-serin",
     scriptId: "serin-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -278,7 +288,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-rhett",
     scriptId: "rhett-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -288,7 +298,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-mira",
     scriptId: "mira-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -298,7 +308,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-kira",
     scriptId: "kira-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -308,7 +318,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-lio",
     scriptId: "lio-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -318,7 +328,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-dara",
     scriptId: "dara-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -328,7 +338,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-sela",
     scriptId: "sela-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -338,7 +348,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-sela-day",
     scriptId: "sela-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -348,7 +358,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-sela-night",
     scriptId: "sela-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -358,7 +368,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-thane",
     scriptId: "thane-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -368,7 +378,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-thane-day",
     scriptId: "thane-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -378,7 +388,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-thane-night",
     scriptId: "thane-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -388,7 +398,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-fenna",
     scriptId: "fenna-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -398,7 +408,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-arin",
     scriptId: "arin-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -408,7 +418,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-haro",
     scriptId: "haro-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -418,7 +428,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-len",
     scriptId: "len-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -428,7 +438,7 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   {
     npcId: "npc-tavi",
     scriptId: "tavi-goblin-activity",
-    priority: 20,
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
     conditions: [
       { eventId: "met-old-fenna-torch-town", value: true },
       { eventId: "kalen-rescued-at-bluff", value: true },
@@ -437,29 +447,29 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   },
 
   // Torch Town NPCs - Defaults (priority 0)
-  { npcId: "npc-eldra", scriptId: "eldra-default", priority: 0 },
-  { npcId: "npc-maro", scriptId: "maro-default", priority: 0 },
-  { npcId: "npc-captain-bren", scriptId: "captain-bren-default", priority: 0 },
-  { npcId: "npc-captain-bren-inside", scriptId: "captain-bren-default", priority: 0 },
-  { npcId: "npc-jorin", scriptId: "jorin-default", priority: 0 },
-  { npcId: "npc-yanna", scriptId: "yanna-default", priority: 0 },
-  { npcId: "npc-serin", scriptId: "serin-default", priority: 0 },
-  { npcId: "npc-rhett", scriptId: "rhett-default", priority: 0 },
-  { npcId: "npc-mira", scriptId: "mira-default", priority: 0 },
-  { npcId: "npc-kira", scriptId: "kira-default", priority: 0 },
-  { npcId: "npc-lio", scriptId: "lio-default", priority: 0 },
-  { npcId: "npc-dara", scriptId: "dara-default", priority: 0 },
-  { npcId: "npc-sela", scriptId: "sela-default", priority: 0 },
-  { npcId: "npc-sela-day", scriptId: "sela-default", priority: 0 },
-  { npcId: "npc-sela-night", scriptId: "sela-default", priority: 0 },
-  { npcId: "npc-thane", scriptId: "thane-default", priority: 0 },
-  { npcId: "npc-thane-day", scriptId: "thane-default", priority: 0 },
-  { npcId: "npc-thane-night", scriptId: "thane-default", priority: 0 },
-  { npcId: "npc-fenna", scriptId: "fenna-default", priority: 0 },
-  { npcId: "npc-arin", scriptId: "arin-default", priority: 0 },
-  { npcId: "npc-haro", scriptId: "haro-default", priority: 0 },
-  { npcId: "npc-len", scriptId: "len-default", priority: 0 },
-  { npcId: "npc-tavi", scriptId: "tavi-default", priority: 0 },
+  { npcId: "npc-eldra", scriptId: "eldra-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-maro", scriptId: "maro-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-captain-bren", scriptId: "captain-bren-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-captain-bren-inside", scriptId: "captain-bren-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-jorin", scriptId: "jorin-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-yanna", scriptId: "yanna-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-serin", scriptId: "serin-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-rhett", scriptId: "rhett-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-mira", scriptId: "mira-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-kira", scriptId: "kira-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-lio", scriptId: "lio-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-dara", scriptId: "dara-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-sela", scriptId: "sela-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-sela-day", scriptId: "sela-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-sela-night", scriptId: "sela-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-thane", scriptId: "thane-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-thane-day", scriptId: "thane-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-thane-night", scriptId: "thane-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-fenna", scriptId: "fenna-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-arin", scriptId: "arin-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-haro", scriptId: "haro-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-len", scriptId: "len-default", priority: PRIORITIES.DEFAULT },
+  { npcId: "npc-tavi", scriptId: "tavi-default", priority: PRIORITIES.DEFAULT },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {

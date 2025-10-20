@@ -89,10 +89,6 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
         speaker: "Elder Rowan",
         text: "Every step after the sanctum is a bargain with older things. Let Lysa's warning settle in your bones.",
       },
-      {
-        speaker: "Hero",
-        text: "It has. I'll measure my breath and my stride.",
-      },
     ],
   },
   "elder-rowan-default": {
@@ -713,8 +709,8 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     id: "captain-bren-goblin-activity",
     lines: [
       { speaker: "Captain Bren", text: "The eastern gate has seen more activity than usual. Goblins, mostly—more organized than they should be." },
-      { speaker: "Captain Bren", text: "Jorin's been helping reinforce our equipment, but I worry about Yanna wandering off to forage. That woman has no sense of danger." },
       { speaker: "Captain Bren", text: "If you're heading out there, we could use someone to scout the area. Find out what's stirring them up." },
+      { speaker: "Captain Bren", text: "I'd get some weapons and armor before heading out there. The smithy should be able to help you out. He's in his shop just south of here." },
     ],
   },
   "jorin-goblin-activity": {
@@ -776,7 +772,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "dara-goblin-activity": {
     id: "dara-goblin-activity",
     lines: [
-      { speaker: "Dara", text: "I've walked many roads and seen many threats. This goblin activity reminds me of darker times." },
+      { speaker: "Dara", text: "Rumors of goblin activity reminds me of darker times." },
       { speaker: "Dara", text: "In my experience, when monsters gather like this, there's always a cause. A leader, a corruption, something." },
       { speaker: "Dara", text: "The eastern wilds hold answers. But answers often come with a price." },
     ],

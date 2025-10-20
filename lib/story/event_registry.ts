@@ -125,6 +125,11 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
     id: "met-old-fenna-torch-town",
     description: "Hero met Old Fenna in Torch Town and learned about the growing danger from the eternal flame.",
     defaultValue: false,
+    diaryEntry: {
+      id: "met-old-fenna-torch-town",
+      title: "Old Fenna's Warning",
+      summary: "Old Fenna warned me of growing danger from the eternal flame. Something dark stirs beyond our eastern walls. The flame shows me shadows gathering, growing bolder. I should investigate beyond the walls.",
+    },
   },
 };
 
