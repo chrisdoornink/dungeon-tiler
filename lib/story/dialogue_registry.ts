@@ -51,14 +51,6 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
         speaker: "Elder Rowan",
         text: "Caretaker Lysa has always felt the sanctum breathe before the rest of us. What message did she press into your hands?",
       },
-      {
-        speaker: "Hero",
-        text: "She warned that the sanctum's wards are thin. One misstep and the climb could swallow me whole.",
-      },
-      {
-        speaker: "Elder Rowan",
-        text: "Then let this ring anchor you. When the sanctum howls, hold your ground and listen before you leap.",
-      },
     ],
     onCompleteEffects: [
       { eventId: "elder-rowan-acknowledged-warning", value: true },
@@ -197,6 +189,23 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "caretaker-lysa-kalen-rescued": {
+    id: "caretaker-lysa-kalen-rescued",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "Thank the stones—Kalen returned safely. You have my deepest gratitude.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "He spoke of a cave at the bluff. I recall old stories... whispers of passages beneath those cliffs.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "You might want to ask around in the town for more details. I'm sure the librarian will have some old maps or stories to share.",
+      },
+    ],
+  },
   "town-librarian-default": {
     id: "town-librarian-default",
     lines: [
@@ -229,6 +238,23 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       {
         speaker: "Elder Rowan",
         text: "Keep your step steady. Unease is a warning—not a verdict.",
+      },
+    ],
+  },
+  "elder-rowan-kalen-rescued": {
+    id: "elder-rowan-kalen-rescued",
+    lines: [
+      {
+        speaker: "Elder Rowan",
+        text: "Kalen is safe—you've done well. The boy's curiosity nearly cost him dearly.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "He mentioned a cave at the bluff. I've kept watch over this sanctum for decades, but even I didn't know of passages there.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "The air still feels... watchful. I'll remain here at the entrance. Something stirs beyond our walls.",
       },
     ],
   },
@@ -553,8 +579,12 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "fenna-default": {
     id: "fenna-default",
     lines: [
-      { speaker: "Old Fenna", text: "The flame must never die. It's not just fire—it's our promise to those who came before." },
+      { speaker: "Old Fenna", text: "Welcome, traveler. I am Old Fenna, keeper of the eternal flame." },
+      { speaker: "Old Fenna", text: "The flame has been restless lately—flickering, dancing with unease. In all my years, I've learned it never lies." },
+      { speaker: "Old Fenna", text: "Something dark stirs beyond our eastern walls. The flame shows me shadows gathering, growing bolder." },
+      { speaker: "Old Fenna", text: "Speak with the townsfolk. They feel it too, though some try to ignore the signs." },
     ],
+    onCompleteEffects: [{ eventId: "met-old-fenna-torch-town", value: true }],
   },
   "arin-default": {
     id: "arin-default",
@@ -659,6 +689,152 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       { speaker: "Rhett", text: "Heard you saved the sanctum boy from trouble. Good on you." },
       { speaker: "Rhett", text: "Hard work and helping others—that's what keeps a community strong." },
+    ],
+  },
+
+  // Goblin Activity - NPCs discussing increased monster activity (after Kalen rescue)
+  "eldra-goblin-activity": {
+    id: "eldra-goblin-activity",
+    lines: [
+      { speaker: "Eldra", text: "The pages whisper of dark times ahead. Goblins at our gates, shadows creeping closer..." },
+      { speaker: "Eldra", text: "I trust only Serin's judgment in these matters. The others panic too easily." },
+      { speaker: "Eldra", text: "If you venture east beyond the walls, tread carefully. The darkness grows bolder." },
+    ],
+  },
+  "maro-goblin-activity": {
+    id: "maro-goblin-activity",
+    lines: [
+      { speaker: "Maro", text: "Business has been slow. People are scared to venture out with all these goblins lurking around." },
+      { speaker: "Maro", text: "That librarian Eldra keeps muttering about 'ancient warnings' and 'lost records.' Bah! We need action, not dusty books." },
+      { speaker: "Maro", text: "If you're brave enough to investigate the eastern wilds, stock up first. I won't have your death on my conscience." },
+    ],
+  },
+  "captain-bren-goblin-activity": {
+    id: "captain-bren-goblin-activity",
+    lines: [
+      { speaker: "Captain Bren", text: "The eastern gate has seen more activity than usual. Goblins, mostly—more organized than they should be." },
+      { speaker: "Captain Bren", text: "Jorin's been helping reinforce our equipment, but I worry about Yanna wandering off to forage. That woman has no sense of danger." },
+      { speaker: "Captain Bren", text: "If you're heading out there, we could use someone to scout the area. Find out what's stirring them up." },
+    ],
+  },
+  "jorin-goblin-activity": {
+    id: "jorin-goblin-activity",
+    lines: [
+      { speaker: "Jorin", text: "Ha! More monsters means more work for me. Every guard in town needs their blade sharpened." },
+      { speaker: "Jorin", text: "Listen—if you bring me 20 stones, good solid ones, I'll forge you a proper sword. Better than anything you'll find out there." },
+      { speaker: "Jorin", text: "The eastern wilds are crawling with goblins. Perfect place to test your mettle and gather materials." },
+    ],
+  },
+  "yanna-goblin-activity": {
+    id: "yanna-goblin-activity",
+    lines: [
+      { speaker: "Yanna", text: "The herbs near the eastern gate have been... whispering. They sense the corruption spreading." },
+      { speaker: "Yanna", text: "Goblins are just symptoms. Something deeper is wrong. The land itself feels sick." },
+      { speaker: "Yanna", text: "If you investigate, bring me samples of anything unusual you find. Plants, soil, anything touched by darkness." },
+    ],
+  },
+  "serin-goblin-activity": {
+    id: "serin-goblin-activity",
+    lines: [
+      { speaker: "Serin", text: "I've been treating more injuries lately. Guards coming back from the eastern gate, mostly." },
+      { speaker: "Serin", text: "Eldra confides in me about her concerns. She's not wrong—something is stirring out there." },
+      { speaker: "Serin", text: "If you plan to investigate, please be careful. I'd rather prevent wounds than heal them." },
+    ],
+  },
+  "rhett-goblin-activity": {
+    id: "rhett-goblin-activity",
+    lines: [
+      { speaker: "Rhett", text: "Can't work the eastern fields anymore. Too many goblins prowling around." },
+      { speaker: "Rhett", text: "Mira says I'm being paranoid, but I've seen them. More every day." },
+      { speaker: "Rhett", text: "Someone needs to clear them out before we lose the harvest. If you're able, the town would be grateful." },
+    ],
+  },
+  "mira-goblin-activity": {
+    id: "mira-goblin-activity",
+    lines: [
+      { speaker: "Mira", text: "Rhett's been on edge about the goblins. I tell him to focus on what he can control, but he worries." },
+      { speaker: "Mira", text: "Every thread tells a story, and lately the threads have been dark. Danger, uncertainty, fear..." },
+      { speaker: "Mira", text: "If you venture east, you'll be weaving yourself into this tale. Make sure it has a good ending." },
+    ],
+  },
+  "kira-goblin-activity": {
+    id: "kira-goblin-activity",
+    lines: [
+      { speaker: "Kira", text: "Uncle Maro won't let me near the eastern gate anymore. He says it's too dangerous." },
+      { speaker: "Kira", text: "But I've seen the guards coming back. They look... worried. What's really out there?" },
+      { speaker: "Kira", text: "I wish I could help, but Uncle says I'm too young. Maybe you could investigate for us?" },
+    ],
+  },
+  "lio-goblin-activity": {
+    id: "lio-goblin-activity",
+    lines: [
+      { speaker: "Lio", text: "Hunting's been impossible lately. The goblins have scared off all the game." },
+      { speaker: "Lio", text: "I've tracked their movements—they're gathering east of town, near the wilds. Something's organizing them." },
+      { speaker: "Lio", text: "If you're a fighter, that's where you need to go. Hunt the hunters, if you catch my meaning." },
+    ],
+  },
+  "dara-goblin-activity": {
+    id: "dara-goblin-activity",
+    lines: [
+      { speaker: "Dara", text: "I've walked many roads and seen many threats. This goblin activity reminds me of darker times." },
+      { speaker: "Dara", text: "In my experience, when monsters gather like this, there's always a cause. A leader, a corruption, something." },
+      { speaker: "Dara", text: "The eastern wilds hold answers. But answers often come with a price." },
+    ],
+  },
+  "sela-goblin-activity": {
+    id: "sela-goblin-activity",
+    lines: [
+      { speaker: "Sela", text: "Night watch has been tense. We hear them out there, beyond the walls. Goblins, definitely." },
+      { speaker: "Sela", text: "Captain Bren has us on high alert. The eastern gate especially—that's where they're most active." },
+      { speaker: "Sela", text: "If you're planning to investigate, go during the day. Night belongs to them now." },
+    ],
+  },
+  "thane-goblin-activity": {
+    id: "thane-goblin-activity",
+    lines: [
+      { speaker: "Thane", text: "..." },
+      { speaker: "Thane", text: "*points east with concern*" },
+      { speaker: "Thane", text: "*makes a slashing gesture, then nods encouragingly*" },
+    ],
+  },
+  "fenna-goblin-activity": {
+    id: "fenna-goblin-activity",
+    lines: [
+      { speaker: "Old Fenna", text: "The flame flickers when danger approaches. It's been restless for days now." },
+      { speaker: "Fenna", text: "Goblins at our gates... I've seen this before, long ago. It never ends well unless someone acts." },
+      { speaker: "Fenna", text: "The flame shows me a path to the east. Someone must walk it, or the darkness will consume us all." },
+    ],
+  },
+  "arin-goblin-activity": {
+    id: "arin-goblin-activity",
+    lines: [
+      { speaker: "Arin", text: "Been reinforcing the eastern wall. Goblins keep testing our defenses." },
+      { speaker: "Arin", text: "Simple work, but necessary. Though I'd rather be building than fortifying." },
+      { speaker: "Arin", text: "If someone could deal with the source of this problem, we could get back to normal life." },
+    ],
+  },
+  "haro-goblin-activity": {
+    id: "haro-goblin-activity",
+    lines: [
+      { speaker: "Haro", text: "The fish have been scarce. Even they know something's wrong." },
+      { speaker: "Haro", text: "Len thinks I'm imagining things, but the water doesn't lie. There's darkness spreading from the east." },
+      { speaker: "Haro", text: "Someone needs to investigate before it reaches the town." },
+    ],
+  },
+  "len-goblin-activity": {
+    id: "len-goblin-activity",
+    lines: [
+      { speaker: "Len", text: "Haro's been going on about 'darkness in the water.' I think he's been in the sun too long." },
+      { speaker: "Len", text: "But... the fish have been acting strange. And those goblins at the eastern gate are real enough." },
+      { speaker: "Len", text: "Maybe Haro's right for once. Maybe someone should check it out." },
+    ],
+  },
+  "tavi-goblin-activity": {
+    id: "tavi-goblin-activity",
+    lines: [
+      { speaker: "Tavi", text: "Grandma won't let me play near the walls anymore. She says there are monsters." },
+      { speaker: "Tavi", text: "Are you gonna go fight them? That would be so cool!" },
+      { speaker: "Tavi", text: "Be careful though. Grandma says heroes are brave, but smart heroes come home." },
     ],
   },
 };

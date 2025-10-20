@@ -17,7 +17,10 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-missing-boy",
     priority: 60,
-    conditions: [{ eventId: "heard-missing-boy", value: true }],
+    conditions: [
+      { eventId: "heard-missing-boy", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: false },
+    ],
   },
   // Elder Rowan
   {
@@ -58,6 +61,12 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: 20,
     conditions: [{ eventId: "elder-rowan-acknowledged-warning", value: true }],
   },
+  {
+    npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-kalen-rescued",
+    priority: 25,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+  },
 
   // Caretaker Lysa
   {
@@ -79,6 +88,12 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     scriptId: "caretaker-lysa-intro",
     priority: 10,
     conditions: [{ eventId: "met-caretaker-lysa", value: false }],
+  },
+  {
+    npcId: "npc-grounds-caretaker",
+    scriptId: "caretaker-lysa-kalen-rescued",
+    priority: 15,
+    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
   // Kalen (sanctum boy) - at sanctum after entering cave (highest priority)
@@ -132,47 +147,47 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     conditions: [{ eventId: "entered-bluff-cave", value: true }],
   },
 
-  // Torch Town NPCs - Kalen Rescue Awareness (priority 20)
+  // Torch Town NPCs - Kalen Rescue Awareness (priority 15)
   {
     npcId: "npc-maro",
     scriptId: "maro-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-yanna",
     scriptId: "yanna-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-serin",
     scriptId: "serin-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-mira",
     scriptId: "mira-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-kira",
     scriptId: "kira-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-fenna",
     scriptId: "fenna-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
   {
     npcId: "npc-rhett",
     scriptId: "rhett-kalen-rescue",
-    priority: 20,
+    priority: 15,
     conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
   },
 
@@ -187,6 +202,238 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     npcId: "npc-bluff-coiled-snake",
     scriptId: "bluff-coiled-snake",
     priority: 0,
+  },
+
+  // Torch Town NPCs - Goblin Activity (priority 20, after meeting Old Fenna + Kalen rescue + cave found)
+  {
+    npcId: "npc-eldra",
+    scriptId: "eldra-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-maro",
+    scriptId: "maro-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-captain-bren",
+    scriptId: "captain-bren-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-captain-bren-inside",
+    scriptId: "captain-bren-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-jorin",
+    scriptId: "jorin-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-yanna",
+    scriptId: "yanna-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-serin",
+    scriptId: "serin-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-rhett",
+    scriptId: "rhett-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-mira",
+    scriptId: "mira-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-kira",
+    scriptId: "kira-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-lio",
+    scriptId: "lio-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-dara",
+    scriptId: "dara-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-sela",
+    scriptId: "sela-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-sela-day",
+    scriptId: "sela-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-sela-night",
+    scriptId: "sela-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-thane",
+    scriptId: "thane-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-thane-day",
+    scriptId: "thane-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-thane-night",
+    scriptId: "thane-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-fenna",
+    scriptId: "fenna-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-arin",
+    scriptId: "arin-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-haro",
+    scriptId: "haro-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-len",
+    scriptId: "len-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
+  },
+  {
+    npcId: "npc-tavi",
+    scriptId: "tavi-goblin-activity",
+    priority: 20,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "entered-bluff-cave", value: true },
+    ],
   },
 
   // Torch Town NPCs - Defaults (priority 0)

@@ -90,7 +90,20 @@ export function buildOutdoorHouse(): StoryRoom {
       archetype: "caretaker",
     },
   });
-  const npcs = [caretaker];
+  const kalen = new NPC({
+    id: "npc-sanctum-boy",
+    name: "Kalen",
+    sprite: "/images/npcs/boy-3.png",
+    y: 3,
+    x: 4,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: {
+      location: "home",
+    },
+  });
+
+  const npcs = [caretaker, kalen];
 
   return {
     id: "story-outdoor-house",
@@ -99,5 +112,12 @@ export function buildOutdoorHouse(): StoryRoom {
     transitionToPrevious,
     entryFromNext,
     npcs,
+    metadata: {
+      conditionalNpcs: {
+        "npc-sanctum-boy": {
+          showWhen: [{ eventId: "rescued-kalen", value: true }],
+        },
+      },
+    },
   };
 }
