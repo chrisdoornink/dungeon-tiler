@@ -6,9 +6,10 @@ interface DeathScreenProps {
     enemyKind?: string;
   };
   onRestart: () => void;
+  hasCheckpoint?: boolean;
 }
 
-export function DeathScreen({ deathCause, onRestart }: DeathScreenProps) {
+export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: DeathScreenProps) {
   const [fadeIn, setFadeIn] = useState(false);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function DeathScreen({ deathCause, onRestart }: DeathScreenProps) {
             textShadow: '2px 2px 0px rgba(0, 0, 0, 0.5)',
           }}
         >
-          Start From Last Save
+          {hasCheckpoint ? 'Start From Last Save' : 'Start Over'}
         </button>
       </div>
 

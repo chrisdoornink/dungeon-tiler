@@ -767,6 +767,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setGameCompletionProcessed(false);
       setGameState(revivedState);
       CurrentGameStorage.saveCurrentGame(revivedState, resolvedStorageSlot);
+    } else {
+      // No checkpoint exists - clear storage and reload to start over
+      CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
+      window.location.reload();
     }
   }, [gameState, resolvedStorageSlot]);
 
@@ -1595,10 +1599,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return;
     }
 
-    // No checkpoint available - handle permanent death
+    // No checkpoint available
     setGameCompletionProcessed(true);
-    // Trigger screen shake on death
     triggerScreenShake(400);
+    
+    // In story mode, always show death screen (even without checkpoint)
+    if (gameState.mode === "story") {
+      setShowDeathScreen(true);
+      // Track death analytics
+      try {
+        const mode = "normal";
+        const mapId = computeMapId(gameState.mapData);
+        trackGameComplete({
+          outcome: "dead",
+          mode,
+          mapId,
+          heroHealth: 0,
+          steps: gameState.stats.steps,
+          enemiesDefeated: gameState.stats.enemiesDefeated,
+          damageDealt: gameState.stats.damageDealt,
+          damageTaken: gameState.stats.damageTaken,
+          byKind: gameState.stats.byKind,
+          deathCause: gameState.deathCause?.type,
+        });
+      } catch {}
+      return;
+    }
+    
+    // For non-story modes, handle permanent death with redirect
     try {
       const mode = isDailyChallenge ? "daily" : "normal";
       const mapId = computeMapId(gameState.mapData);
@@ -2060,6 +2088,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         <DeathScreen
           deathCause={gameState.deathCause}
           onRestart={handleRestartFromCheckpoint}
+          hasCheckpoint={!!gameState.lastCheckpoint}
         />
       )}
       {isHeroDiaryOpen && (
