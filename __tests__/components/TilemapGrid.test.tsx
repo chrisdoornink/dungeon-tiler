@@ -422,6 +422,169 @@ describe('TilemapGrid component', () => {
     jest.useRealTimers();
   });
 
+  describe('inventory display', () => {
+    it('shows full inventory with text when 2 or fewer items', () => {
+      const size = 25;
+      const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+      const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+      subtypes[12][12] = [TileSubtype.PLAYER];
+
+      const initialGameState: GameState = {
+        hasKey: true,
+        hasExitKey: false,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.DOWN,
+        heroHealth: 5,
+        heroAttack: 1,
+        rockCount: 5,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      };
+
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={initialGameState}
+        />
+      );
+
+      // Should show text labels in non-compact mode
+      expect(screen.getByText('Key')).toBeInTheDocument();
+      expect(screen.getByText(/Rock x5/)).toBeInTheDocument();
+    });
+
+    it('shows compact inventory with badges when more than 2 items', () => {
+      const size = 25;
+      const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+      const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+      subtypes[12][12] = [TileSubtype.PLAYER];
+
+      const initialGameState: GameState = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: true,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.DOWN,
+        heroHealth: 5,
+        heroAttack: 1,
+        rockCount: 13,
+        foodCount: 4,
+        potionCount: 1,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      };
+
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={initialGameState}
+        />
+      );
+
+      // In compact mode, text labels should not be visible (except in tooltips)
+      expect(screen.queryByText('Key')).not.toBeInTheDocument();
+      expect(screen.queryByText('Exit Key')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sword')).not.toBeInTheDocument();
+      
+      // Count badges should be visible for items with quantities
+      expect(screen.getByText('13')).toBeInTheDocument(); // rock count
+      expect(screen.getByText('4')).toBeInTheDocument(); // food count
+      expect(screen.getByText('1')).toBeInTheDocument(); // potion count
+    });
+
+    it('switches from normal to compact mode when crossing threshold', () => {
+      const size = 25;
+      const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+      const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+      const r = 10, c = 10;
+      subtypes[r][c] = [TileSubtype.PLAYER];
+      subtypes[r][c+1] = [TileSubtype.ROCK];
+      subtypes[r][c+2] = [TileSubtype.ROCK];
+
+      const initialGameState: GameState = {
+        hasKey: true,
+        hasExitKey: true,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.RIGHT,
+        heroHealth: 5,
+        heroAttack: 1,
+        rockCount: 0,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      };
+
+      const { rerender } = render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={initialGameState}
+        />
+      );
+
+      // With 2 items, should show text labels
+      expect(screen.getByText('Key')).toBeInTheDocument();
+      expect(screen.getByText('Exit Key')).toBeInTheDocument();
+
+      // Pick up rocks to get 3rd item
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+
+      // After picking up rock, should switch to compact mode
+      expect(screen.queryByText('Key')).not.toBeInTheDocument();
+      expect(screen.queryByText('Exit Key')).not.toBeInTheDocument();
+    });
+
+    it('displays inventory items with proper tooltips in compact mode', () => {
+      const size = 25;
+      const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+      const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+      subtypes[12][12] = [TileSubtype.PLAYER];
+
+      const initialGameState: GameState = {
+        hasKey: true,
+        hasExitKey: true,
+        hasSword: true,
+        hasShield: true,
+        mapData: { tiles, subtypes },
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.DOWN,
+        heroHealth: 5,
+        heroAttack: 1,
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      };
+
+      render(
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={mockTileTypes}
+          subtypes={subtypes}
+          initialGameState={initialGameState}
+        />
+      );
+
+      // Check tooltips exist for items
+      const keyItem = screen.getByTitle('Key');
+      expect(keyItem).toBeInTheDocument();
+      
+      const exitKeyItem = screen.getByTitle('Exit Key');
+      expect(exitKeyItem).toBeInTheDocument();
+      
+      const swordItem = screen.getByTitle('Sword');
+      expect(swordItem).toBeInTheDocument();
+      
+      const shieldItem = screen.getByTitle('Shield');
+      expect(shieldItem).toBeInTheDocument();
+    });
+  });
+
   describe('dialogue overlay', () => {
     const makeBaseState = (): {
       tiles: number[][];
