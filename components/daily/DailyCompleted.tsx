@@ -580,7 +580,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             Torch Boy was made by Chris Doornink, a web developer out of Seattle,
             Washington.
           </p>
-          <p className="text-sm text-purple-300">I&apos;m looking for my next quest. Want to hire me?</p>
+          {/* <p className="text-sm text-purple-300">I&apos;m looking for my next quest. Want to hire me?</p> */}
           <div className="space-y-2">
             <div>
               <a href="https://chrisdoornink.com" target="_blank" rel="noreferrer">
