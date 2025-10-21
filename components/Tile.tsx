@@ -1537,20 +1537,21 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
-          {/* Render tree sprite on top of floor */}
+          {/* Render tree sprite on top of floor - 120% size, anchored to bottom, overlaps upward */}
           <img
             src={treeAsset}
             alt=""
             style={{
               position: 'absolute',
-              inset: 0,
-              width: '100%',
-              height: '100%',
+              left: '-10%',
+              bottom: 0,
+              width: '120%',
+              height: '120%',
               objectFit: 'cover',
-              objectPosition: 'center',
+              objectPosition: 'center bottom',
               imageRendering: 'pixelated',
               pointerEvents: 'none',
-              zIndex: 1,
+              zIndex: 11500, // Above hero (11000) so trees overlap hero correctly
             }}
             aria-hidden="true"
           />
