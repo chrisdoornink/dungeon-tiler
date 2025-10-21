@@ -16,7 +16,7 @@ const SIZE = 25;
  */
 const TRANSITIONS = {
   // Back to Wilds Entrance (bottom edge)
-  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [0, 20] as [number, number], returnPoint: [20, 10] as [number, number] },
+  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
 };
 
 /**
@@ -32,6 +32,7 @@ const TRANSITIONS = {
  * - 'W' = wisp (ghost) enemy
  * - 'f' = torch on floor tile
  * - 'p' = pot with food inside
+ * - 's' = pot with snake inside
  * 
  * Transitions:
  * - '0' = Back to Wilds Entrance
@@ -43,12 +44,12 @@ const VISUAL_MAP = [
   "T T T T T T . W . T T T T T T T T T T T T T T T T",
   "T T T T T T . . . T T T T T T T T T T T T T T T T",
   "T T T T T T T . T T T T T T T T T T T T T T T T T",
-  "T T T T T T T . T T T T T T T T . . . . T T T T T",
+  "T T T T T T T . T T T T T T T T . . . s T T T T T",
   "T T T T T T T . T T T T T T T T . S . . T T T T T",
   "T T T T T T T . T T T T T T T T . . . . T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
-  "T T . . . . . . . . . . . . . T T . T T T T T T T",
+  "T T . . . . . . . . . . . . . . . . T T T T T T T",
   "T T . W . . . . . . . . . . . T T . T T T T T T T",
   "T T . . . . . . . . . . . . . T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
@@ -56,12 +57,12 @@ const VISUAL_MAP = [
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T . . . T T T T T T",
   "T T T T T T T . T T T T T T T T . S . T T T T T T",
-  "T T T T T T T . T T T T T T T T . . . T T T T T T",
+  "T T T T T T T . . . . T T T T T . . . T T T T T T",
+  "T T T T T T T T T T . T T T T T T T . T T T T T T",
+  "T T T T T T T T T T . T T T T T T T . T T T T T T",
+  "T T T T T T T T T T . T T T T T T T . T T T T T T",
+  "T T T T T T T T T T . . . . . . . . . T T T T T T",
   "T T T T T T T T T T 0 T T T T T T T T T T T T T T",
-  "T T T T T T T T T T . T T T T T T T T T T T T T T",
-  "T T T T T T T T T T . T T T T T T T T T T T T T T",
-  "T T T T T T T T T T . T T T T T T T T T T T T T T",
-  "T T T T T T T T T T T T T T T T T T T T T T T T T",
 ];
 
 /**
