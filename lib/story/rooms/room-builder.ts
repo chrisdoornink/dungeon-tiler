@@ -3,9 +3,9 @@ import type { MapData } from "../../map/types";
 import { Enemy } from "../../enemy";
 import type { StoryRoom } from "./types";
 import { parseVisualMap, type ParsedMapData } from "./visual-map-parser";
+import type { EnvironmentId } from "../../environment";
 
 type EnemyKind = "goblin" | "snake" | "ghost" | "stone-exciter";
-type EnvironmentId = "outdoor" | "indoor" | "cave" | "dungeon";
 
 /**
  * Room Builder - Shared utility for building story rooms from configuration
@@ -30,7 +30,7 @@ export interface RoomConfig {
     description: string;
   };
   environment?: EnvironmentId;
-  npcs?: any[]; // Can be typed more specifically when NPCs are added
+  npcs?: unknown[]; // Can be typed more specifically when NPCs are added
 }
 
 /**
@@ -105,7 +105,7 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     mapData,
     entryPoint,
     enemies,
-    npcs,
+    npcs: npcs as StoryRoom['npcs'],
     metadata,
     otherTransitions,
   };

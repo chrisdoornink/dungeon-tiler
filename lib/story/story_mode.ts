@@ -26,6 +26,9 @@ import {
   buildSanctum,
   buildTorchTown,
   buildTheWildsEntrance,
+  buildTheWildsSouth,
+  buildTheWildsNorth,
+  buildTheWildsEast,
   buildDepthsOfDespairRoom1,
   buildDepthsOfDespairRoom2,
   buildEldrasCottage,
@@ -140,6 +143,9 @@ export function buildStoryModeState(): GameState {
   const bluffSerpentDen = buildBluffSerpentDen();
   const bluffSerpentDenNorth = buildBluffSerpentDenNorth();
   const wildsEntrance = buildTheWildsEntrance();
+  const wildsSouth = buildTheWildsSouth();
+  const wildsNorth = buildTheWildsNorth();
+  const wildsEast = buildTheWildsEast();
   const depthsRoom1 = buildDepthsOfDespairRoom1();
   const depthsRoom2 = buildDepthsOfDespairRoom2();
 
@@ -566,6 +572,54 @@ export function buildStoryModeState(): GameState {
     );
   }
 
+  // Process otherTransitions for Wilds Entrance (to South, North, East)
+  if (wildsEntrance.otherTransitions) {
+    for (const link of wildsEntrance.otherTransitions) {
+      pushTransition(
+        wildsEntrance.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint
+      );
+    }
+  }
+
+  // Process otherTransitions for Wilds South (back to Entrance)
+  if (wildsSouth.otherTransitions) {
+    for (const link of wildsSouth.otherTransitions) {
+      pushTransition(
+        wildsSouth.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint
+      );
+    }
+  }
+
+  // Process otherTransitions for Wilds North (back to Entrance)
+  if (wildsNorth.otherTransitions) {
+    for (const link of wildsNorth.otherTransitions) {
+      pushTransition(
+        wildsNorth.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint
+      );
+    }
+  }
+
+  // Process otherTransitions for Wilds East (back to Entrance)
+  if (wildsEast.otherTransitions) {
+    for (const link of wildsEast.otherTransitions) {
+      pushTransition(
+        wildsEast.id,
+        link.roomId,
+        link.position,
+        link.targetEntryPoint
+      );
+    }
+  }
+
   const storyRooms: StoryRoom[] = [
     entrance,
     ascent,
@@ -578,6 +632,9 @@ export function buildStoryModeState(): GameState {
     outdoorHouse,
     torchTown,
     wildsEntrance,
+    wildsSouth,
+    wildsNorth,
+    wildsEast,
     depthsRoom1,
     depthsRoom2,
     ...extraRooms,
