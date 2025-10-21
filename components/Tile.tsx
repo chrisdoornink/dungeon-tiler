@@ -1512,6 +1512,33 @@ export const Tile: React.FC<TileProps> = ({
           ? environmentConfig.floorDefault
           : getFloorAsset(environment, { hasNorthNeighbor: Boolean(topNeighbor) });
 
+      // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
+      const hasWallBelow = neighbors.bottom === 1;
+      
+      // Determine which wall image to use for the overlay based on neighboring walls
+      let wallPattern = '0111';
+
+      if (hasWallBelow) {
+        // Check if there are walls to the left and right
+        const hasWallLeft = neighbors.left === 1;
+        const hasWallRight = neighbors.right === 1;
+        
+        if (!hasWallLeft && !hasWallRight) {
+          // No walls on sides, use wall-0010.png (just top wall)
+          wallPattern = '0010';
+        } else if (hasWallLeft && !hasWallRight) {
+          // Wall on left only
+          wallPattern = '0110';
+        } else if (!hasWallLeft && hasWallRight) {
+          // Wall on right only
+          wallPattern = '0011';
+        } else {
+          // Walls on both sides
+          wallPattern = '0111';
+        }
+      }
+      const wallTopImage = getWallAsset(environment, wallPattern);
+
       // Deterministically pick a tree asset based on tile coordinates
       const y = typeof row === 'number' ? row : 0;
       const x = typeof col === 'number' ? col : 0;
@@ -1559,6 +1586,18 @@ export const Tile: React.FC<TileProps> = ({
 
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
+          
+          {/* Render wall top overlay if there's a wall below this tree tile */}
+          {hasWallBelow && (
+            <div 
+              className={styles.wallTopOverlay}
+              style={{
+                backgroundImage: `url(${wallTopImage})`,
+                zIndex: 12000, // Above tree (11500) so wall top renders over tree
+              }}
+              data-testid="wall-top-overlay"
+            />
+          )}
         </div>
       );
     } else {
