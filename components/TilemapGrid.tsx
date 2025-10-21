@@ -2185,198 +2185,311 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               style={{ flex: "1" }}
             >
               <h3 className="text-xs font-medium mb-1">Inventory</h3>
-              <div className="flex flex-wrap gap-1">
-                {diaryEntries.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setHeroDiaryOpen(true)}
-                    aria-haspopup="dialog"
-                    className="flex items-center gap-2 rounded bg-[#333333] px-2 py-0.5 text-xs text-white transition-colors hover:bg-[#444444]"
-                    title="Open hero diary"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className="flex h-8 w-8 items-center justify-center rounded bg-[#2f2a25]/80 text-lg shadow-inner"
-                    >
-                      📖
-                    </span>
-                    <span className="whitespace-nowrap">
-                      Hero Diary
-                      {incompleteDiaryCount > 0
-                        ? ` (${incompleteDiaryCount})`
-                        : ""}
-                    </span>
-                  </button>
-                )}
-                {gameState.hasKey && (
-                  <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 20,
-                        height: 20,
-                        backgroundImage: "url(/images/items/key.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Key</span>
+              {(() => {
+                // Count total inventory items
+                const inventoryCount =
+                  (diaryEntries.length > 0 ? 1 : 0) +
+                  (gameState.hasKey ? 1 : 0) +
+                  (gameState.hasExitKey ? 1 : 0) +
+                  (gameState.hasSword ? 1 : 0) +
+                  (gameState.hasShield ? 1 : 0) +
+                  ((gameState.rockCount ?? 0) > 0 ? 1 : 0) +
+                  ((gameState.runeCount ?? 0) > 0 ? 1 : 0) +
+                  ((gameState.foodCount ?? 0) > 0 ? 1 : 0) +
+                  ((gameState.potionCount ?? 0) > 0 ? 1 : 0);
+
+                const isCompact = inventoryCount > 2;
+
+                return (
+                  <div className="flex flex-wrap gap-1">
+                    {diaryEntries.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setHeroDiaryOpen(true)}
+                        aria-haspopup="dialog"
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] text-lg transition-colors hover:bg-[#444444]"
+                            : "flex items-center gap-2 rounded bg-[#333333] px-2 py-0.5 text-xs text-white transition-colors hover:bg-[#444444]"
+                        }
+                        title={
+                          isCompact
+                            ? `Hero Diary${incompleteDiaryCount > 0 ? ` (${incompleteDiaryCount})` : ""}`
+                            : "Open hero diary"
+                        }
+                      >
+                        <span
+                          aria-hidden="true"
+                          className={
+                            isCompact
+                              ? ""
+                              : "flex h-8 w-8 items-center justify-center rounded bg-[#2f2a25]/80 text-lg shadow-inner"
+                          }
+                        >
+                          📖
+                        </span>
+                        {!isCompact && (
+                          <span className="whitespace-nowrap">
+                            Hero Diary
+                            {incompleteDiaryCount > 0
+                              ? ` (${incompleteDiaryCount})`
+                              : ""}
+                          </span>
+                        )}
+                        {isCompact && incompleteDiaryCount > 0 && (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {incompleteDiaryCount}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                    {gameState.hasKey && (
+                      <div
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title="Key"
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: isCompact ? 28 : 20,
+                            height: isCompact ? 28 : 20,
+                            backgroundImage: "url(/images/items/key.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {!isCompact && <span>Key</span>}
+                      </div>
+                    )}
+                    {gameState.hasExitKey && (
+                      <div
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title="Exit Key"
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: isCompact ? 28 : 20,
+                            height: isCompact ? 28 : 20,
+                            backgroundImage: "url(/images/items/exit-key.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {!isCompact && <span>Exit Key</span>}
+                      </div>
+                    )}
+                    {gameState.hasSword && (
+                      <div
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title="Sword"
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: isCompact ? 32 : 24,
+                            height: isCompact ? 32 : 24,
+                            backgroundImage: "url(/images/items/sword.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {!isCompact && <span>Sword</span>}
+                      </div>
+                    )}
+                    {gameState.hasShield && (
+                      <div
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title="Shield"
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: isCompact ? 28 : 20,
+                            height: isCompact ? 28 : 20,
+                            backgroundImage: "url(/images/items/shield.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {!isCompact && <span>Shield</span>}
+                      </div>
+                    )}
+                    {(gameState.rockCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleThrowRock}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Throw rock (${gameState.rockCount}) — tap or press R`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/rock-1.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {gameState.rockCount}
+                          </span>
+                        ) : (
+                          <>
+                            <span>Rock x{gameState.rockCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or R)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.runeCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleThrowRune}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Use rune (${gameState.runeCount}) — tap or press T`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/rune1.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {gameState.runeCount}
+                          </span>
+                        ) : (
+                          <>
+                            <span>Rune x{gameState.runeCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or T)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.foodCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleUseFood}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Use food (${gameState.foodCount}) — tap or press F`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/food-1.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {gameState.foodCount}
+                          </span>
+                        ) : (
+                          <>
+                            <span>Food x{gameState.foodCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or F)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.potionCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleUsePotion}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Use potion (${gameState.potionCount}) — tap or press P`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/meds-1.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {gameState.potionCount}
+                          </span>
+                        ) : (
+                          <>
+                            <span>Potion x{gameState.potionCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or P)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
-                )}
-                {gameState.hasExitKey && (
-                  <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 20,
-                        height: 20,
-                        backgroundImage: "url(/images/items/exit-key.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Exit Key</span>
-                  </div>
-                )}
-                {gameState.hasSword && (
-                  <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 24,
-                        height: 24,
-                        backgroundImage: "url(/images/items/sword.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Sword</span>
-                  </div>
-                )}
-                {gameState.hasShield && (
-                  <div className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1">
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 20,
-                        height: 20,
-                        backgroundImage: "url(/images/items/shield.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Shield</span>
-                  </div>
-                )}
-                {(gameState.rockCount ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleThrowRock}
-                    className="relative px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                    title={`Throw rock (${gameState.rockCount}) — tap or press R`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 32,
-                        height: 32,
-                        backgroundImage: "url(/images/items/rock-1.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Rock x{gameState.rockCount}</span>
-                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                      (tap or R)
-                    </span>
-                  </button>
-                )}
-                {(gameState.runeCount ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleThrowRune}
-                    className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                    title={`Use rune (${gameState.runeCount}) — tap or press T`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 32,
-                        height: 32,
-                        backgroundImage: "url(/images/items/rune1.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Rune x{gameState.runeCount}</span>
-                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                      (tap or T)
-                    </span>
-                  </button>
-                )}
-                {(gameState.foodCount ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleUseFood}
-                    className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                    title={`Use food (${gameState.foodCount}) — tap or press F`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 32,
-                        height: 32,
-                        backgroundImage: "url(/images/items/food-1.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Food x{gameState.foodCount}</span>
-                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                      (tap or F)
-                    </span>
-                  </button>
-                )}
-                {(gameState.potionCount ?? 0) > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleUsePotion}
-                    className="px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
-                    title={`Use potion (${gameState.potionCount}) — tap or press P`}
-                  >
-                    <span
-                      aria-hidden="true"
-                      style={{
-                        display: "inline-block",
-                        width: 32,
-                        height: 32,
-                        backgroundImage: "url(/images/items/meds-1.png)",
-                        backgroundSize: "contain",
-                        backgroundRepeat: "no-repeat",
-                        backgroundPosition: "center",
-                      }}
-                    />
-                    <span>Potion x{gameState.potionCount}</span>
-                    <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
-                      (tap or P)
-                    </span>
-                  </button>
-                )}
-              </div>
+                );
+              })()}
             </div>
           </div>
           {/* Spacer matching HUD height: pushes grid down until viewport is short */}
