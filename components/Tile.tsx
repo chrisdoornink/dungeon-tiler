@@ -459,6 +459,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.WALL_TORCH &&
+        subtype !== TileSubtype.TOWN_SIGN &&
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&

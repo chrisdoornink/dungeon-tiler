@@ -17,6 +17,9 @@ const SIZE = 25;
  * - '@' = town sign (subtype)
  * - 'f' = torch on floor tile
  * - 'w' = torch on wall tile
+ * - 'r' = pot with rune inside
+ * - 'p' = pot with food inside
+ * - 's' = pot with snake inside
  */
 const VISUAL_MAP = [
   "##TTTTTTTTTTTTTTTTTTTTTTT",
@@ -37,13 +40,16 @@ const VISUAL_MAP = [
   "##..##.......#.##..T#T",
   "##.....T.####.....TT#T",
   "##..#.####.T....######T",
-  "##f........#...........#T",
-  "f@..........#..........T",
+  "wwf........#...........#T",
+  ".@..........#..........T",
   "...TT.TT...T.TT###....#T",
   "..........#.......#.#..T",
   ".....T..#...TT..T.T..TTT",
-  "f....T.T..T.TTT.TT.TT..T",
+  ".f...T.T..T.TTT.TT.TT..T",
   "##TTTTTTTTTTTTT.TTTTTTTT",
+  "##T.TTTTT.T.###........pTT",
+  "##f.TTTT..T.#r#.........TT",
+  "##.......T..#.#TTT.TTTTTT#"
 ];
 
 /**
@@ -102,6 +108,21 @@ function parseVisualMap(visualMap: string[]): {
         case 'w':
           tileType = 1; // wall with torch
           cellSubtypes.push(TileSubtype.WALL_TORCH);
+          break;
+        case 'r':
+          tileType = 0; // floor with pot containing rune
+          cellSubtypes.push(TileSubtype.POT);
+          cellSubtypes.push(TileSubtype.RUNE);
+          break;
+        case 'p':
+          tileType = 0; // floor with pot containing food
+          cellSubtypes.push(TileSubtype.POT);
+          cellSubtypes.push(TileSubtype.FOOD);
+          break;
+        case 's':
+          tileType = 0; // floor with pot containing snake
+          cellSubtypes.push(TileSubtype.POT);
+          cellSubtypes.push(TileSubtype.SNAKE);
           break;
         default:
           tileType = 0; // default to floor for unknown chars
