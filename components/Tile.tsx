@@ -354,6 +354,10 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.ROAD) || false;
   };
 
+  const hasTownSign = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.TOWN_SIGN) || false;
+  };
+
   const getRoadShape = (
     subtypes: number[] | undefined
   ): TileSubtype | null => {
@@ -669,6 +673,18 @@ export const Tile: React.FC<TileProps> = ({
               }}
             />
           </>
+        )}
+
+        {/* Render town sign */}
+        {hasTownSign(subtypes) && (
+          <div
+            key="town-sign"
+            data-testid={`subtype-icon-${TileSubtype.TOWN_SIGN}`}
+            className={`${styles.assetIcon} ${styles.rockIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/town-sign.png')`,
+            }}
+          />
         )}
 
         {/* Render faulty floor cracks overlay */}
@@ -1477,6 +1493,74 @@ export const Tile: React.FC<TileProps> = ({
       );
     } else {
       // Invisible flowers - same style as invisible floor
+      return (
+        <div
+          className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}
+          data-testid={`tile-${tileId}`}
+        />
+      );
+    }
+  }
+
+  // If this is a tree tile
+  if (tileId === 6) {
+    if (isVisible) {
+      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      const floorAsset =
+        process.env.NODE_ENV === 'test'
+          ? environmentConfig.floorDefault
+          : getFloorAsset(environment, { hasNorthNeighbor: Boolean(topNeighbor) });
+
+      // Deterministically pick a tree asset based on tile coordinates
+      const y = typeof row === 'number' ? row : 0;
+      const x = typeof col === 'number' ? col : 0;
+      const seed = (y * 37 + x * 101);
+      const treeAssets = [
+        '/images/trees/tree-1.png',
+        '/images/trees/tree-2.png',
+        '/images/trees/tree-3.png',
+        '/images/trees/tree-4.png',
+      ];
+      const treeAsset = treeAssets[Math.abs(seed) % treeAssets.length];
+
+      return (
+        <div
+          className={floorClasses}
+          style={{
+            backgroundImage: `url(${floorAsset})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            position: "relative",
+            backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent'
+          }}
+          data-testid={`tile-${tileId}`}
+          data-neighbor-code={neighborCode}
+        >
+          {/* Render tree sprite on top of floor */}
+          <img
+            src={treeAsset}
+            alt=""
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center',
+              imageRendering: 'pixelated',
+              pointerEvents: 'none',
+              zIndex: 1,
+            }}
+            aria-hidden="true"
+          />
+
+          {/* Render all subtypes as standardized icons */}
+          {renderSubtypeIcons(subtype)}
+        </div>
+      );
+    } else {
+      // Invisible tree - same style as invisible floor
       return (
         <div
           className={`${styles.tileContainer} ${styles.invisible} ${invisibleClassName ?? ''}`}

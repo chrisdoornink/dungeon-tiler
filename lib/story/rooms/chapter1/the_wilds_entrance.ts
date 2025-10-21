@@ -6,26 +6,118 @@ import type { StoryRoom } from "../types";
 const SIZE = 25;
 
 /**
+ * Visual map layout using readable symbols.
+ * Legend:
+ * - '.' = floor (0)
+ * - '#' = wall (1)
+ * - 'T' = tree (6)
+ * - 'G' = goblin enemy
+ * - 'S' = snake enemy
+ * - '@' = town sign (subtype)
+ */
+const VISUAL_MAP = [
+  "##TTTTTTTTTTTTTTTTTTTTTTT",
+  "##T.TTTTT.T.###.........TT",
+  "##..TTTT..T.#.#.........TT",
+  "##.......T..............#",
+  "##......TT....#.......###",
+  "##TT....T...###.......##T",
+  "##.........####.###....T",
+  "##......TTT....#.#.....T",
+  "##......TTT..TTT.#.....T",
+  "##...#..T.....TT..#....T",
+  "##.G.G#.T.......#...#..T",
+  "##....#.T...........#..T",
+  "##..G...T.....######.##.",
+  "##....#.......#..#...T",
+  "##....#.....#####....T",
+  "##..##.......#.##..T#T",
+  "##.....T.####.....TT#T",
+  "##..#.####.T....######T",
+  "##.........#...........#T",
+  ".@..........#..........T",
+  "...TT.TT...T.TT###....#T",
+  "..........#.......#.#..T",
+  ".....T..#...TT..T.T..TTT",
+  ".....T.T..T.TTT.TT.TT..T",
+  "##TTTTTTTTTTTTT.TTTTTTTT",
+];
+
+/**
+ * Parse the visual map into tiles, subtypes, and enemies
+ */
+function parseVisualMap(visualMap: string[]): {
+  tiles: number[][];
+  subtypes: TileSubtype[][][];
+  enemies: Array<{ y: number; x: number; kind: string }>;
+} {
+  const tiles: number[][] = [];
+  const subtypes: TileSubtype[][][] = [];
+  const enemies: Array<{ y: number; x: number; kind: string }> = [];
+
+  for (let y = 0; y < visualMap.length; y++) {
+    const row = visualMap[y];
+    const tileRow: number[] = [];
+    const subtypeRow: TileSubtype[][] = [];
+
+    // Ensure we process exactly SIZE columns (pad with floor if needed)
+    for (let x = 0; x < SIZE; x++) {
+      const char = x < row.length ? row[x] : '.'; // Default to floor if row is short
+      let tileType = 0; // default to floor
+      const cellSubtypes: TileSubtype[] = [];
+
+      switch (char) {
+        case '.':
+          tileType = 0; // floor
+          break;
+        case '#':
+          tileType = 1; // wall
+          break;
+        case 'T':
+          tileType = 6; // tree
+          break;
+        case 'G':
+          tileType = 0; // floor with goblin
+          enemies.push({ y, x, kind: 'goblin' });
+          break;
+        case 'S':
+          tileType = 0; // floor with snake
+          enemies.push({ y, x, kind: 'snake' });
+          break;
+        case '@':
+          tileType = 0; // floor with town sign
+          cellSubtypes.push(TileSubtype.TOWN_SIGN);
+          break;
+        default:
+          tileType = 0; // default to floor for unknown chars
+      }
+
+      tileRow.push(tileType);
+      subtypeRow.push(cellSubtypes);
+    }
+
+    tiles.push(tileRow);
+    subtypes.push(subtypeRow);
+  }
+
+  return { tiles, subtypes, enemies };
+}
+
+const PARSED_MAP = parseVisualMap(VISUAL_MAP);
+
+/**
  * FIXED_ROOM_DATA: Set this to freeze a specific map + enemy layout permanently.
  * 
- * How to freeze a map you like:
- * 1. Enter The Wilds and play through the map
- * 2. If you like it, check DevTools Console - it auto-logs the room data
- * 3. Look for: "[The Wilds] Room data ready to freeze (copy command above)"
- * 4. Run the copy() command shown in the console
- * 5. Paste the result here as: const FIXED_ROOM_DATA = <paste>;
- * 6. Save this file and reload
- * 
- * The frozen room will have the same map layout AND enemy positions every time!
- * Set back to null to generate random maps again.
+ * This map has been customized with tree borders (tile type 6).
+ * Trees act as non-walkable obstacles with grass floor backgrounds.
  */
-const FIXED_ROOM_DATA: { mapData: MapData; enemies: Array<{ y: number; x: number; kind: string }> } | null = null;
-
-// Example after pasting:
-// const FIXED_ROOM_DATA = {
-//   mapData: { tiles: [[...]], subtypes: [[...]] },
-//   enemies: [{ y: 5, x: 10, kind: "goblin" }, ...]
-// };
+const FIXED_ROOM_DATA: { mapData: MapData; enemies: Array<{ y: number; x: number; kind: string }> } | null = {
+  mapData: {
+    tiles: PARSED_MAP.tiles,
+    subtypes: PARSED_MAP.subtypes
+  },
+  enemies: PARSED_MAP.enemies
+};
 
 /**
  * Generate The Wilds map using the same generation as daily mode.
@@ -186,7 +278,7 @@ export function buildTheWildsEntrance(): StoryRoom {
   let bottomMost: [number, number] | null = null;
   for (let y = 0; y < SIZE; y++) {
     for (let x = 0; x < SIZE; x++) {
-      if (mapData.subtypes[y][x].includes(TileSubtype.ROOM_TRANSITION)) {
+      if (mapData.subtypes[y]?.[x]?.includes(TileSubtype.ROOM_TRANSITION)) {
         if (!bottomMost || y > bottomMost[0]) {
           bottomMost = [y, x];
         }

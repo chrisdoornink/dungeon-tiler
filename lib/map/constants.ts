@@ -16,6 +16,7 @@ export const tileTypes: Record<number, TileType> = {
   3: { id: 3, name: "key", color: "#ff0", walkable: true },
   4: { id: 4, name: "roof", color: "#8b4513", walkable: false },
   5: { id: 5, name: "flowers", color: "#90EE90", walkable: true },
+  6: { id: 6, name: "tree", color: "#228B22", walkable: false },
 };
 
 // Define tile types as constants for clarity
@@ -23,6 +24,7 @@ export const FLOOR = 0;
 export const WALL = 1;
 export const ROOF = 4;
 export const FLOWERS = 5;
+export const TREE = 6;
 
 export const DEFAULT_ROOM_ID = "__base__";
 export type RoomId = string;
@@ -75,6 +77,7 @@ export enum TileSubtype {
   SIGN_LIBRARY = 34,
   SIGN_SMITHY = 35,
   BOOKSHELF = 36,
+  TOWN_SIGN = 37,
 }
 
 /**
