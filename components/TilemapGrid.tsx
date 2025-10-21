@@ -203,6 +203,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const [isHeroDiaryOpen, setHeroDiaryOpen] = useState(false);
 
+  // Room label visibility (auto-hide after a few seconds)
+  const [showRoomLabel, setShowRoomLabel] = useState(true);
+
   // Developer hover coordinates for story mode (dev only)
   const [hoverTile, setHoverTile] = useState<[number, number] | null>(null);
 
@@ -242,6 +245,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return prev;
     });
   }, [activeDialogueChoices]);
+
+  // Auto-hide room label after 3 seconds when room changes
+  useEffect(() => {
+    if (gameState.mode === 'story' && gameState.currentRoomId) {
+      setShowRoomLabel(true);
+      const timer = setTimeout(() => {
+        setShowRoomLabel(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.mode, gameState.currentRoomId]);
 
   const consumeNpcInteraction = useCallback(
     (timestamp: number) => {
@@ -2800,14 +2814,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         </div>
       </div>
 
-      {gameState.mode === 'story' && gameState.currentRoomId && (() => {
+      {gameState.mode === 'story' && gameState.currentRoomId && showRoomLabel && (() => {
         const roomId = gameState.currentRoomId;
         const room = gameState.rooms?.[roomId];
         const label = room?.metadata?.displayLabel as string | undefined;
         if (!label) return null;
         return (
           <div
-            className="fixed top-20 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-black/80 text-white text-sm font-semibold pointer-events-none shadow-lg border border-white/20"
+            className="fixed top-4 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-black/80 text-white text-sm font-semibold pointer-events-none shadow-lg border border-white/20 transition-opacity duration-300"
             style={{ zIndex: 14000 }}
           >
             {label}
