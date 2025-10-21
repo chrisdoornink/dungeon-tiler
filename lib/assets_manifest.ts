@@ -134,4 +134,10 @@ export const ASSET_URLS: string[] = [
   "/images/npcs/girl-2.png",
   "/images/npcs/girl-3.png",
   "/images/npcs/girl-4.png",
+  "/images/dog-golden/dog-front-1.png",
+  "/images/dog-golden/dog-front-2.png",
+  "/images/dog-golden/dog-front-3.png",
+  "/images/dog-golden/dog-front-4.png",
+  "/images/dog-golden/dog-back-1.png",
+  "/images/dog-golden/dog-back-2.png",
 ];

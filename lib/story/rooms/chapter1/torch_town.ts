@@ -550,6 +550,34 @@ export function buildTorchTown(): StoryRoom {
     metadata: { dayLocation: "plaza", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
   }));
 
+  // 19. Brisket (Golden Dog) - Day: Plaza near Tavi
+  npcs.push(new NPC({
+    id: "npc-dog-torch-town",
+    name: "Brisket",
+    sprite: "/images/dog-golden/dog-front-1.png",
+    y: 14,
+    x: 13,
+    facing: Direction.DOWN,
+    canMove: true,
+    tags: ["dog"],
+    metadata: {
+      type: "dog",
+      species: "dog",
+      dayLocation: "plaza",
+      dogFollowChance: 0.75,
+      dogFrontFrames: [
+        "/images/dog-golden/dog-front-1.png",
+        "/images/dog-golden/dog-front-2.png",
+        "/images/dog-golden/dog-front-3.png",
+        "/images/dog-golden/dog-front-4.png",
+      ],
+      dogBackFrames: [
+        "/images/dog-golden/dog-back-1.png",
+        "/images/dog-golden/dog-back-2.png",
+      ],
+    },
+  }));
+
   return {
     id: "story-torch-town",
     mapData: { tiles, subtypes, environment: "outdoor" },
@@ -583,6 +611,7 @@ export function buildTorchTown(): StoryRoom {
         "npc-dara": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-fenna": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-tavi": { removeWhen: [{ timeOfDay: "night" }] },
+        "npc-dog-torch-town": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-arin": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-haro": { removeWhen: [{ timeOfDay: "night" }] },
         "npc-len": { removeWhen: [{ timeOfDay: "night" }] },
