@@ -13,33 +13,36 @@ const SIZE = 25;
  * - 'T' = tree (6)
  * - 'G' = goblin enemy
  * - 'S' = snake enemy
+ * - 'W' = wisp (ghost) enemy
  * - '@' = town sign (subtype)
+ * - 'f' = torch on floor tile
+ * - 'w' = torch on wall tile
  */
 const VISUAL_MAP = [
   "##TTTTTTTTTTTTTTTTTTTTTTT",
   "##T.TTTTT.T.###.........TT",
-  "##..TTTT..T.#.#.........TT",
+  "##f.TTTT..T.#.#.........TT",
   "##.......T..............#",
-  "##......TT....#.......###",
-  "##TT....T...###.......##T",
-  "##.........####.###....T",
+  "##......TT...............###",
+  "##TT....T..............##T",
+  "##f.....................T",
   "##......TTT....#.#.....T",
   "##......TTT..TTT.#.....T",
   "##...#..T.....TT..#....T",
-  "##.G.G#.T.......#...#..T",
+  "##fG.G#.T.......#...#..T",
   "##....#.T...........#..T",
   "##..G...T.....######.##.",
   "##....#.......#..#...T",
-  "##....#.....#####....T",
+  "##f...#.....#####....T",
   "##..##.......#.##..T#T",
   "##.....T.####.....TT#T",
   "##..#.####.T....######T",
-  "##.........#...........#T",
-  ".@..........#..........T",
+  "##f........#...........#T",
+  "f@..........#..........T",
   "...TT.TT...T.TT###....#T",
   "..........#.......#.#..T",
   ".....T..#...TT..T.T..TTT",
-  ".....T.T..T.TTT.TT.TT..T",
+  "f....T.T..T.TTT.TT.TT..T",
   "##TTTTTTTTTTTTT.TTTTTTTT",
 ];
 
@@ -84,9 +87,21 @@ function parseVisualMap(visualMap: string[]): {
           tileType = 0; // floor with snake
           enemies.push({ y, x, kind: 'snake' });
           break;
+        case 'W':
+          tileType = 0; // floor with wisp (ghost)
+          enemies.push({ y, x, kind: 'ghost' });
+          break;
         case '@':
           tileType = 0; // floor with town sign
           cellSubtypes.push(TileSubtype.TOWN_SIGN);
+          break;
+        case 'f':
+          tileType = 0; // floor with torch
+          cellSubtypes.push(TileSubtype.WALL_TORCH);
+          break;
+        case 'w':
+          tileType = 1; // wall with torch
+          cellSubtypes.push(TileSubtype.WALL_TORCH);
           break;
         default:
           tileType = 0; // default to floor for unknown chars
