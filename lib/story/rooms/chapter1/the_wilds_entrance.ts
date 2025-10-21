@@ -139,6 +139,28 @@ function generateWildsEnemies(mapData: MapData): Enemy[] {
   return enemies;
 }
 
+/**
+ * Place 20 rocks randomly in the wilds (or use fixed positions if FIXED_ROOM_DATA is set)
+ */
+function generateRocks(mapData: MapData): TileSubtype[][][] {
+    // Add 20 rocks randomly on empty floor tiles (non-blocking variety)
+    const { tiles, subtypes } = mapData;
+    const want = 20;
+    let placed = 0;
+    const rand = (min: number, max: number) =>
+      Math.floor(Math.random() * (max - min + 1)) + min;
+    for (let attempts = 0; attempts < 500 && placed < want; attempts++) {
+      const y = rand(1, mapData.tiles.length - 2);
+      const x = rand(1, mapData.tiles[y].length - 2);
+      if (tiles[y][x] !== FLOOR) continue;
+      if (subtypes[y][x].length > 0) continue; // keep clear of other features/NPCs/etc
+      subtypes[y][x] = [TileSubtype.ROCK];
+      placed++;
+    }
+    
+    return subtypes;
+}
+
 export function buildTheWildsEntrance(): StoryRoom {
   const mapData = generateWildsMap();
 
@@ -177,6 +199,8 @@ export function buildTheWildsEntrance(): StoryRoom {
   }
   
   const enemies = generateWildsEnemies(mapData);
+
+  const rocks = generateRocks(mapData);
 
   // Auto-log the room data for easy freezing (only when generating randomly)
   if (!FIXED_ROOM_DATA && typeof window !== 'undefined') {
