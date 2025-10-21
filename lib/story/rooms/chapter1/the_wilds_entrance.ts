@@ -6,6 +6,22 @@ import type { StoryRoom } from "../types";
 const SIZE = 25;
 
 /**
+ * Transition definitions - maps transition IDs to their destinations
+ * Each transition in the visual map (0-9, A-Z) references a key here
+ */
+const TRANSITIONS = {
+  // Torch Town connections (left edge, rows 19-23)
+  '0': { roomId: 'story-torch-town' as RoomId, target: [10, 33], returnPoint: [19, 1] },
+  '1': { roomId: 'story-torch-town' as RoomId, target: [11, 33], returnPoint: [20, 1] },
+  '2': { roomId: 'story-torch-town' as RoomId, target: [12, 33], returnPoint: [21, 1] },
+  '3': { roomId: 'story-torch-town' as RoomId, target: [13, 33], returnPoint: [22, 1] },
+  '4': { roomId: 'story-torch-town' as RoomId, target: [14, 33], returnPoint: [23, 1] },
+  
+  // Future transitions can be added here with letters or other numbers
+  // 'A': { roomId: 'story-deep-wilds', target: [5, 5], returnPoint: [24, 12] },
+} as const;
+
+/**
  * Visual map layout using readable symbols.
  * Legend:
  * - '.' = floor (0)
@@ -20,6 +36,10 @@ const SIZE = 25;
  * - 'r' = pot with rune inside
  * - 'p' = pot with food inside
  * - 's' = pot with snake inside
+ * 
+ * Transitions (use keys from TRANSITIONS object above):
+ * - '0', '1', '2', '3', '4' = Torch Town connections (rows 19-23)
+ * - '5'-'9', 'A'-'Z' = available for future areas
  */
 const VISUAL_MAP = [
   "##TTTTTTTTTTTTTTTTTT.TTTT",
@@ -41,11 +61,11 @@ const VISUAL_MAP = [
   "##.....T.####.....TT#T",
   "##..#.####.T....######T",
   "wwf........#...........#T",
-  ".@..........#..........T",
-  "...TT.TT...T.TT###....#T",
-  "..........#.......#.#..T",
-  ".....T..#...TT..T.T..TTT",
-  ".f...T.T..T.TTT.TT.TT..T",
+  "0@..........#..........T",
+  "1..TT.TT...T.TT###....#T",
+  "2.........#.......#.#..T",
+  "3....T..#...TT..T.T..TTT",
+  "4f...T.T..T.TTT.TT.TT..T",
   "##TTTTTTTTTTTTT.TTTTTTTT",
   "##T.TTTTT.T.###........pTT",
   "##f.TTTT..T.#r#.........TT",
@@ -59,10 +79,12 @@ function parseVisualMap(visualMap: string[]): {
   tiles: number[][];
   subtypes: TileSubtype[][][];
   enemies: Array<{ y: number; x: number; kind: string }>;
+  transitions: Map<string, Array<[number, number]>>; // transitionId -> array of [y, x] positions
 } {
   const tiles: number[][] = [];
   const subtypes: TileSubtype[][][] = [];
   const enemies: Array<{ y: number; x: number; kind: string }> = [];
+  const transitions = new Map<string, Array<[number, number]>>();
 
   for (let y = 0; y < visualMap.length; y++) {
     const row = visualMap[y];
@@ -124,6 +146,46 @@ function parseVisualMap(visualMap: string[]): {
           cellSubtypes.push(TileSubtype.POT);
           cellSubtypes.push(TileSubtype.SNAKE);
           break;
+        case '0':
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+        case '9':
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+        case 'E':
+        case 'F':
+        case 'H':
+        case 'I':
+        case 'J':
+        case 'K':
+        case 'L':
+        case 'M':
+        case 'N':
+        case 'O':
+        case 'P':
+        case 'Q':
+        case 'R':
+        case 'U':
+        case 'V':
+        case 'X':
+        case 'Y':
+        case 'Z':
+          tileType = 0; // floor with room transition
+          cellSubtypes.push(TileSubtype.ROOM_TRANSITION);
+          // Track this transition position
+          if (!transitions.has(char)) {
+            transitions.set(char, []);
+          }
+          transitions.get(char)!.push([y, x]);
+          break;
         default:
           tileType = 0; // default to floor for unknown chars
       }
@@ -136,7 +198,7 @@ function parseVisualMap(visualMap: string[]): {
     subtypes.push(subtypeRow);
   }
 
-  return { tiles, subtypes, enemies };
+  return { tiles, subtypes, enemies, transitions };
 }
 
 const PARSED_MAP = parseVisualMap(VISUAL_MAP);
@@ -292,22 +354,8 @@ function generateRocks(mapData: MapData): TileSubtype[][][] {
 export function buildTheWildsEntrance(): StoryRoom {
   const mapData = generateWildsMap();
 
-  // Seamless Torch Town linkage along the left edge: rows 19..23
-  // - Ensure [y,0] and [y,1] are floors
-  // - Mark [y,0] as ROOM_TRANSITION to Torch Town
-  for (let y = 19; y <= 23; y++) {
-    if (mapData.tiles[y]?.[0] !== undefined) {
-      mapData.tiles[y][0] = FLOOR;
-      mapData.subtypes[y][0] = [TileSubtype.ROOM_TRANSITION];
-    }
-    if (mapData.tiles[y]?.[1] !== undefined) {
-      mapData.tiles[y][1] = FLOOR;
-      // Keep any existing subtypes on [y,1] unless it was a wall; if wall, clear
-      if (mapData.subtypes[y][1] == null || mapData.subtypes[y][1].length === 0) {
-        mapData.subtypes[y][1] = [];
-      }
-    }
-  }
+  // Transitions are now defined in the visual map using numbers (0-9)
+  // No need for hardcoded transition logic - they're already in the parsed map!
   
   // Find the entry point: choose the tile just above the bottom-most ROOM_TRANSITION
   let entryPoint: [number, number] = [SIZE - 2, 2];
@@ -329,6 +377,28 @@ export function buildTheWildsEntrance(): StoryRoom {
   const enemies = generateWildsEnemies(mapData);
 
   const rocks = generateRocks(mapData);
+
+  // Build otherTransitions array from TRANSITIONS map and parsed positions
+  const otherTransitions: Array<{
+    roomId: RoomId;
+    position: [number, number];
+    targetEntryPoint: [number, number];
+    returnEntryPoint: [number, number];
+  }> = [];
+
+  PARSED_MAP.transitions.forEach((positions, transitionId) => {
+    const transitionDef = TRANSITIONS[transitionId as keyof typeof TRANSITIONS];
+    if (transitionDef) {
+      positions.forEach(([y, x]) => {
+        otherTransitions.push({
+          roomId: transitionDef.roomId,
+          position: [y, x],
+          targetEntryPoint: transitionDef.target as [number, number],
+          returnEntryPoint: transitionDef.returnPoint as [number, number],
+        });
+      });
+    }
+  });
 
   // Auto-log the room data for easy freezing (only when generating randomly)
   if (!FIXED_ROOM_DATA && typeof window !== 'undefined') {
@@ -361,13 +431,6 @@ export function buildTheWildsEntrance(): StoryRoom {
       displayLabel: "The Wilds — Entrance",
       description: "A dangerous wilderness area teeming with hostile creatures.",
     },
-    otherTransitions: [
-      // Map seam returns to Torch Town east gate columns at y=10..14, x=34
-      { roomId: "story-torch-town" as RoomId, position: [19, 0], targetEntryPoint: [10, 33], returnEntryPoint: [19, 1] },
-      { roomId: "story-torch-town" as RoomId, position: [20, 0], targetEntryPoint: [11, 33], returnEntryPoint: [20, 1] },
-      { roomId: "story-torch-town" as RoomId, position: [21, 0], targetEntryPoint: [12, 33], returnEntryPoint: [21, 1] },
-      { roomId: "story-torch-town" as RoomId, position: [22, 0], targetEntryPoint: [13, 33], returnEntryPoint: [22, 1] },
-      { roomId: "story-torch-town" as RoomId, position: [23, 0], targetEntryPoint: [14, 33], returnEntryPoint: [23, 1] },
-    ],
+    otherTransitions, // Dynamically generated from TRANSITIONS map
   };
 }
