@@ -792,7 +792,9 @@ export const Tile: React.FC<TileProps> = ({
         return '50% 100%';
     }
   })();
-  const showNpcPrompt = shouldShowNpc && npcInteractable;
+  // Don't show dialogue prompt for dogs (they use petting interaction instead)
+  const isDogNpc = npc?.tags?.includes("dog") || npc?.tags?.includes("pet");
+  const showNpcPrompt = shouldShowNpc && npcInteractable && !isDogNpc;
 
   // If this is a floor tile
   if (tileId === 0) {
@@ -902,7 +904,7 @@ export const Tile: React.FC<TileProps> = ({
 
           {shouldShowNpc && npc && (
             <div
-              className={styles.npcImage}
+              className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,
@@ -1386,7 +1388,7 @@ export const Tile: React.FC<TileProps> = ({
 
           {shouldShowNpc && npc && (
             <div
-              className={styles.npcImage}
+              className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,

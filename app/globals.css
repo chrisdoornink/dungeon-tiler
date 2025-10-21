@@ -244,6 +244,22 @@ body {
   animation: spiritFlip 1400ms steps(2, end) infinite;
 }
 
+/* Heart effect animation (for petting dogs) */
+@keyframes heartFloat {
+  0% {
+    transform: translateY(0) scale(0.8);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+    transform: translateY(-10px) scale(1);
+  }
+  100% {
+    transform: translateY(-60px) scale(1.2);
+    opacity: 0;
+  }
+}
+
 /* Poison visual effects */
 @keyframes poisonStenchRise {
   0% {

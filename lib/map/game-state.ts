@@ -16,12 +16,13 @@ import {
 import { resolveNpcDialogueScript } from "../story/npc_script_registry";
 import {
   createInitialStoryFlags,
-  type StoryFlags,
   type StoryCondition,
+  type StoryFlags,
 } from "../story/event_registry";
 import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-handler";
 import { updateConditionalNpcs } from "../story/story_mode";
 import { determineRoomNpcs } from "../story/npc_conditions";
+import { updateDogBehavior } from "../npc_behaviors";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -70,6 +71,35 @@ function incrementStepsAndTime(state: GameState, amount: number = 1): void {
   // Update conditional NPCs when time of day changes
   if (previousPhase !== newPhase && state.mode === "story") {
     updateConditionalNpcs(state);
+  }
+}
+
+/**
+ * Update NPCs with special behaviors (e.g., dogs that follow the player)
+ */
+function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void {
+  if (!state.npcs || state.npcs.length === 0) return;
+  
+  const [py, px] = playerPos;
+  
+  for (const npc of state.npcs) {
+    // Check if this NPC has a special behavior
+    const behavior = npc.metadata?.behavior as string | undefined;
+    
+    if (behavior === "dog") {
+      // Update dog behavior
+      const ctx = {
+        npc,
+        grid: state.mapData.tiles,
+        subtypes: state.mapData.subtypes,
+        player: { y: py, x: px },
+        npcs: state.npcs,
+        enemies: state.enemies,
+        rng: state.combatRng,
+      };
+      
+      updateDogBehavior(ctx);
+    }
   }
 }
 
@@ -1139,6 +1169,9 @@ export function movePlayer(
     }
     console.log(`[ENEMY TURN] After enemy turn. Enemies now at:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x}) dist:${Math.abs(e.y - currentY) + Math.abs(e.x - currentX)}`).join(', '));
 
+    // Update NPC behaviors (e.g., dogs following player)
+    updateNPCBehaviors(newGameState, [currentY, currentX]);
+
     // Ghost effect: any ghost ending adjacent snuffs torch and vanishes with death effect
     const adjacentGhosts = newGameState.enemies.filter(
       (e) =>
@@ -1287,6 +1320,38 @@ export function movePlayer(
       (npc) => npc.y === newY && npc.x === newX && !npc.isDead()
     );
     if (blockingNpc) {
+      // Special handling for dog NPCs - petting interaction
+      const isDog = blockingNpc.tags?.includes("dog") || blockingNpc.tags?.includes("pet");
+      if (isDog) {
+        // Mark this as a petting interaction
+        blockingNpc.setMemory("lastPetAt", Date.now());
+        blockingNpc.setMemory("petCount", ((blockingNpc.getMemory("petCount") as number) || 0) + 1);
+        
+        // Create a special petting interaction event
+        const queue = newGameState.npcInteractionQueue
+          ? [...newGameState.npcInteractionQueue]
+          : [];
+        
+        const petHook = {
+          id: `pet-${blockingNpc.id}`,
+          type: "custom" as const,
+          description: `Pet ${blockingNpc.name}`,
+          payload: { action: "pet", npcId: blockingNpc.id, position: [newY, newX] },
+        };
+        
+        queue.push(blockingNpc.createInteractionEvent("action", petHook));
+        const MAX_QUEUE = 20;
+        const trimmed =
+          queue.length > MAX_QUEUE
+            ? queue.slice(queue.length - MAX_QUEUE)
+            : queue;
+        newGameState.npcInteractionQueue = trimmed;
+        
+        // Don't block movement - player stays in place but interaction triggers
+        return newGameState;
+      }
+      
+      // Regular NPC interaction (dialogue)
       const oppositeFacing = (() => {
         switch (direction) {
           case Direction.UP:

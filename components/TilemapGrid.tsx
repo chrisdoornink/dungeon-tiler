@@ -1075,6 +1075,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     x: number;
     src: string;
   }>(null);
+  // Transient heart effect (petting dogs)
+  const [heartEffect, setHeartEffect] = useState<null | {
+    y: number;
+    x: number;
+    createdAt: number;
+  }>(null);
   // Transient Spirit effects (spawn on enemy death)
   const [spirits, setSpirits] = useState<
     Array<{ id: string; y: number; x: number; createdAt: number }>
@@ -1439,6 +1445,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     const queue = gameState.npcInteractionQueue;
     if (!queue || queue.length === 0) return;
     const last = queue[queue.length - 1];
+    
+    // Handle petting interaction
+    if (last.type === "custom" && last.hookId?.startsWith("pet-")) {
+      const payload = last.availableHooks[0]?.payload as { action?: string; position?: [number, number] } | undefined;
+      if (payload?.action === "pet" && payload.position) {
+        const [y, x] = payload.position;
+        setHeartEffect({ y, x, createdAt: Date.now() });
+        // Clear heart effect after animation completes
+        setTimeout(() => setHeartEffect(null), 1000);
+      }
+    }
+    
     try {
       console.info(
         `[NPC Interaction] ${last.npcName} -> ${last.type} (${last.trigger})`,
@@ -2678,6 +2696,37 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       );
                     });
                   })()}
+                {heartEffect && (() => {
+                  const tileSize = 40;
+                  const pxLeft = (heartEffect.x + 0.5) * tileSize;
+                  const pxTop = (heartEffect.y + 0.5) * tileSize;
+                  const size = 11; // About 1/3 of original 32px
+                  return (
+                    <div
+                      key={`heart-${heartEffect.createdAt}`}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${pxLeft - size / 2}px`,
+                        top: `${pxTop - size / 2}px`,
+                        width: `${size}px`,
+                        height: `${size}px`,
+                        zIndex: 11000,
+                        animation: "heartFloat 1s ease-out forwards",
+                      }}
+                    >
+                      <img
+                        src="/images/presentational/heart-red.png"
+                        alt=""
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "contain",
+                        }}
+                      />
+                    </div>
+                  );
+                })()}
                 <div
                   className={styles.gridContainer}
                   style={{

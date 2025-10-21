@@ -550,6 +550,23 @@ export function buildTorchTown(): StoryRoom {
     metadata: { dayLocation: "plaza", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
   }));
 
+  // 19. Golden Dog - Day: Near Tavi in plaza, Night: Near Tavi in plaza
+  npcs.push(new NPC({
+    id: "npc-dog-golden",
+    name: "Golden Dog",
+    sprite: "/images/dog-golden/dog-front-1.png",
+    y: 14,
+    x: 13,
+    facing: Direction.DOWN,
+    canMove: true,
+    tags: ["dog", "pet"],
+    metadata: { 
+      behavior: "dog",
+      dayLocation: "plaza", 
+      nightLocation: "plaza" 
+    },
+  }));
+
   return {
     id: "story-torch-town",
     mapData: { tiles, subtypes, environment: "outdoor" },
