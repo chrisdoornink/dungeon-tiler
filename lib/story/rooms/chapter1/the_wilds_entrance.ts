@@ -23,6 +23,10 @@ const TRANSITIONS = {
 
 /**
  * Visual map layout using readable symbols.
+ * 
+ * NOTE: Spaces are ignored during parsing - use them for visual formatting!
+ * Example: "# # T T" is the same as "##TT"
+ * 
  * Legend:
  * - '.' = floor (0)
  * - '#' = wall (1)
@@ -42,34 +46,34 @@ const TRANSITIONS = {
  * - '5'-'9', 'A'-'Z' = available for future areas
  */
 const VISUAL_MAP = [
-  "##TTTTTTTTTTTTTTTTTT.TTTT",
-  "##T.TTTTT.T.###TTTTTWTTTTT",
-  "##f.TTTT..T.#.#TTTT..TTTTT",
-  "##.......T.....TTT..TTTTTT",
-  "##......TT.............WTT",
-  "##TT....T..............##T",
-  "##f.....................T",
-  "##......TTT....#.#.....T",
-  "##......TTT..TTT.#.....T",
-  "##...#..T.....TT..#....T",
-  "##fG.G#.T.......#...#..T",
-  "##....#.T...........#..T",
-  "##..G...T.....######.##.",
-  "##....#.......#..#...T",
-  "##f...#.....#####....T",
-  "##..##.......#.##..T#T",
-  "##.....T.####.....TT#T",
-  "##..#.####.T....######T",
-  "wwf........#...........#T",
-  "0@..........#..........T",
-  "1..TT.TT...T.TT###....#T",
-  "2.........#.......#.#..T",
-  "3....T..#...TT..T.T..TTT",
-  "4f...T.T..T.TTT.TT.TT..T",
-  "##TTTTTTTTTTTTT.TTTTTTTT",
-  "##T.TTTTT.T.###........pTT",
-  "##f.TTTT..T.#r#.........TT",
-  "##.......T..#.#TTT.TTTTTT#"
+  "# # T T T T T T T T T T T T T T T T T T . T T T T T",
+  "# # T . T T T T T . T . # # # T T T T T W T T T T T",
+  "# # f . T T T T . . T . # . # T T T T . . T T T T T",
+  "# # . . . . . . . T . . . . . T T T . . T T T T T T",
+  "# # . . . . . . T T . . . . . . . . . . . . . W T T",
+  "# # T T . . . . T . . . . . . . . . . . . . . . T T",
+  "# # f . . . . . . . . . . . . . . . . . . . . . . T",
+  "# # . . . . . . T T T . . . . # . # . . . . . . . .",
+  "# # . . . . . . T T T . . T T T . # . . . . . . . .",
+  "# # . . . # . . T . . . . . T T . . # . . . . . . .",
+  "# # f G . G # . T . . . . . . . # . . . # . . . . .",
+  "# # . . . . # . T . . . . . . . . . . . . # . . . .",
+  "# # . . G . . . T . . . . . # # # # # # . # # . . .",
+  "# # . . . . # . . . . . . . # . . # . . . T . . . .",
+  "# # f . . . # . . . . . # # # # # . . . . T . . . .",
+  "# # . . # # . . . . . . . # . # # . . T # T . . . .",
+  "# # . . . . . T . # # # # . . . . . T T # T . . . .",
+  "# # . . # . # # # # . T . . . . # # # # # # T . . .",
+  "w w f . . . . . . . . # . . . . . . . . . . . # . .",
+  "0 @ . . . . . . . . . . # . . . . . . . . . . . . .",
+  "1 . . T T . T T . . . T . T T # # # . . . . # . . .",
+  "2 . . . . . . . . . . # . . . . . . . # . # . . . .",
+  "3 . . . . T . . # . . . T T . . T . T . . T T T . .",
+  "4 f . . . T . T . . T . T T T . T T . T T . . T . .",
+  "# # T T T T T T T T T T T T T . T T T T T T T T T T",
+  "# # T . T T T T T . T . # # # . . . . . . . . p T T",
+  "# # f . T T T T . . T . # r # . . . . . . . . . T T",
+  "# # . . . . . . . T . . # . # T T T . T T T T T T #"
 ];
 
 /**
@@ -93,7 +97,22 @@ function parseVisualMap(visualMap: string[]): {
 
     // Ensure we process exactly SIZE columns (pad with floor if needed)
     for (let x = 0; x < SIZE; x++) {
-      const char = x < row.length ? row[x] : '.'; // Default to floor if row is short
+      // Get character, skipping spaces (used for visual formatting only)
+      let char = '.';
+      let sourceIndex = 0;
+      let tilesProcessed = 0;
+      while (sourceIndex < row.length && tilesProcessed <= x) {
+        const c = row[sourceIndex];
+        if (c !== ' ') {
+          if (tilesProcessed === x) {
+            char = c;
+            break;
+          }
+          tilesProcessed++;
+        }
+        sourceIndex++;
+      }
+      
       let tileType = 0; // default to floor
       const cellSubtypes: TileSubtype[] = [];
 
