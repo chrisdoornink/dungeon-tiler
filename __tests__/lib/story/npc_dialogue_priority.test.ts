@@ -93,12 +93,23 @@ describe("NPC Dialogue Priority System", () => {
       expect(scriptId).toBe("kira-kalen-rescue");
     });
 
-    it("should show rescue dialogue for Old Fenna when kalen-rescued-at-bluff is true", () => {
+    it("should show goblin activity dialogue for Old Fenna when all conditions are met", () => {
+      const flags: StoryFlags = {
+        "met-old-fenna-torch-town": true,
+        "kalen-rescued-at-bluff": true,
+        "entered-bluff-cave": true,
+      };
+      const scriptId = resolveNpcDialogueScript("npc-fenna", flags);
+      expect(scriptId).toBe("fenna-goblin-activity");
+    });
+
+    it("should show default for Old Fenna when only kalen-rescued-at-bluff is true", () => {
       const flags: StoryFlags = {
         "kalen-rescued-at-bluff": true,
       };
       const scriptId = resolveNpcDialogueScript("npc-fenna", flags);
-      expect(scriptId).toBe("fenna-kalen-rescue");
+      // Old Fenna doesn't have a kalen-rescue dialogue, only goblin-activity or default
+      expect(scriptId).toBe("fenna-default");
     });
 
     it("should show rescue dialogue for Rhett when kalen-rescued-at-bluff is true", () => {
@@ -111,17 +122,28 @@ describe("NPC Dialogue Priority System", () => {
   });
 
   describe("Priority Ordering", () => {
-    it("should prioritize cave hint (25) over rescue dialogue (20) for Eldra", () => {
+    it("should prioritize goblin activity (65) over cave hint (30) for Eldra", () => {
+      const flags: StoryFlags = {
+        "met-old-fenna-torch-town": true,
+        "entered-bluff-cave": true,
+        "kalen-rescued-at-bluff": true,
+      };
+      const scriptId = resolveNpcDialogueScript("npc-eldra", flags);
+      // Goblin activity has priority 65, cave hint has priority 30
+      expect(scriptId).toBe("eldra-goblin-activity");
+    });
+
+    it("should prioritize cave hint (30) over rescue dialogue (25) for Eldra", () => {
       const flags: StoryFlags = {
         "entered-bluff-cave": true,
         "kalen-rescued-at-bluff": true,
       };
       const scriptId = resolveNpcDialogueScript("npc-eldra", flags);
-      // Cave hint has priority 25, so it should win
+      // Cave hint has priority 30, rescue has priority 25
       expect(scriptId).toBe("eldra-cave-hint");
     });
 
-    it("should prioritize rescue dialogue (20) over default (0) for Maro", () => {
+    it("should prioritize rescue dialogue (25) over default (0) for Maro", () => {
       const flags: StoryFlags = {
         "kalen-rescued-at-bluff": true,
       };
