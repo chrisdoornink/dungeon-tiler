@@ -22,11 +22,11 @@ const SIZE = 25;
  * - 's' = pot with snake inside
  */
 const VISUAL_MAP = [
-  "##TTTTTTTTTTTTTTTTTTTTTTT",
-  "##T.TTTTT.T.###.........TT",
-  "##f.TTTT..T.#.#.........TT",
-  "##.......T..............#",
-  "##......TT...............###",
+  "##TTTTTTTTTTTTTTTTTT.TTTT",
+  "##T.TTTTT.T.###TTTTTWTTTTT",
+  "##f.TTTT..T.#.#TTTT..TTTTT",
+  "##.......T.....TTT..TTTTTT",
+  "##......TT.............WTT",
   "##TT....T..............##T",
   "##f.....................T",
   "##......TTT....#.#.....T",
