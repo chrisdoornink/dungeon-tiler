@@ -2,6 +2,23 @@ import { NPC } from "./npc";
 import { FLOOR } from "./map/constants";
 
 /**
+ * Restricted tiles where dogs cannot move (entrance/exit areas)
+ */
+const DOG_RESTRICTED_TILES: Array<[number, number]> = [
+  [12, 30], [12, 29], [13, 29], [13, 30], [11, 29], [11, 30],
+  [30, 4], [29, 4], [28, 4], [27, 4]
+];
+
+/**
+ * Check if a position is restricted for dogs
+ */
+function isDogRestrictedTile(y: number, x: number): boolean {
+  return DOG_RESTRICTED_TILES.some(([restrictedY, restrictedX]) => 
+    restrictedY === y && restrictedX === x
+  );
+}
+
+/**
  * Context for NPC behavior updates
  */
 export interface NPCBehaviorContext {
@@ -26,6 +43,7 @@ export interface NPCBehaviorResult {
 /**
  * Dog behavior: follows the player 75% of the time, stays put 25% of the time
  * Alternates front sprites when moving, uses back sprites when moving up
+ * After being pet, moves out of the player's way
  */
 export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
   const { npc, grid, player, npcs, enemies, rng } = ctx;
@@ -33,6 +51,19 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
   
   // Check if player is adjacent (for potential petting)
   const distToPlayer = Math.abs(npc.y - player.y) + Math.abs(npc.x - player.x);
+  
+  // Check if dog was recently pet (within last 500ms) - if so, move out of the way
+  const lastPetAt = npc.getMemory("lastPetAt") as number | undefined;
+  const timeSincePet = lastPetAt ? Date.now() - lastPetAt : Infinity;
+  const wasRecentlyPet = timeSincePet < 500;
+  
+  if (wasRecentlyPet && distToPlayer === 1) {
+    // Dog was just pet and is adjacent to player - sidestep or back away
+    const moveResult = tryMoveAwayFromPlayer(npc, grid, player, npcs, enemies);
+    if (moveResult.moved) {
+      return moveResult;
+    }
+  }
   
   // 75% chance to follow player, 25% chance to stay put
   const shouldFollow = random() < 0.75;
@@ -61,6 +92,9 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
       
       // Check if target is valid floor
       if (!isValidPosition(grid, targetY, targetX)) continue;
+      
+      // Check if target is restricted for dogs
+      if (isDogRestrictedTile(targetY, targetX)) continue;
       
       // Check if target is occupied by player
       if (targetY === player.y && targetX === player.x) continue;
@@ -112,6 +146,134 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
   }
   
   return { moved: false };
+}
+
+/**
+ * Try to move the dog away from the player after being pet
+ * Priority: sidestep > backward (2 spaces if possible)
+ */
+function tryMoveAwayFromPlayer(
+  npc: NPC,
+  grid: number[][],
+  player: { y: number; x: number },
+  npcs: NPC[],
+  enemies?: Array<{ y: number; x: number }>
+): NPCBehaviorResult {
+  const dy = player.y - npc.y;
+  const dx = player.x - npc.x;
+  
+  // Calculate perpendicular directions (sidestep options)
+  const sidestepMoves: Array<[number, number]> = [];
+  if (dy !== 0) {
+    // Player is above/below - sidestep left/right
+    sidestepMoves.push([0, -1], [0, 1]);
+  }
+  if (dx !== 0) {
+    // Player is left/right - sidestep up/down
+    sidestepMoves.push([-1, 0], [1, 0]);
+  }
+  
+  // Try sidestep moves first
+  for (const [moveY, moveX] of sidestepMoves) {
+    if (tryMove(npc, grid, player, npcs, enemies, moveY, moveX)) {
+      updateDogSprite(npc, moveY, moveX);
+      return { moved: true };
+    }
+  }
+  
+  // If sidestep not possible, try backing away
+  // Move in opposite direction from player
+  const backY = dy > 0 ? -1 : dy < 0 ? 1 : 0;
+  const backX = dx > 0 ? -1 : dx < 0 ? 1 : 0;
+  
+  // Try to move 2 spaces back if possible
+  if (backY !== 0 || backX !== 0) {
+    const canMove2Spaces = 
+      tryMove(npc, grid, player, npcs, enemies, backY * 2, backX * 2, true);
+    
+    if (canMove2Spaces) {
+      // Move 2 spaces
+      npc.y += backY * 2;
+      npc.x += backX * 2;
+      updateDogSprite(npc, backY, backX);
+      return { moved: true };
+    }
+    
+    // Try 1 space back
+    if (tryMove(npc, grid, player, npcs, enemies, backY, backX)) {
+      updateDogSprite(npc, backY, backX);
+      return { moved: true };
+    }
+  }
+  
+  return { moved: false };
+}
+
+/**
+ * Try to move the NPC to a target position
+ * Returns true if move was successful and updates NPC position
+ */
+function tryMove(
+  npc: NPC,
+  grid: number[][],
+  player: { y: number; x: number },
+  npcs: NPC[],
+  enemies: Array<{ y: number; x: number }> | undefined,
+  moveY: number,
+  moveX: number,
+  checkOnly = false
+): boolean {
+  const targetY = npc.y + moveY;
+  const targetX = npc.x + moveX;
+  
+  // Check if target is valid floor
+  if (!isValidPosition(grid, targetY, targetX)) return false;
+  
+  // Check if target is restricted for dogs
+  const isDog = npc.tags?.includes("dog") || npc.tags?.includes("pet");
+  if (isDog && isDogRestrictedTile(targetY, targetX)) return false;
+  
+  // Check if target is occupied by player
+  if (targetY === player.y && targetX === player.x) return false;
+  
+  // Check if target is occupied by another NPC
+  const npcBlocking = npcs.some(
+    (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
+  );
+  if (npcBlocking) return false;
+  
+  // Check if target is occupied by an enemy
+  const enemyBlocking = enemies?.some(
+    (e) => e.y === targetY && e.x === targetX
+  );
+  if (enemyBlocking) return false;
+  
+  // Move is valid
+  if (!checkOnly) {
+    npc.y = targetY;
+    npc.x = targetX;
+  }
+  
+  return true;
+}
+
+/**
+ * Update dog sprite based on movement direction
+ */
+function updateDogSprite(npc: NPC, moveY: number, _moveX: number): void {
+  if (moveY < 0) {
+    // Moving up - alternate between back sprites
+    const currentStep = (npc.memory?.dogStep as number) || 0;
+    const nextStep = (currentStep + 1) % 2;
+    npc.setMemory("dogStep", nextStep);
+    npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}.png`;
+  } else {
+    // Moving down, left, or right - alternate between front sprites
+    const currentStep = (npc.memory?.dogStep as number) || 0;
+    const nextStep = (currentStep + 1) % 4;
+    npc.setMemory("dogStep", nextStep);
+    npc.sprite = `/images/dog-golden/dog-front-${nextStep + 1}.png`;
+  }
 }
 
 /**
