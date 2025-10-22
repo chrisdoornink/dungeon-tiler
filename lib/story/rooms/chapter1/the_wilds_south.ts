@@ -44,13 +44,13 @@ const TRANSITIONS = {
  * - '0' = Back to Wilds Entrance
  */
 const VISUAL_MAP = [
-  "# # T T T T T T T T T T T T T T T T T T 0 T T T T T",
-  "# # T . T T T T . . T T T T T . . T T T . T T T T T",
-  "# # f . T T T . . . . T T T . . . . T T . . T T T T",
-  "# # . . . T T . . . . . T T . . R R R R . . . T T T",
-  "# # . . . T T . . . . . T T . . R R R R . . . . T T",
-  "# # T T . T T . . . . . T T . . R R R R . . . . . T",
-  "# # f . . T T . . . . . T T T T h h d h . . . . . T",
+  "# # T T T T T T T T T T T T # 1 # T T T 0 T T T T T",
+  "# # T . T T T T . . T T T # # . # T T T . T T T T T",
+  "# # f . T T T . . . . T T # . . # . T . . . T T T T",
+  "# # . . . T T T T T T . T # . . R R R R . . . T T T",
+  "# # . . . T T T T T T . T # . . R R R R . . . . T T",
+  "# # T T . T T . . . . . T # . . R R R R . . . . . T",
+  "# # f . . T T . . . . . T # # # h h d h . . . . . T",
   "# # . . . v . . . . . . . . . . . . . . . . . . . T",
   "# # . . . . . T T T . . . . . . . . . . . . . . . T",
   "# # . . . . . . T . . . . . . . . . . . . . . . . T",

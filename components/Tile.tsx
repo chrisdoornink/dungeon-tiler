@@ -1099,6 +1099,10 @@ export const Tile: React.FC<TileProps> = ({
       // Check if there's a roof tile behind (north of) this wall - for roof overhang
       const hasRoofBehind = neighbors.top === 4;
       const roofFrontOverhangImage = '/images/roof/spanish-roof-front-overhang.png';
+      
+      // Check if there's a roof tile below (south of) this wall - for roof back overhang
+      const hasRoofBelow = neighbors.bottom === 4;
+      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
 
       // Forced perspective: if the tile below is a FLOOR (0), make the bottom border thicker/darker
       const isFloorBelow = neighbors.bottom === 0;
@@ -1107,7 +1111,13 @@ export const Tile: React.FC<TileProps> = ({
         wallClasses += " border-b-8 border-b-[#1f1f1f]";
       }
 
-      const variantName = getWallVariantName(neighbors);
+      // When there's a roof below, we need to modify the neighbor info to treat it like a wall below
+      // This ensures the wall renders as a "top wall" (pattern 0010) connected to the house
+      const modifiedNeighbors = hasRoofBelow 
+        ? { ...neighbors, bottom: 1 } // Treat roof as wall for pattern calculation
+        : neighbors;
+
+      const variantName = getWallVariantName(modifiedNeighbors);
 
       // Map wall variant to NESW asset filename
       // N is always 0 since we don't care about the north direction
@@ -1222,6 +1232,23 @@ export const Tile: React.FC<TileProps> = ({
               data-testid="wall-roof-overhang-overlay"
             />
           )}
+          
+          {/* Render roof back overhang overlay if there's a roof below (south of) this wall */}
+          {hasRoofBelow && (
+            <div 
+              className={styles.roofOverhangOverlay}
+              style={{
+                backgroundImage: `url(${roofBackOverhangImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center bottom',
+                backgroundRepeat: 'no-repeat',
+                bottom: 0,
+                top: 'auto',
+                height: '33%',
+              }}
+              data-testid="wall-roof-back-overhang-overlay"
+            />
+          )}
 
           {/* Render hanging signs if present */}
           {subtype.includes(TileSubtype.SIGN_STORE) && (
@@ -1275,6 +1302,10 @@ export const Tile: React.FC<TileProps> = ({
     if (isVisible) {
       const roofClasses = `${styles.tileContainer} ${styles.roof} ${tierClass}`;
       const roofAsset = '/images/roof/spanish-roof-main.png';
+      
+      // Check if there's a tree behind (north of) this roof - for roof overhang
+      const hasTreeBehind = neighbors.top === 6;
+      const roofFrontOverhangImage = '/images/roof/spanish-roof-front-overhang.png';
 
       return (
         <div
@@ -1287,6 +1318,20 @@ export const Tile: React.FC<TileProps> = ({
             backgroundRepeat: "no-repeat"
           }}
         >
+          {/* Render roof front overhang overlay if there's a tree behind (north of) this roof */}
+          {hasTreeBehind && (
+            <div 
+              className={styles.roofOverhangOverlay}
+              style={{
+                backgroundImage: `url(${roofFrontOverhangImage})`,
+                top: 0,
+                bottom: 'auto',
+                height: '33%',
+              }}
+              data-testid="roof-tree-overhang-overlay"
+            />
+          )}
+          
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}
         </div>
@@ -1516,6 +1561,10 @@ export const Tile: React.FC<TileProps> = ({
       // Check if bottom neighbor is a wall - if so, we'll render the wall top overlay
       const hasWallBelow = neighbors.bottom === 1;
       
+      // Check if bottom neighbor is a roof - if so, we'll render the roof back overhang
+      const hasRoofBelow = neighbors.bottom === 4;
+      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
+      
       // Determine which wall image to use for the overlay based on neighboring walls
       let wallPattern = '0111';
 
@@ -1597,6 +1646,23 @@ export const Tile: React.FC<TileProps> = ({
                 zIndex: 12000, // Above tree (11500) so wall top renders over tree
               }}
               data-testid="wall-top-overlay"
+            />
+          )}
+          
+          {/* Render roof back overhang overlay if there's a roof below this tree tile */}
+          {hasRoofBelow && (
+            <div 
+              className={styles.roofOverhangOverlay}
+              style={{
+                backgroundImage: `url(${roofBackOverhangImage})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center bottom',
+                backgroundRepeat: 'no-repeat',
+                bottom: 0,
+                top: 'auto',
+                height: '33%',
+              }}
+              data-testid="tree-roof-back-overhang-overlay"
             />
           )}
         </div>
