@@ -5,7 +5,7 @@
  * To create a new room, copy this file and modify the configuration below.
  */
 
-import { RoomId } from "../../../map";
+import { RoomId, TileSubtype } from "../../../map";
 import type { StoryRoom } from "../types";
 import { buildRoom, type RoomConfig } from "../room-builder";
 
@@ -114,6 +114,9 @@ const ROOM_CONFIG: RoomConfig = {
   },
   environment: 'outdoor',
   npcs: [],
+  randomItems: [
+    { subtype: TileSubtype.ROCK, count: 20 }
+  ],
 };
 
 /**

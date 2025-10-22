@@ -1,4 +1,4 @@
-import { RoomId, TileSubtype } from "../../map";
+import { RoomId, TileSubtype, FLOOR } from "../../map";
 import type { MapData } from "../../map/types";
 import { Enemy } from "../../enemy";
 import type { StoryRoom } from "./types";
@@ -20,6 +20,11 @@ export interface TransitionDefinition {
   returnPoint: [number, number];
 }
 
+export interface RandomItemPlacement {
+  subtype: TileSubtype;
+  count: number;
+}
+
 export interface RoomConfig {
   id: string;
   size: number;
@@ -31,6 +36,7 @@ export interface RoomConfig {
   };
   environment?: EnvironmentId;
   npcs?: unknown[]; // Can be typed more specifically when NPCs are added
+  randomItems?: RandomItemPlacement[]; // Items to randomly place on empty floor tiles
 }
 
 /**
@@ -40,7 +46,7 @@ export interface RoomConfig {
  * @returns Complete StoryRoom ready to use in the game
  */
 export function buildRoom(config: RoomConfig): StoryRoom {
-  const { id, size, visualMap, transitions: transitionDefs, metadata, environment = "outdoor", npcs = [] } = config;
+  const { id, size, visualMap, transitions: transitionDefs, metadata, environment = "outdoor", npcs = [], randomItems = [] } = config;
 
   // Parse the visual map
   const parsedMap: ParsedMapData = parseVisualMap(visualMap, size);
@@ -58,6 +64,11 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     enemy.kind = kind as EnemyKind;
     return enemy;
   });
+
+  // Place random items on empty floor tiles
+  if (randomItems.length > 0) {
+    placeRandomItems(mapData, enemies, randomItems);
+  }
 
   // Find entry point (tile just above the bottom-most ROOM_TRANSITION)
   let entryPoint: [number, number] = [size - 2, 2];
@@ -109,4 +120,63 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     metadata,
     otherTransitions,
   };
+}
+
+/**
+ * Place random items on empty floor tiles
+ * 
+ * @param mapData - The map data to modify
+ * @param enemies - Array of enemies to avoid placing items on
+ * @param randomItems - Array of item placements to perform
+ */
+function placeRandomItems(
+  mapData: MapData,
+  enemies: Enemy[],
+  randomItems: RandomItemPlacement[]
+): void {
+  const size = mapData.tiles.length;
+  
+  // Find all empty floor tiles (floor with no subtypes, no enemies)
+  const emptyFloorTiles: Array<[number, number]> = [];
+  
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      // Check if it's a floor tile
+      if (mapData.tiles[y][x] !== FLOOR) continue;
+      
+      // Check if it has no subtypes (or only empty array)
+      const subtypes = mapData.subtypes[y]?.[x] || [];
+      if (subtypes.length > 0) continue;
+      
+      // Check if there's no enemy on this tile
+      const hasEnemy = enemies.some(e => e.y === y && e.x === x);
+      if (hasEnemy) continue;
+      
+      emptyFloorTiles.push([y, x]);
+    }
+  }
+  
+  // Shuffle the empty floor tiles for random placement
+  const shuffled = [...emptyFloorTiles].sort(() => Math.random() - 0.5);
+  
+  // Place each type of random item
+  let tileIndex = 0;
+  for (const { subtype, count } of randomItems) {
+    for (let i = 0; i < count && tileIndex < shuffled.length; i++) {
+      const [y, x] = shuffled[tileIndex];
+      
+      // Initialize subtypes array if needed
+      if (!mapData.subtypes[y]) {
+        mapData.subtypes[y] = [];
+      }
+      if (!mapData.subtypes[y][x]) {
+        mapData.subtypes[y][x] = [];
+      }
+      
+      // Add the subtype
+      mapData.subtypes[y][x].push(subtype);
+      
+      tileIndex++;
+    }
+  }
 }
