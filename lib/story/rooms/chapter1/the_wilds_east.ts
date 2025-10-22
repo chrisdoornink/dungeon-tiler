@@ -40,9 +40,19 @@ const TRANSITIONS = {
  * 
  * Legend:
  * - '.' = floor (0)
+ * - '#' = wall (1)
+ * - 'T' = tree (6)
+ * - 'h' = house wall (1)
+ * - 'R' = roof (4)
  * - 'G' = goblin enemy
+ * - 'S' = snake enemy
+ * - 'W' = wisp (ghost) enemy
+ * - 'd' = door (wall with door subtype)
  * - 'f' = torch on floor tile
+ * - 'w' = torch on wall tile
+ * - 'r' = pot with rune inside
  * - 'p' = pot with food inside
+ * - 's' = pot with snake inside
  * 
  * Transitions:
  * - '0'-'9', 'A'-'D' = Back to Wilds Entrance (left edge)

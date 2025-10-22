@@ -102,6 +102,16 @@ export function parseVisualMap(visualMap: string[], size: number): ParsedMapData
           cellSubtypes.push(TileSubtype.POT);
           cellSubtypes.push(TileSubtype.SNAKE);
           break;
+        case 'h':
+          tileType = 1; // wall tile (for house walls)
+          break;
+        case 'R':
+          tileType = 4; // roof tile
+          break;
+        case 'd':
+          tileType = 1; // wall tile with door subtype
+          cellSubtypes.push(TileSubtype.DOOR);
+          break;
         case '0':
         case '1':
         case '2':

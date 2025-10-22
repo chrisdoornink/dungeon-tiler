@@ -17,6 +17,10 @@ const SIZE = 25;
 const TRANSITIONS = {
   // Back to Wilds Entrance (bottom edge)
   '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
+  '1': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
+  '2': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
+  '3': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
+  
 };
 
 /**
@@ -28,9 +32,15 @@ const TRANSITIONS = {
  * - '.' = floor (0)
  * - '#' = wall (1)
  * - 'T' = tree (6)
+ * - 'h' = house wall (1)
+ * - 'R' = roof (4)
+ * - 'G' = goblin enemy
  * - 'S' = snake enemy
  * - 'W' = wisp (ghost) enemy
+ * - 'd' = door (wall with door subtype)
  * - 'f' = torch on floor tile
+ * - 'w' = torch on wall tile
+ * - 'r' = pot with rune inside
  * - 'p' = pot with food inside
  * - 's' = pot with snake inside
  * 
@@ -38,13 +48,13 @@ const TRANSITIONS = {
  * - '0' = Back to Wilds Entrance
  */
 const VISUAL_MAP = [
-  "T T T T T T T T T T T T T T T T T T T T T T T T T",
-  "T T T T T T T T T T T T T T T T T T T T T T T T T",
-  "T T T T T T . . . T T T T T T T T T T T T T T T T",
+  "T T T T T T T T T T T T T T T T T 1 2 3 T T T T T",
+  "T T T T T T T T T T . . . . . . . . . . T T T T T",
+  "T T T T T T . . . . . . . . . . . . . T T T T T T",
   "T T T T T T . W . T T T T T T T T T T T T T T T T",
   "T T T T T T . . . T T T T T T T T T T T T T T T T",
   "T T T T T T T . T T T T T T T T T T T T T T T T T",
-  "T T T T T T T . T T T T T T T T . . . s T T T T T",
+  "T T T # T T T . T T T T T T T T . . . s T T T T T",
   "T T T T T T T . T T T T T T T T . S . . T T T T T",
   "T T T T T T T . T T T T T T T T . . . . T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",

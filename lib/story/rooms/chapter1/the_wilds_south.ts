@@ -28,11 +28,17 @@ const TRANSITIONS = {
  * - '.' = floor (0)
  * - '#' = wall (1)
  * - 'T' = tree (6)
+ * - 'h' = house wall (1)
+ * - 'R' = roof (4)
  * - 'G' = goblin enemy
  * - 'S' = snake enemy
  * - 'W' = wisp (ghost) enemy
+ * - 'd' = door (wall with door subtype)
  * - 'f' = torch on floor tile
+ * - 'w' = torch on wall tile
+ * - 'r' = pot with rune inside
  * - 'p' = pot with food inside
+ * - 's' = pot with snake inside
  * 
  * Transitions:
  * - '0' = Back to Wilds Entrance
@@ -41,11 +47,11 @@ const VISUAL_MAP = [
   "# # T T T T T T T T T T T T T T T T T T 0 T T T T T",
   "# # T . T T T T . . T T T T T . . T T T . T T T T T",
   "# # f . T T T . . . . T T T . . . . T T . . T T T T",
-  "# # . . . . . . . . . . T . . . . . . . . . . T T T",
-  "# # . . . . . . . . . . . . . . . . . . . . . . T T",
-  "# # T T . . . . . . . . . . . . . . . . . . . . . T",
-  "# # f . . . . . . . . . . . . . . . . . . . . . . T",
-  "# # . . . . . T T . . . . . . . . . . . . . . . . T",
+  "# # . . . T T . . . . . T T . . R R R R . . . T T T",
+  "# # . . . T T . . . . . T T . . R R R R . . . . T T",
+  "# # T T . T T . . . . . T T . . R R R R . . . . . T",
+  "# # f . . T T . . . . . T T T T h h d h . . . . . T",
+  "# # . . . v . . . . . . . . . . . . . . . . . . . T",
   "# # . . . . . T T T . . . . . . . . . . . . . . . T",
   "# # . . . . . . T . . . . . . . . . . . . . . . . T",
   "# # f G . . . . . . . . . . . . . . . . . . . . . T",
