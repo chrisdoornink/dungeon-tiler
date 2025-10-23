@@ -698,6 +698,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [activeDialogueChoices, selectedChoiceIndex, handleDialogueChoiceSelect]);
 
+  const handleTextInputSubmit = useCallback(
+    (value: string) => {
+      if (!dialogueSession || !activeDialogueLine?.textInput) return;
+      
+      const stateKey = activeDialogueLine.textInput.stateKey;
+      
+      // Update game state with the input value
+      setGameState((prev) => {
+        const nextState = {
+          ...prev,
+          [stateKey]: value,
+        };
+        try {
+          CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+        } catch {}
+        return nextState;
+      });
+      
+      // Advance to next dialogue line
+      handleDialogueAdvance();
+    },
+    [dialogueSession, activeDialogueLine, resolvedStorageSlot, handleDialogueAdvance, setGameState]
+  );
+
   const handleInteract = useCallback(() => {
     if (dialogueActive) {
       handleDialogueAdvance();
@@ -2891,6 +2915,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           }))}
           selectedChoiceIndex={selectedChoiceIndex}
           onSelectChoice={handleDialogueChoiceSelect}
+          textInput={activeDialogueLine.textInput ? {
+            prompt: activeDialogueLine.textInput.prompt,
+            placeholder: activeDialogueLine.textInput.placeholder,
+            maxLength: activeDialogueLine.textInput.maxLength,
+          } : undefined}
+          onTextInputSubmit={handleTextInputSubmit}
         />
       )}
 

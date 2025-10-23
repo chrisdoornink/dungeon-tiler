@@ -638,6 +638,7 @@ export interface GameState {
   hasKey: boolean; // Player has the universal generic key
   hasExitKey: boolean;
   hasSword?: boolean;
+  swordName?: string; // Player-chosen name for their sword
   hasShield?: boolean;
   mode?: 'normal' | 'daily' | 'story';
   allowCheckpoints?: boolean;

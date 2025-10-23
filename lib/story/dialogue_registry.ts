@@ -20,7 +20,18 @@ export interface DialogueLine {
   text: string;
   options?: DialogueChoice[];
   effects?: StoryEffect[];
+  /** Prompt for text input (e.g., naming an item) */
+  textInput?: {
+    prompt: string;
+    placeholder?: string;
+    /** Key in game state to store the input (e.g., "swordName") */
+    stateKey: keyof GameState;
+    maxLength?: number;
+  };
 }
+
+// Import GameState type for textInput stateKey typing
+import type { GameState } from "../map/game-state";
 
 export interface DialogueScript {
   id: string;
@@ -869,10 +880,18 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "jorin-sword-complete": {
     id: "jorin-sword-complete",
     lines: [
-      { speaker: "Jorin", text: "Excellent! Let me get to work..." },
-      { speaker: "Jorin", text: "*The smith heats the forge and begins hammering the stones into shape*" },
-      { speaker: "Jorin", text: "There we go! A fine blade, balanced and sharp." },
-      { speaker: "Jorin", text: "This sword will serve you well. May it strike true!" },
+      { speaker: "Jorin", text: "Here you go! A fine blade, balanced and sharp." },
+      { 
+        speaker: "Jorin", 
+        text: "Every great sword deserves a name. What will you call it?",
+        textInput: {
+          prompt: "Name your sword:",
+          placeholder: "Enter sword name...",
+          stateKey: "swordName",
+          maxLength: 30,
+        },
+      },
+      { speaker: "Jorin", text: "A fine name! May it serve you well in battle!" },
     ],
   },
   "jorin-after-sword": {

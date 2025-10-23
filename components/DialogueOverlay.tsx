@@ -1,9 +1,15 @@
-import React from "react";
+import React, { useState, useRef, useEffect } from "react";
 import styles from "./DialogueOverlay.module.css";
 
 interface DialogueChoiceOption {
   id: string;
   label: string;
+}
+
+interface TextInputConfig {
+  prompt: string;
+  placeholder?: string;
+  maxLength?: number;
 }
 
 interface DialogueOverlayProps {
@@ -16,6 +22,8 @@ interface DialogueOverlayProps {
   choices?: DialogueChoiceOption[];
   selectedChoiceIndex?: number;
   onSelectChoice?: (id: string) => void;
+  textInput?: TextInputConfig;
+  onTextInputSubmit?: (value: string) => void;
 }
 
 const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
@@ -28,13 +36,21 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
   choices,
   selectedChoiceIndex = 0,
   onSelectChoice,
+  textInput,
+  onTextInputSubmit,
 }) => {
+  const [inputValue, setInputValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  
   const displayText = renderedText.length > 0 ? renderedText : "\u00a0";
-  const showCursor = isTyping && (!choices || choices.length === 0);
+  const showCursor = isTyping && (!choices || choices.length === 0) && !textInput;
   const ariaTitle = speaker ? `${speaker}: ${text}` : text;
   const hasChoices = Boolean(choices && choices.length > 0);
+  const hasTextInput = Boolean(textInput && !isTyping);
   const footerLabel = hasChoices
     ? "Choose"
+    : hasTextInput
+    ? "Submit"
     : isTyping
     ? "Reveal"
     : hasMore
@@ -42,9 +58,23 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
     : "Close";
   const isHero = (speaker ?? "").toLowerCase() === "hero";
 
+  // Auto-focus input when it appears
+  useEffect(() => {
+    if (hasTextInput && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [hasTextInput]);
+
   const handleOverlayClick = () => {
-    if (hasChoices) return;
+    if (hasChoices || hasTextInput) return;
     onAdvance();
+  };
+  
+  const handleInputSubmit = () => {
+    if (inputValue.trim()) {
+      onTextInputSubmit?.(inputValue.trim());
+      setInputValue("");
+    }
   };
 
   return (
@@ -88,6 +118,39 @@ const DialogueOverlay: React.FC<DialogueOverlayProps> = ({
                 </button>
               );
             })}
+          </div>
+        ) : null}
+        {hasTextInput ? (
+          <div className={styles.textInputContainer}>
+            <label className={styles.inputLabel}>{textInput!.prompt}</label>
+            <input
+              ref={inputRef}
+              type="text"
+              className={styles.textInput}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleInputSubmit();
+                }
+                e.stopPropagation();
+              }}
+              placeholder={textInput!.placeholder}
+              maxLength={textInput!.maxLength}
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              type="button"
+              className={styles.submitButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleInputSubmit();
+              }}
+              disabled={!inputValue.trim()}
+            >
+              Submit
+            </button>
           </div>
         ) : null}
         <div className={styles.footer}>

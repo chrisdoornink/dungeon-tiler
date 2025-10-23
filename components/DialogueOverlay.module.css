@@ -103,6 +103,70 @@
   font-size: 13px;
 }
 
+.textInputContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 12px;
+  background: rgba(250, 245, 220, 0.05);
+  border: 1px solid rgba(250, 245, 220, 0.15);
+  border-radius: 10px;
+}
+
+.inputLabel {
+  font-size: 12px;
+  color: rgba(250, 245, 220, 0.9);
+  letter-spacing: 0.5px;
+}
+
+.textInput {
+  width: 100%;
+  padding: 10px 12px;
+  background: rgba(18, 18, 22, 0.6);
+  border: 2px solid rgba(250, 245, 220, 0.25);
+  border-radius: 8px;
+  color: #fefcf2;
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.textInput:focus {
+  border-color: rgba(255, 217, 136, 0.6);
+  box-shadow: 0 0 8px rgba(255, 217, 136, 0.25);
+}
+
+.textInput::placeholder {
+  color: rgba(250, 245, 220, 0.4);
+}
+
+.submitButton {
+  align-self: flex-end;
+  padding: 8px 20px;
+  background: rgba(255, 217, 136, 0.2);
+  border: 1px solid rgba(255, 217, 136, 0.5);
+  border-radius: 8px;
+  color: #fefcf2;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.submitButton:hover:not(:disabled) {
+  background: rgba(255, 217, 136, 0.3);
+  border-color: rgba(255, 217, 136, 0.7);
+  box-shadow: 0 0 12px rgba(255, 217, 136, 0.3);
+}
+
+.submitButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .cursor {
   display: inline-block;
   width: 8px;
