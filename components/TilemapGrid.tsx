@@ -710,12 +710,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const dy = py - npc.y;
       const dx = px - npc.x;
       let faceDir = npc.facing;
-      if (Math.abs(dy) > Math.abs(dx)) {
-        faceDir = dy > 0 ? Direction.DOWN : Direction.UP;
-      } else if (Math.abs(dx) > 0) {
+      // Only change facing for left/right interactions to avoid "laying down" bug
+      // when NPCs face UP (which rotates them -90deg in the renderer)
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 0) {
+        // Player is left/right of NPC - face toward player
+        // dx > 0 means player is to the right (higher X), so NPC faces RIGHT
+        // dx < 0 means player is to the left (lower X), so NPC faces LEFT
         faceDir = dx > 0 ? Direction.RIGHT : Direction.LEFT;
+        npc.face(faceDir);
       }
-      npc.face(faceDir);
+      // Don't change facing for vertical interactions (keeps NPC from laying down)
       npc.setMemory("lastManualInteract", Date.now());
       npc.setMemory("lastHeroDirection", prev.playerDirection);
 

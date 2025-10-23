@@ -1352,20 +1352,12 @@ export function movePlayer(
       }
       
       // Regular NPC interaction (dialogue)
-      const oppositeFacing = (() => {
-        switch (direction) {
-          case Direction.UP:
-            return Direction.DOWN;
-          case Direction.DOWN:
-            return Direction.UP;
-          case Direction.LEFT:
-            return Direction.RIGHT;
-          case Direction.RIGHT:
-          default:
-            return Direction.LEFT;
-        }
-      })();
-      blockingNpc.face(oppositeFacing);
+      // Only change facing for left/right to avoid "laying down" bug when NPC faces UP
+      if (direction === Direction.LEFT || direction === Direction.RIGHT) {
+        const oppositeFacing = direction === Direction.LEFT ? Direction.RIGHT : Direction.LEFT;
+        blockingNpc.face(oppositeFacing);
+      }
+      // Don't change facing for vertical bumps (keeps NPC from laying down)
       blockingNpc.setMemory("lastBumpAt", Date.now());
       blockingNpc.setMemory("lastHeroDirection", direction);
       blockingNpc.setMemory("lastManualInteract", Date.now());
