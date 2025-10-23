@@ -1370,7 +1370,7 @@ export function movePlayer(
       const flags = newGameState.storyFlags ?? createInitialStoryFlags();
       // Only resolve dialogue scripts in story mode
       const scriptId = newGameState.mode === 'story' 
-        ? resolveNpcDialogueScript(blockingNpc.id, flags)
+        ? resolveNpcDialogueScript(blockingNpc.id, flags, newGameState)
         : undefined;
       const dynamicHook = scriptId
         ? {

@@ -1,11 +1,18 @@
 import type { StoryEffect } from "./event_registry";
 
+export interface ExchangeEffect {
+  type: "exchange";
+  exchangeId: string;
+}
+
+export type DialogueEffect = StoryEffect | ExchangeEffect;
+
 export interface DialogueChoice {
   id: string;
   prompt: string;
   response?: DialogueLine[];
   nextDialogueId?: string;
-  effects?: StoryEffect[];
+  effects?: DialogueEffect[];
 }
 
 export interface DialogueLine {
@@ -831,6 +838,48 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Tavi", text: "Grandma won't let me play near the walls anymore. She says there are monsters." },
       { speaker: "Tavi", text: "Are you gonna go fight them? That would be so cool!" },
       { speaker: "Tavi", text: "Be careful though. Grandma says heroes are brave, but smart heroes come home." },
+    ],
+  },
+  "jorin-sword-offer": {
+    id: "jorin-sword-offer",
+    lines: [
+      {
+        speaker: "Jorin",
+        text: "Ah! You've got the stones. Ready for me to forge that sword?",
+        options: [
+          {
+            id: "accept-sword-trade",
+            prompt: "Yes, forge me a sword (20 stones)",
+            nextDialogueId: "jorin-sword-complete",
+            effects: [
+              { type: "exchange", exchangeId: "smithy-stones-for-sword" },
+            ],
+          },
+          {
+            id: "decline-sword-trade",
+            prompt: "Not right now",
+            response: [
+              { speaker: "Jorin", text: "No problem. Come back when you're ready." },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  "jorin-sword-complete": {
+    id: "jorin-sword-complete",
+    lines: [
+      { speaker: "Jorin", text: "Excellent! Let me get to work..." },
+      { speaker: "Jorin", text: "*The smith heats the forge and begins hammering the stones into shape*" },
+      { speaker: "Jorin", text: "There we go! A fine blade, balanced and sharp." },
+      { speaker: "Jorin", text: "This sword will serve you well. May it strike true!" },
+    ],
+  },
+  "jorin-after-sword": {
+    id: "jorin-after-sword",
+    lines: [
+      { speaker: "Jorin", text: "That sword I forged for you should serve you well." },
+      { speaker: "Jorin", text: "Keep it sharp, and it'll keep you safe." },
     ],
   },
 };

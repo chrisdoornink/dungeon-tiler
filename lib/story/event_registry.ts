@@ -95,6 +95,16 @@ const STORY_EVENTS: Record<string, StoryEventDefinition> = {
     defaultValue: false,
     // No diary entry - this is just for dialogue state tracking
   },
+  "smithy-forged-sword": {
+    id: "smithy-forged-sword",
+    description: "Jorin the smith forged a sword for the hero in exchange for 20 stones.",
+    defaultValue: false,
+    diaryEntry: {
+      id: "smithy-forged-sword",
+      title: "A New Blade",
+      summary: "Jorin forged me a fine sword from the stones I collected. Now I'm properly armed!",
+    },
+  },
   "entered-bluff-cave": {
     id: "entered-bluff-cave",
     description: "Hero entered the bluff cave, Kalen moved to sanctum area.",

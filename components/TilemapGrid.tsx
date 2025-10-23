@@ -54,9 +54,11 @@ import {
   getDialogueScript,
   type DialogueChoice,
   type DialogueLine,
+  type DialogueEffect,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
-import { createInitialStoryFlags } from "../lib/story/event_registry";
+import { createInitialStoryFlags, type StoryEffect } from "../lib/story/event_registry";
+import { performExchange } from "../lib/story/exchange_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
@@ -589,19 +591,41 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
         if (choice.effects && choice.effects.length > 0) {
           setGameState((state) => {
-            const result = applyStoryEffectsWithDiary(
-              state.storyFlags,
-              state.diaryEntries,
-              choice.effects
-            );
-            if (!result.flagsChanged && !result.diaryChanged) {
-              return state;
+            let nextState = { ...state };
+            
+            // Separate story effects from exchange effects
+            const storyEffects: StoryEffect[] = [];
+            const exchangeEffects: string[] = [];
+            
+            for (const effect of choice.effects!) {
+              if ('type' in effect && effect.type === 'exchange') {
+                exchangeEffects.push(effect.exchangeId);
+              } else {
+                storyEffects.push(effect as StoryEffect);
+              }
             }
-            const nextState: GameState = {
-              ...state,
-              storyFlags: result.flags ?? state.storyFlags,
-              diaryEntries: result.diaryEntries ?? state.diaryEntries ?? [],
-            };
+            
+            // Apply exchange effects first (they modify game state)
+            for (const exchangeId of exchangeEffects) {
+              nextState = performExchange(exchangeId, nextState);
+            }
+            
+            // Then apply story effects (flags and diary)
+            if (storyEffects.length > 0) {
+              const result = applyStoryEffectsWithDiary(
+                nextState.storyFlags,
+                nextState.diaryEntries,
+                storyEffects
+              );
+              if (result.flagsChanged || result.diaryChanged) {
+                nextState = {
+                  ...nextState,
+                  storyFlags: result.flags ?? nextState.storyFlags,
+                  diaryEntries: result.diaryEntries ?? nextState.diaryEntries ?? [],
+                };
+              }
+            }
+            
             // Update conditional NPCs when story flags change
             updateConditionalNpcs(nextState);
             try {
@@ -732,7 +756,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const flags = prev.storyFlags ?? createInitialStoryFlags();
       // Default script resolution via registry (story mode only)
       const scriptId = prev.mode === 'story' 
-        ? resolveNpcDialogueScript(npc.id, flags)
+        ? resolveNpcDialogueScript(npc.id, flags, prev)
         : undefined;
       if (process.env.NODE_ENV === "development") {
         try {

@@ -3,12 +3,15 @@ import {
   type StoryCondition,
   type StoryFlags,
 } from "./event_registry";
+import type { GameState } from "../map/game-state";
 
 export interface NPCDialogueRule {
   npcId: string;
   scriptId: string;
   priority?: number;
   conditions?: StoryCondition[];
+  /** Custom condition function for complex checks (e.g., item counts) */
+  customCondition?: (gameState: GameState) => boolean;
 }
 
 const PRIORITIES = {
@@ -470,6 +473,34 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
   { npcId: "npc-haro", scriptId: "haro-default", priority: PRIORITIES.DEFAULT },
   { npcId: "npc-len", scriptId: "len-default", priority: PRIORITIES.DEFAULT },
   { npcId: "npc-tavi", scriptId: "tavi-default", priority: PRIORITIES.DEFAULT },
+  
+  // Jorin (Smithy)
+  {
+    npcId: "npc-jorin",
+    scriptId: "jorin-after-sword",
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST,
+    conditions: [{ eventId: "smithy-forged-sword", value: true }],
+  },
+  {
+    npcId: "npc-jorin",
+    scriptId: "jorin-sword-offer",
+    priority: PRIORITIES.CONDITIONALLY_HIGHEST - 1,
+    conditions: [
+      { eventId: "smithy-forged-sword", value: false },
+    ],
+    customCondition: (gameState: GameState) => (gameState.rockCount ?? 0) >= 20,
+  },
+  {
+    npcId: "npc-jorin",
+    scriptId: "jorin-goblin-activity",
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
+    conditions: [{ eventId: "met-old-fenna-torch-town", value: true }],
+  },
+  {
+    npcId: "npc-jorin",
+    scriptId: "jorin-default",
+    priority: PRIORITIES.DEFAULT,
+  },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {
@@ -478,7 +509,8 @@ export function listNpcDialogueRules(): NPCDialogueRule[] {
 
 export function resolveNpcDialogueScript(
   npcId: string,
-  flags: StoryFlags | undefined
+  flags: StoryFlags | undefined,
+  gameState?: GameState
 ): string | undefined {
   const candidates = NPC_DIALOGUE_RULES.filter((rule) => rule.npcId === npcId);
   if (candidates.length === 0) return undefined;
@@ -486,9 +518,17 @@ export function resolveNpcDialogueScript(
     (a, b) => (b.priority ?? 0) - (a.priority ?? 0)
   );
   for (const rule of sorted) {
-    if (areStoryConditionsMet(flags, rule.conditions)) {
-      return rule.scriptId;
+    // Check story flag conditions
+    if (!areStoryConditionsMet(flags, rule.conditions)) {
+      continue;
     }
+    // Check custom condition if present
+    if (rule.customCondition && gameState) {
+      if (!rule.customCondition(gameState)) {
+        continue;
+      }
+    }
+    return rule.scriptId;
   }
   return undefined;
 }
