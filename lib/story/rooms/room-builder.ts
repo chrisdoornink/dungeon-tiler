@@ -27,7 +27,7 @@ export interface RandomItemPlacement {
 
 export interface RoomConfig {
   id: string;
-  size: number;
+  size: number | [number, number]; // Single number for square, or [width, height] for rectangular
   visualMap: string[];
   transitions: Record<string, TransitionDefinition>;
   metadata: {
@@ -48,8 +48,12 @@ export interface RoomConfig {
 export function buildRoom(config: RoomConfig): StoryRoom {
   const { id, size, visualMap, transitions: transitionDefs, metadata, environment = "outdoor", npcs = [], randomItems = [] } = config;
 
+  // Handle both square (number) and rectangular ([width, height]) sizes
+  const width = Array.isArray(size) ? size[0] : size;
+  const height = Array.isArray(size) ? size[1] : size;
+
   // Parse the visual map
-  const parsedMap: ParsedMapData = parseVisualMap(visualMap, size);
+  const parsedMap: ParsedMapData = parseVisualMap(visualMap, width, height);
 
   // Create map data
   const mapData: MapData = {
@@ -71,11 +75,11 @@ export function buildRoom(config: RoomConfig): StoryRoom {
   }
 
   // Find entry point (tile just above the bottom-most ROOM_TRANSITION)
-  let entryPoint: [number, number] = [size - 2, 2];
+  let entryPoint: [number, number] = [height - 2, 2];
   let bottomMost: [number, number] | null = null;
   
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
       if (mapData.subtypes[y]?.[x]?.includes(TileSubtype.ROOM_TRANSITION)) {
         if (!bottomMost || y > bottomMost[0]) {
           bottomMost = [y, x];

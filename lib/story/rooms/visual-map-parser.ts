@@ -18,22 +18,25 @@ export interface ParsedMapData {
  * Parse a visual map into game-ready data structures
  * 
  * @param visualMap - Array of strings representing the map layout
- * @param size - Size of the map (width and height)
+ * @param width - Width of the map (number of columns)
+ * @param height - Height of the map (number of rows), defaults to width for square maps
  * @returns Parsed map data with tiles, subtypes, enemies, and transitions
  */
-export function parseVisualMap(visualMap: string[], size: number): ParsedMapData {
+export function parseVisualMap(visualMap: string[], width: number, height?: number): ParsedMapData {
   const tiles: number[][] = [];
   const subtypes: TileSubtype[][][] = [];
   const enemies: Array<{ y: number; x: number; kind: string }> = [];
   const transitions = new Map<string, Array<[number, number]>>();
+  
+  const actualHeight = height ?? width; // Use width if height not specified (square map)
 
   for (let y = 0; y < visualMap.length; y++) {
     const row = visualMap[y];
     const tileRow: number[] = [];
     const subtypeRow: TileSubtype[][] = [];
 
-    // Ensure we process exactly SIZE columns (pad with floor if needed)
-    for (let x = 0; x < size; x++) {
+    // Ensure we process exactly WIDTH columns (pad with floor if needed)
+    for (let x = 0; x < width; x++) {
       // Get character, skipping spaces (used for visual formatting only)
       let char = '.';
       let sourceIndex = 0;

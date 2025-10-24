@@ -63,7 +63,7 @@ const VISUAL_MAP = [
   "T T . W . . . . . . . . . . . T T . T T T T T T T",
   "T T . . . . . . . . . . . . . T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
-  "T T T T T T T . T T T T T T T T T . T T T T T T T",
+  "T T T T T T T S T T T T T T T T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T T . T T T T T T T",
   "T T T T T T T . T T T T T T T T . . . T T T T T T",
   "T T T T T T T . T T T T T T T T . S . T T T T T T",
