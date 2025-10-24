@@ -24,7 +24,7 @@ export interface ExchangeReward {
   /** Type of reward */
   type: "item" | "flag";
   /** Item to give (e.g., "sword", "shield") */
-  itemType?: "sword" | "shield" | "key" | "exitKey";
+  itemType?: "sword" | "shield" | "key" | "exitKey" | "snakeMedallion";
   /** Story flag to set if type is "flag" */
   flagId?: string;
   /** Value to set for the flag */
@@ -100,29 +100,22 @@ export const EXCHANGES: Record<string, ExchangeDefinition> = {
     repeatable: false,
   },
   
-  // Future exchange: Snake riddle reward
-  // "snake-riddle-reward": {
-  //   id: "snake-riddle-reward",
-  //   npcId: "npc-bluff-coiled-snake",
-  //   name: "Riddle Reward",
-  //   description: "Receive a reward for completing all riddles",
-  //   requirements: [
-  //     {
-  //       type: "flag",
-  //       flagId: "completed-all-snake-riddles",
-  //     },
-  //   ],
-  //   costs: [],
-  //   rewards: [
-  //     {
-  //       type: "item",
-  //       itemType: "shield", // Or whatever item you decide
-  //     },
-  //   ],
-  //   completionDialogueId: "snake-riddle-reward-complete",
-  //   completionFlagId: "received-snake-reward",
-  //   repeatable: false,
-  // },
+  "snake-riddle-reward": {
+    id: "snake-riddle-reward",
+    npcId: "npc-bluff-coiled-snake",
+    name: "Snake Medallion",
+    description: "Receive the Snake Medallion for solving all riddles",
+    requirements: [],
+    costs: [],
+    rewards: [
+      {
+        type: "item",
+        itemType: "snakeMedallion",
+      },
+    ],
+    completionFlagId: "received-snake-medallion",
+    repeatable: false,
+  },
 };
 
 /**
@@ -218,6 +211,9 @@ export function performExchange(
           break;
         case "exitKey":
           newState = { ...newState, hasExitKey: true };
+          break;
+        case "snakeMedallion":
+          newState = { ...newState, hasSnakeMedallion: true };
           break;
       }
     } else if (reward.type === "flag" && reward.flagId) {

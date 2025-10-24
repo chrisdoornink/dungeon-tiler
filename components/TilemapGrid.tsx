@@ -211,6 +211,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Developer hover coordinates for story mode (dev only)
   const [hoverTile, setHoverTile] = useState<[number, number] | null>(null);
 
+  // Portal travel animation state
+  const [travelAnimation, setTravelAnimation] = useState<{
+    phase: 'sparkle-out' | 'transition' | 'sparkle-in' | 'complete';
+    startTime: number;
+  } | null>(null);
+
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
   const [activeBookshelfId, setActiveBookshelfId] = useState<string | null>(null);
@@ -259,6 +265,69 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState.mode, gameState.currentRoomId]);
 
+  // Handle portal travel animation phases
+  useEffect(() => {
+    if (!travelAnimation) return;
+    
+    const elapsed = Date.now() - travelAnimation.startTime;
+    
+    if (travelAnimation.phase === 'sparkle-out') {
+      // Show sparkle animation for 600ms
+      if (elapsed >= 600) {
+        setTravelAnimation({ phase: 'transition', startTime: Date.now() });
+      }
+    } else if (travelAnimation.phase === 'transition') {
+      // Perform the actual teleportation
+      if (gameState.portalLocation && playerPosition) {
+        const targetRoomId = gameState.portalLocation.roomId;
+        const targetPos = gameState.portalLocation.position;
+        const currentRoomId = gameState.currentRoomId ?? '__base__';
+        
+        if (targetRoomId !== currentRoomId && gameState.rooms) {
+          // Cross-room travel - use room transition logic
+          // This would need to integrate with the existing room transition system
+          // For now, just move to sparkle-in phase
+          setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
+        } else {
+          // Same room travel - just move player
+          setGameState((prev) => {
+            const newMapData = JSON.parse(JSON.stringify(prev.mapData));
+            const [oldY, oldX] = playerPosition;
+            const [newY, newX] = targetPos;
+            
+            // Remove player from old position
+            const oldSubs = newMapData.subtypes[oldY][oldX] || [];
+            newMapData.subtypes[oldY][oldX] = oldSubs.filter(
+              (s: number) => s !== TileSubtype.PLAYER
+            );
+            
+            // Add player to new position
+            const newSubs = newMapData.subtypes[newY][newX] || [];
+            if (!newSubs.includes(TileSubtype.PLAYER)) {
+              newMapData.subtypes[newY][newX] = [...newSubs, TileSubtype.PLAYER];
+            }
+            
+            const nextState: GameState = {
+              ...prev,
+              mapData: newMapData,
+            };
+            CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+            return nextState;
+          });
+          setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
+        }
+      }
+    } else if (travelAnimation.phase === 'sparkle-in') {
+      // Show sparkle animation for 600ms
+      if (elapsed >= 600) {
+        setTravelAnimation({ phase: 'complete', startTime: Date.now() });
+      }
+    } else if (travelAnimation.phase === 'complete') {
+      // Clean up
+      setTravelAnimation(null);
+    }
+  }, [travelAnimation, gameState.portalLocation, gameState.currentRoomId, gameState.rooms, playerPosition, resolvedStorageSlot]);
+
   const consumeNpcInteraction = useCallback(
     (timestamp: number) => {
       setGameState((prev) => {
@@ -306,6 +375,81 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return newState;
     });
   }, [resolvedStorageSlot]);
+
+  // Handle snake medallion click - place portal or show travel dialogue
+  const handleSnakeMedallionClick = useCallback(() => {
+    if (!playerPosition) return;
+    
+    setGameState((prev) => {
+      if (!prev.hasSnakeMedallion) return prev;
+      
+      const [py, px] = playerPosition;
+      const currentRoomId = prev.currentRoomId ?? '__base__';
+      
+      // If no portal exists, place it at current location
+      if (!prev.portalLocation) {
+        const newMapData = JSON.parse(JSON.stringify(prev.mapData));
+        const subs = newMapData.subtypes[py][px] || [];
+        if (!subs.includes(TileSubtype.PORTAL)) {
+          newMapData.subtypes[py][px] = [...subs, TileSubtype.PORTAL];
+        }
+        
+        const nextState: GameState = {
+          ...prev,
+          mapData: newMapData,
+          portalLocation: {
+            roomId: currentRoomId,
+            position: [py, px],
+          },
+        };
+        CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+        return nextState;
+      }
+      
+      // Portal exists - show dialogue for travel or replace
+      const portalScript: DialogueLine[] = [
+        {
+          speaker: "System",
+          text: "What would you like to do with the portal?",
+          options: [
+            {
+              id: "travel",
+              prompt: "Travel to the portal",
+              response: [],
+            },
+            {
+              id: "replace",
+              prompt: "Replace portal location",
+              response: [],
+            },
+            {
+              id: "cancel",
+              prompt: "Cancel",
+              response: [],
+            },
+          ],
+        },
+      ];
+      
+      setDialogueSession({
+        event: {
+          type: "dialogue",
+          timestamp: Date.now(),
+          npcId: "portal-medallion",
+          npcName: "Portal",
+          availableHooks: [],
+          hookId: undefined,
+          trigger: "action",
+        },
+        script: portalScript,
+        lineIndex: 0,
+        dialogueId: "portal-medallion-menu",
+        consumedScriptIds: ["portal-medallion-menu"],
+      });
+      
+      return prev;
+    });
+  }, [playerPosition, resolvedStorageSlot]);
 
   const handleDiaryToggle = useCallback(
     (entryId: string, completed: boolean) => {
@@ -582,6 +726,89 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const handleDialogueChoiceSelect = useCallback(
     (choiceId: string) => {
+      // Handle portal medallion special choices
+      if (dialogueSession?.dialogueId === "portal-medallion-menu") {
+        if (choiceId === "travel") {
+          // Initiate portal travel
+          if (gameState.portalLocation && playerPosition) {
+            // Start travel animation
+            setTravelAnimation({ phase: 'sparkle-out', startTime: Date.now() });
+            // Close dialogue
+            setDialogueSession(null);
+            setSelectedChoiceIndex(0);
+            resetDialogue();
+          }
+          return;
+        } else if (choiceId === "replace") {
+          // Replace portal location
+          if (playerPosition) {
+            setGameState((prev) => {
+              const [py, px] = playerPosition;
+              const currentRoomId = prev.currentRoomId ?? '__base__';
+              
+              // Remove old portal from old location
+              if (prev.portalLocation && prev.rooms) {
+                const oldRoomId = prev.portalLocation.roomId;
+                const oldPos = prev.portalLocation.position;
+                
+                if (oldRoomId === currentRoomId) {
+                  // Same room - update current map
+                  const newMapData = JSON.parse(JSON.stringify(prev.mapData));
+                  const oldSubs = newMapData.subtypes[oldPos[0]][oldPos[1]] || [];
+                  newMapData.subtypes[oldPos[0]][oldPos[1]] = oldSubs.filter(
+                    (s: number) => s !== TileSubtype.PORTAL
+                  );
+                  
+                  // Add portal to new location
+                  const newSubs = newMapData.subtypes[py][px] || [];
+                  if (!newSubs.includes(TileSubtype.PORTAL)) {
+                    newMapData.subtypes[py][px] = [...newSubs, TileSubtype.PORTAL];
+                  }
+                  
+                  const nextState: GameState = {
+                    ...prev,
+                    mapData: newMapData,
+                    portalLocation: {
+                      roomId: currentRoomId,
+                      position: [py, px],
+                    },
+                  };
+                  CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+                  return nextState;
+                }
+              }
+              
+              // Different room or no rooms - just update current location
+              const newMapData = JSON.parse(JSON.stringify(prev.mapData));
+              const newSubs = newMapData.subtypes[py][px] || [];
+              if (!newSubs.includes(TileSubtype.PORTAL)) {
+                newMapData.subtypes[py][px] = [...newSubs, TileSubtype.PORTAL];
+              }
+              
+              const nextState: GameState = {
+                ...prev,
+                mapData: newMapData,
+                portalLocation: {
+                  roomId: currentRoomId,
+                  position: [py, px],
+                },
+              };
+              CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+              return nextState;
+            });
+          }
+          setDialogueSession(null);
+          setSelectedChoiceIndex(0);
+          resetDialogue();
+          return;
+        } else if (choiceId === "cancel") {
+          setDialogueSession(null);
+          setSelectedChoiceIndex(0);
+          resetDialogue();
+          return;
+        }
+      }
+      
       setDialogueSession((prev) => {
         if (!prev) return prev;
         const currentLine = prev.script[prev.lineIndex];
@@ -2182,6 +2409,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           onToggleComplete={handleDiaryToggle}
         />
       )}
+      {/* Portal travel sparkle animation */}
+      {travelAnimation && (travelAnimation.phase === 'sparkle-out' || travelAnimation.phase === 'sparkle-in') && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
+          <div className="relative w-64 h-64">
+            <img
+              src="/images/items/travel-sparkle-large.png"
+              alt=""
+              className="absolute inset-0 w-full h-full animate-pulse"
+              style={{ animationDuration: '0.3s' }}
+            />
+            <img
+              src="/images/items/travel-sparkle-small.png"
+              alt=""
+              className="absolute inset-0 w-full h-full animate-ping"
+              style={{ animationDuration: '0.6s' }}
+            />
+          </div>
+        </div>
+      )}
       <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
         <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
           {checkpointFlash && (
@@ -2277,6 +2523,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   (gameState.hasExitKey ? 1 : 0) +
                   (gameState.hasSword ? 1 : 0) +
                   (gameState.hasShield ? 1 : 0) +
+                  (gameState.hasSnakeMedallion ? 1 : 0) +
                   ((gameState.rockCount ?? 0) > 0 ? 1 : 0) +
                   ((gameState.runeCount ?? 0) > 0 ? 1 : 0) +
                   ((gameState.foodCount ?? 0) > 0 ? 1 : 0) +
@@ -2422,6 +2669,32 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         />
                         {!isCompact && <span>Shield</span>}
                       </div>
+                    )}
+                    {gameState.hasSnakeMedallion && (
+                      <button
+                        type="button"
+                        onClick={handleSnakeMedallionClick}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title="Snake Medallion — Place or travel to portal"
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: isCompact ? 28 : 20,
+                            height: isCompact ? 28 : 20,
+                            backgroundImage: "url(/images/items/snake-medalion.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {!isCompact && <span>Snake Medallion</span>}
+                      </button>
                     )}
                     {(gameState.rockCount ?? 0) > 0 && (
                       <button

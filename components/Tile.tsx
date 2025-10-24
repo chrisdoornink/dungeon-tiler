@@ -358,6 +358,14 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.TOWN_SIGN) || false;
   };
 
+  const hasPortal = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PORTAL) || false;
+  };
+
+  const hasSnakeMedallion = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SNAKE_MEDALLION) || false;
+  };
+
   const getRoadShape = (
     subtypes: number[] | undefined
   ): TileSubtype | null => {
@@ -685,6 +693,32 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
               backgroundImage: `url('/images/items/town-sign.png')`,
+            }}
+          />
+        )}
+
+        {/* Render portal */}
+        {hasPortal(subtypes) && (
+          <div
+            key="portal"
+            data-testid={`subtype-icon-${TileSubtype.PORTAL}`}
+            className={`${styles.assetIcon} ${styles.rockIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/portal-static.png')`,
+              transform: isPlayerTile ? 'scale(0.5)' : 'scale(1)',
+              zIndex: isPlayerTile ? 1 : 10,
+            }}
+          />
+        )}
+
+        {/* Render snake medallion */}
+        {hasSnakeMedallion(subtypes) && (
+          <div
+            key="snake-medallion"
+            data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
+            className={`${styles.assetIcon} ${styles.rockIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/snake-medalion.png')`,
             }}
           />
         )}

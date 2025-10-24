@@ -87,6 +87,10 @@ export const ASSET_URLS: string[] = [
   "/images/items/food-3.png",
   "/images/items/meds-1.png",
   "/images/items/rune1.png",
+  "/images/items/snake-medalion.png",
+  "/images/items/portal-static.png",
+  "/images/items/travel-sparkle-large.png",
+  "/images/items/travel-sparkle-small.png",
   "/images/window.png",
 
   // Flowers and bushes

@@ -657,6 +657,7 @@ export interface GameState {
   runeCount?: number; // Count of collected runes
   foodCount?: number; // Count of collected food items
   potionCount?: number; // Count of collected +2 potions
+  hasSnakeMedallion?: boolean; // Snake medallion for portal travel
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -702,6 +703,11 @@ export interface GameState {
   roomTransitions?: RoomTransition[];
   potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
   lastCheckpoint?: CheckpointSnapshot;
+  // Portal state for snake medallion
+  portalLocation?: {
+    roomId: RoomId;
+    position: [number, number];
+  };
 }
 
 export type CheckpointSnapshot =

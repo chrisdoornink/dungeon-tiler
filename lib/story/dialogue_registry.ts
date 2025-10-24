@@ -449,14 +449,37 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Ancient Serpent",
-        text: "You have earned the gift I guard. Take thisss rune of teleportation—it will carry you acrosss great dissstances in an instant.",
+        text: "Few have sssolved all my riddlesss. You have earned the gift I guard.",
         effects: [
           { eventId: "snake-riddles-completed", value: true },
         ],
       },
       {
         speaker: "Ancient Serpent",
-        text: "Use it wisely, traveler. May your journey be sswift.",
+        text: "Take thisss... the Snake Medallion. It has been passed down through ages untold.",
+        options: [
+          {
+            id: "accept-medallion",
+            prompt: "Accept the Snake Medallion",
+            effects: [
+              { type: "exchange", exchangeId: "snake-riddle-reward" },
+            ],
+            response: [
+              {
+                speaker: "Ancient Serpent",
+                text: "With it, you may place a portal upon any ground you sstand. Click the medallion once to mark your sspot.",
+              },
+              {
+                speaker: "Ancient Serpent",
+                text: "Click it again, and you may travel to that portal... or move it to where you now sstand.",
+              },
+              {
+                speaker: "Ancient Serpent",
+                text: "Use it wisely, traveler. The pathsss you forge may save you... or doom you.",
+              },
+            ],
+          },
+        ],
       },
     ],
   },

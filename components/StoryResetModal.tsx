@@ -239,6 +239,15 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
               />
               Exit Key
             </label>
+            <label className="flex items-center gap-2 text-xs uppercase tracking-wide text-gray-400">
+              <input
+                type="checkbox"
+                checked={config.hasSnakeMedallion}
+                onChange={updateBoolean("hasSnakeMedallion")}
+                className="h-4 w-4"
+              />
+              Snake Medallion
+            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

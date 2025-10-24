@@ -42,6 +42,7 @@ function createDefaultResetConfig(
     hasShield: !!state.hasShield,
     hasKey: !!state.hasKey,
     hasExitKey: !!state.hasExitKey,
+    hasSnakeMedallion: !!state.hasSnakeMedallion,
     rockCount: state.rockCount ?? 0,
     runeCount: state.runeCount ?? 0,
     foodCount: state.foodCount ?? 0,

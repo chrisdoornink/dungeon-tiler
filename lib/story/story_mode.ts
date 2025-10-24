@@ -833,6 +833,7 @@ export interface StoryResetConfig {
   hasShield: boolean;
   hasKey: boolean;
   hasExitKey: boolean;
+  hasSnakeMedallion: boolean;
   rockCount: number;
   runeCount: number;
   foodCount: number;
@@ -895,6 +896,7 @@ function applyStoryResetConfig(
   state.hasShield = config.hasShield;
   state.hasKey = config.hasKey;
   state.hasExitKey = config.hasExitKey;
+  state.hasSnakeMedallion = config.hasSnakeMedallion;
   state.rockCount = clamp(Math.floor(config.rockCount), 0, 99);
   state.runeCount = clamp(Math.floor(config.runeCount), 0, 99);
   state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
