@@ -643,7 +643,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "dara-cave-hint": {
     id: "dara-cave-hint",
     lines: [
-      { speaker: "Dara", text: "A cave at the bluff? I've traveled many roads, but I hadn't heard of that one." },
+      { speaker: "Dara", text: "A cave at the bluff? I've haven't traveled west of the town yet, so I haven't seen or heard of that one." },
       { speaker: "Dara", text: "In my experience, caves like that often have histories. Check the town's library—old places like this usually keep records." },
     ],
   },
