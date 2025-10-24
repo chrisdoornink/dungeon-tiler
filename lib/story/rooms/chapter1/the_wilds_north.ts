@@ -16,10 +16,10 @@ const SIZE = 25;
  */
 const TRANSITIONS = {
   // Back to Wilds Entrance (bottom edge)
-  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
-  '1': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
-  '2': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
-  '3': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [20, 10] as [number, number] },
+  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [0, 24] as [number, number], returnPoint: [24, 10] as [number, number] },
+  '1': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [0, 17] as [number, number] },
+  '2': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [0, 18] as [number, number] },
+  '3': { roomId: 'story-the-wilds-north-clearing' as RoomId, target: [0, 24] as [number, number], returnPoint: [0, 19] as [number, number] },
   
 };
 
@@ -79,7 +79,7 @@ const VISUAL_MAP = [
  * Room Configuration
  */
 const ROOM_CONFIG: RoomConfig = {
-  id: 'the-wilds-north',
+  id: 'story-the-wilds-north',
   size: SIZE,
   visualMap: VISUAL_MAP,
   transitions: TRANSITIONS,

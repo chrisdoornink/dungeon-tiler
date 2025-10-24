@@ -75,7 +75,7 @@ const VISUAL_MAP = [
  * Room Configuration
  */
 const ROOM_CONFIG: RoomConfig = {
-  id: 'the-wilds-south',
+  id: 'story-the-wilds-south',
   size: SIZE,
   visualMap: VISUAL_MAP,
   transitions: TRANSITIONS,

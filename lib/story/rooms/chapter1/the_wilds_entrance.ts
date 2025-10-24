@@ -23,7 +23,7 @@ const TRANSITIONS = {
   '3': { roomId: 'story-torch-town' as RoomId, target: [13, 33] as [number, number], returnPoint: [22, 1] as [number, number] },
   '4': { roomId: 'story-torch-town' as RoomId, target: [14, 33] as [number, number], returnPoint: [23, 1] as [number, number] },
   '5': { roomId: 'story-the-wilds-south' as RoomId, target: [1, 20] as [number, number], returnPoint: [24, 1] as [number, number] },
-  '6': { roomId: 'story-the-wilds-north' as RoomId, target: [20, 10] as [number, number], returnPoint: [25, 1] as [number, number] },
+  '6': { roomId: 'story-the-wilds-north' as RoomId, target: [24, 10] as [number, number], returnPoint: [25, 1] as [number, number] },
   '7': { roomId: 'story-the-wilds-east' as RoomId, target: [1, 1] as [number, number], returnPoint: [7, 24] as [number, number] },
   '8': { roomId: 'story-the-wilds-east' as RoomId, target: [2, 1] as [number, number], returnPoint: [8, 24] as [number, number] },
   '9': { roomId: 'story-the-wilds-east' as RoomId, target: [3, 1] as [number, number], returnPoint: [9, 24] as [number, number] },
