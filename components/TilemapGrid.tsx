@@ -380,14 +380,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const handleSnakeMedallionClick = useCallback(() => {
     if (!playerPosition) return;
     
-    setGameState((prev) => {
-      if (!prev.hasSnakeMedallion) return prev;
-      
-      const [py, px] = playerPosition;
-      const currentRoomId = prev.currentRoomId ?? '__base__';
-      
-      // If no portal exists, place it at current location
-      if (!prev.portalLocation) {
+    // Check current state synchronously
+    const hasPortal = gameState.portalLocation !== undefined;
+    
+    if (!hasPortal) {
+      // Place portal
+      setGameState((prev) => {
+        if (!prev.hasSnakeMedallion) return prev;
+        
+        const [py, px] = playerPosition;
+        const currentRoomId = prev.currentRoomId ?? '__base__';
         const newMapData = JSON.parse(JSON.stringify(prev.mapData));
         const subs = newMapData.subtypes[py][px] || [];
         if (!subs.includes(TileSubtype.PORTAL)) {
@@ -404,8 +406,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         };
         CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
         return nextState;
-      }
-      
+      });
+    } else {
       // Portal exists - show dialogue for travel or replace
       const portalScript: DialogueLine[] = [
         {
@@ -415,17 +417,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             {
               id: "travel",
               prompt: "Travel to the portal",
-              response: [],
             },
             {
               id: "replace",
               prompt: "Replace portal location",
-              response: [],
             },
             {
               id: "cancel",
               prompt: "Cancel",
-              response: [],
             },
           ],
         },
@@ -446,10 +445,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         dialogueId: "portal-medallion-menu",
         consumedScriptIds: ["portal-medallion-menu"],
       });
-      
-      return prev;
-    });
-  }, [playerPosition, resolvedStorageSlot]);
+    }
+  }, [playerPosition, gameState.portalLocation, resolvedStorageSlot]);
 
   const handleDiaryToggle = useCallback(
     (entryId: string, completed: boolean) => {
@@ -898,7 +895,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setSelectedChoiceIndex(0);
       resetDialogue();
     },
-    [resetDialogue, resolvedStorageSlot, setGameState]
+    [dialogueSession, gameState, playerPosition, resetDialogue, resolvedStorageSlot, setGameState]
   );
 
   const handleDialogueChoiceNavigate = useCallback(

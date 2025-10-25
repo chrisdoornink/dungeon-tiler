@@ -1701,6 +1701,7 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||
       destSubtypes.includes(TileSubtype.CHECKPOINT) ||
       destSubtypes.includes(TileSubtype.WALL_TORCH) ||
+      destSubtypes.includes(TileSubtype.PORTAL) ||
       // Roads are floor overlays; keep them when the player steps on them
       destSubtypes.includes(TileSubtype.ROAD) ||
       destSubtypes.includes(TileSubtype.ROAD_STRAIGHT) ||
