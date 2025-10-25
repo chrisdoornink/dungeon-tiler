@@ -267,65 +267,75 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle portal travel animation phases
   useEffect(() => {
-    if (!travelAnimation) return;
+    if (!travelAnimation) return undefined;
     
-    const elapsed = Date.now() - travelAnimation.startTime;
-    
-    if (travelAnimation.phase === 'sparkle-out') {
-      // Show sparkle animation for 600ms
-      if (elapsed >= 600) {
-        setTravelAnimation({ phase: 'transition', startTime: Date.now() });
-      }
-    } else if (travelAnimation.phase === 'transition') {
-      // Perform the actual teleportation
-      if (gameState.portalLocation && playerPosition) {
-        const targetRoomId = gameState.portalLocation.roomId;
-        const targetPos = gameState.portalLocation.position;
-        const currentRoomId = gameState.currentRoomId ?? '__base__';
-        
-        if (targetRoomId !== currentRoomId && gameState.rooms) {
-          // Cross-room travel - use room transition logic
-          // This would need to integrate with the existing room transition system
-          // For now, just move to sparkle-in phase
-          setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
-        } else {
-          // Same room travel - just move player
-          setGameState((prev) => {
-            const newMapData = JSON.parse(JSON.stringify(prev.mapData));
-            const [oldY, oldX] = playerPosition;
-            const [newY, newX] = targetPos;
-            
-            // Remove player from old position
-            const oldSubs = newMapData.subtypes[oldY][oldX] || [];
-            newMapData.subtypes[oldY][oldX] = oldSubs.filter(
-              (s: number) => s !== TileSubtype.PLAYER
-            );
-            
-            // Add player to new position
-            const newSubs = newMapData.subtypes[newY][newX] || [];
-            if (!newSubs.includes(TileSubtype.PLAYER)) {
-              newMapData.subtypes[newY][newX] = [...newSubs, TileSubtype.PLAYER];
-            }
-            
-            const nextState: GameState = {
-              ...prev,
-              mapData: newMapData,
-            };
-            CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
-            return nextState;
-          });
-          setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
+    const checkPhase = () => {
+      const elapsed = Date.now() - travelAnimation.startTime;
+      
+      if (travelAnimation.phase === 'sparkle-out') {
+        // Show sparkle animation for 600ms
+        if (elapsed >= 600) {
+          setTravelAnimation({ phase: 'transition', startTime: Date.now() });
         }
+      } else if (travelAnimation.phase === 'transition') {
+        // Perform the actual teleportation
+        if (gameState.portalLocation && playerPosition) {
+          const targetRoomId = gameState.portalLocation.roomId;
+          const targetPos = gameState.portalLocation.position;
+          const currentRoomId = gameState.currentRoomId ?? '__base__';
+          
+          if (targetRoomId !== currentRoomId && gameState.rooms) {
+            // Cross-room travel - use room transition logic
+            // This would need to integrate with the existing room transition system
+            // For now, just move to sparkle-in phase
+            setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
+          } else {
+            // Same room travel - just move player
+            setGameState((prev) => {
+              const newMapData = JSON.parse(JSON.stringify(prev.mapData));
+              const [oldY, oldX] = playerPosition;
+              const [newY, newX] = targetPos;
+              
+              // Remove player from old position
+              const oldSubs = newMapData.subtypes[oldY][oldX] || [];
+              newMapData.subtypes[oldY][oldX] = oldSubs.filter(
+                (s: number) => s !== TileSubtype.PLAYER
+              );
+              
+              // Add player to new position
+              const newSubs = newMapData.subtypes[newY][newX] || [];
+              if (!newSubs.includes(TileSubtype.PLAYER)) {
+                newMapData.subtypes[newY][newX] = [...newSubs, TileSubtype.PLAYER];
+              }
+              
+              const nextState: GameState = {
+                ...prev,
+                mapData: newMapData,
+              };
+              CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+              return nextState;
+            });
+            setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
+          }
+        }
+      } else if (travelAnimation.phase === 'sparkle-in') {
+        // Show sparkle animation for 600ms
+        if (elapsed >= 600) {
+          setTravelAnimation({ phase: 'complete', startTime: Date.now() });
+        }
+      } else if (travelAnimation.phase === 'complete') {
+        // Clean up
+        setTravelAnimation(null);
       }
-    } else if (travelAnimation.phase === 'sparkle-in') {
-      // Show sparkle animation for 600ms
-      if (elapsed >= 600) {
-        setTravelAnimation({ phase: 'complete', startTime: Date.now() });
-      }
-    } else if (travelAnimation.phase === 'complete') {
-      // Clean up
-      setTravelAnimation(null);
-    }
+    };
+    
+    // Check immediately
+    checkPhase();
+    
+    // Then check every 100ms
+    const interval = setInterval(checkPhase, 100);
+    
+    return () => clearInterval(interval);
   }, [travelAnimation, gameState.portalLocation, gameState.currentRoomId, gameState.rooms, playerPosition, resolvedStorageSlot]);
 
   const consumeNpcInteraction = useCallback(
