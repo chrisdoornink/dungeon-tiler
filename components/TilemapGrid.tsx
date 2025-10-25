@@ -13,9 +13,14 @@ import {
   type TimeOfDayState,
   createInitialTimeOfDay,
   DAY_PHASE_CONFIG,
+  serializeEnemies,
+  serializeNPCs,
 } from "../lib/map";
+import { removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
+import { rehydrateEnemies } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
+import { rehydrateNPCs } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
 import { Tile, type HeroDeathPhase, type HeroDeathState } from "./Tile";
 import {
@@ -285,9 +290,54 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const currentRoomId = gameState.currentRoomId ?? '__base__';
           
           if (targetRoomId !== currentRoomId && gameState.rooms) {
-            // Cross-room travel - use room transition logic
-            // This would need to integrate with the existing room transition system
-            // For now, just move to sparkle-in phase
+            // Cross-room travel - save current room and load target room
+            setGameState((prev) => {
+              const updatedRooms: Record<string, any> = { ...prev.rooms };
+              
+              // Save current room state
+              if (currentRoomId && updatedRooms[currentRoomId]) {
+                updatedRooms[currentRoomId] = {
+                  ...updatedRooms[currentRoomId],
+                  mapData: removePlayerFromMapData(prev.mapData),
+                  enemies: serializeEnemies(prev.enemies),
+                  npcs: serializeNPCs(prev.npcs),
+                  potOverrides: prev.potOverrides ? { ...prev.potOverrides } : undefined,
+                };
+              }
+              
+              // Load target room
+              const targetRoom = updatedRooms[targetRoomId];
+              if (!targetRoom) {
+                return prev; // Room doesn't exist, abort
+              }
+              
+              // Clone target room map and place player at portal location
+              const nextMapData = JSON.parse(JSON.stringify(targetRoom.mapData));
+              const [newY, newX] = targetPos;
+              const dest = nextMapData.subtypes[newY][newX] || [];
+              const filtered = dest.filter((t: number) => t !== TileSubtype.PLAYER);
+              if (!filtered.includes(TileSubtype.PLAYER)) {
+                filtered.push(TileSubtype.PLAYER);
+              }
+              nextMapData.subtypes[newY][newX] = filtered;
+              
+              // Rehydrate enemies and NPCs from target room
+              const nextEnemies = rehydrateEnemies(targetRoom.enemies || []);
+              const nextNpcs = rehydrateNPCs(targetRoom.npcs || []);
+              
+              const nextState: GameState = {
+                ...prev,
+                mapData: nextMapData,
+                currentRoomId: targetRoomId,
+                rooms: updatedRooms,
+                enemies: nextEnemies,
+                npcs: nextNpcs,
+                potOverrides: targetRoom.potOverrides ? { ...targetRoom.potOverrides } : undefined,
+              };
+              
+              CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+              return nextState;
+            });
             setTravelAnimation({ phase: 'sparkle-in', startTime: Date.now() });
           } else {
             // Same room travel - just move player
