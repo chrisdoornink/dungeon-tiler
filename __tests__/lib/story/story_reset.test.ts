@@ -33,6 +33,7 @@ describe("story reset helpers", () => {
       hasShield: false,
       hasKey: true,
       hasExitKey: false,
+      hasSnakeMedallion: false,
       rockCount: 3,
       runeCount: 2,
       foodCount: 1,
