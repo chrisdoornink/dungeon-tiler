@@ -15,6 +15,7 @@ import {
   DAY_PHASE_CONFIG,
   serializeEnemies,
   serializeNPCs,
+  type RoomSnapshot,
 } from "../lib/map";
 import { removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
@@ -59,7 +60,6 @@ import {
   getDialogueScript,
   type DialogueChoice,
   type DialogueLine,
-  type DialogueEffect,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
 import { createInitialStoryFlags, type StoryEffect } from "../lib/story/event_registry";
@@ -292,7 +292,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (targetRoomId !== currentRoomId && gameState.rooms) {
             // Cross-room travel - save current room and load target room
             setGameState((prev) => {
-              const updatedRooms: Record<string, any> = { ...prev.rooms };
+              const updatedRooms: Record<string, RoomSnapshot> = { ...prev.rooms };
               
               // Save current room state
               if (currentRoomId && updatedRooms[currentRoomId]) {
