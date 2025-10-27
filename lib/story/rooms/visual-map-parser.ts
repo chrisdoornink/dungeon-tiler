@@ -115,6 +115,38 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
           tileType = 1; // wall tile with door subtype
           cellSubtypes.push(TileSubtype.DOOR);
           break;
+        case 'a':
+          tileType = 0; // floor with bed empty variant 1
+          cellSubtypes.push(TileSubtype.BED_EMPTY_1);
+          break;
+        case 'b':
+          tileType = 0; // floor with bed empty variant 2
+          cellSubtypes.push(TileSubtype.BED_EMPTY_2);
+          break;
+        case 'c':
+          tileType = 0; // floor with bed empty variant 3
+          cellSubtypes.push(TileSubtype.BED_EMPTY_3);
+          break;
+        case 'e':
+          tileType = 0; // floor with bed empty variant 4
+          cellSubtypes.push(TileSubtype.BED_EMPTY_4);
+          break;
+        case '!':
+          tileType = 0; // floor with bed full variant 1
+          cellSubtypes.push(TileSubtype.BED_FULL_1);
+          break;
+        case '~':
+          tileType = 0; // floor with bed full variant 2
+          cellSubtypes.push(TileSubtype.BED_FULL_2);
+          break;
+        case '^':
+          tileType = 0; // floor with bed full variant 3
+          cellSubtypes.push(TileSubtype.BED_FULL_3);
+          break;
+        case '*':
+          tileType = 0; // floor with bed full variant 4
+          cellSubtypes.push(TileSubtype.BED_FULL_4);
+          break;
         case '0':
         case '1':
         case '2':

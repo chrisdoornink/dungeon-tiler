@@ -76,6 +76,8 @@ export function buildRoom(config: RoomConfig): StoryRoom {
 
   // Find entry point (tile just above the bottom-most ROOM_TRANSITION)
   let entryPoint: [number, number] = [height - 2, 2];
+  let transitionToPrevious: [number, number] | undefined = undefined;
+  let entryFromNext: [number, number] | undefined = undefined;
   let bottomMost: [number, number] | null = null;
   
   for (let y = 0; y < height; y++) {
@@ -91,6 +93,8 @@ export function buildRoom(config: RoomConfig): StoryRoom {
   if (bottomMost) {
     const [by, bx] = bottomMost;
     entryPoint = [Math.max(1, by - 1), bx];
+    transitionToPrevious = [by, bx];
+    entryFromNext = [Math.max(1, by - 2), bx];
   }
 
   // Build otherTransitions array from transition definitions and parsed positions
@@ -119,6 +123,8 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     id: id as RoomId,
     mapData,
     entryPoint,
+    transitionToPrevious,
+    entryFromNext,
     enemies,
     npcs: npcs as StoryRoom['npcs'],
     metadata,

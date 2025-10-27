@@ -81,6 +81,14 @@ export enum TileSubtype {
   FLOOR_TORCH = 38,
   SNAKE_MEDALLION = 39,
   PORTAL = 40,
+  BED_EMPTY_1 = 41,
+  BED_EMPTY_2 = 42,
+  BED_EMPTY_3 = 43,
+  BED_EMPTY_4 = 44,
+  BED_FULL_1 = 45,
+  BED_FULL_2 = 46,
+  BED_FULL_3 = 47,
+  BED_FULL_4 = 48,
 }
 
 /**

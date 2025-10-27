@@ -55,6 +55,7 @@ import ItemPickupAnimation from "./ItemPickupAnimation";
 import DialogueOverlay from "./DialogueOverlay";
 import { useTypewriter } from "../lib/dialogue/useTypewriter";
 import { BookshelfMenu } from "./BookshelfMenu";
+import { BedInteractionModal } from "./BedInteractionModal";
 import { DeathScreen } from "./DeathScreen";
 import {
   getDialogueScript,
@@ -225,6 +226,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
   const [activeBookshelfId, setActiveBookshelfId] = useState<string | null>(null);
+  const [activeBedInteraction, setActiveBedInteraction] = useState<{
+    bedId: string;
+    position: [number, number];
+    isOccupied: boolean;
+  } | null>(null);
   const activeDialogueLine = dialogueSession
     ? dialogueSession.script[dialogueSession.lineIndex] ?? null
     : null;
@@ -1369,6 +1375,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return next;
     });
   }, [gameState.bookshelfInteractionQueue, dialogueSession, activeBookshelfId, resolvedStorageSlot]);
+
+  // Handle bed interactions
+  useEffect(() => {
+    if (dialogueSession || activeBookshelfId || activeBedInteraction) return;
+    const queue = gameState.bedInteractionQueue;
+    if (!queue || queue.length === 0) return;
+    const nextBed = queue[0];
+    if (!nextBed) return;
+
+    setActiveBedInteraction(nextBed);
+    
+    // Clear the queue and save
+    setGameState((prev) => {
+      const next = {
+        ...prev,
+        bedInteractionQueue: [],
+      };
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      return next;
+    });
+  }, [gameState.bedInteractionQueue, dialogueSession, activeBookshelfId, activeBedInteraction, resolvedStorageSlot]);
 
   useEffect(() => {
     if (dialogueSession) return;
@@ -3275,6 +3302,46 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               return updated;
             });
           }}
+        />
+      )}
+
+      {activeBedInteraction && (
+        <BedInteractionModal
+          isOccupied={activeBedInteraction.isOccupied}
+          currentTimeOfDay={gameState.timeOfDay?.phase === 'night' ? 'night' : 'day'}
+          onSleepUntilNight={() => {
+            // Advance time to night
+            setGameState((prev) => {
+              const next = {
+                ...prev,
+                timeOfDay: {
+                  ...prev.timeOfDay!,
+                  phase: 'night' as const,
+                  stepsSincePhaseChange: 0,
+                },
+              };
+              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+              return next;
+            });
+            setActiveBedInteraction(null);
+          }}
+          onSleepUntilMorning={() => {
+            // Advance time to day
+            setGameState((prev) => {
+              const next = {
+                ...prev,
+                timeOfDay: {
+                  ...prev.timeOfDay!,
+                  phase: 'day' as const,
+                  stepsSincePhaseChange: 0,
+                },
+              };
+              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+              return next;
+            });
+            setActiveBedInteraction(null);
+          }}
+          onCancel={() => setActiveBedInteraction(null)}
         />
       )}
       

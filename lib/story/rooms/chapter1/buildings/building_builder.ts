@@ -3,6 +3,12 @@ import type { EnvironmentId } from "../../../../environment";
 import type { StoryRoom } from "../../types";
 import type { NPC } from "../../../../npc";
 
+export interface BedPlacement {
+  y: number;
+  x: number;
+  variant: 1 | 2 | 3 | 4; // Which bed style (1-4)
+}
+
 /**
  * Generic interior room builder for buildings.
  * Produces an enclosed room with floor size (outWidth*2-1) x (outHeight*2-1)
@@ -13,7 +19,8 @@ export function buildBuildingInterior(
   outHeight: number,
   environment: EnvironmentId,
   displayLabel: string,
-  npcs?: NPC[]
+  npcs?: NPC[],
+  beds?: BedPlacement[]
 ): StoryRoom {
   const innerW = outWidth * 2 - 1;
   const innerH = outHeight * 2 - 1;
@@ -53,6 +60,16 @@ export function buildBuildingInterior(
   ];
   const entryFromNext: [number, number] = [innerH - 1, doorX];
 
+  // Place beds if provided
+  if (beds) {
+    for (const bed of beds) {
+      if (tiles[bed.y]?.[bed.x] === FLOOR) {
+        const bedSubtype = TileSubtype[`BED_EMPTY_${bed.variant}` as keyof typeof TileSubtype] as TileSubtype;
+        subtypes[bed.y][bed.x] = [bedSubtype];
+      }
+    }
+  }
+
   return {
     id,
     mapData: { tiles, subtypes, environment },
@@ -62,6 +79,7 @@ export function buildBuildingInterior(
     npcs,
     metadata: {
       displayLabel,
+      beds, // Store bed info for day/night switching
     },
   };
 }

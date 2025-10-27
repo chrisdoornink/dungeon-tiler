@@ -1,28 +1,41 @@
-import type { RoomId } from "../../../../map";
-import { Direction } from "../../../../map";
+/**
+ * Dara's Cottage
+ * 1 resident: Dara (Outskirts dweller)
+ */
+
+import { RoomId } from "../../../../map";
 import type { StoryRoom } from "../../types";
-import { NPC } from "../../../../npc";
-import { buildHouseInterior } from "./house_builder";
+import { buildRoom, type RoomConfig } from "../../room-builder";
+
+const SIZE = 7;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, target: [26, 19] as [number, number], returnPoint: [5, 3] as [number, number] },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # #",
+  "# . . . . . #",
+  "# c . . . w #",
+  "# . . . . . #",
+  "# w . . . . #",
+  "# . . . . . #",
+  "# # # 0 # # #"
+];
+
+const ROOM_CONFIG: RoomConfig = {
+  id: 'story-torch-town-home-7',
+  size: SIZE,
+  visualMap: VISUAL_MAP,
+  transitions: TRANSITIONS,
+  metadata: {
+    displayLabel: "Dara's Cottage",
+    description: 'A quiet cottage on the outskirts, home to Dara.',
+  },
+  environment: 'house',
+  npcs: [],
+};
 
 export function buildDarasCottage(): StoryRoom {
-  const id = "story-torch-town-home-7" as RoomId;
-  const displayLabel = "Dara's Cottage";
-  
-  const npcs: NPC[] = [
-    new NPC({ id: "npc-dara", name: "Dara", sprite: "/images/npcs/torch-town/dara.png", y: 3, x: 2, facing: Direction.DOWN, canMove: false, metadata: { location: "house" } }),
-  ];
-  
-  const room = buildHouseInterior(id, 3, 2, "house", displayLabel, npcs);
-  
-  // Add conditional NPC visibility - Dara appears here at night
-  room.metadata = {
-    ...room.metadata,
-    conditionalNpcs: {
-      "npc-dara": {
-        showWhen: [{ timeOfDay: "night" }]
-      }
-    }
-  };
-  
-  return room;
+  return buildRoom(ROOM_CONFIG);
 }

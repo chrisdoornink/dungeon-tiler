@@ -1,51 +1,41 @@
-import type { RoomId } from "../../../../map";
-import { Direction } from "../../../../map";
+/**
+ * Haro & Len's Cottage
+ * 2 residents: Haro (Fisher), Len (Fisher)
+ */
+
+import { RoomId } from "../../../../map";
 import type { StoryRoom } from "../../types";
-import { NPC } from "../../../../npc";
-import { buildHouseInterior } from "./house_builder";
+import { buildRoom, type RoomConfig } from "../../room-builder";
+
+const SIZE = 7;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, target: [26, 28] as [number, number], returnPoint: [5, 3] as [number, number] },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # #",
+  "# . . . . . #",
+  "# e . . a w #",
+  "# . . . . . #",
+  "# w . . . . #",
+  "# . . . . . #",
+  "# # # 0 # # #"
+];
+
+const ROOM_CONFIG: RoomConfig = {
+  id: 'story-torch-town-home-5',
+  size: SIZE,
+  visualMap: VISUAL_MAP,
+  transitions: TRANSITIONS,
+  metadata: {
+    displayLabel: "Haro & Len's Cottage",
+    description: 'Home of Haro and Len, the fisher brothers.',
+  },
+  environment: 'house',
+  npcs: [],
+};
 
 export function buildHaroAndLensCottage(): StoryRoom {
-  const id = "story-torch-town-home-5" as RoomId;
-  const displayLabel = "Haro & Len's Cottage";
-  
-  // Create NPCs for this house - they'll be shown/hidden based on time of day
-  const npcs: NPC[] = [
-    new NPC({
-      id: "npc-haro",
-      name: "Haro",
-      sprite: "/images/npcs/torch-town/haro.png",
-      y: 3, // Inside the house
-      x: 2,
-      facing: Direction.DOWN,
-      canMove: false,
-      metadata: { location: "house" },
-    }),
-    new NPC({
-      id: "npc-len",
-      name: "Len",
-      sprite: "/images/npcs/torch-town/len.png",
-      y: 3, // Inside the house
-      x: 3,
-      facing: Direction.DOWN,
-      canMove: false,
-      metadata: { location: "house" },
-    }),
-  ];
-  
-  const room = buildHouseInterior(id, 3, 2, "house", displayLabel, npcs);
-  
-  // Add conditional NPC visibility - Haro and Len appear here at night
-  room.metadata = {
-    ...room.metadata,
-    conditionalNpcs: {
-      "npc-haro": {
-        showWhen: [{ timeOfDay: "night" }]
-      },
-      "npc-len": {
-        showWhen: [{ timeOfDay: "night" }]
-      }
-    }
-  };
-  
-  return room;
+  return buildRoom(ROOM_CONFIG);
 }

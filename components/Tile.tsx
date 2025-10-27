@@ -366,6 +366,30 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.SNAKE_MEDALLION) || false;
   };
 
+  // Bed helpers
+  const hasBed = (subtypes: number[] | undefined): boolean => {
+    if (!subtypes) return false;
+    return subtypes.some(s => 
+      s === TileSubtype.BED_EMPTY_1 || s === TileSubtype.BED_EMPTY_2 ||
+      s === TileSubtype.BED_EMPTY_3 || s === TileSubtype.BED_EMPTY_4 ||
+      s === TileSubtype.BED_FULL_1 || s === TileSubtype.BED_FULL_2 ||
+      s === TileSubtype.BED_FULL_3 || s === TileSubtype.BED_FULL_4
+    );
+  };
+
+  const getBedAsset = (subtypes: number[] | undefined): string | null => {
+    if (!subtypes) return null;
+    if (subtypes.includes(TileSubtype.BED_EMPTY_1)) return '/images/items/beds/bed-1-empty.png';
+    if (subtypes.includes(TileSubtype.BED_EMPTY_2)) return '/images/items/beds/bed-2-empty.png';
+    if (subtypes.includes(TileSubtype.BED_EMPTY_3)) return '/images/items/beds/bed-3-empty.png';
+    if (subtypes.includes(TileSubtype.BED_EMPTY_4)) return '/images/items/beds/bed-4-empty.png';
+    if (subtypes.includes(TileSubtype.BED_FULL_1)) return '/images/items/beds/bed-1-full.png';
+    if (subtypes.includes(TileSubtype.BED_FULL_2)) return '/images/items/beds/bed-2-full.png';
+    if (subtypes.includes(TileSubtype.BED_FULL_3)) return '/images/items/beds/bed-3-full.png';
+    if (subtypes.includes(TileSubtype.BED_FULL_4)) return '/images/items/beds/bed-4-full.png';
+    return null;
+  };
+
   const getRoadShape = (
     subtypes: number[] | undefined
   ): TileSubtype | null => {
@@ -490,7 +514,16 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.SIGN_STORE &&
         subtype !== TileSubtype.SIGN_LIBRARY &&
         subtype !== TileSubtype.SIGN_SMITHY &&
-        subtype !== TileSubtype.BOOKSHELF // Filter out subtypes with custom rendering
+        subtype !== TileSubtype.BOOKSHELF &&
+        // Exclude beds from generic rendering
+        subtype !== TileSubtype.BED_EMPTY_1 &&
+        subtype !== TileSubtype.BED_EMPTY_2 &&
+        subtype !== TileSubtype.BED_EMPTY_3 &&
+        subtype !== TileSubtype.BED_EMPTY_4 &&
+        subtype !== TileSubtype.BED_FULL_1 &&
+        subtype !== TileSubtype.BED_FULL_2 &&
+        subtype !== TileSubtype.BED_FULL_3 &&
+        subtype !== TileSubtype.BED_FULL_4
     );
   };
 
@@ -721,6 +754,25 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
               backgroundImage: `url('/images/items/snake-medalion.png')`,
+            }}
+          />
+        )}
+
+        {/* Render bed */}
+        {hasBed(subtypes) && getBedAsset(subtypes) && (
+          <div
+            key="bed"
+            data-testid="bed-overlay"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${getBedAsset(subtypes)})`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              imageRendering: 'pixelated',
+              zIndex: 1,
+              pointerEvents: 'none',
             }}
           />
         )}

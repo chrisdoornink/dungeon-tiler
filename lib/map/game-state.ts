@@ -679,6 +679,11 @@ export interface GameState {
     bookshelfId: string;
     position: [number, number];
   }>;
+  bedInteractionQueue?: Array<{
+    bedId: string;
+    position: [number, number];
+    isOccupied: boolean;
+  }>;
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
@@ -1317,6 +1322,35 @@ export function movePlayer(
           {
             bookshelfId,
             position: [newY, newX],
+          }
+        ];
+      }
+      return newGameState;
+    }
+
+    // Check if tile has a bed - blocks movement but triggers interaction
+    const hasBed = subtype.some(s => 
+      s === TileSubtype.BED_EMPTY_1 || s === TileSubtype.BED_EMPTY_2 ||
+      s === TileSubtype.BED_EMPTY_3 || s === TileSubtype.BED_EMPTY_4 ||
+      s === TileSubtype.BED_FULL_1 || s === TileSubtype.BED_FULL_2 ||
+      s === TileSubtype.BED_FULL_3 || s === TileSubtype.BED_FULL_4
+    );
+    if (hasBed) {
+      // Check if bed is occupied (has BED_FULL subtype)
+      const isOccupied = subtype.some(s => 
+        s === TileSubtype.BED_FULL_1 || s === TileSubtype.BED_FULL_2 ||
+        s === TileSubtype.BED_FULL_3 || s === TileSubtype.BED_FULL_4
+      );
+      // Queue bed interaction
+      if (newGameState.currentRoomId) {
+        const bedId = `${newGameState.currentRoomId}-bed-${newY}-${newX}`;
+        const existingQueue = newGameState.bedInteractionQueue ?? [];
+        newGameState.bedInteractionQueue = [
+          ...existingQueue,
+          {
+            bedId,
+            position: [newY, newX],
+            isOccupied,
           }
         ];
       }

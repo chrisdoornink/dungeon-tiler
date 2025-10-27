@@ -1,28 +1,41 @@
-import type { RoomId } from "../../../../map";
-import { Direction } from "../../../../map";
+/**
+ * Serin's Clinic
+ * 1 resident: Serin (Healer) - lives and works here
+ */
+
+import { RoomId } from "../../../../map";
 import type { StoryRoom } from "../../types";
-import { NPC } from "../../../../npc";
-import { buildHouseInterior } from "./house_builder";
+import { buildRoom, type RoomConfig } from "../../room-builder";
+
+const SIZE = 7;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, target: [22, 28] as [number, number], returnPoint: [5, 3] as [number, number] },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # #",
+  "# . . . . . #",
+  "# a . . . w #",
+  "# . . . . . #",
+  "# w . . . . #",
+  "# . . . . . #",
+  "# # # 0 # # #"
+];
+
+const ROOM_CONFIG: RoomConfig = {
+  id: 'story-torch-town-home-3',
+  size: SIZE,
+  visualMap: VISUAL_MAP,
+  transitions: TRANSITIONS,
+  metadata: {
+    displayLabel: "Serin's Clinic",
+    description: 'A small clinic where Serin the healer lives and works.',
+  },
+  environment: 'house',
+  npcs: [],
+};
 
 export function buildSerinsClinic(): StoryRoom {
-  const id = "story-torch-town-home-3" as RoomId;
-  const displayLabel = "Serin's Clinic";
-  
-  const npcs: NPC[] = [
-    new NPC({ id: "npc-serin", name: "Serin", sprite: "/images/npcs/torch-town/serin.png", y: 3, x: 2, facing: Direction.DOWN, canMove: false, metadata: { location: "house" } }),
-  ];
-  
-  const room = buildHouseInterior(id, 3, 2, "house", displayLabel, npcs);
-  
-  // Add conditional NPC visibility - Serin is always here (day and night)
-  room.metadata = {
-    ...room.metadata,
-    conditionalNpcs: {
-      "npc-serin": {
-        showWhen: [] // Always show (no conditions)
-      }
-    }
-  };
-  
-  return room;
+  return buildRoom(ROOM_CONFIG);
 }
