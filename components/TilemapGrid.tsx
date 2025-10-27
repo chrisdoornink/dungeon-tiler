@@ -17,6 +17,7 @@ import {
   serializeNPCs,
   type RoomSnapshot,
 } from "../lib/map";
+import { advanceTimeOfDay } from "../lib/time_of_day";
 import { removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
@@ -3310,15 +3311,33 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           isOccupied={activeBedInteraction.isOccupied}
           currentTimeOfDay={gameState.timeOfDay?.phase === 'night' ? 'night' : 'day'}
           onSleepUntilNight={() => {
-            // Advance time to night
+            // Calculate steps needed to reach night
             setGameState((prev) => {
+              const currentTime = prev.timeOfDay ?? createInitialTimeOfDay();
+              let stepsToAdvance = 0;
+              
+              // If currently in day or dusk, advance to night
+              if (currentTime.phase === 'day') {
+                // Skip rest of day + dusk to get to night
+                const dayRemaining = DAY_PHASE_CONFIG.day.duration - currentTime.stepInPhase;
+                const duskDuration = DAY_PHASE_CONFIG.dusk.duration;
+                stepsToAdvance = dayRemaining + duskDuration;
+              } else if (currentTime.phase === 'dusk') {
+                // Skip rest of dusk to get to night
+                stepsToAdvance = DAY_PHASE_CONFIG.dusk.duration - currentTime.stepInPhase;
+              } else if (currentTime.phase === 'dawn') {
+                // Skip rest of dawn + day + dusk to get to next night
+                const dawnRemaining = DAY_PHASE_CONFIG.dawn.duration - currentTime.stepInPhase;
+                const dayDuration = DAY_PHASE_CONFIG.day.duration;
+                const duskDuration = DAY_PHASE_CONFIG.dusk.duration;
+                stepsToAdvance = dawnRemaining + dayDuration + duskDuration;
+              }
+              // If already night, don't advance
+              
+              const newTimeOfDay = advanceTimeOfDay(currentTime, stepsToAdvance);
               const next = {
                 ...prev,
-                timeOfDay: {
-                  ...prev.timeOfDay!,
-                  phase: 'night' as const,
-                  stepsSincePhaseChange: 0,
-                },
+                timeOfDay: newTimeOfDay,
               };
               CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
               return next;
@@ -3326,15 +3345,33 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             setActiveBedInteraction(null);
           }}
           onSleepUntilMorning={() => {
-            // Advance time to day
+            // Calculate steps needed to reach morning (day)
             setGameState((prev) => {
+              const currentTime = prev.timeOfDay ?? createInitialTimeOfDay();
+              let stepsToAdvance = 0;
+              
+              // If currently in night or dawn, advance to day
+              if (currentTime.phase === 'night') {
+                // Skip rest of night + dawn to get to day
+                const nightRemaining = DAY_PHASE_CONFIG.night.duration - currentTime.stepInPhase;
+                const dawnDuration = DAY_PHASE_CONFIG.dawn.duration;
+                stepsToAdvance = nightRemaining + dawnDuration;
+              } else if (currentTime.phase === 'dawn') {
+                // Skip rest of dawn to get to day
+                stepsToAdvance = DAY_PHASE_CONFIG.dawn.duration - currentTime.stepInPhase;
+              } else if (currentTime.phase === 'dusk') {
+                // Skip rest of dusk + night + dawn to get to next day
+                const duskRemaining = DAY_PHASE_CONFIG.dusk.duration - currentTime.stepInPhase;
+                const nightDuration = DAY_PHASE_CONFIG.night.duration;
+                const dawnDuration = DAY_PHASE_CONFIG.dawn.duration;
+                stepsToAdvance = duskRemaining + nightDuration + dawnDuration;
+              }
+              // If already day, don't advance
+              
+              const newTimeOfDay = advanceTimeOfDay(currentTime, stepsToAdvance);
               const next = {
                 ...prev,
-                timeOfDay: {
-                  ...prev.timeOfDay!,
-                  phase: 'day' as const,
-                  stepsSincePhaseChange: 0,
-                },
+                timeOfDay: newTimeOfDay,
               };
               CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
               return next;
