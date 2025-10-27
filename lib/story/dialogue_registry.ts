@@ -220,6 +220,40 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "caretaker-lysa-after-fenna": {
+    id: "caretaker-lysa-after-fenna",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "Old Fenna's flame never lies. If she's seen shadows gathering, then the danger is real.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "The sanctum's pulse grows heavier each day. I fear for Torch Town's safety.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "You'll need proper equipment if you're to investigate further. Jorin in the town can forge you a weapon—he's the best smith we have.",
+      },
+    ],
+  },
+  "caretaker-lysa-armed-ready": {
+    id: "caretaker-lysa-armed-ready",
+    lines: [
+      {
+        speaker: "Caretaker Lysa",
+        text: "I see you're properly armed now. That's good—you'll need every advantage.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "The eastern wilds beyond Torch Town... that's where the darkness gathers thickest. The goblins are organized, purposeful.",
+      },
+      {
+        speaker: "Caretaker Lysa",
+        text: "Push deeper into the wilds. Find the source of this corruption before it spreads to the town. The sanctum's stones tremble at what's coming.",
+      },
+    ],
+  },
   "town-librarian-default": {
     id: "town-librarian-default",
     lines: [
@@ -269,6 +303,40 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       {
         speaker: "Elder Rowan",
         text: "The air still feels... watchful. I'll remain here at the entrance. Something stirs beyond our walls.",
+      },
+    ],
+  },
+  "elder-rowan-after-fenna": {
+    id: "elder-rowan-after-fenna",
+    lines: [
+      {
+        speaker: "Elder Rowan",
+        text: "You've spoken with Old Fenna, I sense it. The eternal flame reveals truths that even the sanctum's stones cannot.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Torch Town is in danger. The darkness she speaks of... it matches what Lysa and I have felt growing.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Before you venture further, arm yourself properly. Jorin's smithy in town—he can forge you something worthy of this fight.",
+      },
+    ],
+  },
+  "elder-rowan-armed-ready": {
+    id: "elder-rowan-armed-ready",
+    lines: [
+      {
+        speaker: "Elder Rowan",
+        text: "A fine blade. You carry yourself differently now—ready for what lies ahead.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "The eastern wilds are where the answers lie. The goblins, the corruption, the sanctum's unrest—all threads lead there.",
+      },
+      {
+        speaker: "Elder Rowan",
+        text: "Go deep. Find the source. The town's survival may depend on what you discover.",
       },
     ],
   },

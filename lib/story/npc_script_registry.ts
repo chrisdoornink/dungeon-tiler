@@ -17,6 +17,7 @@ export interface NPCDialogueRule {
 const PRIORITIES = {
   CONDITIONALLY_HIGHEST: 1000,
   NPC_INTRO: 100,
+  ARMED_AND_READY: 70, // Has sword, ready to investigate wilds
   TOWN_GOBLIN_ACTIVITY_COMPLETED: 66, // story event TBD
   TOWN_GOBLIN_ACTIVITY_DETECTED: 65, // eventID: met-old-fenna-torch-town
   MISSING_BOY: 60, // eventID: heard-missing-boy
@@ -83,7 +84,28 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     npcId: "npc-elder-rowan",
     scriptId: "elder-rowan-kalen-rescued",
     priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
-    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+    conditions: [
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "met-old-fenna-torch-town", value: false },
+    ],
+  },
+  {
+    npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-armed-ready",
+    priority: PRIORITIES.ARMED_AND_READY,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "smithy-forged-sword", value: true },
+    ],
+  },
+  {
+    npcId: "npc-elder-rowan",
+    scriptId: "elder-rowan-after-fenna",
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "smithy-forged-sword", value: false },
+    ],
   },
 
   // Caretaker Lysa
@@ -112,7 +134,28 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     npcId: "npc-grounds-caretaker",
     scriptId: "caretaker-lysa-kalen-rescued",
     priority: PRIORITIES.KALEN_RESCUED_AT_BLUFF,
-    conditions: [{ eventId: "kalen-rescued-at-bluff", value: true }],
+    conditions: [
+      { eventId: "kalen-rescued-at-bluff", value: true },
+      { eventId: "met-old-fenna-torch-town", value: false },
+    ],
+  },
+  {
+    npcId: "npc-grounds-caretaker",
+    scriptId: "caretaker-lysa-armed-ready",
+    priority: PRIORITIES.ARMED_AND_READY,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "smithy-forged-sword", value: true },
+    ],
+  },
+  {
+    npcId: "npc-grounds-caretaker",
+    scriptId: "caretaker-lysa-after-fenna",
+    priority: PRIORITIES.TOWN_GOBLIN_ACTIVITY_DETECTED,
+    conditions: [
+      { eventId: "met-old-fenna-torch-town", value: true },
+      { eventId: "smithy-forged-sword", value: false },
+    ],
   },
 
   // Kalen (sanctum boy) - at sanctum after entering cave (highest priority)
