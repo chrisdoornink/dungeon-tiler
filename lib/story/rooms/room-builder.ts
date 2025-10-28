@@ -31,8 +31,18 @@ export interface RoomConfig {
   visualMap: string[];
   transitions: Record<string, TransitionDefinition>;
   metadata: {
-    displayLabel: string;
-    description: string;
+    displayLabel?: string;
+    description?: string;
+    conditionalNpcs?: Record<string, { removeWhen?: Array<{ eventId: string; value: boolean }>; showWhen?: Array<{ eventId: string; value: boolean }> }>;
+    onRoomEnter?: { effects: Array<{ eventId: string; value: boolean }> };
+    archetype?: string;
+    location?: string;
+    dayLocation?: string;
+    nightLocation?: string;
+    house?: string;
+    behavior?: string;
+    homes?: Record<string, unknown>;
+    buildings?: Record<string, unknown>;
   };
   environment?: EnvironmentId;
   npcs?: unknown[]; // Can be typed more specifically when NPCs are added

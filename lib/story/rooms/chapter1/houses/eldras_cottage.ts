@@ -3,9 +3,11 @@
  * 1 resident: Eldra
  */
 
-import { RoomId } from "../../../../map";
+import { RoomId, Direction } from "../../../../map";
 import type { StoryRoom } from "../../types";
 import { buildRoom, type RoomConfig } from "../../room-builder";
+import { NPC } from "../../../../npc";
+import { HOUSE_LABELS } from "../torch_town";
 
 const SIZE = 7;
 
@@ -33,6 +35,18 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
+// Eldra sleeps in bed 'a' at position [2, 1] (row 2, col 1)
+const eldra = new NPC({
+  id: "npc-eldra-night",
+  name: "Eldra",
+  sprite: "/images/npcs/torch-town/eldra.png",
+  y: 2,
+  x: 1,
+  facing: Direction.DOWN,
+  canMove: false,
+  metadata: { nightLocation: "house1", house: HOUSE_LABELS.HOUSE_1 },
+});
+
 const ROOM_CONFIG: RoomConfig = {
   id: 'story-torch-town-home-0',
   size: SIZE,
@@ -41,9 +55,12 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Eldra's Cottage",
     description: 'A cozy cottage belonging to Eldra.',
+    conditionalNpcs: {
+      "npc-eldra-night": { showWhen: [{ timeOfDay: "night" }] },
+    },
   },
   environment: 'house',
-  npcs: [],
+  npcs: [eldra],
 };
 
 export function buildEldrasCottage(): StoryRoom {

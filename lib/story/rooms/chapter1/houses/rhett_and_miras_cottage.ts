@@ -3,9 +3,11 @@
  * 2 residents: Rhett (Farmer), Mira (Weaver)
  */
 
-import { RoomId } from "../../../../map";
+import { RoomId, Direction } from "../../../../map";
 import type { StoryRoom } from "../../types";
 import { buildRoom, type RoomConfig } from "../../room-builder";
+import { NPC } from "../../../../npc";
+import { HOUSE_LABELS } from "../torch_town";
 
 const SIZE = 7;
 
@@ -23,6 +25,29 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
+// Rhett in bed 'b' at [2, 1], Mira in bed 'c' at [2, 4]
+const rhett = new NPC({
+  id: "npc-rhett-night",
+  name: "Rhett",
+  sprite: "/images/npcs/torch-town/rhett.png",
+  y: 2,
+  x: 1,
+  facing: Direction.DOWN,
+  canMove: false,
+  metadata: { nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
+});
+
+const mira = new NPC({
+  id: "npc-mira-night",
+  name: "Mira",
+  sprite: "/images/npcs/torch-town/mira.png",
+  y: 2,
+  x: 4,
+  facing: Direction.DOWN,
+  canMove: false,
+  metadata: { nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
+});
+
 const ROOM_CONFIG: RoomConfig = {
   id: 'story-torch-town-home-4',
   size: SIZE,
@@ -31,9 +56,13 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Rhett & Mira's Cottage",
     description: 'Home of Rhett the farmer and Mira the weaver.',
+    conditionalNpcs: {
+      "npc-rhett-night": { showWhen: [{ timeOfDay: "night" }] },
+      "npc-mira-night": { showWhen: [{ timeOfDay: "night" }] },
+    },
   },
   environment: 'house',
-  npcs: [],
+  npcs: [rhett, mira],
 };
 
 export function buildRhettAndMirasCottage(): StoryRoom {
