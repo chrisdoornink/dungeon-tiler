@@ -780,7 +780,7 @@ export function initializeGameState(): GameState {
     ? placeEnemies({
         grid: mapData.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: Math.floor(Math.random() * 3) + 5, // 5–8 enemies
+        count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
       })
     : [];
@@ -845,7 +845,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     ? placeEnemies({
         grid: ensured.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: Math.floor(Math.random() * 3) + 5, // 5–8 enemies
+        count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
       })
     : [];

@@ -73,8 +73,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/fire-goblin/fire-goblin-right.png",
       back: "/images/enemies/fire-goblin/fire-goblin-back.png",
     },
-    desiredMinCount: 3,
-    desiredMaxCount: 4,
+    desiredMinCount: 2,
+    desiredMaxCount: 3,
     base: { health: 5, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
@@ -89,7 +89,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/lantern-wisp.png", // placeholder
       back: "/images/enemies/lantern-wisp.png", // placeholder
     },
-    desiredMinCount: 1,
+    desiredMinCount: 0,
     desiredMaxCount: 2,
     base: { health: 2, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
@@ -114,8 +114,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       right: "/images/enemies/stone-exciter-right.png",
       back: "/images/enemies/stone-exciter-back.png",
     },
-    desiredMinCount: 1,
-    desiredMaxCount: 2,
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
     base: { health: 8, attack: 5 },
     // Takes exactly 1 melee damage regardless of sword/variance
     calcMeleeDamage: () => 1,
