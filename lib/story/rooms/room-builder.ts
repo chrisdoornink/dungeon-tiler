@@ -4,6 +4,7 @@ import { Enemy } from "../../enemy";
 import type { StoryRoom } from "./types";
 import { parseVisualMap, type ParsedMapData } from "./visual-map-parser";
 import type { EnvironmentId } from "../../environment";
+import type { StoryCondition, StoryEffect } from "../event_registry";
 
 type EnemyKind = "goblin" | "snake" | "ghost" | "stone-exciter";
 
@@ -33,8 +34,8 @@ export interface RoomConfig {
   metadata: {
     displayLabel?: string;
     description?: string;
-    conditionalNpcs?: Record<string, { removeWhen?: Array<{ eventId: string; value: boolean }>; showWhen?: Array<{ eventId: string; value: boolean }> }>;
-    onRoomEnter?: { effects: Array<{ eventId: string; value: boolean }> };
+    conditionalNpcs?: Record<string, { removeWhen?: StoryCondition[]; showWhen?: StoryCondition[] }>;
+    onRoomEnter?: { effects: StoryEffect[] };
     archetype?: string;
     location?: string;
     dayLocation?: string;
