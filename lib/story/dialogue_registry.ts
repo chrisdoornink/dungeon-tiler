@@ -311,7 +311,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "Elder Rowan",
-        text: "You've spoken with Old Fenna, I sense it. The eternal flame reveals truths that even the sanctum's stones cannot.",
+        text: "You've spoken with Old Fenna, I sense it. Her wisdom reveals truths that even the sanctum's stones cannot.",
       },
       {
         speaker: "Elder Rowan",
@@ -684,9 +684,9 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "fenna-default": {
     id: "fenna-default",
     lines: [
-      { speaker: "Old Fenna", text: "Welcome, traveler. I am Old Fenna, keeper of the eternal flame." },
-      { speaker: "Old Fenna", text: "The flame has been restless lately—flickering, dancing with unease. In all my years, I've learned it never lies." },
-      { speaker: "Old Fenna", text: "Something dark stirs beyond our eastern walls. The flame shows me shadows gathering, growing bolder." },
+      { speaker: "Old Fenna", text: "Welcome, traveler. I am Old Fenna, one of the town's elders." },
+      { speaker: "Old Fenna", text: "I've felt a restlessness lately—an unease in the air. In all my years, I've learned to trust these feelings." },
+      { speaker: "Old Fenna", text: "Something dark stirs beyond our eastern walls. I sense shadows gathering, growing bolder." },
       { speaker: "Old Fenna", text: "Speak with the townsfolk. They feel it too, though some try to ignore the signs." },
     ],
     onCompleteEffects: [{ eventId: "met-old-fenna-torch-town", value: true }],
