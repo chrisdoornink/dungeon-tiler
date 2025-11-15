@@ -1292,7 +1292,13 @@ export function movePlayer(
   // If the new position is a floor or flowers tile
   if (newMapData.tiles[newY][newX] === FLOOR || newMapData.tiles[newY][newX] === FLOWERS) {
     const subtype = newMapData.subtypes[newY][newX];
-    const triggeredCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
+    const containsCheckpoint = subtype.includes(TileSubtype.CHECKPOINT);
+
+    // Treat checkpoints as solid objects – the player cannot stand on the
+    // checkpoint tile itself.
+    if (containsCheckpoint) {
+      return newGameState;
+    }
 
     // Check if tile has a bookshelf - blocks movement but triggers interaction
     if (subtype.includes(TileSubtype.BOOKSHELF)) {
@@ -1754,8 +1760,22 @@ export function movePlayer(
     });
     moved = true;
 
-    if (triggeredCheckpoint && newGameState.allowCheckpoints) {
-      checkpointTouched = true;
+    if (newGameState.allowCheckpoints) {
+      const adjacentTiles: Array<[number, number]> = [
+        [newY - 1, newX],
+        [newY + 1, newX],
+        [newY, newX - 1],
+        [newY, newX + 1],
+      ];
+      for (const [ay, ax] of adjacentTiles) {
+        if (
+          isWithinBounds(newMapData, ay, ax) &&
+          newMapData.subtypes[ay]?.[ax]?.includes(TileSubtype.CHECKPOINT)
+        ) {
+          checkpointTouched = true;
+          break;
+        }
+      }
     }
 
     // Relight hero torch if adjacent to any wall torch after normal movement
