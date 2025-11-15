@@ -56,10 +56,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Jorin & Yanna's Cottage",
     description: 'Home of Jorin the blacksmith and Yanna the herbalist.',
-    conditionalNpcs: {
-      "npc-jorin-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-yanna-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [jorin, yanna],

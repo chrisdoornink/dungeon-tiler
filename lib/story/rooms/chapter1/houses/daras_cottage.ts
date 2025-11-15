@@ -45,9 +45,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Dara's Cottage",
     description: 'A quiet cottage on the outskirts, home to Dara.',
-    conditionalNpcs: {
-      "npc-dara-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [dara],

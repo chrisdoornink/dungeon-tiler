@@ -50,11 +50,6 @@ import { addSnakesPerRules } from "./enemy-features";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
-import {
-  advanceTimeOfDay,
-  createInitialTimeOfDay,
-  type TimeOfDayState,
-} from "../time_of_day";
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
   if (amount <= 0) return;
@@ -64,14 +59,6 @@ function incrementStepsAndTime(state: GameState, amount: number = 1): void {
     steps: currentStats.steps + amount,
   };
   state.stats = nextStats;
-  const previousPhase = state.timeOfDay?.phase;
-  state.timeOfDay = advanceTimeOfDay(state.timeOfDay, amount);
-  const newPhase = state.timeOfDay?.phase;
-  
-  // Update conditional NPCs when time of day changes
-  if (previousPhase !== newPhase && state.mode === "story") {
-    updateConditionalNpcs(state);
-  }
 }
 
 /**
@@ -700,7 +687,6 @@ export interface GameState {
       stepInterval: number;
     };
   };
-  timeOfDay?: TimeOfDayState;
   storyFlags?: StoryFlags;
   diaryEntries?: HeroDiaryEntry[];
   rooms?: Record<RoomId, RoomSnapshot>;
@@ -820,7 +806,6 @@ export function initializeGameState(): GameState {
       steps: 0,
       byKind: createEmptyByKind(),
     },
-    timeOfDay: createInitialTimeOfDay(),
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
@@ -876,7 +861,6 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
       steps: 0,
       byKind: createEmptyByKind(),
     },
-    timeOfDay: createInitialTimeOfDay(),
     recentDeaths: [],
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
@@ -950,7 +934,7 @@ function applyRoomTransition(
       targetRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
       sourceRooms,
       state.storyFlags,
-      state.timeOfDay?.phase
+      undefined
     );
     targetNPCsPlain = npcs;
     console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n) => n.id).join(', ') || 'none');

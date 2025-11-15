@@ -56,10 +56,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Maro & Kira's Cottage",
     description: 'Home of Maro the storekeeper and his daughter Kira.',
-    conditionalNpcs: {
-      "npc-maro-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-kira-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [maro, kira],

@@ -56,10 +56,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Haro & Len's Cottage",
     description: 'Home of Haro and Len, the fisher brothers.',
-    conditionalNpcs: {
-      "npc-haro-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-len-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [haro, len],

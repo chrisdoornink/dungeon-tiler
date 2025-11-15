@@ -42,13 +42,5 @@ export function buildLibrary(): StoryRoom {
   
   room.npcs = [eldra];
   
-  // Only show Eldra during the day (she goes home at night)
-  room.metadata = {
-    ...room.metadata,
-    conditionalNpcs: {
-      "npc-eldra": { removeWhen: [{ timeOfDay: "night" }] },
-    },
-  };
-  
   return room;
 }

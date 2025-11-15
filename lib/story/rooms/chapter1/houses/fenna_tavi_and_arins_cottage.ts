@@ -67,11 +67,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Fenna, Tavi & Arin's Cottage",
     description: 'A lively home shared by Fenna, Arin, and young Tavi.',
-    conditionalNpcs: {
-      "npc-fenna-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-arin-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-tavi-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [fenna, arin, tavi],

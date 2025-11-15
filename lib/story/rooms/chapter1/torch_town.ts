@@ -588,28 +588,10 @@ export function buildTorchTown(): StoryRoom {
         guardTowerSize: [guardTowerWidth, guardTowerHeight],
         homeSize: [homeWidth, homeHeight],
       },
-      // Hide NPCs from Torch Town when they go to their houses/buildings at night
+      // Remove night-specific NPCs since day/night cycle is removed
       conditionalNpcs: {
-        "npc-maro": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-kira": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-jorin": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-yanna": { removeWhen: [{ timeOfDay: "night" }] },
-        // Serin stays at clinic always, so not removed
-        "npc-rhett": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-mira": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-dara": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-fenna": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-tavi": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-arin": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-haro": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-len": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-captain-bren": { removeWhen: [{ timeOfDay: "night" }] },
-        // Sela and Thane switch between day/night patrol positions
-        "npc-sela-day": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-sela-night": { showWhen: [{ timeOfDay: "night" }] },
-        "npc-thane-day": { removeWhen: [{ timeOfDay: "night" }] },
-        "npc-thane-night": { showWhen: [{ timeOfDay: "night" }] },
-        // Lio stays out at night (wandering)
+        "npc-sela-night": { removeWhen: [{ always: true }] },
+        "npc-thane-night": { removeWhen: [{ always: true }] },
       },
     },
   };

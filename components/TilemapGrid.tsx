@@ -10,14 +10,10 @@ import {
   performUseFood,
   performUsePotion,
   reviveFromLastCheckpoint,
-  type TimeOfDayState,
-  createInitialTimeOfDay,
-  DAY_PHASE_CONFIG,
   serializeEnemies,
   serializeNPCs,
   type RoomSnapshot,
 } from "../lib/map";
-import { advanceTimeOfDay } from "../lib/time_of_day";
 import { removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
@@ -69,7 +65,6 @@ import { performExchange } from "../lib/story/exchange_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
-import DayNightMeter from "./DayNightMeter";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -133,9 +128,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Initialize game state
   const [gameState, setGameState] = useState<GameState>(() => {
     if (initialGameState) {
-      return initialGameState.timeOfDay
-        ? initialGameState
-        : { ...initialGameState, timeOfDay: createInitialTimeOfDay() };
+      return initialGameState;
     } else if (tilemap) {
       // Create a new game state with the provided tilemap and subtypes
       const dynH = tilemap.length;
@@ -170,7 +163,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           steps: 0,
           byKind: createEmptyByKind(),
         },
-        timeOfDay: createInitialTimeOfDay(),
       };
     } else {
       throw new Error("Either initialGameState or tilemap must be provided");
@@ -1516,18 +1508,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environment: EnvironmentId =
     (gameState.mapData.environment as EnvironmentId | undefined) ??
     DEFAULT_ENVIRONMENT;
-  const timeOfDayState: TimeOfDayState =
-    gameState.timeOfDay ?? createInitialTimeOfDay();
   const environmentConfig = getEnvironmentConfig(environment);
   const environmentDaylight = environmentConfig.daylight;
-  // Visually treat dawn/dusk as day for outdoor visibility
-  const visualPhaseId =
-    timeOfDayState.phase === "dawn" || timeOfDayState.phase === "dusk"
-      ? "day"
-      : timeOfDayState.phase;
-  const visualPhaseAllowsFull = DAY_PHASE_CONFIG[visualPhaseId]?.allowsFullVisibility ?? false;
-  const autoPhaseVisibility =
-    environment === "outdoor" ? visualPhaseAllowsFull : environmentDaylight;
+  const autoPhaseVisibility = environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
   const suppressDarknessOverlay =
     autoPhaseVisibility || (forceDaylight && heroTorchLitState);
@@ -3197,7 +3180,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     suppressDarknessOverlay,
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
-                    timeOfDayState,
                     activeCheckpoint,
                     heroDeathStateForTiles
                   )}
@@ -3205,20 +3187,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               </div>
             </div>
           </div>
-          {!isDailyChallenge && (
-            <div
-              className="absolute bottom-4 left-4 pointer-events-none"
-              style={{ zIndex: 12000 }}
-            >
-              <DayNightMeter
-                timeOfDay={timeOfDayState}
-                className="pointer-events-auto"
-                variant={gameState.mode === 'story' ? 'story' : 'rich'}
-                sunIconUrl={gameState.mode === 'story' ? '/images/presentational/sun.png' : undefined}
-                moonIconUrl={gameState.mode === 'story' ? '/images/presentational/moon.png' : undefined}
-              />
-            </div>
-          )}
         </div>
         {/* Close centering wrapper */}
         </div>
@@ -3309,69 +3277,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       {activeBedInteraction && (
         <BedInteractionModal
           isOccupied={activeBedInteraction.isOccupied}
-          currentTimeOfDay={gameState.timeOfDay?.phase === 'night' ? 'night' : 'day'}
-          onSleepUntilNight={() => {
-            // Calculate steps needed to reach night
+          onSleep={() => {
+            // Restore health to full
             setGameState((prev) => {
-              const currentTime = prev.timeOfDay ?? createInitialTimeOfDay();
-              let stepsToAdvance = 0;
-              
-              // If currently in day or dusk, advance to night
-              if (currentTime.phase === 'day') {
-                // Skip rest of day + dusk to get to night
-                const dayRemaining = DAY_PHASE_CONFIG.day.duration - currentTime.stepInPhase;
-                const duskDuration = DAY_PHASE_CONFIG.dusk.duration;
-                stepsToAdvance = dayRemaining + duskDuration;
-              } else if (currentTime.phase === 'dusk') {
-                // Skip rest of dusk to get to night
-                stepsToAdvance = DAY_PHASE_CONFIG.dusk.duration - currentTime.stepInPhase;
-              } else if (currentTime.phase === 'dawn') {
-                // Skip rest of dawn + day + dusk to get to next night
-                const dawnRemaining = DAY_PHASE_CONFIG.dawn.duration - currentTime.stepInPhase;
-                const dayDuration = DAY_PHASE_CONFIG.day.duration;
-                const duskDuration = DAY_PHASE_CONFIG.dusk.duration;
-                stepsToAdvance = dawnRemaining + dayDuration + duskDuration;
-              }
-              // If already night, don't advance
-              
-              const newTimeOfDay = advanceTimeOfDay(currentTime, stepsToAdvance);
               const next = {
                 ...prev,
-                timeOfDay: newTimeOfDay,
-              };
-              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
-              return next;
-            });
-            setActiveBedInteraction(null);
-          }}
-          onSleepUntilMorning={() => {
-            // Calculate steps needed to reach morning (day)
-            setGameState((prev) => {
-              const currentTime = prev.timeOfDay ?? createInitialTimeOfDay();
-              let stepsToAdvance = 0;
-              
-              // If currently in night or dawn, advance to day
-              if (currentTime.phase === 'night') {
-                // Skip rest of night + dawn to get to day
-                const nightRemaining = DAY_PHASE_CONFIG.night.duration - currentTime.stepInPhase;
-                const dawnDuration = DAY_PHASE_CONFIG.dawn.duration;
-                stepsToAdvance = nightRemaining + dawnDuration;
-              } else if (currentTime.phase === 'dawn') {
-                // Skip rest of dawn to get to day
-                stepsToAdvance = DAY_PHASE_CONFIG.dawn.duration - currentTime.stepInPhase;
-              } else if (currentTime.phase === 'dusk') {
-                // Skip rest of dusk + night + dawn to get to next day
-                const duskRemaining = DAY_PHASE_CONFIG.dusk.duration - currentTime.stepInPhase;
-                const nightDuration = DAY_PHASE_CONFIG.night.duration;
-                const dawnDuration = DAY_PHASE_CONFIG.dawn.duration;
-                stepsToAdvance = duskRemaining + nightDuration + dawnDuration;
-              }
-              // If already day, don't advance
-              
-              const newTimeOfDay = advanceTimeOfDay(currentTime, stepsToAdvance);
-              const next = {
-                ...prev,
-                timeOfDay: newTimeOfDay,
+                heroHealth: 6, // Full health
               };
               CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
               return next;
@@ -3487,13 +3398,10 @@ function renderTileGrid(
   suppressDarknessOverlay: boolean = false,
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
-  timeOfDay?: TimeOfDayState,
   activeCheckpoint?: [number, number] | null,
   heroDeathState?: HeroDeathState
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
-  const resolvedTimeOfDay = timeOfDay ?? createInitialTimeOfDay();
-  const timeOfDayVisual = DAY_PHASE_CONFIG[resolvedTimeOfDay.phase];
   // Find player position in the grid
   let playerPosition: [number, number] | null = null;
 
@@ -3767,24 +3675,6 @@ function renderTileGrid(
         />
       );
     }
-  }
-
-  if (timeOfDayVisual?.overlay) {
-    const overlayStyle: React.CSSProperties = {
-      background: timeOfDayVisual.overlay.color,
-      opacity: timeOfDayVisual.overlay.opacity,
-      zIndex: 8800,
-    };
-    if (timeOfDayVisual.overlay.blendMode) {
-      overlayStyle.mixBlendMode = timeOfDayVisual.overlay.blendMode;
-    }
-    tiles.push(
-      <div
-        key="time-of-day-overlay"
-        className="pointer-events-none absolute inset-0"
-        style={overlayStyle}
-      />
-    );
   }
 
   return tiles;

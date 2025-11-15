@@ -3,17 +3,13 @@ import styles from './BedInteractionModal.module.css';
 
 interface BedInteractionModalProps {
   isOccupied: boolean;
-  currentTimeOfDay: 'day' | 'night';
-  onSleepUntilNight: () => void;
-  onSleepUntilMorning: () => void;
+  onSleep: () => void;
   onCancel: () => void;
 }
 
 export const BedInteractionModal: React.FC<BedInteractionModalProps> = ({
   isOccupied,
-  currentTimeOfDay,
-  onSleepUntilNight,
-  onSleepUntilMorning,
+  onSleep,
   onCancel,
 }) => {
   if (isOccupied) {
@@ -36,23 +32,13 @@ export const BedInteractionModal: React.FC<BedInteractionModalProps> = ({
     <div className={styles.overlay} onClick={onCancel}>
       <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 className={styles.title}>Rest</h2>
-        <p className={styles.message}>What would you like to do?</p>
+        <p className={styles.message}>Sleep to restore your health to full.</p>
         <div className={styles.buttonContainer}>
           <button
             className={styles.button}
-            onClick={onSleepUntilMorning}
-            disabled={currentTimeOfDay === 'day'}
+            onClick={onSleep}
           >
-            Sleep until Morning
-            {currentTimeOfDay === 'day' && <span className={styles.disabled}> (Already morning)</span>}
-          </button>
-          <button
-            className={styles.button}
-            onClick={onSleepUntilNight}
-            disabled={currentTimeOfDay === 'night'}
-          >
-            Sleep until Night
-            {currentTimeOfDay === 'night' && <span className={styles.disabled}> (Already night)</span>}
+            Sleep
           </button>
           <button className={`${styles.button} ${styles.cancelButton}`} onClick={onCancel}>
             Cancel

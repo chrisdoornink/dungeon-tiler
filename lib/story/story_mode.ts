@@ -10,7 +10,6 @@ import {
   isWithinBounds,
   FLOOR,
 } from "../map";
-import { createTimeOfDayAtPhase } from "../time_of_day";
 import { Enemy, EnemyState, rehydrateEnemies, type PlainEnemy } from "../enemy";
 import { rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
@@ -838,7 +837,6 @@ export interface StoryResetConfig {
   runeCount: number;
   foodCount: number;
   potionCount: number;
-  timeOfDay?: "day" | "dusk" | "night" | "dawn";
   storyFlags?: Record<string, boolean>;
 }
 
@@ -902,11 +900,6 @@ function applyStoryResetConfig(
   state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
   state.potionCount = clamp(Math.floor(config.potionCount), 0, 99);
 
-  // Set time of day if specified
-  if (config.timeOfDay) {
-    state.timeOfDay = createTimeOfDayAtPhase(config.timeOfDay);
-  }
-
   state.stats = {
     ...state.stats,
     steps: 0,
@@ -934,7 +927,7 @@ function applyStoryResetConfig(
         currentRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
         state.rooms,
         state.storyFlags,
-        state.timeOfDay?.phase ?? config.timeOfDay ?? "day"
+        undefined
       );
       state.npcs = rehydrateNPCs(npcs);
     }
@@ -966,7 +959,7 @@ export function updateConditionalNpcs(state: GameState): void {
     currentRoom.metadata?.conditionalNpcs as Record<string, { showWhen?: StoryCondition[]; removeWhen?: StoryCondition[] }> | undefined,
     state.rooms,
     state.storyFlags,
-    state.timeOfDay?.phase
+    undefined
   );
   
   // Update the active NPCs immediately

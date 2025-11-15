@@ -82,14 +82,6 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
       }));
     };
 
-  const updateTimeOfDay = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value as "day" | "dusk" | "night" | "dawn";
-    setConfig((prev) => ({
-      ...prev,
-      timeOfDay: value,
-    }));
-  };
-
   const updateStoryFlag = (flagId: string) =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const checked = event.target.checked;
@@ -184,22 +176,6 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
                 className="h-4 w-4"
               />
             </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
-              Time of Day
-            </label>
-            <select
-              value={config.timeOfDay ?? "day"}
-              onChange={updateTimeOfDay}
-              className="w-full rounded border border-white/30 bg-black/60 px-3 py-2 text-sm focus:border-emerald-400 focus:outline-none"
-            >
-              <option value="day">Day</option>
-              <option value="dusk">Dusk</option>
-              <option value="night">Night</option>
-              <option value="dawn">Dawn</option>
-            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

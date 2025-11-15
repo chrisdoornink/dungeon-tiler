@@ -56,10 +56,6 @@ const ROOM_CONFIG: RoomConfig = {
   metadata: {
     displayLabel: "Rhett & Mira's Cottage",
     description: 'Home of Rhett the farmer and Mira the weaver.',
-    conditionalNpcs: {
-      "npc-rhett-night": { showWhen: [{ timeOfDay: "night" }] },
-      "npc-mira-night": { showWhen: [{ timeOfDay: "night" }] },
-    },
   },
   environment: 'house',
   npcs: [rhett, mira],
