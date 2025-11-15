@@ -546,8 +546,14 @@ export function buildTorchTown(): StoryRoom {
     y: 13,
     x: 13,
     facing: Direction.LEFT,
-    canMove: false,
-    metadata: { dayLocation: "plaza", nightLocation: "house7", house: HOUSE_LABELS.HOUSE_7 },
+    canMove: true,
+    metadata: { 
+      behavior: "wander",
+      wanderBounds: { minY: 5, maxY: 13, minX: 5, maxX: 13 },
+      dayLocation: "plaza", 
+      nightLocation: "house7", 
+      house: HOUSE_LABELS.HOUSE_7 
+    },
   }));
 
   // 19. Golden Dog - Day: Near Tavi in plaza, Night: Near Tavi in plaza

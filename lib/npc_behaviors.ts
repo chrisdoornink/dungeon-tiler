@@ -303,3 +303,76 @@ export function getRandomDogBackSprite(rng?: () => number): string {
   const index = Math.floor(random() * 2) + 1;
   return `/images/dog-golden/dog-back-${index}.png`;
 }
+
+/**
+ * Wander behavior: NPC randomly moves within specified bounds
+ * 50% chance to move each turn, picks a random adjacent direction
+ */
+export function updateWanderBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
+  const { npc, grid, player, npcs, enemies, rng } = ctx;
+  const random = rng ?? Math.random;
+  
+  // Get wander bounds from metadata
+  const bounds = npc.metadata?.wanderBounds as { minY: number; maxY: number; minX: number; maxX: number } | undefined;
+  if (!bounds) {
+    return { moved: false };
+  }
+  
+  // 50% chance to move
+  const shouldMove = random() < 0.5;
+  if (!shouldMove) {
+    return { moved: false };
+  }
+  
+  // Pick a random direction: up, down, left, right
+  const directions: Array<[number, number]> = [
+    [-1, 0], // up
+    [1, 0],  // down
+    [0, -1], // left
+    [0, 1],  // right
+  ];
+  
+  // Shuffle directions
+  for (let i = directions.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1));
+    [directions[i], directions[j]] = [directions[j], directions[i]];
+  }
+  
+  // Try each direction
+  for (const [moveY, moveX] of directions) {
+    const targetY = npc.y + moveY;
+    const targetX = npc.x + moveX;
+    
+    // Check if target is within bounds
+    if (targetY < bounds.minY || targetY > bounds.maxY || 
+        targetX < bounds.minX || targetX > bounds.maxX) {
+      continue;
+    }
+    
+    // Check if target is valid floor
+    if (!isValidPosition(grid, targetY, targetX)) continue;
+    
+    // Check if target is occupied by player
+    if (targetY === player.y && targetX === player.x) continue;
+    
+    // Check if target is occupied by another NPC
+    const npcBlocking = npcs.some(
+      (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
+    );
+    if (npcBlocking) continue;
+    
+    // Check if target is occupied by an enemy
+    const enemyBlocking = enemies?.some(
+      (e) => e.y === targetY && e.x === targetX
+    );
+    if (enemyBlocking) continue;
+    
+    // Move is valid
+    npc.y = targetY;
+    npc.x = targetX;
+    
+    return { moved: true };
+  }
+  
+  return { moved: false };
+}

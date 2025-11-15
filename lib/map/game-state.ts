@@ -22,7 +22,7 @@ import {
 import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-handler";
 import { updateConditionalNpcs } from "../story/story_mode";
 import { determineRoomNpcs } from "../story/npc_conditions";
-import { updateDogBehavior } from "../npc_behaviors";
+import { updateDogBehavior, updateWanderBehavior } from "../npc_behaviors";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -72,6 +72,7 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
   for (const npc of state.npcs) {
     // Check if this NPC has a special behavior
     const behavior = npc.metadata?.behavior as string | undefined;
+    if (!behavior) continue;
     
     if (behavior === "dog") {
       // Update dog behavior
@@ -86,6 +87,19 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
       };
       
       updateDogBehavior(ctx);
+    } else if (behavior === "wander") {
+      // Update wander behavior
+      const ctx = {
+        npc,
+        grid: state.mapData.tiles,
+        subtypes: state.mapData.subtypes,
+        player: { y: py, x: px },
+        npcs: state.npcs,
+        enemies: state.enemies,
+        rng: state.combatRng,
+      };
+      
+      updateWanderBehavior(ctx);
     }
   }
 }
