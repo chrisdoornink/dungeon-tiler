@@ -25,24 +25,13 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
-// Jorin in bed 'c' at [2, 1], Yanna in bed 'e' at [2, 4]
+// Jorin is at home (not in town), Yanna is at forest edge
 const jorin = new NPC({
-  id: "npc-jorin-night",
+  id: "npc-jorin",
   name: "Jorin",
   sprite: "/images/npcs/torch-town/jorin.png",
-  y: 2,
-  x: 1,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
-});
-
-const yanna = new NPC({
-  id: "npc-yanna-night",
-  name: "Yanna",
-  sprite: "/images/npcs/torch-town/yanna.png",
-  y: 2,
-  x: 4,
+  y: 3,
+  x: 2,
   facing: Direction.DOWN,
   canMove: false,
   metadata: { nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
@@ -58,7 +47,7 @@ const ROOM_CONFIG: RoomConfig = {
     description: 'Home of Jorin the blacksmith and Yanna the herbalist.',
   },
   environment: 'house',
-  npcs: [jorin, yanna],
+  npcs: [jorin],
 };
 
 export function buildJorinAndYannasCottage(): StoryRoom {

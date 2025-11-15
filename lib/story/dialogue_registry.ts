@@ -653,6 +653,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "kira-default": {
     id: "kira-default",
     lines: [
+      { speaker: "Kira", text: "Hello! I'm Kira, my uncle Maro is the storekeeper. He's got a lot of supplies if you need anything." },
       { speaker: "Kira", text: "There's so much more beyond these walls... don't you ever wonder what's out there?" },
     ],
   },

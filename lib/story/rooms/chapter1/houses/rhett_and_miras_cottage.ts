@@ -25,28 +25,7 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
-// Rhett in bed 'b' at [2, 1], Mira in bed 'c' at [2, 4]
-const rhett = new NPC({
-  id: "npc-rhett-night",
-  name: "Rhett",
-  sprite: "/images/npcs/torch-town/rhett.png",
-  y: 2,
-  x: 1,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
-});
-
-const mira = new NPC({
-  id: "npc-mira-night",
-  name: "Mira",
-  sprite: "/images/npcs/torch-town/mira.png",
-  y: 2,
-  x: 4,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house5", house: HOUSE_LABELS.HOUSE_5 },
-});
+// Rhett is in the fields, Mira is weaving near their house - neither are inside
 
 const ROOM_CONFIG: RoomConfig = {
   id: 'story-torch-town-home-4',
@@ -58,7 +37,7 @@ const ROOM_CONFIG: RoomConfig = {
     description: 'Home of Rhett the farmer and Mira the weaver.',
   },
   environment: 'house',
-  npcs: [rhett, mira],
+  npcs: [],
 };
 
 export function buildRhettAndMirasCottage(): StoryRoom {

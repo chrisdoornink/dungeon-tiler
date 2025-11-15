@@ -25,28 +25,7 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
-// Maro in bed 'a' at [2, 1], Kira in bed 'b' at [2, 4]
-const maro = new NPC({
-  id: "npc-maro-night",
-  name: "Maro",
-  sprite: "/images/npcs/torch-town/maro.png",
-  y: 2,
-  x: 1,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house2", house: HOUSE_LABELS.HOUSE_2 },
-});
-
-const kira = new NPC({
-  id: "npc-kira-night",
-  name: "Kira",
-  sprite: "/images/npcs/torch-town/kira.png",
-  y: 2,
-  x: 4,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house2", house: HOUSE_LABELS.HOUSE_2 },
-});
+// Maro is at the store, Kira is in the plaza - neither are home
 
 const ROOM_CONFIG: RoomConfig = {
   id: 'story-torch-town-home-1',
@@ -58,7 +37,7 @@ const ROOM_CONFIG: RoomConfig = {
     description: 'Home of Maro the storekeeper and his daughter Kira.',
   },
   environment: 'house',
-  npcs: [maro, kira],
+  npcs: [],
 };
 
 export function buildMaroAndKirasCottage(): StoryRoom {

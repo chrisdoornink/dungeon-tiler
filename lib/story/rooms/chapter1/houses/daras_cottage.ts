@@ -25,17 +25,7 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
-// Dara in bed 'c' at [2, 1]
-const dara = new NPC({
-  id: "npc-dara-night",
-  name: "Dara",
-  sprite: "/images/npcs/torch-town/dara.png",
-  y: 2,
-  x: 1,
-  facing: Direction.DOWN,
-  canMove: false,
-  metadata: { nightLocation: "house8", house: HOUSE_LABELS.HOUSE_8 },
-});
+// Dara is at the town outskirts - not at home
 
 const ROOM_CONFIG: RoomConfig = {
   id: 'story-torch-town-home-7',
@@ -47,7 +37,7 @@ const ROOM_CONFIG: RoomConfig = {
     description: 'A quiet cottage on the outskirts, home to Dara.',
   },
   environment: 'house',
-  npcs: [dara],
+  npcs: [],
 };
 
 export function buildDarasCottage(): StoryRoom {
