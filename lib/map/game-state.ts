@@ -1314,6 +1314,11 @@ export function movePlayer(
       return newGameState;
     }
 
+    // Check if tile has a town sign - blocks movement (solid object)
+    if (subtype.includes(TileSubtype.TOWN_SIGN)) {
+      return newGameState;
+    }
+
     // Check if tile has a bookshelf - blocks movement but triggers interaction
     if (subtype.includes(TileSubtype.BOOKSHELF)) {
       // Queue bookshelf interaction
