@@ -254,7 +254,12 @@ function isSafeFloorForEnemy(
   if (!subtypes) return true;
   const tileSubs = subtypes[y]?.[x] || [];
   const isFaulty = tileSubs.includes(18);
-  return !isFaulty;
+  // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
+  const hasBlockingSubtype = tileSubs.includes(16) || // WALL_TORCH (used for floor torches too)
+                              tileSubs.includes(37) || // TOWN_SIGN
+                              tileSubs.includes(22) || // CHECKPOINT
+                              tileSubs.includes(36);   // BOOKSHELF
+  return !isFaulty && !hasBlockingSubtype;
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {

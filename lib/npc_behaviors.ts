@@ -1,5 +1,5 @@
 import { NPC } from "./npc";
-import { FLOOR } from "./map/constants";
+import { FLOOR, TileSubtype } from "./map/constants";
 
 /**
  * Restricted tiles where dogs cannot move (entrance/exit areas)
@@ -95,6 +95,18 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
       
       // Check if target is restricted for dogs
       if (isDogRestrictedTile(targetY, targetX)) continue;
+      
+      // Check if target has blocking subtypes (torches, town signs, etc.)
+      const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
+      if (targetSubtypes) {
+        const hasBlockingSubtype = targetSubtypes.some(subtype => 
+          subtype === TileSubtype.WALL_TORCH ||
+          subtype === TileSubtype.TOWN_SIGN ||
+          subtype === TileSubtype.CHECKPOINT ||
+          subtype === TileSubtype.BOOKSHELF
+        );
+        if (hasBlockingSubtype) continue;
+      }
       
       // Check if target is occupied by player
       if (targetY === player.y && targetX === player.x) continue;
@@ -351,6 +363,18 @@ export function updateWanderBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult
     
     // Check if target is valid floor
     if (!isValidPosition(grid, targetY, targetX)) continue;
+    
+    // Check if target has blocking subtypes (torches, town signs, etc.)
+    const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
+    if (targetSubtypes) {
+      const hasBlockingSubtype = targetSubtypes.some(subtype => 
+        subtype === TileSubtype.WALL_TORCH ||
+        subtype === TileSubtype.TOWN_SIGN ||
+        subtype === TileSubtype.CHECKPOINT ||
+        subtype === TileSubtype.BOOKSHELF
+      );
+      if (hasBlockingSubtype) continue;
+    }
     
     // Check if target is occupied by player
     if (targetY === player.y && targetX === player.x) continue;

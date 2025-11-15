@@ -1319,6 +1319,11 @@ export function movePlayer(
       return newGameState;
     }
 
+    // Check if tile has a torch on floor - blocks movement (solid object)
+    if (subtype.includes(TileSubtype.WALL_TORCH)) {
+      return newGameState;
+    }
+
     // Check if tile has a bookshelf - blocks movement but triggers interaction
     if (subtype.includes(TileSubtype.BOOKSHELF)) {
       // Queue bookshelf interaction
