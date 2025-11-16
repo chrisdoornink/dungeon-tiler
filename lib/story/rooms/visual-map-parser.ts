@@ -37,12 +37,27 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
 
     // Ensure we process exactly WIDTH columns (pad with floor if needed)
     for (let x = 0; x < width; x++) {
-      // Get character, skipping spaces (used for visual formatting only)
+      // Get character or multi-char sequence, skipping spaces (used for visual formatting only)
       let char = '.';
       let sourceIndex = 0;
       let tilesProcessed = 0;
       while (sourceIndex < row.length && tilesProcessed <= x) {
         const c = row[sourceIndex];
+        
+        // Check for multi-character transition ID in brackets [10], [11], etc.
+        if (c === '[') {
+          const closeBracket = row.indexOf(']', sourceIndex);
+          if (closeBracket !== -1) {
+            if (tilesProcessed === x) {
+              char = row.substring(sourceIndex + 1, closeBracket); // Extract ID without brackets
+              break;
+            }
+            tilesProcessed++;
+            sourceIndex = closeBracket + 1;
+            continue;
+          }
+        }
+        
         if (c !== ' ') {
           if (tilesProcessed === x) {
             char = c;
@@ -197,7 +212,18 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
           transitions.get(char)!.push([y, x]);
           break;
         default:
-          tileType = 0; // default to floor for unknown chars
+          // Check if it's a multi-character transition ID (from brackets)
+          if (char.length > 1 || (char.length === 1 && /[0-9]/.test(char))) {
+            // Multi-char IDs or numeric IDs are transitions
+            tileType = 0; // floor with room transition
+            cellSubtypes.push(TileSubtype.ROOM_TRANSITION);
+            if (!transitions.has(char)) {
+              transitions.set(char, []);
+            }
+            transitions.get(char)!.push([y, x]);
+          } else {
+            tileType = 0; // default to floor for unknown chars
+          }
       }
 
       tileRow.push(tileType);

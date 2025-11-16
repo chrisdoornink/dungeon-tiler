@@ -4,9 +4,12 @@ import type { NPC } from "../../npc";
 import { TileSubtype } from "../../map";
 
 export type StoryRoomLink = {
+  id: string; // Unique ID for this transition
   roomId: RoomId;
   position: [number, number];
-  targetEntryPoint?: [number, number];
+  targetTransitionId: string; // ID of the partner transition in destination room
+  offsetX?: number; // Optional X offset from partner transition position
+  offsetY?: number; // Optional Y offset from partner transition position
 };
 
 export interface StoryRoom {

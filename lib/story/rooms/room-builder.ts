@@ -17,7 +17,9 @@ type EnemyKind = "goblin" | "snake" | "ghost" | "stone-exciter";
 
 export interface TransitionDefinition {
   roomId: RoomId;
-  target: [number, number];
+  targetTransitionId: string; // ID of the partner transition in the destination room
+  offsetX?: number; // Optional X offset from partner transition position (default: 0)
+  offsetY?: number; // Optional Y offset from partner transition position (default: 0)
 }
 
 export interface RandomItemPlacement {
@@ -109,9 +111,12 @@ export function buildRoom(config: RoomConfig): StoryRoom {
 
   // Build otherTransitions array from transition definitions and parsed positions
   const otherTransitions: Array<{
+    id: string;
     roomId: RoomId;
     position: [number, number];
-    targetEntryPoint: [number, number];
+    targetTransitionId: string;
+    offsetX?: number;
+    offsetY?: number;
   }> = [];
 
   parsedMap.transitions.forEach((positions, transitionId) => {
@@ -119,9 +124,12 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     if (transitionDef) {
       positions.forEach(([y, x]) => {
         otherTransitions.push({
+          id: transitionId, // Use the visual map character as the ID
           roomId: transitionDef.roomId,
           position: [y, x],
-          targetEntryPoint: transitionDef.target as [number, number],
+          targetTransitionId: transitionDef.targetTransitionId,
+          offsetX: transitionDef.offsetX,
+          offsetY: transitionDef.offsetY,
         });
       });
     }

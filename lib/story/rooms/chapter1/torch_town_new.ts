@@ -67,8 +67,8 @@ const VISUAL_MAP = [
 ];
 
 const TRANSITIONS = {
-  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [1, 17] as [number, number] },
-  '1': { roomId: 'story-outdoor-clearing' as RoomId, target: [1, 17] as [number, number] },  
+  '0': { roomId: 'story-the-wilds-entrance' as RoomId, targetTransitionId: '0' },
+  '1': { roomId: 'story-outdoor-clearing' as RoomId, targetTransitionId: 'outdoor-torch', offsetY: 1 },  
 };
 
 export function buildTorchTownNew(): StoryRoom {

@@ -206,15 +206,19 @@ export function buildOutdoorClearing(): StoryRoom {
     transitionToNext: [doorY, doorX],
     otherTransitions: [
       {
+        id: 'outdoor-torch', // Unique ID for this transition
         roomId: "story-torch-town" as RoomId,
-        position: torchTownTransition,
-        targetEntryPoint: [25, 17],
+        position: torchTownTransition, // [0, 12]
+        targetTransitionId: '1', // References Torch Town's '1' transition
+        offsetY: -1, // Spawn 1 tile below the transition to avoid immediate re-trigger
       },
       // Opening on the left wall near the top leading to the bluff passageway
       {
+        id: 'outdoor-bluff', // Unique ID for this transition
         roomId: "story-bluff-passage" as RoomId,
         position: [3, 0],
-        targetEntryPoint: [4, 1],
+        targetTransitionId: 'bluff-entrance', // References Bluff's entrance transition
+        offsetX: 1, // Spawn 1 tile to the right of the transition
       },
     ],
     npcs,

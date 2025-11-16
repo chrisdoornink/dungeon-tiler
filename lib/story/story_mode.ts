@@ -203,52 +203,9 @@ export function buildStoryModeState(): GameState {
     outdoor.entryFromNext ?? outdoor.entryPoint
   );
 
-  if (outdoor.otherTransitions) {
-    for (const link of outdoor.otherTransitions) {
-      if (link.roomId !== torchTown.id) continue;
-      pushTransition(
-        outdoor.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint ?? torchTown.entryFromNext ?? torchTown.entryPoint
-      );
-      // Note: Reverse transition (torchTown -> outdoor) should be defined in torchTown's otherTransitions
-      // This old-system fallback is kept for backward compatibility with torch_town.ts
-      if (torchTown.transitionToPrevious) {
-        pushTransition(
-          torchTown.id,
-          outdoor.id,
-          torchTown.transitionToPrevious,
-          link.targetEntryPoint ?? outdoor.entryPoint
-        );
-      }
-    }
-  }
+  // Note: Torch Town transitions are now auto-registered below via otherTransitions
 
-  if (entrance.otherTransitions) {
-    for (const link of entrance.otherTransitions) {
-      pushTransition(
-        entrance.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint ??
-          (link.roomId === depthsRoom1.id
-            ? depthsRoom1.entryPoint
-            : undefined)
-      );
-    }
-  }
-
-  if (depthsRoom1.otherTransitions) {
-    for (const link of depthsRoom1.otherTransitions) {
-      pushTransition(
-        depthsRoom1.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint ?? entrance.entryPoint
-      );
-    }
-  }
+  // Note: otherTransitions are now auto-registered below for all rooms
 
   if (depthsRoom1.transitionToNext) {
     pushTransition(
@@ -259,16 +216,7 @@ export function buildStoryModeState(): GameState {
     );
   }
 
-  if (depthsRoom2.otherTransitions) {
-    for (const link of depthsRoom2.otherTransitions) {
-      pushTransition(
-        depthsRoom2.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint ?? depthsRoom1.returnEntryPoint ?? depthsRoom1.entryPoint
-      );
-    }
-  }
+  // Note: otherTransitions are now auto-registered below for all rooms
 
   // Outdoor -> Bluff Passageway transitions
   pushTransition(
@@ -573,53 +521,7 @@ export function buildStoryModeState(): GameState {
     );
   }
 
-  // Process otherTransitions for Wilds Entrance (to South, North, East)
-  if (wildsEntrance.otherTransitions) {
-    for (const link of wildsEntrance.otherTransitions) {
-      pushTransition(
-        wildsEntrance.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint
-      );
-    }
-  }
-
-  // Process otherTransitions for Wilds South (back to Entrance)
-  if (wildsSouth.otherTransitions) {
-    for (const link of wildsSouth.otherTransitions) {
-      pushTransition(
-        wildsSouth.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint
-      );
-    }
-  }
-
-  // Process otherTransitions for Wilds North (back to Entrance)
-  if (wildsNorth.otherTransitions) {
-    for (const link of wildsNorth.otherTransitions) {
-      pushTransition(
-        wildsNorth.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint
-      );
-    }
-  }
-
-  // Process otherTransitions for Wilds East (back to Entrance)
-  if (wildsEast.otherTransitions) {
-    for (const link of wildsEast.otherTransitions) {
-      pushTransition(
-        wildsEast.id,
-        link.roomId,
-        link.position,
-        link.targetEntryPoint
-      );
-    }
-  }
+  // Note: All otherTransitions are now auto-registered below for all rooms
 
   const storyRooms: StoryRoom[] = [
     entrance,
@@ -640,6 +542,44 @@ export function buildStoryModeState(): GameState {
     depthsRoom2,
     ...extraRooms,
   ];
+
+  // Auto-register all otherTransitions from all rooms
+  for (const room of storyRooms) {
+    if (room.otherTransitions) {
+      for (const link of room.otherTransitions) {
+        // Find the destination room and the partner transition
+        const destRoom = storyRooms.find(r => r.id === link.roomId);
+        if (!destRoom) {
+          console.warn(`[TRANSITION] Room ${link.roomId} not found for transition from ${room.id}`);
+          continue;
+        }
+        
+        // Find the partner transition in the destination room by its ID
+        const partnerTransition = destRoom.otherTransitions?.find(
+          t => t.id === link.targetTransitionId
+        );
+        
+        if (!partnerTransition) {
+          console.warn(`[TRANSITION] Partner transition '${link.targetTransitionId}' not found in ${link.roomId} for transition from ${room.id}`);
+          continue;
+        }
+        
+        // Use the partner transition's position as the spawn point, with optional offset
+        const offsetX = link.offsetX ?? 0;
+        const offsetY = link.offsetY ?? 0;
+        const targetEntry: [number, number] = [
+          partnerTransition.position[0] + offsetY,
+          partnerTransition.position[1] + offsetX
+        ];
+        pushTransition(
+          room.id,
+          link.roomId,
+          link.position,
+          targetEntry
+        );
+      }
+    }
+  }
 
   const roomSnapshots: GameState["rooms"] = {};
   for (const room of storyRooms) {

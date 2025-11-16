@@ -16,7 +16,7 @@ const SIZE = 25;
  */
 const TRANSITIONS = {
   // Back to Wilds Entrance (bottom edge where '5' is located)
-  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [26, 18] as [number, number], returnPoint: [1, 20] as [number, number] },
+  '0': { roomId: 'story-the-wilds-entrance' as RoomId, targetTransitionId: '5', offsetY: -1 },
 };
 
 /**
