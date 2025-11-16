@@ -23,7 +23,7 @@ import {
   buildOutdoorClearing,
   buildOutdoorHouse,
   buildSanctum,
-  buildTorchTown,
+  buildTorchTownNew,
   buildTheWildsEntrance,
   buildTheWildsSouth,
   buildTheWildsNorth,
@@ -136,7 +136,7 @@ export function buildStoryModeState(): GameState {
   const sanctum = buildSanctum();
   const outdoor = buildOutdoorClearing();
   const outdoorHouse = buildOutdoorHouse();
-  const torchTown = buildTorchTown();
+  const torchTown = buildTorchTownNew();
   const bluffPassage = buildBluffPassageway();
   const bluffCaves = buildBluffCaves();
   const bluffSerpentDen = buildBluffSerpentDen();

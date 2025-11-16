@@ -25,16 +25,16 @@ const VISUAL_MAP = [
   "# # # 0 # # #"
 ];
 
-// Serin stays awake at clinic, positioned away from bed at [2, 3]
+// Serin is always in her clinic, positioned away from bed at [2, 3]
 const serin = new NPC({
-  id: "npc-serin-night",
+  id: "npc-serin",
   name: "Serin",
   sprite: "/images/npcs/torch-town/serin.png",
   y: 2,
   x: 3,
   facing: Direction.DOWN,
   canMove: false,
-  metadata: { nightLocation: "house4", house: HOUSE_LABELS.HOUSE_4 },
+  metadata: { dayLocation: "house4", nightLocation: "house4", house: HOUSE_LABELS.HOUSE_4 },
 });
 
 const ROOM_CONFIG: RoomConfig = {

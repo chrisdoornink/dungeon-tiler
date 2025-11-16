@@ -370,17 +370,7 @@ export function buildTorchTown(): StoryRoom {
     metadata: { dayLocation: "forestEdge", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
   }));
 
-  // 6. Serin (Healer) - Day: House 4 (clinic), Night: House 4
-  npcs.push(new NPC({
-    id: "npc-serin",
-    name: "Serin",
-    sprite: "/images/npcs/torch-town/serin.png",
-    y: houses[3].top + homeHeight,
-    x: houses[3].left + 1,
-    facing: Direction.DOWN,
-    canMove: false,
-    metadata: { dayLocation: "house4", nightLocation: "house4", house: HOUSE_LABELS.HOUSE_4 },
-  }));
+  // 6. Serin (Healer) - Always in her clinic (House 4), not in town
 
   // 7. Rhett (Farmer) - Day: Fields (near gate), Night: House 5
   npcs.push(new NPC({
@@ -572,6 +562,20 @@ export function buildTorchTown(): StoryRoom {
       nightLocation: "plaza" 
     },
   }));
+
+  // Add decorative flowers
+  tiles[22][23] = FLOWERS;
+  tiles[22][24] = FLOWERS;
+  tiles[22][25] = FLOWERS;
+
+  tiles[20][22] = FLOWERS;
+  tiles[21][22] = FLOWERS;
+  tiles[22][22] = FLOWERS;
+
+  tiles[20][23] = FLOWERS;
+  tiles[21][23] = FLOWERS;
+  tiles[22][23] = FLOWERS;
+
 
   return {
     id: "story-torch-town",

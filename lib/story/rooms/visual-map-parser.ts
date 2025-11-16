@@ -111,6 +111,14 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
         case 'R':
           tileType = 4; // roof tile
           break;
+        case '=':
+          tileType = 0; // floor with road marker (shape auto-detected later)
+          cellSubtypes.push(TileSubtype.ROAD);
+          break;
+        case 'C':
+          tileType = 0; // floor with checkpoint
+          cellSubtypes.push(TileSubtype.CHECKPOINT);
+          break;
         case 'd':
           tileType = 1; // wall tile with door subtype
           cellSubtypes.push(TileSubtype.DOOR);
@@ -147,6 +155,9 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
           tileType = 0; // floor with bed full variant 4
           cellSubtypes.push(TileSubtype.BED_FULL_4);
           break;
+        case 'F':
+          tileType = 5; // flowers tile
+          break;
         case '0':
         case '1':
         case '2':
@@ -159,10 +170,8 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
         case '9':
         case 'A':
         case 'B':
-        case 'C':
         case 'D':
         case 'E':
-        case 'F':
         case 'H':
         case 'I':
         case 'J':
