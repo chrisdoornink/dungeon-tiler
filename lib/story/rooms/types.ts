@@ -7,7 +7,6 @@ export type StoryRoomLink = {
   roomId: RoomId;
   position: [number, number];
   targetEntryPoint?: [number, number];
-  returnEntryPoint?: [number, number];
 };
 
 export interface StoryRoom {

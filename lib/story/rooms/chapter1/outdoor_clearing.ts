@@ -124,14 +124,6 @@ export function buildOutdoorClearing(): StoryRoom {
   subtypes[torchTownTransition[0]][torchTownTransition[1]] = [
     TileSubtype.ROOM_TRANSITION,
   ];
-  const torchTownReturn: [number, number] = [
-    Math.min(height - 2, torchTownTransition[0] + 1),
-    torchTownTransition[1],
-  ];
-  if (tiles[torchTownReturn[0]]?.[torchTownReturn[1]] === WALL) {
-    tiles[torchTownReturn[0]][torchTownReturn[1]] = FLOOR;
-    subtypes[torchTownReturn[0]][torchTownReturn[1]] = [];
-  }
 
   // Place Elder Rowan just outside the cave entrance: 3 tiles up and 3 to the right of the mouth
   const elderY = Math.max(1, entryPoint[0] - 3);
@@ -216,13 +208,13 @@ export function buildOutdoorClearing(): StoryRoom {
       {
         roomId: "story-torch-town" as RoomId,
         position: torchTownTransition,
-        returnEntryPoint: torchTownReturn,
+        targetEntryPoint: [25, 17],
       },
       // Opening on the left wall near the top leading to the bluff passageway
       {
         roomId: "story-bluff-passage" as RoomId,
         position: [3, 0],
-        returnEntryPoint: [4, 1],
+        targetEntryPoint: [4, 1],
       },
     ],
     npcs,

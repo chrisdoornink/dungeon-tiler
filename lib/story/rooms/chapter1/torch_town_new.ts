@@ -67,8 +67,8 @@ const VISUAL_MAP = [
 ];
 
 const TRANSITIONS = {
-  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [1, 17] as [number, number], returnPoint: [32, 9] as [number, number] },
-  '1': { roomId: 'story-outdoor-clearing' as RoomId, target: [1, 17] as [number, number], returnPoint: [17, 1] as [number, number] },  
+  '0': { roomId: 'story-the-wilds-entrance' as RoomId, target: [1, 17] as [number, number] },
+  '1': { roomId: 'story-outdoor-clearing' as RoomId, target: [1, 17] as [number, number] },  
 };
 
 export function buildTorchTownNew(): StoryRoom {
@@ -86,17 +86,6 @@ export function buildTorchTownNew(): StoryRoom {
   };
 
   const room = buildRoom(config);
-  
-  // Debug: Check transitions
-  console.log('[TORCH TOWN] Other transitions:', room.otherTransitions);
-  console.log('[TORCH TOWN] Checking transition tiles:');
-  for (let y = 0; y < room.mapData.tiles.length; y++) {
-    for (let x = 0; x < room.mapData.tiles[y].length; x++) {
-      if (room.mapData.subtypes[y]?.[x]?.includes(TileSubtype.ROOM_TRANSITION)) {
-        console.log(`  Found transition at (${y}, ${x}), tile=${room.mapData.tiles[y][x]}, subtypes=`, room.mapData.subtypes[y][x]);
-      }
-    }
-  }
   
   // Auto-detect road shapes based on adjacency
   autoDetectRoadShapes(room.mapData.tiles, room.mapData.subtypes);

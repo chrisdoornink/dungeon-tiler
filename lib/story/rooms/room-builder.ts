@@ -18,7 +18,6 @@ type EnemyKind = "goblin" | "snake" | "ghost" | "stone-exciter";
 export interface TransitionDefinition {
   roomId: RoomId;
   target: [number, number];
-  returnPoint: [number, number];
 }
 
 export interface RandomItemPlacement {
@@ -113,7 +112,6 @@ export function buildRoom(config: RoomConfig): StoryRoom {
     roomId: RoomId;
     position: [number, number];
     targetEntryPoint: [number, number];
-    returnEntryPoint: [number, number];
   }> = [];
 
   parsedMap.transitions.forEach((positions, transitionId) => {
@@ -124,7 +122,6 @@ export function buildRoom(config: RoomConfig): StoryRoom {
           roomId: transitionDef.roomId,
           position: [y, x],
           targetEntryPoint: transitionDef.target as [number, number],
-          returnEntryPoint: transitionDef.returnPoint as [number, number],
         });
       });
     }

@@ -212,12 +212,14 @@ export function buildStoryModeState(): GameState {
         link.position,
         link.targetEntryPoint ?? torchTown.entryFromNext ?? torchTown.entryPoint
       );
+      // Note: Reverse transition (torchTown -> outdoor) should be defined in torchTown's otherTransitions
+      // This old-system fallback is kept for backward compatibility with torch_town.ts
       if (torchTown.transitionToPrevious) {
         pushTransition(
           torchTown.id,
           outdoor.id,
           torchTown.transitionToPrevious,
-          link.returnEntryPoint ?? outdoor.entryPoint
+          link.targetEntryPoint ?? outdoor.entryPoint
         );
       }
     }
