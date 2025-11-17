@@ -306,6 +306,9 @@ export function buildStoryModeState(): GameState {
 
   // Build Torch Town interior rooms and transitions
   const extraRooms: StoryRoom[] = [];
+  
+  // NOTE: Torch Town New uses the otherTransitions system, so we unconditionally
+  // build all buildings and houses. They will auto-register their transitions.
   const torchTownBuildings = torchTown.metadata?.buildings as
     | {
         libraryDoor: [number, number];
@@ -322,6 +325,21 @@ export function buildStoryModeState(): GameState {
   const torchTownHomes =
     (torchTown.metadata?.homes as Record<string, string>) || {};
 
+  // Always build buildings and houses for Torch Town New (they use otherTransitions)
+  extraRooms.push(buildLibrary());
+  extraRooms.push(buildGuardTower());
+  extraRooms.push(buildStore());
+  extraRooms.push(buildSmithy());
+  extraRooms.push(buildEldrasCottage());
+  extraRooms.push(buildMaroAndKirasCottage());
+  extraRooms.push(buildJorinAndYannasCottage());
+  extraRooms.push(buildSerinsClinic());
+  extraRooms.push(buildRhettAndMirasCottage());
+  extraRooms.push(buildHaroAndLensCottage());
+  extraRooms.push(buildFennaTaviAndArinsCottage());
+  extraRooms.push(buildDarasCottage());
+
+  // Legacy system for old Torch Town (if buildings metadata exists)
   if (torchTownBuildings) {
     // Library interior - using individual builder
     const libraryRoom = buildLibrary();

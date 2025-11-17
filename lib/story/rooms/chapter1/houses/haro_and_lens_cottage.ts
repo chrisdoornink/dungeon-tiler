@@ -12,7 +12,7 @@ import { HOUSE_LABELS } from "../torch_town";
 const SIZE = 7;
 
 const TRANSITIONS = {
-  '0': { roomId: 'story-torch-town' as RoomId, target: [26, 28] as [number, number], returnPoint: [5, 3] as [number, number] },
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: 'd7', offsetY: 1 },
 };
 
 const VISUAL_MAP = [

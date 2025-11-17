@@ -51,18 +51,18 @@ const VISUAL_MAP = [
   "# # # . . . . F F F . . . . . = . . . = . . . . . . . . . . # # #",
   "# # # . . . . . . . . . . . . = = = = = . . . R R R R . . F # # #",
   "# # # . R R R . R R R R F . . . . = . . . . . R R R R . . . # # #",
-  "# # # . R R R . R R R R F . . . . = . . . . . hh[d12]R. . . # # #",
+  "# # # . R R R . R R R R F . . . . = . . . . . hh[d12]h. . . # # #",
   "# # # . [d5]hh .hh[d6]h F . . . . = . . T T . . . = . . . . # # #",
   "# # # . . F F . . . = . . . . . . = . . T T . . . = . . . . # # #",
   "# # # . = = = = = = = = = = = = = = . . . . . . . = . R R R # # #",
   "# # # . . . . . . . . . . . . . . = . R R R . . . = . R R R # # #",
-  "# # # . . . . . . R R R . . . . . = . R R R . . . = . h[d13]h## #",
+  "# # # . . . . . . R R R . . . . . = . R R R . . . = . [d11]hh## #",
   "# # # . R R R R . R R R . R R R . = . h[d7]h. . = = = = F F # # #",
   "# # # . R R R R . h[d8]h. R R R . = . . = . . . = . . . . . # # #",
-  "# # # . hh[d9]h . . = . . h[d10]h.= = = = = = = = = . R R R # # #",
-  "# # # . . . . . . . . . . . . . . = . . . . . . . = . R R R # # #",
-  "# # # . T . = = = = = = = = = = = = . F . . F F . = . h[d11]h# # #",
-  "# # # . . . . . . . . . . . . . . = . . . . . . . = = = = . # # #",
+  "# # # . hh[d9]h . . = . . h[d10]h.= = = = = = = = . . . F . # # #",
+  "# # # . . . . . . . . . . . . . . = . . . . . . . . F . T . # # #",
+  "# # # . T . = = = = = = = = = = = = . F . . F F . F T F F . # # #",
+  "# # # . . . . . . . . . . . . . . = . . . . . . . . F . . . # # #",
   "# # # # # # # # # # # # # # # # # = # # # # # # # # # # # # # # #",
   "# # # # # # # # # # # # # # # # # 1 # # # # # # # # # # # # # # #",
 ];
@@ -79,13 +79,15 @@ const TRANSITIONS = {
   'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Smithy
   
   // Houses
-  'd5': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Rhett & Mira's Cottage
-  'd6': { roomId: 'story-torch-town-home-2' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Jorin & Yanna's Cottage
-  'd7': { roomId: 'story-torch-town-home-5' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Haro & Len's Cottage
-  'd8': { roomId: 'story-torch-town-home-6' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Fenna, Tavi & Arin's Cottage
-  'd9': { roomId: 'story-torch-town-home-0' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Eldra's Cottage
-  'd10': { roomId: 'story-torch-town-home-1' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Maro & Kira's Cottage
-  'd11': { roomId: 'story-torch-town-home-7' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Dara's Cottage
+  'd5': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Rhett & Mira's Cottage
+  'd6': { roomId: 'story-torch-town-home-2' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Jorin & Yanna's Cottage
+  'd7': { roomId: 'story-torch-town-home-5' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Haro & Len's Cottage
+  'd8': { roomId: 'story-torch-town-home-6' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Fenna, Tavi & Arin's Cottage
+  'd9': { roomId: 'story-torch-town-home-0' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Eldra's Cottage
+  'd10': { roomId: 'story-torch-town-home-1' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Maro & Kira's Cottage
+  'd11': { roomId: 'story-torch-town-home-7' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Dara's Cottage
+  'd12': { roomId: 'story-torch-town-home-3' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Serin's Clinic
+  // 'd13': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Rhett & Mira's Cottage (duplicate)
 };
 
 export function buildTorchTownNew(): StoryRoom {
@@ -106,6 +108,25 @@ export function buildTorchTownNew(): StoryRoom {
   
   // Auto-detect road shapes based on adjacency
   autoDetectRoadShapes(room.mapData.tiles, room.mapData.subtypes);
+  
+  // Add building signs next to doors
+  // Library sign (next to d1 door at row 4, col ~17)
+  const librarySignPos = [4, 16]; // One tile to the left of d1
+  if (!room.mapData.subtypes[librarySignPos[0]][librarySignPos[1]].includes(TileSubtype.SIGN_LIBRARY)) {
+    room.mapData.subtypes[librarySignPos[0]][librarySignPos[1]].push(TileSubtype.SIGN_LIBRARY);
+  }
+  
+  // Store sign (next to d3 door at row 8, col ~11)
+  const storeSignPos = [8, 9]; // One tile to the left of d3
+  if (!room.mapData.subtypes[storeSignPos[0]][storeSignPos[1]].includes(TileSubtype.SIGN_STORE)) {
+    room.mapData.subtypes[storeSignPos[0]][storeSignPos[1]].push(TileSubtype.SIGN_STORE);
+  }
+  
+  // Smithy sign (next to d4 door at row 8, col ~24)
+  const smithySignPos = [8, 22]; // One tile to the left of d4
+  if (!room.mapData.subtypes[smithySignPos[0]][smithySignPos[1]].includes(TileSubtype.SIGN_SMITHY)) {
+    room.mapData.subtypes[smithySignPos[0]][smithySignPos[1]].push(TileSubtype.SIGN_SMITHY);
+  }
   
   // Add NPCs
   const npcs: NPC[] = [];
