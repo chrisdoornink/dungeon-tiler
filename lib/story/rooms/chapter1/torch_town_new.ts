@@ -60,7 +60,7 @@ const VISUAL_MAP = [
   "# # # . R R R R . R R R . R R R . = . h[d7]h. . = = = = F F # # #",
   "# # # . R R R R . h[d8]h. R R R . = . . = . . . = . . . . . # # #",
   "# # # . hh[d9]h . . = . . h[d10]h.= = = = = = = = . . . F . # # #",
-  "# # # . . . . . . . . . . . . . . = . . . . . . . . F . T . # # #",
+  "# # # . . . . . . . = . . . . . . = . . . . . . . . F . T . # # #",
   "# # # . T . = = = = = = = = = = = = . F . . F F . F T F F . # # #",
   "# # # . . . . . . . . . . . . . . = . . . . . . . . F . . . # # #",
   "# # # # # # # # # # # # # # # # # = # # # # # # # # # # # # # # #",
@@ -143,8 +143,7 @@ export function buildTorchTownNew(): StoryRoom {
     tags: ["dog", "pet"],
     metadata: { 
       behavior: "dog",
-      dayLocation: "plaza", 
-      nightLocation: "plaza" 
+      dayLocation: "plaza"
     },
   }));
   
@@ -160,10 +159,164 @@ export function buildTorchTownNew(): StoryRoom {
     metadata: { 
       behavior: "wander",
       wanderBounds: { minY: 5, maxY: 13, minX: 5, maxX: 13 },
-      dayLocation: "plaza", 
-      nightLocation: "house7", 
-      house: HOUSE_LABELS.HOUSE_7 
+      dayLocation: "plaza"
     },
+  }));
+  
+  // Captain Bren (Guard Captain) - Patrol in plaza
+  npcs.push(new NPC({
+    id: "npc-captain-bren",
+    name: "Captain Bren",
+    sprite: "/images/npcs/torch-town/captain-bren.png",
+    y: 11,
+    x: 25,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "patrol" },
+  }));
+  
+  // Yanna (Herbalist) - Forest edge near gate
+  npcs.push(new NPC({
+    id: "npc-yanna",
+    name: "Yanna",
+    sprite: "/images/npcs/torch-town/yanna.png",
+    y: 24,
+    x: 30,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "forestEdge" },
+  }));
+  
+  // Rhett (Farmer) - Fields near gate
+  npcs.push(new NPC({
+    id: "npc-rhett",
+    name: "Rhett",
+    sprite: "/images/npcs/torch-town/rhett.png",
+    y: 22,
+    x: 26,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "fields" },
+  }));
+  
+  // Mira (Weaver) - Weaving near house
+  npcs.push(new NPC({
+    id: "npc-mira",
+    name: "Mira",
+    sprite: "/images/npcs/torch-town/mira.png",
+    y: 15,
+    x: 7,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "weaving" },
+  }));
+  
+  // Kira (Teen) - Wandering in plaza
+  npcs.push(new NPC({
+    id: "npc-kira",
+    name: "Kira",
+    sprite: "/images/npcs/torch-town/kira.png",
+    y: 10,
+    x: 14,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "plaza" },
+  }));
+  
+  // Lio (Hunter) - Near gate
+  npcs.push(new NPC({
+    id: "npc-lio",
+    name: "Lio",
+    sprite: "/images/npcs/torch-town/lio.png",
+    y: 15,
+    x: 28,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "gate" },
+  }));
+  
+  // Dara (Outsider) - Town outskirts
+  npcs.push(new NPC({
+    id: "npc-dara",
+    name: "Dara",
+    sprite: "/images/npcs/torch-town/dara.png",
+    y: 17,
+    x: 12,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "outskirts" },
+  }));
+  
+  // Sela (Guard) - Training yard
+  npcs.push(new NPC({
+    id: "npc-sela",
+    name: "Sela",
+    sprite: "/images/npcs/torch-town/sela.png",
+    y: 5,
+    x: 28,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "trainingYard" },
+  }));
+  
+  // Thane (Guard) - Training yard
+  npcs.push(new NPC({
+    id: "npc-thane",
+    name: "Thane",
+    sprite: "/images/npcs/torch-town/thane.png",
+    y: 5,
+    x: 26,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "trainingYard" },
+  }));
+  
+  // Old Fenna (Flame Caretaker) - Central fire
+  npcs.push(new NPC({
+    id: "npc-fenna",
+    name: "Old Fenna",
+    sprite: "/images/npcs/torch-town/old-fenna.png",
+    y: 9,
+    x: 15,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "centralFire" },
+  }));
+  
+  // Arin (Carpenter) - Work site near houses
+  npcs.push(new NPC({
+    id: "npc-arin",
+    name: "Arin",
+    sprite: "/images/npcs/torch-town/arin.png",
+    y: 19,
+    x: 19,
+    facing: Direction.LEFT,
+    canMove: false,
+    metadata: { dayLocation: "workSite" },
+  }));
+  
+  // Haro (Fisher) - Fishing area
+  npcs.push(new NPC({
+    id: "npc-haro",
+    name: "Haro",
+    sprite: "/images/npcs/torch-town/haro.png",
+    y: 21,
+    x: 25,
+    facing: Direction.DOWN,
+    canMove: false,
+    metadata: { dayLocation: "fishing" },
+  }));
+  
+  // Len (Fisher) - Fishing area
+  npcs.push(new NPC({
+    id: "npc-len",
+    name: "Len",
+    sprite: "/images/npcs/torch-town/len.png",
+    y: 21,
+    x: 24,
+    facing: Direction.RIGHT,
+    canMove: false,
+    metadata: { dayLocation: "fishing" },
   }));
 
   return {
