@@ -51,16 +51,16 @@ const VISUAL_MAP = [
   "# # # . . . . F F F . . . . . = . . . = . . . . . . . . . . # # #",
   "# # # . . . . . . . . . . . . = = = = = . . . R R R R . . F # # #",
   "# # # . R R R . R R R R F . . . . = . . . . . R R R R . . . # # #",
-  "# # # . R R R . R R R R F . . . . = . . . . . hh[d12]h. . . # # #",
+  "# # # . R R R . R R R R F . . . . = . . T T . hh[d12]h. . . # # #",
   "# # # . [d5]hh .hh[d6]h F . . . . = . . T T . . . = . . . . # # #",
-  "# # # . . F F . . . = . . . . . . = . . T T . . . = . . . . # # #",
-  "# # # . = = = = = = = = = = = = = = . . . . . . . = . R R R # # #",
+  "# # # . . F F . . . = . . . . . . = . . . . . . . = . . . . # # #",
+  "# # # . = = = = = = = = = = = = = = . R R R . . . = . R R R # # #",
   "# # # . . . . . . . . . . . . . . = . R R R . . . = . R R R # # #",
-  "# # # . . . . . . R R R . . . . . = . R R R . . . = . [d11]hh## #",
-  "# # # . R R R R . R R R . R R R . = . h[d7]h. . = = = = F F # # #",
-  "# # # . R R R R . h[d8]h. R R R . = . . = . . . = . . . . . # # #",
-  "# # # . hh[d9]h . . = . . h[d10]h.= = = = = = = = . . . F . # # #",
-  "# # # . . . . . . . = . . . . . . = . . . . . . . . F . T . # # #",
+  "# # # . . . . . . R R R . . . . . = . h[d7]h. . . = . [d11]hh## #",
+  "# # # . R R R R . R R R . R R R . = . . = . . . = = = = F F # # #",
+  "# # # . R R R R . h[d8]h. R R R . = = = = = = = = . . . . . # # #",
+  "# # # . hh[d9]h . . = . . h[d10]h.= . . . . F . . . . . F . # # #",
+  "# # # . . . . . . . = . . . . . . = . . F F F . . . F . T . # # #",
   "# # # . T . = = = = = = = = = = = = . F . . F F . F T F F . # # #",
   "# # # . . . . . . . . . . . . . . = . . . . . . . . F . . . # # #",
   "# # # # # # # # # # # # # # # # # = # # # # # # # # # # # # # # #",
@@ -73,10 +73,10 @@ const TRANSITIONS = {
   '1': { roomId: 'story-outdoor-clearing' as RoomId, targetTransitionId: 'outdoor-torch', offsetY: 1 },
   
   // Buildings
-  'd1': { roomId: 'story-torch-town-library' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Library
-  'd2': { roomId: 'story-torch-town-guard-tower' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Guard Tower
-  'd3': { roomId: 'story-torch-town-store' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Store
-  'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Smithy
+  'd1': { roomId: 'story-torch-town-library' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Library
+  'd2': { roomId: 'story-torch-town-guard-tower' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Guard Tower
+  'd3': { roomId: 'story-torch-town-store' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Store
+  'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Smithy
   
   // Houses
   'd5': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Rhett & Mira's Cottage
@@ -141,10 +141,7 @@ export function buildTorchTownNew(): StoryRoom {
     facing: Direction.DOWN,
     canMove: true,
     tags: ["dog", "pet"],
-    metadata: { 
-      behavior: "dog",
-      dayLocation: "plaza"
-    },
+    metadata: { behavior: "dog" },
   }));
   
   // Tavi - wandering child in plaza
@@ -158,8 +155,7 @@ export function buildTorchTownNew(): StoryRoom {
     canMove: true,
     metadata: { 
       behavior: "wander",
-      wanderBounds: { minY: 5, maxY: 13, minX: 5, maxX: 13 },
-      dayLocation: "plaza"
+      wanderBounds: { minY: 5, maxY: 13, minX: 5, maxX: 13 }
     },
   }));
   
@@ -168,11 +164,10 @@ export function buildTorchTownNew(): StoryRoom {
     id: "npc-captain-bren",
     name: "Captain Bren",
     sprite: "/images/npcs/torch-town/captain-bren.png",
-    y: 11,
-    x: 25,
+    y: 8,
+    x: 29,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "patrol" },
   }));
   
   // Yanna (Herbalist) - Forest edge near gate
@@ -180,11 +175,10 @@ export function buildTorchTownNew(): StoryRoom {
     id: "npc-yanna",
     name: "Yanna",
     sprite: "/images/npcs/torch-town/yanna.png",
-    y: 24,
-    x: 30,
+    y: 23,
+    x: 24,
     facing: Direction.LEFT,
     canMove: false,
-    metadata: { dayLocation: "forestEdge" },
   }));
   
   // Rhett (Farmer) - Fields near gate
@@ -196,7 +190,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 26,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "fields" },
   }));
   
   // Mira (Weaver) - Weaving near house
@@ -208,7 +201,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 7,
     facing: Direction.LEFT,
     canMove: false,
-    metadata: { dayLocation: "weaving" },
   }));
   
   // Kira (Teen) - Wandering in plaza
@@ -220,7 +212,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 14,
     facing: Direction.RIGHT,
     canMove: false,
-    metadata: { dayLocation: "plaza" },
   }));
   
   // Lio (Hunter) - Near gate
@@ -232,7 +223,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 28,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "gate" },
   }));
   
   // Dara (Outsider) - Town outskirts
@@ -244,7 +234,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 12,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "outskirts" },
   }));
   
   // Sela (Guard) - Training yard
@@ -256,7 +245,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 28,
     facing: Direction.LEFT,
     canMove: false,
-    metadata: { dayLocation: "trainingYard" },
   }));
   
   // Thane (Guard) - Training yard
@@ -268,7 +256,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 26,
     facing: Direction.RIGHT,
     canMove: false,
-    metadata: { dayLocation: "trainingYard" },
   }));
   
   // Old Fenna (Flame Caretaker) - Central fire
@@ -280,7 +267,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 15,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "centralFire" },
   }));
   
   // Arin (Carpenter) - Work site near houses
@@ -292,7 +278,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 19,
     facing: Direction.LEFT,
     canMove: false,
-    metadata: { dayLocation: "workSite" },
   }));
   
   // Haro (Fisher) - Fishing area
@@ -304,7 +289,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 25,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "fishing" },
   }));
   
   // Len (Fisher) - Fishing area
@@ -316,7 +300,6 @@ export function buildTorchTownNew(): StoryRoom {
     x: 24,
     facing: Direction.RIGHT,
     canMove: false,
-    metadata: { dayLocation: "fishing" },
   }));
 
   return {
