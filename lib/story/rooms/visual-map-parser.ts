@@ -214,9 +214,16 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
         default:
           // Check if it's a multi-character transition ID (from brackets)
           if (char.length > 1 || (char.length === 1 && /[0-9]/.test(char))) {
-            // Multi-char IDs or numeric IDs are transitions
-            tileType = 0; // floor with room transition
-            cellSubtypes.push(TileSubtype.ROOM_TRANSITION);
+            // Check if it's a door transition (starts with 'd')
+            if (char.startsWith('d')) {
+              tileType = 1; // wall with door and transition
+              cellSubtypes.push(TileSubtype.DOOR);
+              cellSubtypes.push(TileSubtype.ROOM_TRANSITION);
+            } else {
+              // Regular transition (floor)
+              tileType = 0; // floor with room transition
+              cellSubtypes.push(TileSubtype.ROOM_TRANSITION);
+            }
             if (!transitions.has(char)) {
               transitions.set(char, []);
             }

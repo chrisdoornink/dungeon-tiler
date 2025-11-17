@@ -16,7 +16,7 @@ const SIZE = 25;
  * Each transition in the visual map (0-9, A-Z) references a key here
  */
 const TRANSITIONS = {
-  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: '0', offsetX: -1 },
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: '0' },
   '5': { roomId: 'story-the-wilds-south' as RoomId, targetTransitionId: '0', offsetY: 1 },
   '6': { roomId: 'story-the-wilds-north' as RoomId, targetTransitionId: '0' },
   // Transitions to Wilds East (right edge) - offsetX: -1 spawns player 1 tile to the left

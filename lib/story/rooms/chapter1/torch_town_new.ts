@@ -10,8 +10,9 @@
  * - 'F' = flowers
  * - '@' = town sign
  * - 'f' = floor torch
- * - '0'-'9', 'A'-'H' = room transitions (houses/buildings)
- * - 'd' = door
+ * - '0', '1' = world transitions (Wilds Entrance, Outdoor Clearing)
+ * - '[d1]'-'[d11]' = house door transitions (wall + door + transition)
+ * - 'h' = house wall
  */
 
 import { RoomId, Direction, TileSubtype } from "../../../map";
@@ -41,34 +42,50 @@ const VISUAL_MAP = [
   "# # # . . . . . . . . . . . . . . . . . . . . . . . . . . . # # #",
   "# # # . . F . . . . . . . . . R R R R R . . . F . . R R R R # # #",
   "# # # . . . . . . . F . . . . R R R R R . . F F . . R R R R # # #",
-  "# # # . . . . . . . . . . . . h h d h h . . . . . . h h d h # # #",
+  "# # # . . . . . . . . . . . . hh[d1]h h . . . . . . hh[d2]h # # #",
   "# # # . . R R R R R R R . . . . . = . . . . . . . . . . = . # # #",
   "# # # . . R R R R R R R . T . . . = . . . R R R R . . . = . # # #",
   "# # # . . R R R R R R R . . . = = = = = . h R R R . . . = . # # #",
-  "# # # . . h h h d h h h . . . = . . . = . . h d h . . . = . # # #",
+  "# # # . . h hh[d3]h h h . . . = . . . = . .h[d4]h . . . = . # # #",
   "# # # . . . . F = = = = = = = = . C . = = = = = = = = = = = = = 0",
   "# # # . . . . F F F . . . . . = . . . = . . . . . . . . . . # # #",
   "# # # . . . . . . . . . . . . = = = = = . . . R R R R . . F # # #",
   "# # # . R R R . R R R R F . . . . = . . . . . R R R R . . . # # #",
-  "# # # . R R R . R R R R F . . . . = . . . . . h h d h . . . # # #",
-  "# # # . d h h . h h d h F . . . . = . . T T . . . = . . . . # # #",
-  "# # # . . F F . . . = . . . . . . = . . T T . . . = . R R R # # #",
+  "# # # . R R R . R R R R F . . . . = . . . . . hh[d12]R. . . # # #",
+  "# # # . [d5]hh .hh[d6]h F . . . . = . . T T . . . = . . . . # # #",
+  "# # # . . F F . . . = . . . . . . = . . T T . . . = . . . . # # #",
   "# # # . = = = = = = = = = = = = = = . . . . . . . = . R R R # # #",
-  "# # # . . . . . . . . . . . . . . = . R R R . . . = . d h h # # #",
-  "# # # . . . . . . R R R . . . . . = . R R R . . = = = = F F # # #",
-  "# # # . R R R R . R R R . R R R . = . h d h . . = . . . . . # # #",
-  "# # # . R R R R . h d h . R R R . = . . = . . . = . . . . . # # #",
-  "# # # . h h d h . . = . . h d h . = = = = = = = = = . R R R # # #",
-  "# # # . . . . . . . = . . . = . . = F F . F F . F = . R R R # # #",
-  "# # # . T . = = = = = = = = = = = = . F . . F F . = . h d h # # #",
+  "# # # . . . . . . . . . . . . . . = . R R R . . . = . R R R # # #",
+  "# # # . . . . . . R R R . . . . . = . R R R . . . = . h[d13]h## #",
+  "# # # . R R R R . R R R . R R R . = . h[d7]h. . = = = = F F # # #",
+  "# # # . R R R R . h[d8]h. R R R . = . . = . . . = . . . . . # # #",
+  "# # # . hh[d9]h . . = . . h[d10]h.= = = = = = = = = . R R R # # #",
+  "# # # . . . . . . . . . . . . . . = . . . . . . . = . R R R # # #",
+  "# # # . T . = = = = = = = = = = = = . F . . F F . = . h[d11]h# # #",
   "# # # . . . . . . . . . . . . . . = . . . . . . . = = = = . # # #",
   "# # # # # # # # # # # # # # # # # = # # # # # # # # # # # # # # #",
   "# # # # # # # # # # # # # # # # # 1 # # # # # # # # # # # # # # #",
 ];
 
 const TRANSITIONS = {
+  // World transitions
   '0': { roomId: 'story-the-wilds-entrance' as RoomId, targetTransitionId: '0' },
-  '1': { roomId: 'story-outdoor-clearing' as RoomId, targetTransitionId: 'outdoor-torch', offsetY: 1 },  
+  '1': { roomId: 'story-outdoor-clearing' as RoomId, targetTransitionId: 'outdoor-torch', offsetY: 1 },
+  
+  // Buildings
+  'd1': { roomId: 'story-torch-town-library' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Library
+  'd2': { roomId: 'story-torch-town-guard-tower' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Guard Tower
+  'd3': { roomId: 'story-torch-town-store' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Store
+  'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: 'exit', offsetY: 1 }, // Smithy
+  
+  // Houses
+  'd5': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Rhett & Mira's Cottage
+  'd6': { roomId: 'story-torch-town-home-2' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Jorin & Yanna's Cottage
+  'd7': { roomId: 'story-torch-town-home-5' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Haro & Len's Cottage
+  'd8': { roomId: 'story-torch-town-home-6' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Fenna, Tavi & Arin's Cottage
+  'd9': { roomId: 'story-torch-town-home-0' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Eldra's Cottage
+  'd10': { roomId: 'story-torch-town-home-1' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Maro & Kira's Cottage
+  'd11': { roomId: 'story-torch-town-home-7' as RoomId, targetTransitionId: '0', offsetY: 1 }, // Dara's Cottage
 };
 
 export function buildTorchTownNew(): StoryRoom {

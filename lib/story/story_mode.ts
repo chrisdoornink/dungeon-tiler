@@ -498,28 +498,9 @@ export function buildStoryModeState(): GameState {
     }
   }
 
-  // Torch Town <-> The Wilds seam transitions (five adjacent tiles)
-  // Map left edge of Wilds rows 19..23 to Torch Town east gate rows 10..14 at col 34
-  for (let i = 0; i < 5; i++) {
-    const wildY = 19 + i;
-    const torchY = 10 + i;
-    const wildFrom: [number, number] = [wildY, 0];
-    const torchFrom: [number, number] = [torchY, 34];
-    // Wilds -> Torch Town
-    pushTransition(
-      wildsEntrance.id,
-      torchTown.id,
-      wildFrom,
-      [torchY, 33]
-    );
-    // Torch Town -> Wilds (land just inside at [y,1])
-    pushTransition(
-      torchTown.id,
-      wildsEntrance.id,
-      torchFrom,
-      [wildY, 1]
-    );
-  }
+  // NOTE: Torch Town <-> Wilds transitions are now handled by the new transition system
+  // using otherTransitions with targetTransitionId. The old hardcoded seam transitions
+  // have been removed in favor of the visual map transition system.
 
   // Note: All otherTransitions are now auto-registered below for all rooms
 

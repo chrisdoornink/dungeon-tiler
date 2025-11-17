@@ -8,7 +8,7 @@ export function buildLibrary(): StoryRoom {
   const id = "story-torch-town-library" as RoomId;
   const displayLabel = "Library";
   
-  const room = buildBuildingInterior(id, 5, 4, "house", displayLabel, []);
+  const room = buildBuildingInterior(id, 5, 4, "house", displayLabel, [], undefined, 'd1');
   
   // Add bookshelves as overlays on floor tiles
   // Top row (1, 1-9)

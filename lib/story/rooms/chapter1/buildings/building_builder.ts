@@ -20,7 +20,8 @@ export function buildBuildingInterior(
   environment: EnvironmentId,
   displayLabel: string,
   npcs?: NPC[],
-  beds?: BedPlacement[]
+  beds?: BedPlacement[],
+  torchTownDoorId?: string
 ): StoryRoom {
   const innerW = outWidth * 2 - 1;
   const innerH = outHeight * 2 - 1;
@@ -76,6 +77,15 @@ export function buildBuildingInterior(
     entryPoint,
     transitionToPrevious,
     entryFromNext,
+    otherTransitions: torchTownDoorId ? [
+      {
+        id: 'exit', // Unique ID for this transition
+        roomId: 'story-torch-town' as RoomId,
+        position: transitionToPrevious,
+        targetTransitionId: torchTownDoorId, // References the door ID in Torch Town (e.g., 'd1', 'd2')
+        offsetY: -1, // Spawn 1 tile above the door (inside the building)
+      },
+    ] : undefined,
     npcs,
     metadata: {
       displayLabel,

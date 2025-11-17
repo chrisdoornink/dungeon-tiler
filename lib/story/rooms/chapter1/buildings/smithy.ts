@@ -22,5 +22,5 @@ export function buildSmithy(): StoryRoom {
   // NPCs can be conditionally added here based on time of day or story flags
   const npcs: NPC[] = [jorin];
   
-  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs);
+  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs, undefined, 'd4');
 }

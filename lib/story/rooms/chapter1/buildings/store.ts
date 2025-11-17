@@ -22,5 +22,5 @@ export function buildStore(): StoryRoom {
   
   const npcs: NPC[] = [maro];
   
-  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs);
+  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs, undefined, 'd3');
 }

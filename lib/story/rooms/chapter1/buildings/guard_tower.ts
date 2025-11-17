@@ -10,7 +10,7 @@ import { buildRoom, type RoomConfig } from "../../room-builder";
 const SIZE = 9;
 
 const TRANSITIONS = {
-  '0': { roomId: 'story-torch-town' as RoomId, target: [18, 10] as [number, number], returnPoint: [7, 4] as [number, number] },
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: 'd2', offsetY: -1 },
 };
 
 const VISUAL_MAP = [
