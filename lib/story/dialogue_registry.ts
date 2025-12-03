@@ -57,7 +57,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Elder Rowan",
-        text: "Caretaker Lysa is inside the sanctum preparing for your return.",
+        text: "Caretaker Lysa is inside the house up ahead preparing for your return.",
       },
     ],
     onCompleteEffects: [{ eventId: "met-elder-rowan", value: true }],
