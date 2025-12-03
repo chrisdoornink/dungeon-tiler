@@ -781,7 +781,7 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const tileSubs = row ? row[enemy.x] || [] : [];
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
 
-    if (enemy.kind === "stone-exciter" && onFaulty) {
+    if ((enemy.kind === "stone-exciter" || enemy.kind === "goblin") && onFaulty) {
       defeated.push(enemy);
 
       if (!state.recentDeaths) state.recentDeaths = [];
