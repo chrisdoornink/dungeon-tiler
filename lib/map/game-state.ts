@@ -768,6 +768,48 @@ export function reviveFromLastCheckpoint(
   return restored;
 }
 
+function applyEnemyHazardDeaths(state: GameState): void {
+  if (!state.enemies || !Array.isArray(state.enemies)) return;
+  const subtypes = state.mapData.subtypes;
+  if (!subtypes || !Array.isArray(subtypes)) return;
+
+  const remaining: Enemy[] = [];
+  const defeated: Enemy[] = [];
+
+  for (const enemy of state.enemies) {
+    const row = subtypes[enemy.y];
+    const tileSubs = row ? row[enemy.x] || [] : [];
+    const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
+
+    if (enemy.kind === "stone-exciter" && onFaulty) {
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      if (!state.stats.byKind) state.stats.byKind = createEmptyByKind();
+      const k = enemy.kind as EnemyKind;
+      state.stats.byKind[k] = (state.stats.byKind[k] ?? 0) + 1;
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else {
+      remaining.push(enemy);
+    }
+  }
+
+  if (defeated.length === 0) return;
+
+  state.enemies = remaining;
+
+  for (const enemy of defeated) {
+    const info = createDefeatedEnemyInfo(enemy);
+    const updated = processEnemyDefeat(state, info);
+    Object.assign(state, updated);
+  }
+}
+
 /**
  * Initialize a new game state with a newly generated map
  * @returns A new GameState object
@@ -1177,6 +1219,10 @@ export function movePlayer(
         }
       }
     }
+
+    // After enemies move, apply hazard deaths (stone-exciters falling into faulty floor)
+    applyEnemyHazardDeaths(newGameState);
+
     console.log(`[ENEMY TURN] After enemy turn. Enemies now at:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x}) dist:${Math.abs(e.y - currentY) + Math.abs(e.x - currentX)}`).join(', '));
 
     // Update NPC behaviors (e.g., dogs following player)

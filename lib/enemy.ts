@@ -254,6 +254,8 @@ function isSafeFloorForEnemy(
   if (!subtypes) return true;
   const tileSubs = subtypes[y]?.[x] || [];
   const isFaulty = tileSubs.includes(18);
+  // Stone-exciters are allowed to step onto faulty floors; others still avoid
+  if (kind === 'stone-exciter') return true;
   return !isFaulty;
 }
 
