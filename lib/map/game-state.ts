@@ -525,8 +525,22 @@ export function performThrowRune(gameState: GameState): GameState {
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
-        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
+        const hasImportantTile = lastSubs.some(s => 
+          s === TileSubtype.EXIT || 
+          s === TileSubtype.DOOR || 
+          s === TileSubtype.EXITKEY ||
+          s === TileSubtype.KEY ||
+          s === TileSubtype.LOCK ||
+          s === TileSubtype.ROOM_TRANSITION ||
+          s === TileSubtype.CHECKPOINT
+        );
+        
+        if (!hasImportantTile) {
+          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        }
       }
       // No valid landing spot found; keep inventory unchanged
       return preTickState;
@@ -586,8 +600,22 @@ export function performThrowRune(gameState: GameState): GameState {
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
-        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
+        const hasImportantTile = lastSubs.some(s => 
+          s === TileSubtype.EXIT || 
+          s === TileSubtype.DOOR || 
+          s === TileSubtype.EXITKEY ||
+          s === TileSubtype.KEY ||
+          s === TileSubtype.LOCK ||
+          s === TileSubtype.ROOM_TRANSITION ||
+          s === TileSubtype.CHECKPOINT
+        );
+        
+        if (!hasImportantTile) {
+          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        }
       }
       return preTickState;
     }
@@ -620,9 +648,23 @@ export function performThrowRune(gameState: GameState): GameState {
   }
 
   // Clear path for 4 tiles -> land on 4th tile (preserve overlays)
+  // But don't place rune on important interactive tiles like EXIT, DOOR, etc.
   if (newMapData.tiles[ty][tx] === FLOOR) {
-    const base = (newMapData.subtypes[ty][tx] || []).filter((t) => t !== TileSubtype.RUNE);
-    newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
+    const subs = newMapData.subtypes[ty][tx] || [];
+    const hasImportantTile = subs.some(s => 
+      s === TileSubtype.EXIT || 
+      s === TileSubtype.DOOR || 
+      s === TileSubtype.EXITKEY ||
+      s === TileSubtype.KEY ||
+      s === TileSubtype.LOCK ||
+      s === TileSubtype.ROOM_TRANSITION ||
+      s === TileSubtype.CHECKPOINT
+    );
+    
+    if (!hasImportantTile) {
+      const base = subs.filter((t) => t !== TileSubtype.RUNE);
+      newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
+    }
     return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
   }
   return preTickState;
