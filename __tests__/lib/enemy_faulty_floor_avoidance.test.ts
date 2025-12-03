@@ -2,7 +2,7 @@ import { Enemy } from "../../lib/enemy";
 import { TileSubtype } from "../../lib/map";
 
 describe("Enemy Faulty Floor Avoidance", () => {
-  test("enemy avoids moving onto faulty floor tiles", () => {
+  test("snake enemy avoids moving onto faulty floor tiles", () => {
     // Create a simple 3x3 grid with floor tiles
     const grid = [
       [0, 0, 0], // floor tiles
@@ -19,6 +19,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
 
     // Place enemy at [0, 1] and player at [2, 1]
     const enemy = new Enemy({ y: 0, x: 1 });
+    enemy.kind = 'snake';
     const player = { y: 2, x: 1 };
 
     // Enemy should try to move toward player but avoid faulty floor
@@ -34,7 +35,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
     expect(damage).toBe(0); // No contact damage since not adjacent to player
   });
 
-  test("enemy finds alternative path when direct route has faulty floor", () => {
+  test("snake enemy finds alternative path when direct route has faulty floor", () => {
     // Create a 3x3 grid where enemy can move horizontally to avoid faulty floor
     const grid = [
       [0, 0, 0],
@@ -51,6 +52,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
 
     // Place enemy at [0, 1] and player at [2, 1] - direct path blocked
     const enemy = new Enemy({ y: 0, x: 1 });
+    enemy.kind = 'snake';
     const player = { y: 2, x: 1 };
 
     // Enemy should try horizontal moves since vertical is blocked
@@ -91,5 +93,53 @@ describe("Enemy Faulty Floor Avoidance", () => {
     const moved = enemy.y !== initialPos.y || enemy.x !== initialPos.x;
     expect(moved).toBe(true);
     expect(damage).toBe(0); // No contact damage since not adjacent
+  });
+
+  test("goblin is allowed to step onto faulty floor tile", () => {
+    const grid = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+
+    const subtypes = [
+      [[], [], []],
+      [[], [TileSubtype.FAULTY_FLOOR], []],
+      [[], [], []],
+    ];
+
+    const enemy = new Enemy({ y: 0, x: 1 });
+    enemy.kind = 'goblin';
+    const player = { y: 2, x: 1 };
+
+    enemy.update({ grid, subtypes, player });
+
+    expect(enemy.y).toBe(1);
+    expect(enemy.x).toBe(1);
+    expect(subtypes[enemy.y][enemy.x]).toContain(TileSubtype.FAULTY_FLOOR);
+  });
+
+  test("stone-exciter is allowed to step onto faulty floor tile", () => {
+    const grid = [
+      [0, 0, 0],
+      [0, 0, 0],
+      [0, 0, 0],
+    ];
+
+    const subtypes = [
+      [[], [], []],
+      [[], [TileSubtype.FAULTY_FLOOR], []],
+      [[], [], []],
+    ];
+
+    const enemy = new Enemy({ y: 0, x: 1 });
+    enemy.kind = 'stone-exciter';
+    const player = { y: 2, x: 1 };
+
+    enemy.update({ grid, subtypes, player });
+
+    expect(enemy.y).toBe(1);
+    expect(enemy.x).toBe(1);
+    expect(subtypes[enemy.y][enemy.x]).toContain(TileSubtype.FAULTY_FLOOR);
   });
 });
