@@ -12,9 +12,9 @@ const TRANSITIONS = {
 
 const VISUAL_MAP = [
   "# # # # # # # # # # #",
+  "# k k k k k k k k k #",
   "# . . . . . . . . . #",
-  "# . . . . . . . . . #",
-  "# . . . . . . . . . #",
+  "# k k k . . . k k k #",
   "# . . . . . . . . . #",
   "# # # # # 0 # # # # #",
 ];
@@ -33,22 +33,6 @@ export function buildLibrary(): StoryRoom {
   };
   
   const room = buildRoom(config);
-  
-  // Add bookshelves as overlays on floor tiles
-  // Top row (1, 1-9)
-  for (let x = 1; x <= 9; x++) {
-    room.mapData.subtypes[1][x] = [TileSubtype.BOOKSHELF];
-  }
-  
-  // Middle row left side (4, 1-3)
-  for (let x = 1; x <= 3; x++) {
-    room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
-  }
-  
-  // Middle row right side (4, 7-9)
-  for (let x = 7; x <= 9; x++) {
-    room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
-  }
   
   // Place Eldra (the librarian) inside
   const eldra = new NPC({

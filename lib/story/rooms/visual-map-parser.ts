@@ -173,6 +173,10 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
         case 'F':
           tileType = 5; // flowers tile
           break;
+        case 'k':
+          tileType = 0; // floor with bookshelf
+          cellSubtypes.push(TileSubtype.BOOKSHELF);
+          break;
         case '0':
         case '1':
         case '2':
