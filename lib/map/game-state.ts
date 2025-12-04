@@ -525,8 +525,22 @@ export function performThrowRune(gameState: GameState): GameState {
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
-        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
+        const hasImportantTile = lastSubs.some(s => 
+          s === TileSubtype.EXIT || 
+          s === TileSubtype.DOOR || 
+          s === TileSubtype.EXITKEY ||
+          s === TileSubtype.KEY ||
+          s === TileSubtype.LOCK ||
+          s === TileSubtype.ROOM_TRANSITION ||
+          s === TileSubtype.CHECKPOINT
+        );
+        
+        if (!hasImportantTile) {
+          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        }
       }
       // No valid landing spot found; keep inventory unchanged
       return preTickState;
@@ -586,8 +600,22 @@ export function performThrowRune(gameState: GameState): GameState {
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
-        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
+        const hasImportantTile = lastSubs.some(s => 
+          s === TileSubtype.EXIT || 
+          s === TileSubtype.DOOR || 
+          s === TileSubtype.EXITKEY ||
+          s === TileSubtype.KEY ||
+          s === TileSubtype.LOCK ||
+          s === TileSubtype.ROOM_TRANSITION ||
+          s === TileSubtype.CHECKPOINT
+        );
+        
+        if (!hasImportantTile) {
+          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        }
       }
       return preTickState;
     }
@@ -620,9 +648,23 @@ export function performThrowRune(gameState: GameState): GameState {
   }
 
   // Clear path for 4 tiles -> land on 4th tile (preserve overlays)
+  // But don't place rune on important interactive tiles like EXIT, DOOR, etc.
   if (newMapData.tiles[ty][tx] === FLOOR) {
-    const base = (newMapData.subtypes[ty][tx] || []).filter((t) => t !== TileSubtype.RUNE);
-    newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
+    const subs = newMapData.subtypes[ty][tx] || [];
+    const hasImportantTile = subs.some(s => 
+      s === TileSubtype.EXIT || 
+      s === TileSubtype.DOOR || 
+      s === TileSubtype.EXITKEY ||
+      s === TileSubtype.KEY ||
+      s === TileSubtype.LOCK ||
+      s === TileSubtype.ROOM_TRANSITION ||
+      s === TileSubtype.CHECKPOINT
+    );
+    
+    if (!hasImportantTile) {
+      const base = subs.filter((t) => t !== TileSubtype.RUNE);
+      newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
+    }
     return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
   }
   return preTickState;
@@ -766,6 +808,48 @@ export function reviveFromLastCheckpoint(
   };
 
   return restored;
+}
+
+function applyEnemyHazardDeaths(state: GameState): void {
+  if (!state.enemies || !Array.isArray(state.enemies)) return;
+  const subtypes = state.mapData.subtypes;
+  if (!subtypes || !Array.isArray(subtypes)) return;
+
+  const remaining: Enemy[] = [];
+  const defeated: Enemy[] = [];
+
+  for (const enemy of state.enemies) {
+    const row = subtypes[enemy.y];
+    const tileSubs = row ? row[enemy.x] || [] : [];
+    const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
+
+    if ((enemy.kind === "stone-exciter" || enemy.kind === "goblin") && onFaulty) {
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      if (!state.stats.byKind) state.stats.byKind = createEmptyByKind();
+      const k = enemy.kind as EnemyKind;
+      state.stats.byKind[k] = (state.stats.byKind[k] ?? 0) + 1;
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else {
+      remaining.push(enemy);
+    }
+  }
+
+  if (defeated.length === 0) return;
+
+  state.enemies = remaining;
+
+  for (const enemy of defeated) {
+    const info = createDefeatedEnemyInfo(enemy);
+    const updated = processEnemyDefeat(state, info);
+    Object.assign(state, updated);
+  }
 }
 
 /**
@@ -1177,6 +1261,10 @@ export function movePlayer(
         }
       }
     }
+
+    // After enemies move, apply hazard deaths (stone-exciters falling into faulty floor)
+    applyEnemyHazardDeaths(newGameState);
+
     // console.log(`[ENEMY TURN] After enemy turn. Enemies now at:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x}) dist:${Math.abs(e.y - currentY) + Math.abs(e.x - currentX)}`).join(', '));
 
     // Update NPC behaviors (e.g., dogs following player)

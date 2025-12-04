@@ -259,6 +259,9 @@ function isSafeFloorForEnemy(
                               tileSubs.includes(37) || // TOWN_SIGN
                               tileSubs.includes(22) || // CHECKPOINT
                               tileSubs.includes(36);   // BOOKSHELF
+
+  // Goblins and stone-exciters are allowed to step onto faulty floors; others still avoid
+  if (kind === 'goblin' || kind === 'stone-exciter') return true;
   return !isFaulty && !hasBlockingSubtype;
 }
 

@@ -57,7 +57,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Elder Rowan",
-        text: "Caretaker Lysa is inside the sanctum preparing for your return.",
+        text: "Caretaker Lysa is inside the house up ahead preparing for your return.",
       },
     ],
     onCompleteEffects: [{ eventId: "met-elder-rowan", value: true }],
@@ -135,7 +135,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "Caretaker Lysa",
-        text: "Even others feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northeast of the sanctum—stronger by the hour.",
+        text: "Even others feel it too. The town's been uneasy. I sense a growing, negative current from the bluff northwest of the sanctum—stronger by the hour.",
       },
       {
         speaker: "Caretaker Lysa",
@@ -151,7 +151,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
             response: [
               {
                 speaker: "Caretaker Lysa",
-                text: "Just outside of this sanctum to the northeast. There is a narrow passageway leading to the bluff.",
+                text: "Just outside of this room to the northwest. There is a narrow passageway leading to the bluff.",
               },
               {
                 speaker: "Caretaker Lysa",
