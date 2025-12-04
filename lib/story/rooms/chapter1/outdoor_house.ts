@@ -115,7 +115,7 @@ export function buildOutdoorHouse(): StoryRoom {
     metadata: {
       conditionalNpcs: {
         "npc-sanctum-boy": {
-          showWhen: [{ eventId: "rescued-kalen", value: true }],
+          showWhen: [{ eventId: "entered-bluff-cave", value: true }],
         },
       },
     },
