@@ -1,12 +1,37 @@
 import { Direction } from "../../../../map";
 import type { RoomId } from "../../../../map";
 import type { StoryRoom } from "../../types";
+import { buildRoom, type RoomConfig } from "../../room-builder";
 import { NPC } from "../../../../npc";
-import { buildBuildingInterior } from "./building_builder";
+
+const SIZE = 9;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: 'd3', offsetY: 1 },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # # # #",
+  "# . . . . . . . #",
+  "# . . . . . . . #",
+  "# . . . . . . . #",
+  "# # # # 0 # # # #",
+];
 
 export function buildStore(): StoryRoom {
-  const id = "story-torch-town-store" as RoomId;
-  const displayLabel = "Store";
+  const config: RoomConfig = {
+    id: 'story-torch-town-store',
+    size: SIZE,
+    visualMap: VISUAL_MAP,
+    transitions: TRANSITIONS,
+    metadata: {
+      displayLabel: "Store",
+    },
+    environment: 'house',
+    npcs: [],
+  };
+  
+  const room = buildRoom(config);
   
   // Maro the storekeeper
   const maro = new NPC({
@@ -14,13 +39,12 @@ export function buildStore(): StoryRoom {
     name: "Maro",
     sprite: "/images/npcs/torch-town/maro.png",
     y: 2,
-    x: 2,
+    x: 4,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "store" },
   });
   
-  const npcs: NPC[] = [maro];
+  room.npcs = [maro];
   
-  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs, undefined, 'd3');
+  return room;
 }

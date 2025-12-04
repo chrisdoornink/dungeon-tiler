@@ -1,14 +1,38 @@
 import type { RoomId } from "../../../../map";
 import { Direction, TileSubtype } from "../../../../map";
 import type { StoryRoom } from "../../types";
+import { buildRoom, type RoomConfig } from "../../room-builder";
 import { NPC } from "../../../../npc";
-import { buildBuildingInterior } from "./building_builder";
+
+const SIZE = 11;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: 'd1', offsetY: 1 },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # # # # # #",
+  "# . . . . . . . . . #",
+  "# . . . . . . . . . #",
+  "# . . . . . . . . . #",
+  "# . . . . . . . . . #",
+  "# # # # # 0 # # # # #",
+];
 
 export function buildLibrary(): StoryRoom {
-  const id = "story-torch-town-library" as RoomId;
-  const displayLabel = "Library";
+  const config: RoomConfig = {
+    id: 'story-torch-town-library',
+    size: SIZE,
+    visualMap: VISUAL_MAP,
+    transitions: TRANSITIONS,
+    metadata: {
+      displayLabel: "Library",
+    },
+    environment: 'house',
+    npcs: [],
+  };
   
-  const room = buildBuildingInterior(id, 5, 4, "house", displayLabel, [], undefined, 'd1');
+  const room = buildRoom(config);
   
   // Add bookshelves as overlays on floor tiles
   // Top row (1, 1-9)
@@ -26,18 +50,15 @@ export function buildLibrary(): StoryRoom {
     room.mapData.subtypes[4][x] = [TileSubtype.BOOKSHELF];
   }
   
-  // Place Eldra (the librarian) inside during the day
-  const eldraY = Math.max(2, room.entryPoint[0] - 2);
-  const eldraX = room.entryPoint[1];
+  // Place Eldra (the librarian) inside
   const eldra = new NPC({
     id: "npc-eldra",
     name: "Eldra",
     sprite: "/images/npcs/torch-town/eldra.png",
-    y: eldraY,
-    x: eldraX,
+    y: 3,
+    x: 5,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "library", nightLocation: "house1" },
   });
   
   room.npcs = [eldra];

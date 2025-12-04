@@ -51,8 +51,8 @@ const VISUAL_MAP = [
   "# # # . . . . F F F . . . . . = . . . = . . . . . . . . . . # # #",
   "# # # . . . . . . . . . . . . = = = = = . . . R R R R . . F # # #",
   "# # # . R R R . R R R R F . . . . = . . . . . R R R R . . . # # #",
-  "# # # . R R R . R R R R F . . . . = . . T T . hh[d12]h. . . # # #",
-  "# # # . [d5]hh .hh[d6]h F . . . . = . . T T . . . = . . . . # # #",
+  "# # # . R R R . R R R R F . . . . = . T T T . hh[d12]h. . . # # #",
+  "# # # . [d5]hh .hh[d6]h F . . . . = . T T T . . . = . . . . # # #",
   "# # # . . F F . . . = . . . . . . = . . . . . . . = . . . . # # #",
   "# # # . = = = = = = = = = = = = = = . R R R . . . = . R R R # # #",
   "# # # . . . . . . . . . . . . . . = . R R R . . . = . R R R # # #",
@@ -73,10 +73,10 @@ const TRANSITIONS = {
   '1': { roomId: 'story-outdoor-clearing' as RoomId, targetTransitionId: 'outdoor-torch', offsetY: 1 },
   
   // Buildings
-  'd1': { roomId: 'story-torch-town-library' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Library
+  'd1': { roomId: 'story-torch-town-library' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Library
   'd2': { roomId: 'story-torch-town-guard-tower' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Guard Tower
-  'd3': { roomId: 'story-torch-town-store' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Store
-  'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: 'exit', offsetY: -1 }, // Smithy
+  'd3': { roomId: 'story-torch-town-store' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Store
+  'd4': { roomId: 'story-torch-town-smithy' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Smithy
   
   // Houses
   'd5': { roomId: 'story-torch-town-home-4' as RoomId, targetTransitionId: '0', offsetY: -1 }, // Rhett & Mira's Cottage
@@ -155,7 +155,7 @@ export function buildTorchTownNew(): StoryRoom {
     canMove: true,
     metadata: { 
       behavior: "wander",
-      wanderBounds: { minY: 5, maxY: 13, minX: 5, maxX: 13 }
+      wanderBounds: { minY: 2, maxY: 12, minX: 10, maxX: 22 }
     },
   }));
   

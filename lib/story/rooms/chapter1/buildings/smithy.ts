@@ -1,26 +1,48 @@
 import { Direction, type RoomId } from "../../../../map";
 import type { StoryRoom } from "../../types";
+import { buildRoom, type RoomConfig } from "../../room-builder";
 import { NPC } from "../../../../npc";
-import { buildBuildingInterior } from "./building_builder";
-import { HOUSE_LABELS } from "../torch_town";
+
+const SIZE = 9;
+
+const TRANSITIONS = {
+  '0': { roomId: 'story-torch-town' as RoomId, targetTransitionId: 'd4', offsetY: 1 },
+};
+
+const VISUAL_MAP = [
+  "# # # # # # # # #",
+  "# . . . . . . . #",
+  "# . . . . . . . #",
+  "# . . . . . . . #",
+  "# # # # 0 # # # #",
+];
 
 export function buildSmithy(): StoryRoom {
-  const id = "story-torch-town-smithy" as RoomId;
-  const displayLabel = "Smithy";
+  const config: RoomConfig = {
+    id: 'story-torch-town-smithy',
+    size: SIZE,
+    visualMap: VISUAL_MAP,
+    transitions: TRANSITIONS,
+    metadata: {
+      displayLabel: "Smithy",
+    },
+    environment: 'house',
+    npcs: [],
+  };
+  
+  const room = buildRoom(config);
   
   const jorin = new NPC({
     id: "npc-jorin",
     name: "Jorin",
     sprite: "/images/npcs/torch-town/jorin.png",
-    y: 3,
-    x: 3,
+    y: 2,
+    x: 4,
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { dayLocation: "smithy", nightLocation: "house3", house: HOUSE_LABELS.HOUSE_3 },
   });
 
-  // NPCs can be conditionally added here based on time of day or story flags
-  const npcs: NPC[] = [jorin];
+  room.npcs = [jorin];
   
-  return buildBuildingInterior(id, 4, 3, "house", displayLabel, npcs, undefined, 'd4');
+  return room;
 }
