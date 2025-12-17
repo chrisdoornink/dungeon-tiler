@@ -2788,9 +2788,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         />
                         {isCompact ? (
-                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
-                            {gameState.rockCount}
-                          </span>
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              R
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.rockCount}
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span>Rock x{gameState.rockCount}</span>
@@ -2825,9 +2830,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         />
                         {isCompact ? (
-                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
-                            {gameState.runeCount}
-                          </span>
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              T
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.runeCount}
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span>Rune x{gameState.runeCount}</span>
@@ -2862,9 +2872,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         />
                         {isCompact ? (
-                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
-                            {gameState.foodCount}
-                          </span>
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              F
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.foodCount}
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span>Food x{gameState.foodCount}</span>
@@ -2899,9 +2914,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         />
                         {isCompact ? (
-                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
-                            {gameState.potionCount}
-                          </span>
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              P
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.potionCount}
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span>Potion x{gameState.potionCount}</span>
