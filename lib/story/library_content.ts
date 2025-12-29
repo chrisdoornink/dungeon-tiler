@@ -34,7 +34,7 @@ The town has grown from a small outpost to a thriving community, with a library,
       {
         id: "ancient-serpent-legend",
         title: "Legends of the Ancient Serpent",
-        content: `Deep within the eastern caves of the Bluff, it is said that an Ancient Serpent dwells—a creature of immense wisdom and age. Unlike the common snakes that roam the wilds, this serpent is believed to possess intelligence rivaling that of the wisest scholars.
+        content: `Deep within the caves of the Western Bluff, it is said that an Ancient Serpent dwells—a creature of immense wisdom and age. Unlike the common snakes that roam the wilds, this serpent is believed to possess intelligence rivaling that of the wisest scholars.
 
 According to legend, the Ancient Serpent guards a powerful artifact that can bend space itself, allowing one to traverse great distances in an instant. However, the serpent does not yield its treasure to strength or force. Only those who prove their wisdom through riddles may earn its favor.
 
