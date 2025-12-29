@@ -7,7 +7,6 @@ export { buildAscentCorridor } from "./ascent_corridor";
 export { buildSanctum } from "./sanctum";
 export { buildOutdoorClearing } from "./outdoor_clearing";
 export { buildOutdoorHouse } from "./outdoor_house";
-export { buildTorchTown } from "./torch_town";
 export { buildTorchTownNew } from "./torch_town_new";
 export { buildTheWildsEntrance } from "./the_wilds_entrance";
 export { buildTheWildsSouth } from "./the_wilds_south";

@@ -7,7 +7,7 @@ import { RoomId, Direction } from "../../../../map";
 import type { StoryRoom } from "../../types";
 import { buildRoom, type RoomConfig } from "../../room-builder";
 import { NPC } from "../../../../npc";
-import { HOUSE_LABELS } from "../torch_town";
+import { HOUSE_LABELS } from "../torch_town_new";
 
 const SIZE = 7;
 
