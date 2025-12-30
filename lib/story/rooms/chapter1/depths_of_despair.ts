@@ -162,10 +162,10 @@ export function buildDepthsOfDespairRoom1(): StoryRoom {
     },
     otherTransitions: [
       {
+        id: "0",
         roomId: "story-hall-entrance" as RoomId,
         position: entryPoint,
-        targetEntryPoint: [2, 1], // Where to appear in entrance hall (just inside from left wall)
-        returnEntryPoint: [entryRow, width - 2], // Where to appear when coming back to depths
+        targetTransitionId: "depths-entry",
       },
     ],
   };
@@ -225,8 +225,10 @@ export function buildDepthsOfDespairRoom2(): StoryRoom {
     },
     otherTransitions: [
       {
+        id: "0",
         roomId: "story-depths-despair-1" as RoomId,
         position: entryPoint,
+        targetTransitionId: "next",
       },
     ],
   };

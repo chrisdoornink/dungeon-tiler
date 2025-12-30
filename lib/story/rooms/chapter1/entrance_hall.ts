@@ -83,8 +83,10 @@ export function buildEntranceHall(): StoryRoom {
 
   const otherTransitions: StoryRoomLink[] = [
     {
+      id: "depths-entry",
       roomId: "story-depths-despair-1" as RoomId,
       position: depthsTransition,
+      targetTransitionId: "0",
     },
   ];
 
