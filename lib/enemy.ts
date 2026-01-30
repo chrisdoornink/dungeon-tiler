@@ -477,13 +477,15 @@ export function updateEnemies(
     }
     // Optionally suppress this enemy's attack for this tick
     if (base > 0 && !suppress?.(e)) {
-      // Variance: goblins mirror hero damage spread (-1/0/+1). Other enemies keep 25% crit (+2).
+      // Variance: goblins weighted toward base damage (50% 0, 25% -1, 25% +1). Other enemies keep 25% crit (+2).
       let variance = 0;
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
         if (e.kind === 'goblin') {
-          variance = rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
+          console.log('goblin variance', rVal);
+          // Weighted: 25% chance -1, 50% chance 0, 25% chance +1
+          variance = rVal < 0.25 ? -1 : rVal < 0.75 ? 0 : 1;
         } else {
           variance = rVal >= 0.75 ? 2 : rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
         }
