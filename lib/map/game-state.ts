@@ -1716,8 +1716,9 @@ export function movePlayer(
         const enemy = newGameState.enemies[idx];
         // Use provided RNG, else fallback to Math.random so variance applies in gameplay
         const rng = newGameState.combatRng ?? Math.random;
+        // Weighted variance: 25% chance -1, 50% chance 0, 25% chance +1
         const variance = rng
-          ? ((r) => (r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1))(rng())
+          ? ((r) => (r < 0.25 ? -1 : r < 0.75 ? 0 : 1))(rng())
           : 0;
         const swordBonus = newGameState.hasSword ? 2 : 0;
         const heroDamage = EnemyRegistry[enemy.kind].calcMeleeDamage({
