@@ -38,7 +38,8 @@ import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
-import { computeMapId } from "../lib/map";
+import { hashStringToSeed } from "../lib/rng";
+import { computeMapId, advanceToNextFloor } from "../lib/map";
 import { CurrentGameStorage, type GameStorageSlot } from "../lib/current_game_storage";
 import {
   DEFAULT_ENVIRONMENT,
@@ -1684,6 +1685,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return () => clearTimeout(timer);
     }
   }, [gameState.showFullMap, suppressDarknessOverlay]);
+
+  // Handle floor transition for multi-tier daily mode
+  useEffect(() => {
+    if (gameState.needsFloorTransition && isDailyChallenge && resolvedStorageSlot === 'daily-new') {
+      // Get daily seed
+      const localToday = DateUtils.getTodayString();
+      const dailySeed = hashStringToSeed(localToday);
+      
+      // Advance to next floor
+      const nextFloorState = advanceToNextFloor(gameState, dailySeed);
+      
+      // Clear the transition flag
+      nextFloorState.needsFloorTransition = false;
+      
+      // Update game state and save
+      setGameState(nextFloorState);
+      CurrentGameStorage.saveCurrentGame(nextFloorState, resolvedStorageSlot);
+    }
+  }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {

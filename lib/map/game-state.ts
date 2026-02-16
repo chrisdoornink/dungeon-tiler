@@ -47,6 +47,7 @@ import {
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
+import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
@@ -685,6 +686,8 @@ export interface GameState {
   hasShield?: boolean;
   mode?: 'normal' | 'daily' | 'story';
   allowCheckpoints?: boolean;
+  currentFloor?: number; // Current floor number for multi-tier daily mode (1-indexed)
+  maxFloors?: number; // Maximum number of floors for multi-tier daily mode
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
@@ -755,6 +758,8 @@ export interface GameState {
     roomId: RoomId;
     position: [number, number];
   };
+  // Multi-tier daily mode: signals that the player entered the exit and needs to advance to the next floor
+  needsFloorTransition?: boolean;
 }
 
 export type CheckpointSnapshot =
@@ -963,6 +968,70 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
     diaryEntries: [],
+  };
+}
+
+/**
+ * Advance to the next floor in multi-tier daily mode.
+ * Generates a new map with a floor-specific seed, preserves hero stats and inventory.
+ * @param currentState - The current game state
+ * @param dailySeed - The base daily seed (from date)
+ * @returns A new GameState for the next floor
+ */
+export function advanceToNextFloor(currentState: GameState, dailySeed: number): GameState {
+  const currentFloor = currentState.currentFloor ?? 1;
+  const nextFloor = currentFloor + 1;
+  const maxFloors = currentState.maxFloors ?? 10;
+
+  // Create floor-specific seed by combining daily seed with floor number
+  const floorSeed = dailySeed + nextFloor;
+  
+  const rng = mulberry32Fn(floorSeed);
+  
+  // Generate new map with floor-specific seed
+  const newMapData = withPatchedMathRandom(rng, () => {
+    const mapData = generateCompleteMap();
+    // Daily-only: 1-in-6 chance to use the outdoor environment
+    if (Math.random() < 1 / 6) {
+      mapData.environment = "outdoor";
+    }
+    return mapData;
+  });
+
+  // Find player position to place enemies
+  const playerPos = findPlayerPosition(newMapData);
+  const enemies = playerPos
+    ? withPatchedMathRandom(rng, () => {
+        const placed = placeEnemies({
+          grid: newMapData.tiles,
+          player: { y: playerPos[0], x: playerPos[1] },
+          count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
+          minDistanceFromPlayer: 8,
+        });
+        enemyTypeAssignement(placed);
+        return placed;
+      })
+    : [];
+
+  // Add rune pots and snakes
+  const withRunes = addRunePotsForStoneExciters(newMapData, enemies);
+  const snakesAdded = addSnakesPerRules(withRunes, enemies);
+
+  // Create new game state preserving hero stats and inventory
+  return {
+    ...currentState,
+    currentFloor: nextFloor,
+    maxFloors,
+    mapData: withRunes,
+    enemies: snakesAdded,
+    hasExitKey: false, // Reset exit key for new floor
+    win: false, // Reset win state
+    recentDeaths: [],
+    defeatedEnemies: [],
+    npcInteractionQueue: [],
+    bookshelfInteractionQueue: [],
+    bedInteractionQueue: [],
+    // Preserve: heroHealth, heroAttack, hasSword, hasShield, rockCount, runeCount, foodCount, potionCount, stats, etc.
   };
 }
 
@@ -1359,20 +1428,36 @@ export function movePlayer(
     // If it's an exit, require EXITKEY to open
     else if (subtype.includes(TileSubtype.EXIT)) {
       if (newGameState.hasExitKey) {
-        // Convert the exit to floor when player opens it
-        newMapData.tiles[newY][newX] = FLOOR;
-        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
-          newX
-        ].filter((type) => type !== TileSubtype.EXIT);
+        // Check if this is multi-tier mode and not the final floor
+        const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
+        const currentFloor = newGameState.currentFloor ?? 1;
+        const maxFloors = newGameState.maxFloors ?? 1;
+        const isFinalFloor = currentFloor >= maxFloors;
 
-        // Move player to the new position and consume the exit key
-        newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
-          currentX
-        ].filter((type) => type !== TileSubtype.PLAYER);
-        newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
-        newGameState.hasExitKey = false;
-        newGameState.win = true;
-        moved = true;
+        if (isMultiTier && !isFinalFloor) {
+          // Multi-tier mode: advance to next floor instead of winning
+          // Don't modify the map - the entire state will be replaced by advanceToNextFloor
+          newGameState.hasExitKey = false;
+          newGameState.win = false;
+          newGameState.needsFloorTransition = true;
+          return newGameState; // Return immediately; floor transition handler will replace the state
+        } else {
+          // Single-tier mode or final floor: normal win behavior
+          // Convert the exit to floor when player opens it
+          newMapData.tiles[newY][newX] = FLOOR;
+          newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
+            newX
+          ].filter((type) => type !== TileSubtype.EXIT);
+
+          // Move player to the new position and consume the exit key
+          newMapData.subtypes[currentY][currentX] = newMapData.subtypes[currentY][
+            currentX
+          ].filter((type) => type !== TileSubtype.PLAYER);
+          newMapData.subtypes[newY][newX].push(TileSubtype.PLAYER);
+          newGameState.hasExitKey = false;
+          newGameState.win = true;
+          moved = true;
+        }
 
         // Here you would typically trigger a win condition
         // debug: player opened exit
@@ -1674,10 +1759,25 @@ export function movePlayer(
         // Block movement onto EXIT tile without the exit key
         return newGameState;
       } else {
-        // With key: stepping onto EXIT triggers win. Do NOT remove EXIT from map.
-        newGameState.hasExitKey = false;
-        newGameState.win = true;
-        // debug: player won
+        // Check if this is multi-tier mode and not the final floor
+        const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
+        const currentFloor = newGameState.currentFloor ?? 1;
+        const maxFloors = newGameState.maxFloors ?? 1;
+        const isFinalFloor = currentFloor >= maxFloors;
+
+        if (isMultiTier && !isFinalFloor) {
+          // Multi-tier mode: advance to next floor instead of winning
+          newGameState.hasExitKey = false;
+          newGameState.win = false;
+          newGameState.needsFloorTransition = true;
+          return newGameState; // Return immediately; floor transition handler will replace the state
+        } else {
+          // Single-tier mode or final floor: normal win behavior
+          // With key: stepping onto EXIT triggers win. Do NOT remove EXIT from map.
+          newGameState.hasExitKey = false;
+          newGameState.win = true;
+        }
+        // debug: player won or advancing floor
         // Continue to generic movement below so the player moves onto the tile this tick
       }
     }

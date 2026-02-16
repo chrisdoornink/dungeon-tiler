@@ -7,14 +7,17 @@ import type { GameState } from "./map";
 
 const CURRENT_GAME_KEY = "currentGame";
 const DAILY_GAME_KEY = "currentDailyGame";
+const DAILY_NEW_GAME_KEY = "currentDailyNewGame";
 const STORY_GAME_KEY = "currentStoryGame";
 
-export type GameStorageSlot = "default" | "daily" | "story";
+export type GameStorageSlot = "default" | "daily" | "daily-new" | "story";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
     case "daily":
       return DAILY_GAME_KEY;
+    case "daily-new":
+      return DAILY_NEW_GAME_KEY;
     case "story":
       return STORY_GAME_KEY;
     default:
@@ -41,7 +44,7 @@ export class CurrentGameStorage {
       const storedState: StoredGameState = {
         ...gameState,
         lastSaved: Date.now(),
-        isDailyChallenge: slot === "daily",
+        isDailyChallenge: slot === "daily" || slot === "daily-new",
       };
       const key = keyForSlot(slot);
       window.localStorage.setItem(key, JSON.stringify(storedState));

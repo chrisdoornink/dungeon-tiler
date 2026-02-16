@@ -71,6 +71,7 @@ export {
   initializeGameState,
   initializeGameStateFromMap,
   movePlayer,
+  advanceToNextFloor,
 } from "./map/game-state";
 
 export type { GameState, CheckpointSnapshot } from "./map/game-state";

@@ -18,6 +18,7 @@ export interface GameViewProps {
   isDailyChallenge?: boolean;
   forceDaylightDefault?: boolean;
   onDailyComplete?: (result: "won" | "lost") => void;
+  storageSlot?: "default" | "daily" | "daily-new" | "story";
 }
 
 function GameViewInner({
@@ -28,6 +29,7 @@ function GameViewInner({
   isDailyChallenge,
   forceDaylightDefault,
   onDailyComplete,
+  storageSlot,
 }: GameViewProps) {
   const [daylight] = useState(
     typeof forceDaylightDefault === "boolean"
@@ -42,10 +44,10 @@ function GameViewInner({
     let state: GameState | undefined;
 
     // First priority: check for current game in progress (auto-save/restore)
-    const storageSlot = isDailyChallenge ? 'daily' : 'default';
+    const slot = storageSlot ?? (isDailyChallenge ? 'daily' : 'default');
 
     if (!replayExact && !mapId && typeof window !== "undefined") {
-      const savedGame = CurrentGameStorage.loadCurrentGame(storageSlot);
+      const savedGame = CurrentGameStorage.loadCurrentGame(slot);
       if (savedGame) {
         // Rehydrate enemies into class instances so methods exist
         if (Array.isArray(savedGame.enemies)) {
@@ -109,6 +111,11 @@ function GameViewInner({
         if (state) {
           state.mode = 'daily';
           state.allowCheckpoints = false;
+          // Initialize multi-tier mode for daily-new storage slot
+          if (slot === 'daily-new') {
+            state.currentFloor = 1;
+            state.maxFloors = 10;
+          }
         }
       } else {
         if (algorithm === "default") {
@@ -128,7 +135,7 @@ function GameViewInner({
           // Use single key, replace previous game data
           window.localStorage.setItem("initialGame", JSON.stringify(state));
           // Also save as current game for auto-save/restore functionality
-          CurrentGameStorage.saveCurrentGame(state, storageSlot);
+          CurrentGameStorage.saveCurrentGame(state, slot);
         } catch {
           // ignore storage errors
         }

@@ -483,7 +483,6 @@ export function updateEnemies(
       if (rng) {
         rVal = rng();
         if (e.kind === 'goblin') {
-          console.log('goblin variance', rVal);
           // Weighted: 25% chance -1, 50% chance 0, 25% chance +1
           variance = rVal < 0.25 ? -1 : rVal < 0.75 ? 0 : 1;
         } else {
