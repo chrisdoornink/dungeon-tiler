@@ -121,7 +121,7 @@ export class ScoreCalculator {
     let adjustedEnemiesDefeated = stats.enemiesDefeated;
     if (stats.byKind) {
       const stoneCount = stats.byKind["stone-exciter"] ?? 0;
-      const otherCount = (stats.byKind.goblin ?? 0) + (stats.byKind.ghost ?? 0);
+      const otherCount = (stats.byKind["fire-goblin"] ?? 0) + (stats.byKind["water-goblin"] ?? 0) + (stats.byKind.ghost ?? 0);
 
       // If stone-exciter count is suspiciously high compared to others, likely doubled
       if (stoneCount > 0 && (stoneCount >= otherCount * 2 || stoneCount > 4)) {
