@@ -230,7 +230,30 @@ export class Enemy {
         this.state = EnemyState.IDLE;
       }
     } else {
-      // Keep IDLE for now; we'll expand later (e.g., patrol)
+      // Idle goblins have a 50% chance to wander randomly each turn
+      const isGoblin = this.kind !== 'ghost' && this.kind !== 'snake';
+      if (isGoblin && Math.random() < 0.5) {
+        const dirs: Array<[number, number, 'UP'|'RIGHT'|'DOWN'|'LEFT']> = [
+          [-1, 0, 'UP'], [1, 0, 'DOWN'], [0, -1, 'LEFT'], [0, 1, 'RIGHT'],
+        ];
+        // Shuffle directions
+        for (let i = dirs.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+        }
+        for (const [dy, dx, face] of dirs) {
+          const ny = this.y + dy;
+          const nx = this.x + dx;
+          if (ny === player.y && nx === player.x) continue;
+          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
+            this.y = ny;
+            this.x = nx;
+            this.facing = face;
+            try { (this.behaviorMemory as Record<string, unknown>)["moved"] = true; } catch {}
+            break;
+          }
+        }
+      }
       this.state = EnemyState.IDLE;
     }
     return 0;

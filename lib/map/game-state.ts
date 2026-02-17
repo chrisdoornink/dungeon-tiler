@@ -948,7 +948,7 @@ export function initializeGameState(): GameState {
  * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
  */
 export function initializeGameStateForMultiTier(floor: number = 1): GameState {
-  // Compute the chest/key allocation for floors 1–4
+  // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
 
   // Convert Map to plain object for JSON serialization
@@ -1129,13 +1129,14 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     mapData: withRunes,
     enemies: snakesAdded,
     hasExitKey: false, // Reset exit key for new floor
+    portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
     recentDeaths: [],
     defeatedEnemies: [],
     npcInteractionQueue: [],
     bookshelfInteractionQueue: [],
     bedInteractionQueue: [],
-    // Preserve: heroHealth, heroAttack, hasSword, hasShield, rockCount, runeCount, foodCount, potionCount, stats, etc.
+    // Preserve: heroHealth, heroAttack, hasSword, hasShield, hasSnakeMedallion, rockCount, runeCount, foodCount, potionCount, stats, etc.
   };
 }
 

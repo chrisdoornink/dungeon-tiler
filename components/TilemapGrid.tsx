@@ -2457,6 +2457,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Use potion
           handleUsePotion();
           return;
+        case "m":
+        case "M":
+          // Use snake medallion (place/travel portal)
+          handleSnakeMedallionClick();
+          return;
         case "e":
         case "E":
           handleInteract();
@@ -2482,6 +2487,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleThrowRune,
     handleUseFood,
     handleUsePotion,
+    handleSnakeMedallionClick,
     handleInteract,
     handleDialogueChoiceNavigate,
     handleDialogueChoiceConfirm,
