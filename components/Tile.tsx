@@ -41,7 +41,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
+  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
@@ -1054,7 +1054,7 @@ export const Tile: React.FC<TileProps> = ({
                             return 'front';
                         }
                       };
-                      const kind: EnemyKind = (enemyKind ?? 'goblin');
+                      const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
                       // For snakes: use moving sprite when enemyMoved, else coiled
                       if (kind === 'snake') {
                         const f = enemyFacing;
@@ -1583,7 +1583,7 @@ export const Tile: React.FC<TileProps> = ({
                             return 'front';
                         }
                       };
-                      const kind: EnemyKind = (enemyKind ?? 'goblin');
+                      const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
                       // For snakes: use moving sprite when enemyMoved, else coiled
                       if (kind === 'snake') {
                         const f = enemyFacing;

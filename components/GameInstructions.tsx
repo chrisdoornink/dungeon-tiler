@@ -42,7 +42,7 @@ export default function GameInstructions() {
         <p>
           Beware of the vicious
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>{EnemyRegistry.goblin.displayName}s</strong>
+            <strong>{EnemyRegistry["fire-goblin"].displayName}s</strong>
             <span
               className="w-10 h-10"
               style={{

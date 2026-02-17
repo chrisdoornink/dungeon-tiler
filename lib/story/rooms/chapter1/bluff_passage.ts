@@ -103,7 +103,7 @@ export function buildBluffPassageway(): StoryRoom {
     for (const [yy, xx] of search) {
       if (yy > 0 && yy < height - 1 && xx > 0 && xx < width - 1 && tiles[yy][xx] === FLOOR) {
         const goblin = new Enemy({ y: yy, x: xx });
-        goblin.kind = "goblin";
+        goblin.kind = "fire-goblin";
         // Mark this as the special goblin that triggers Kalen's rescue
         goblin.behaviorMemory["isKalenThreat"] = true;
         enemies.push(goblin);
@@ -113,7 +113,7 @@ export function buildBluffPassageway(): StoryRoom {
     }
     if (!placed && tiles[gy]?.[gx] === FLOOR) {
       const fallbackGoblin = new Enemy({ y: gy, x: gx });
-      fallbackGoblin.kind = 'goblin';
+      fallbackGoblin.kind = 'fire-goblin';
       fallbackGoblin.behaviorMemory["isKalenThreat"] = true;
       enemies.push(fallbackGoblin);
     }

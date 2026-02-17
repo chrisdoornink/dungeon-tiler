@@ -72,10 +72,10 @@ function buildTestRoom3(): GameState {
 
   const enemies: Enemy[] = [];
   const g1 = new Enemy({ y: gy, x: leftGoblinX });
-  g1.kind = "goblin";
+  g1.kind = "fire-goblin";
   enemies.push(g1);
   const g2 = new Enemy({ y: gy, x: rightGoblinX });
-  g2.kind = "goblin";
+  g2.kind = "fire-goblin";
   enemies.push(g2);
 
   const mapData: MapData = { tiles, subtypes } as MapData;

@@ -25,7 +25,9 @@ const EMOJI_MAP = {
   map: "🗺️",
 
   // Enemies
-  goblin: "👹",
+  "fire-goblin": "👹",
+  "water-goblin": "🧊",
+  "water-goblin-spear": "🔱",
   ghost: "👻",
   "stone-exciter": "🗿",
   snake: "🐍",
@@ -112,7 +114,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         };
       case "enemy":
         const enemyKind = (lastGame.deathCause.enemyKind ||
-          "goblin") as EnemyKind;
+          "fire-goblin") as EnemyKind;
         const enemyConfig = EnemyRegistry[enemyKind];
         const enemyImage = getEnemyIcon(enemyKind);
         const enemyName = `a ${enemyConfig.displayName}`;
@@ -146,8 +148,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       if (lastGame.deathCause.type === "faulty_floor") {
         deathEmojis.push(EMOJI_MAP.faulty_floor);
       } else if (lastGame.deathCause.type === "enemy") {
-        const e = (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ?? "goblin";
-        deathEmojis.push(EMOJI_MAP[e] || EMOJI_MAP.goblin);
+        const e = (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ?? "fire-goblin";
+        deathEmojis.push(EMOJI_MAP[e] || EMOJI_MAP["fire-goblin"]);
       } else if (lastGame.deathCause.type === "poison") {
         deathEmojis.push(EMOJI_MAP.poison);
         // include snake indicator if known or by convention
@@ -182,7 +184,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
         if (numCount > 0) {
           const emoji =
-            EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP.goblin;
+            EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP["fire-goblin"];
           enemyChunks.push(emoji.repeat(numCount));
         }
       });

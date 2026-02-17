@@ -28,13 +28,13 @@ export class Enemy {
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
-  // 'goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons
-  private _kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake' = 'goblin';
+  // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'goblin' | 'ghost' | 'stone-exciter' | 'snake' { return this._kind; }
-  set kind(k: 'goblin' | 'ghost' | 'stone-exciter' | 'snake') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -46,6 +46,12 @@ export class Enemy {
       this.attack = 5;
       // Stone-exciter durability tuning: 8 HP baseline
       this.health = 8;
+    } else if (k === 'water-goblin') {
+      // Water goblin: same HP as fire goblin, higher attack and defense
+      this.attack = 2;
+    } else if (k === 'water-goblin-spear') {
+      // Water goblin with spear: similar to hero with sword (+1)
+      this.attack = 4;
     } else if (k === 'snake') {
       // Snake baseline per registry: low HP, light attack
       if (this.health > 2) this.health = 2;
@@ -242,7 +248,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'goblin' | 'ghost' | 'stone-exciter' | 'snake'
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake'
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
   if (kind === 'ghost') {
@@ -261,7 +267,7 @@ function isSafeFloorForEnemy(
                               tileSubs.includes(36);   // BOOKSHELF
 
   // Goblins and stone-exciters are allowed to step onto faulty floors; others still avoid
-  if (kind === 'goblin' || kind === 'stone-exciter') return true;
+  if (kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || kind === 'stone-exciter') return true;
   return !isFaulty && !hasBlockingSubtype;
 }
 
@@ -311,8 +317,8 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export type PlainEnemy = {
   y: number;
   x: number;
-  kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
-  _kind?: 'goblin' | 'ghost' | 'stone-exciter' | 'snake';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -326,8 +332,10 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
   return list.map((d: PlainEnemy) => {
     const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
     // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
-    const k = d?.kind ?? d?._kind;
-    if (k === 'ghost' || k === 'stone-exciter' || k === 'goblin' || k === 'snake') {
+    let k: string | undefined = d?.kind ?? d?._kind;
+    // Migration: old saved games may have 'goblin' → map to 'fire-goblin'
+    if (k === 'goblin') k = 'fire-goblin';
+    if (k === 'ghost' || k === 'stone-exciter' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'snake') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
@@ -482,7 +490,7 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        if (e.kind === 'goblin') {
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear') {
           // Weighted: 25% chance -1, 50% chance 0, 25% chance +1
           variance = rVal < 0.25 ? -1 : rVal < 0.75 ? 0 : 1;
         } else {

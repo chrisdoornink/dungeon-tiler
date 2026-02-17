@@ -109,7 +109,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
     ];
 
     const enemy = new Enemy({ y: 0, x: 1 });
-    enemy.kind = 'goblin';
+    enemy.kind = 'fire-goblin';
     const player = { y: 2, x: 1 };
 
     enemy.update({ grid, subtypes, player });

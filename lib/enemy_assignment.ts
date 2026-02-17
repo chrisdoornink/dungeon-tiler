@@ -3,7 +3,9 @@ import { type EnemyKind, getDesiredCountRanges } from "./enemies/registry";
 
 /**
  * Assign enemy kinds using controlled counts per level:
- * - goblin: 3–4
+ * - fire-goblin: 2–3
+ * - water-goblin: 1–2
+ * - water-goblin-spear: 0–1
  * - ghost: 1–2
  * - stone-exciter: 1–2
  *
@@ -20,43 +22,55 @@ export function enemyTypeAssignement(
   // Pull desired ranges from the registry
   const ranges = getDesiredCountRanges();
   const min = {
-    goblins: ranges["goblin"].min,
+    fireGoblins: ranges["fire-goblin"].min,
+    waterGoblins: ranges["water-goblin"].min,
+    waterGoblinSpears: ranges["water-goblin-spear"].min,
     ghosts: ranges["ghost"].min,
     stones: ranges["stone-exciter"].min,
   } as const;
   const max = {
-    goblins: ranges["goblin"].max,
+    fireGoblins: ranges["fire-goblin"].max,
+    waterGoblins: ranges["water-goblin"].max,
+    waterGoblinSpears: ranges["water-goblin-spear"].max,
     ghosts: ranges["ghost"].max,
     stones: ranges["stone-exciter"].max,
   } as const;
 
   // Sample desired counts within ranges (uniformly choose an endpoint)
-  let goblins = min.goblins + (rng() < 0.5 ? 0 : Math.max(0, max.goblins - min.goblins));
+  let fireGoblins = min.fireGoblins + (rng() < 0.5 ? 0 : Math.max(0, max.fireGoblins - min.fireGoblins));
+  let waterGoblins = min.waterGoblins + (rng() < 0.5 ? 0 : Math.max(0, max.waterGoblins - min.waterGoblins));
+  let waterGoblinSpears = min.waterGoblinSpears + (rng() < 0.5 ? 0 : Math.max(0, max.waterGoblinSpears - min.waterGoblinSpears));
   let ghosts = min.ghosts + (rng() < 0.5 ? 0 : Math.max(0, max.ghosts - min.ghosts));
   let stones = min.stones + (rng() < 0.5 ? 0 : Math.max(0, max.stones - min.stones));
 
   const target = enemies.length;
-  const sum = () => goblins + ghosts + stones;
+  const sum = () => fireGoblins + waterGoblins + waterGoblinSpears + ghosts + stones;
 
   // If we have fewer than needed, increase within ranges first, then beyond if required
   while (sum() < target) {
-    if (goblins < max.goblins) goblins++;
+    if (fireGoblins < max.fireGoblins) fireGoblins++;
+    else if (waterGoblins < max.waterGoblins) waterGoblins++;
+    else if (waterGoblinSpears < max.waterGoblinSpears) waterGoblinSpears++;
     else if (ghosts < max.ghosts) ghosts++;
     else if (stones < max.stones) stones++;
-    else goblins++; // as last resort, exceed preferred range
+    else fireGoblins++; // as last resort, exceed preferred range
   }
 
   // If we have more than needed, decrease within ranges in order of preference
   while (sum() > target) {
-    if (goblins > min.goblins) goblins--;
+    if (waterGoblinSpears > min.waterGoblinSpears) waterGoblinSpears--;
+    else if (waterGoblins > min.waterGoblins) waterGoblins--;
+    else if (fireGoblins > min.fireGoblins) fireGoblins--;
     else if (ghosts > min.ghosts) ghosts--;
     else if (stones > min.stones) stones--;
-    else goblins--; // as last resort, go below preferred range
+    else fireGoblins--; // as last resort, go below preferred range
   }
 
   // Build an assignment pool
   const pool: EnemyKind[] = [];
-  for (let i = 0; i < goblins; i++) pool.push("goblin");
+  for (let i = 0; i < fireGoblins; i++) pool.push("fire-goblin");
+  for (let i = 0; i < waterGoblins; i++) pool.push("water-goblin");
+  for (let i = 0; i < waterGoblinSpears; i++) pool.push("water-goblin-spear");
   for (let i = 0; i < ghosts; i++) pool.push("ghost");
   for (let i = 0; i < stones; i++) pool.push("stone-exciter");
 
@@ -68,6 +82,6 @@ export function enemyTypeAssignement(
 
   // Assign kinds to enemies in order
   for (let i = 0; i < enemies.length; i++) {
-    enemies[i].kind = pool[i] ?? "goblin"; // safety fallback
+    enemies[i].kind = pool[i] ?? "fire-goblin"; // safety fallback
   }
 }

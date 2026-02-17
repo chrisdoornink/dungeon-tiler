@@ -417,7 +417,7 @@ describe('Tile component', () => {
           hasEnemy={true}
           enemyVisible={true}
           enemyFacing="DOWN"
-          enemyKind="goblin"
+          enemyKind="fire-goblin"
           row={13}
           col={2}
         />

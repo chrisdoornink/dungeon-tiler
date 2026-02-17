@@ -38,14 +38,14 @@ function createBaseGameState(): GameState {
   } as unknown as GameState;
 }
 
-function createEnemy(kind: "goblin" | "stone-exciter"): Enemy {
+function createEnemy(kind: "fire-goblin" | "water-goblin" | "stone-exciter"): Enemy {
   const enemy = new Enemy({ y: 2, x: 1 });
   enemy.kind = kind;
   return enemy;
 }
 
 describe("Enemy faulty floor hazard deaths", () => {
-  ( ["goblin", "stone-exciter"] as const ).forEach((kind) => {
+  ( ["fire-goblin", "stone-exciter"] as const ).forEach((kind) => {
     test(`${kind} standing on faulty floor is removed and counted as defeated`, () => {
       const base = createBaseGameState();
       const enemy = createEnemy(kind);

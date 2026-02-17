@@ -33,7 +33,7 @@ describe("Goblin mirror variance with Math.random fallback", () => {
     // Set up: player at (2,2), goblin at (2,1) left of player
     const gs = makeState(2, 2);
     const e = new Enemy({ y: 2, x: 1 });
-    e.kind = 'goblin';
+    e.kind = 'fire-goblin';
     gs.enemies!.push(e);
 
     // Mock Math.random sequence: 0.1 (-1) -> 0 damage; 0.5 (0) -> 1; 0.9 (+1) -> 2
@@ -66,7 +66,7 @@ describe("Goblin mirror variance with Math.random fallback", () => {
     // Player at (4,4), goblin at (4,5). Attack by moving RIGHT.
     const base = makeState(4, 4);
     const g = new Enemy({ y: 4, x: 5 });
-    g.kind = 'goblin';
+    g.kind = 'fire-goblin';
     g.health = 5;
     const gs: GameState = { ...base, enemies: [g] } as GameState;
 
@@ -84,7 +84,7 @@ describe("Goblin mirror variance with Math.random fallback", () => {
     // Reset for next case
     const base2 = makeState(4, 4);
     const g2 = new Enemy({ y: 4, x: 5 });
-    g2.kind = 'goblin';
+    g2.kind = 'fire-goblin';
     g2.health = 5;
     const gs2: GameState = { ...base2, enemies: [g2] } as GameState;
 
@@ -98,7 +98,7 @@ describe("Goblin mirror variance with Math.random fallback", () => {
     // Reset for next case
     const base3 = makeState(4, 4);
     const g3 = new Enemy({ y: 4, x: 5 });
-    g3.kind = 'goblin';
+    g3.kind = 'fire-goblin';
     g3.health = 5;
     const gs3: GameState = { ...base3, enemies: [g3] } as GameState;
 

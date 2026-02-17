@@ -112,6 +112,12 @@ export const ASSET_URLS: string[] = [
   // Remaining enemies (large files - load later)
   "/images/enemies/fire-goblin/fire-goblin-right.png",
   "/images/enemies/fire-goblin/fire-goblin-back.png",
+  "/images/enemies/fire-goblin/blue-goblin-front.png",
+  "/images/enemies/fire-goblin/blue-goblin-right.png",
+  "/images/enemies/fire-goblin/blue-goblin-back.png",
+  "/images/enemies/fire-goblin/blue-goblin-front-spear.png",
+  "/images/enemies/fire-goblin/blue-goblin-right-spear.png",
+  "/images/enemies/fire-goblin/blue-goblin-back-spear.png",
   "/images/enemies/lantern-wisp.png",
   "/images/enemies/stone-exciter-front.png",
   "/images/enemies/stone-exciter-right.png",

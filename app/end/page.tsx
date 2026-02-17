@@ -29,7 +29,7 @@ type LastGame = {
     damageTaken: number;
     enemiesDefeated: number;
     steps?: number;
-    byKind?: { goblin: number; ghost: number; 'stone-exciter': number };
+    byKind?: { 'fire-goblin': number; 'water-goblin': number; 'water-goblin-spear': number; ghost: number; 'stone-exciter': number };
   };
 };
 
@@ -104,7 +104,7 @@ export default function EndPage() {
           alt: "Floor crack"
         };
       case 'enemy':
-        const enemyKind = (last.deathCause.enemyKind || 'goblin') as EnemyKind;
+        const enemyKind = (last.deathCause.enemyKind || 'fire-goblin') as EnemyKind;
         const enemyConfig = EnemyRegistry[enemyKind];
         const enemyImage = getEnemyIcon(enemyKind);
         const enemyName = `a ${enemyConfig.displayName}`;
@@ -134,9 +134,11 @@ export default function EndPage() {
         : last.deathCause.type === 'enemy'
         ? (({
             ghost: '👻',
-            goblin: '👹',
+            'fire-goblin': '👹',
+            'water-goblin': '🧊',
+            'water-goblin-spear': '🔱',
             'stone-exciter': '🗿',
-          } as Record<string, string>)[last.deathCause.enemyKind || 'goblin'] || '👹')
+          } as Record<string, string>)[last.deathCause.enemyKind || 'fire-goblin'] || '👹')
         : '')
     : '';
   const stepsPart = typeof last.stats?.steps === 'number' ? `👣 ${last.stats!.steps}` : '';
@@ -151,7 +153,7 @@ export default function EndPage() {
     Object.entries(last.stats.byKind as Record<string, number>).forEach(([enemyType, count]) => {
       const n = typeof count === 'number' ? count : 0;
       if (n > 0) {
-        const emoji = ({ ghost: '👻', goblin: '👹', 'stone-exciter': '🗿' } as Record<string, string>)[enemyType] || '👹';
+        const emoji = ({ ghost: '👻', 'fire-goblin': '👹', 'water-goblin': '🧊', 'water-goblin-spear': '🔱', 'stone-exciter': '🗿' } as Record<string, string>)[enemyType] || '👹';
         enemyChunks.push(emoji.repeat(n));
       }
     });

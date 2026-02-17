@@ -75,7 +75,7 @@ type DialogueSession = {
   consumedScriptIds: string[];
 };
 
-const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["goblin"]);
+const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["fire-goblin", "water-goblin", "water-goblin-spear"]);
 
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
@@ -3595,7 +3595,9 @@ function renderTileGrid(
             enemyFacing={enemyAtTile?.facing}
             enemyKind={
               enemyAtTile?.kind as
-                | "goblin"
+                | "fire-goblin"
+                | "water-goblin"
+                | "water-goblin-spear"
                 | "ghost"
                 | "stone-exciter"
                 | "snake"

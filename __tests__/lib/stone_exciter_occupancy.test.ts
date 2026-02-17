@@ -3,7 +3,7 @@ import { Enemy, updateEnemies } from "../../lib/enemy";
 // 7x7 open floor grid
 const grid = Array.from({ length: 7 }, () => Array(7).fill(0));
 
-function makeEnemy(y: number, x: number, kind: 'goblin' | 'ghost' | 'stone-exciter' = 'goblin') {
+function makeEnemy(y: number, x: number, kind: 'fire-goblin' | 'water-goblin' | 'ghost' | 'stone-exciter' = 'fire-goblin') {
   const e = new Enemy({ y, x });
   e.kind = kind;
   return e;
@@ -14,7 +14,7 @@ describe("stone-exciter occupancy: cannot clip through or onto other enemies dur
     const player = { y: 3, x: 3 };
     // Stone-exciter at (3,6) moving left toward player, with a blocker at (3,5)
     const exciter = makeEnemy(3, 6, 'stone-exciter');
-    const blocker = makeEnemy(3, 5, 'goblin');
+    const blocker = makeEnemy(3, 5, 'fire-goblin');
 
     // Trigger hunt: player within 4 tiles horizontally (dist=3)
     updateEnemies(grid, [exciter, blocker], player);
@@ -30,7 +30,7 @@ describe("stone-exciter occupancy: cannot clip through or onto other enemies dur
     // Exciter at (3,4), wants to move left twice toward player.
     // Place a blocker at (3,3) which would be the first step; ensure no clipping through to (3,2).
     const exciter = makeEnemy(3, 4, 'stone-exciter');
-    const blocker = makeEnemy(3, 3, 'goblin');
+    const blocker = makeEnemy(3, 3, 'fire-goblin');
 
     updateEnemies(grid, [exciter, blocker], player);
 

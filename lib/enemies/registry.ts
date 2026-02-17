@@ -1,6 +1,6 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
-export type EnemyKind = "goblin" | "ghost" | "stone-exciter" | "snake";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "ghost" | "stone-exciter" | "snake";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -64,9 +64,9 @@ export interface EnemyConfig {
 const clampMin = (n: number, min = 0) => (n < min ? min : n);
 
 export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
-  goblin: {
-    kind: "goblin",
-    displayName: "Goblin",
+  "fire-goblin": {
+    kind: "fire-goblin",
+    displayName: "Fire Goblin",
     assets: {
       front: "/images/enemies/fire-goblin/fire-goblin-front.png",
       left: "/images/enemies/fire-goblin/fire-goblin-right.png", // mirror right for left
@@ -76,6 +76,38 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     desiredMinCount: 2,
     desiredMaxCount: 3,
     base: { health: 5, attack: 1 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {},
+  },
+  "water-goblin": {
+    kind: "water-goblin",
+    displayName: "Water Goblin",
+    assets: {
+      front: "/images/enemies/fire-goblin/blue-goblin-front.png",
+      left: "/images/enemies/fire-goblin/blue-goblin-right.png", // mirror right for left
+      right: "/images/enemies/fire-goblin/blue-goblin-right.png",
+      back: "/images/enemies/fire-goblin/blue-goblin-back.png",
+    },
+    desiredMinCount: 1,
+    desiredMaxCount: 2,
+    base: { health: 5, attack: 2 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {},
+  },
+  "water-goblin-spear": {
+    kind: "water-goblin-spear",
+    displayName: "Water Goblin Spearman",
+    assets: {
+      front: "/images/enemies/fire-goblin/blue-goblin-front-spear.png",
+      left: "/images/enemies/fire-goblin/blue-goblin-right-spear.png", // mirror right for left
+      right: "/images/enemies/fire-goblin/blue-goblin-right-spear.png",
+      back: "/images/enemies/fire-goblin/blue-goblin-back-spear.png",
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
+    base: { health: 5, attack: 4 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},

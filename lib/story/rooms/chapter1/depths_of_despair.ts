@@ -140,7 +140,7 @@ export function buildDepthsOfDespairRoom1(): StoryRoom {
 
   const forbidden = createForbiddenSet(entryPoint, exitPoint);
   const configs: EnemyConfig[] = [
-    { kind: "goblin", count: 20 },
+    { kind: "fire-goblin", count: 20 },
     { kind: "ghost", count: 3 },
     { kind: "stone-exciter", count: 5 },
   ];
@@ -200,7 +200,7 @@ export function buildDepthsOfDespairRoom2(): StoryRoom {
   forbidden.add("34,6");
   
   const configs: EnemyConfig[] = [
-    { kind: "goblin", count: 40 },
+    { kind: "fire-goblin", count: 40 },
     { kind: "ghost", count: 6 },
     { kind: "stone-exciter", count: 10 },
   ];

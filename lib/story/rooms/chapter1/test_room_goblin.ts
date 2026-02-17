@@ -43,7 +43,7 @@ export function buildTestRoomGoblin(): StoryRoom {
 
   // All enemies are goblins by default
   enemies.forEach(e => {
-    e.kind = 'goblin';
+    e.kind = 'fire-goblin';
   });
 
   // Add some wall torches for visibility

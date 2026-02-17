@@ -7,7 +7,7 @@ describe('ScoreCalculator', () => {
     enemiesDefeated: 5,
     steps: 80, // Updated for new step penalty threshold
     byKind: {
-      goblin: 3,
+      'fire-goblin': 3,
       ghost: 1,
       'stone-exciter': 1,
     },
@@ -65,12 +65,12 @@ describe('ScoreCalculator', () => {
     it('should treat all enemy types equally', () => {
       const goblinStats = {
         ...mockStats,
-        byKind: { goblin: 5, ghost: 0, 'stone-exciter': 0 },
+        byKind: { 'fire-goblin': 5, ghost: 0, 'stone-exciter': 0 },
       };
       
       const mixedStats = {
         ...mockStats,
-        byKind: { goblin: 2, ghost: 2, 'stone-exciter': 1 },
+        byKind: { 'fire-goblin': 2, ghost: 2, 'stone-exciter': 1 },
       };
       
       const goblinScore = ScoreCalculator.calculateScore('win', 4, goblinStats, mockInventory);
@@ -136,7 +136,7 @@ describe('ScoreCalculator', () => {
         damageTaken: 0,
         enemiesDefeated: 2,
         steps: 40,
-        byKind: { goblin: 2, ghost: 0, 'stone-exciter': 0 },
+        byKind: { 'fire-goblin': 2, ghost: 0, 'stone-exciter': 0 },
       };
       
       const speedRunInventory: GameInventory = {
@@ -161,7 +161,7 @@ describe('ScoreCalculator', () => {
         damageTaken: 1,
         enemiesDefeated: 6,
         steps: 90,
-        byKind: { goblin: 4, ghost: 1, 'stone-exciter': 1 },
+        byKind: { 'fire-goblin': 4, ghost: 1, 'stone-exciter': 1 },
       };
       
       const combatInventory: GameInventory = {
@@ -186,7 +186,7 @@ describe('ScoreCalculator', () => {
         damageTaken: 0,
         enemiesDefeated: 2,
         steps: 35,
-        byKind: { goblin: 2, ghost: 0, 'stone-exciter': 0 },
+        byKind: { 'fire-goblin': 2, ghost: 0, 'stone-exciter': 0 },
       };
       
       const speedInventory: GameInventory = {
@@ -203,7 +203,7 @@ describe('ScoreCalculator', () => {
         damageTaken: 1,
         enemiesDefeated: 7,
         steps: 85,
-        byKind: { goblin: 5, ghost: 1, 'stone-exciter': 1 },
+        byKind: { 'fire-goblin': 5, ghost: 1, 'stone-exciter': 1 },
       };
       
       const combatInventory: GameInventory = {
@@ -232,7 +232,7 @@ describe('ScoreCalculator', () => {
         damageTaken: 2,
         enemiesDefeated: 5,
         steps: 200, // Way too many steps
-        byKind: { goblin: 5, ghost: 0, 'stone-exciter': 0 },
+        byKind: { 'fire-goblin': 5, ghost: 0, 'stone-exciter': 0 },
       };
       
       const fastStats: GameStats = {

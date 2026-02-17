@@ -83,7 +83,7 @@ export function parseVisualMap(visualMap: string[], width: number, height?: numb
           break;
         case 'G':
           tileType = 0; // floor with goblin
-          enemies.push({ y, x, kind: 'goblin' });
+          enemies.push({ y, x, kind: 'fire-goblin' });
           break;
         case 'S':
           tileType = 0; // floor with snake

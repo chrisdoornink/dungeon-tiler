@@ -57,7 +57,7 @@ describe("Enemy Defeat Story Events", () => {
       y: 5,
       x: 5
     });
-    enemy.kind = "goblin";
+    enemy.kind = "fire-goblin";
     enemy.health = 2;
     // Set behavior memory via the internal property since it's read-only
     (enemy as any)._behaviorMem = behaviorMemory;
@@ -162,7 +162,7 @@ describe("Enemy Defeat Story Events", () => {
       expect(result).toEqual({
         y: 5,
         x: 5,
-        kind: "goblin",
+        kind: "fire-goblin",
         behaviorMemory: { isKalenThreat: true, moved: false }
       });
     });
@@ -175,7 +175,7 @@ describe("Enemy Defeat Story Events", () => {
       expect(result).toEqual({
         y: 5,
         x: 5,
-        kind: "goblin",
+        kind: "fire-goblin",
         behaviorMemory: {}
       });
     });

@@ -28,7 +28,7 @@ describe('stone-exciter contact damage', () => {
     const exciter = makeExciter(3, 5); // two to the right
     // Put a blocker between player and exciter to avoid contact this tick
     const blocker = new Enemy({ y: 3, x: 4 });
-    blocker.kind = 'goblin';
+    blocker.kind = 'fire-goblin';
 
     const damage = updateEnemies(grid, [exciter, blocker], player, {
       rng: () => 0.9,
