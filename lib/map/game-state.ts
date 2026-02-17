@@ -828,7 +828,7 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const tileSubs = row ? row[enemy.x] || [] : [];
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
 
-    if ((enemy.kind === "stone-exciter" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear") && onFaulty) {
+    if ((enemy.kind === "stone-exciter" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
       defeated.push(enemy);
 
       if (!state.recentDeaths) state.recentDeaths = [];

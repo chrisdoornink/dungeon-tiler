@@ -1,6 +1,6 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "ghost" | "stone-exciter" | "snake";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "ghost" | "stone-exciter" | "snake";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -108,6 +108,38 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     desiredMinCount: 0,
     desiredMaxCount: 1,
     base: { health: 5, attack: 4 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {},
+  },
+  "earth-goblin": {
+    kind: "earth-goblin",
+    displayName: "Earth Goblin",
+    assets: {
+      front: "/images/enemies/fire-goblin/brown-goblin-front.png",
+      left: "/images/enemies/fire-goblin/brown-goblin-right.png",
+      right: "/images/enemies/fire-goblin/brown-goblin-right.png",
+      back: "/images/enemies/fire-goblin/brown-goblin-back.png",
+    },
+    desiredMinCount: 1,
+    desiredMaxCount: 2,
+    base: { health: 3, attack: 1 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {},
+  },
+  "earth-goblin-knives": {
+    kind: "earth-goblin-knives",
+    displayName: "Earth Goblin Knifesman",
+    assets: {
+      front: "/images/enemies/fire-goblin/brown-goblin-front-knives.png",
+      left: "/images/enemies/fire-goblin/brown-goblin-right-knives.png",
+      right: "/images/enemies/fire-goblin/brown-goblin-right-knives.png",
+      back: "/images/enemies/fire-goblin/brown-goblin-back-knives.png",
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
+    base: { health: 3, attack: 3 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},

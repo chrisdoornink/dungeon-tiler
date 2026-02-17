@@ -28,6 +28,8 @@ const EMOJI_MAP = {
   "fire-goblin": "👹",
   "water-goblin": "🧊",
   "water-goblin-spear": "🔱",
+  "earth-goblin": "🟤",
+  "earth-goblin-knives": "🗡️",
   ghost: "👻",
   "stone-exciter": "🗿",
   snake: "🐍",

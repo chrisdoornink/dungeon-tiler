@@ -75,7 +75,7 @@ type DialogueSession = {
   consumedScriptIds: string[];
 };
 
-const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["fire-goblin", "water-goblin", "water-goblin-spear"]);
+const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["fire-goblin"]);
 
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
@@ -3598,6 +3598,8 @@ function renderTileGrid(
                 | "fire-goblin"
                 | "water-goblin"
                 | "water-goblin-spear"
+                | "earth-goblin"
+                | "earth-goblin-knives"
                 | "ghost"
                 | "stone-exciter"
                 | "snake"

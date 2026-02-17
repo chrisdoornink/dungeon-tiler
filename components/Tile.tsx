@@ -41,7 +41,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'ghost' | 'stone-exciter' | 'snake';
+  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
