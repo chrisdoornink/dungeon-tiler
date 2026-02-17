@@ -1,5 +1,5 @@
 "use client";
 
-import DailyChallengePage from "./daily/page";
+import DailyNewPage from "./daily-new/page";
 
-export default DailyChallengePage;
+export default DailyNewPage;

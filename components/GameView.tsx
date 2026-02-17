@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
+import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies, type PlainEnemy } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
 import { DateUtils } from "../lib/date_utils";
@@ -101,6 +101,10 @@ function GameViewInner({
           } else if (algorithm === "complete") {
             generateCompleteMap();
           }
+          if (slot === 'daily-new') {
+            // Multi-tier daily mode uses its own initializer with floor-based generation
+            return initializeGameStateForMultiTier(1);
+          }
           const gs = initializeGameState();
           // Daily-only: 1-in-6 chance to use the outdoor environment
           if (gs && gs.mapData && Math.random() < 1 / 6) {
@@ -111,11 +115,6 @@ function GameViewInner({
         if (state) {
           state.mode = 'daily';
           state.allowCheckpoints = false;
-          // Initialize multi-tier mode for daily-new storage slot
-          if (slot === 'daily-new') {
-            state.currentFloor = 1;
-            state.maxFloors = 10;
-          }
         }
       } else {
         if (algorithm === "default") {
@@ -213,6 +212,7 @@ function GameViewInner({
           forceDaylight={daylight}
           isDailyChallenge={!!isDailyChallenge}
           onDailyComplete={onDailyComplete}
+          storageSlot={storageSlot}
         />
       </div>
     </div>

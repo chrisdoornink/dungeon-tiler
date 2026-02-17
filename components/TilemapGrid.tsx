@@ -1861,6 +1861,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     rocks: 0,
     runes: 0,
     food: 0,
+    chestKeys: 0,
   });
 
   // Helper function to trigger item pickup animation
@@ -1888,6 +1889,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (!gameState) return;
       // Keys
       if (gameState.hasKey && !prevInv.key) {
+        trackPickup("key");
+        triggerItemPickupAnimation("key");
+      }
+      if ((gameState.chestKeyCount ?? 0) > prevInv.chestKeys) {
         trackPickup("key");
         triggerItemPickupAnimation("key");
       }
@@ -1926,6 +1931,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       rocks: gameState.rockCount ?? 0,
       runes: gameState.runeCount ?? 0,
       food: gameState.foodCount ?? 0,
+      chestKeys: gameState.chestKeyCount ?? 0,
     };
     const changed =
       nextInv.key !== prevInv.key ||
@@ -1934,7 +1940,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       nextInv.shield !== prevInv.shield ||
       nextInv.rocks !== prevInv.rocks ||
       nextInv.runes !== prevInv.runes ||
-      nextInv.food !== prevInv.food;
+      nextInv.food !== prevInv.food ||
+      nextInv.chestKeys !== prevInv.chestKeys;
     if (changed) {
       setPrevInv(nextInv);
     }
@@ -2528,6 +2535,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 flex items-center justify-center">
           <div className="game-scale relative" data-testid="game-scale">
+            {/* Floor indicator for multi-tier daily mode */}
+            {gameState.currentFloor != null && (gameState.maxFloors ?? 0) > 1 && (
+              <div className="text-center text-xs text-gray-400 font-semibold mb-1">
+                Level {gameState.currentFloor}
+              </div>
+            )}
             {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
             <div
               className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
@@ -2605,9 +2618,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               <h3 className="text-xs font-medium mb-1">Inventory</h3>
               {(() => {
                 // Count total inventory items
+                const chestKeys = gameState.chestKeyCount ?? 0;
                 const inventoryCount =
                   (diaryEntries.length > 0 ? 1 : 0) +
-                  (gameState.hasKey ? 1 : 0) +
+                  (gameState.hasKey || chestKeys > 0 ? 1 : 0) +
                   (gameState.hasExitKey ? 1 : 0) +
                   (gameState.hasSword ? 1 : 0) +
                   (gameState.hasShield ? 1 : 0) +
@@ -2662,14 +2676,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         )}
                       </button>
                     )}
-                    {gameState.hasKey && (
+                    {(gameState.hasKey || chestKeys > 0) && (
                       <div
                         className={
                           isCompact
                             ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
                             : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
                         }
-                        title="Key"
+                        title={chestKeys > 0 ? `Keys (${chestKeys})` : "Key"}
                       >
                         <span
                           aria-hidden="true"
@@ -2683,7 +2697,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             backgroundPosition: "center",
                           }}
                         />
-                        {!isCompact && <span>Key</span>}
+                        {!isCompact && <span>{chestKeys > 0 ? `Key x${chestKeys}` : "Key"}</span>}
+                        {isCompact && chestKeys > 1 && (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            {chestKeys}
+                          </span>
+                        )}
                       </div>
                     )}
                     {gameState.hasExitKey && (

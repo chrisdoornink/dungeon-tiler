@@ -499,6 +499,151 @@ export function generateCompleteMap(): MapData {
   return addPlayerToMap(withTorches);
 }
 
+/**
+ * Chest contents for multi-tier mode: sword, shield, snake medallion.
+ */
+const MULTI_TIER_CHEST_CONTENTS = [
+  TileSubtype.SWORD,
+  TileSubtype.SHIELD,
+  TileSubtype.SNAKE_MEDALLION,
+];
+
+/**
+ * Deterministically allocate 3 chests and 3 keys across floors 1–4.
+ * Uses Math.random (expected to be seeded externally).
+ *
+ * Returns a map: floor → { chests: number, keys: number, chestContents: TileSubtype[] }
+ *
+ * Constraint: cumulative keys ≥ cumulative chests at each floor,
+ * so the player always has enough keys to open available chests.
+ */
+export function allocateChestsAndKeys(): Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }> {
+  const result = new Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }>();
+  for (let f = 1; f <= 4; f++) {
+    result.set(f, { chests: 0, keys: 0, chestContents: [] });
+  }
+
+  // Shuffle chest contents to randomize which item goes where
+  const contents = [...MULTI_TIER_CHEST_CONTENTS];
+  for (let i = contents.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [contents[i], contents[j]] = [contents[j], contents[i]];
+  }
+
+  // Place 3 chests randomly across floors 1–4
+  const chestFloors: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    chestFloors.push(1 + Math.floor(Math.random() * 4)); // 1–4
+  }
+  chestFloors.sort((a, b) => a - b);
+
+  // Place 3 keys randomly across floors 1–4, then adjust to satisfy the
+  // cumulative constraint: by floor F, total keys placed ≥ total chests placed.
+  const keyFloors: number[] = [];
+  for (let i = 0; i < 3; i++) {
+    keyFloors.push(1 + Math.floor(Math.random() * 4)); // 1–4
+  }
+  keyFloors.sort((a, b) => a - b);
+
+  // Enforce constraint: for each chest, ensure a key exists on or before that floor
+  for (let i = 0; i < 3; i++) {
+    if (keyFloors[i] > chestFloors[i]) {
+      keyFloors[i] = chestFloors[i];
+    }
+  }
+  keyFloors.sort((a, b) => a - b);
+
+  // Assign to result
+  for (let i = 0; i < 3; i++) {
+    const cf = chestFloors[i];
+    const entry = result.get(cf)!;
+    entry.chests++;
+    entry.chestContents.push(contents[i]);
+
+    const kf = keyFloors[i];
+    result.get(kf)!.keys++;
+  }
+
+  return result;
+}
+
+/**
+ * Place a specific number of locked chests with given contents on a map.
+ */
+export function addSpecificChestsToMap(
+  mapData: MapData,
+  chestContents: TileSubtype[],
+): MapData {
+  if (chestContents.length === 0) return mapData;
+
+  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const grid = newMapData.tiles;
+  const gridHeight = grid.length;
+  const gridWidth = grid[0].length;
+
+  const eligible: Array<[number, number]> = [];
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (
+        grid[y][x] === FLOOR &&
+        (newMapData.subtypes[y][x].length === 0 ||
+          newMapData.subtypes[y][x].includes(TileSubtype.NONE))
+      ) {
+        eligible.push([y, x]);
+      }
+    }
+  }
+
+  // Shuffle eligible positions
+  for (let i = eligible.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
+  }
+
+  const count = Math.min(chestContents.length, eligible.length);
+  for (let i = 0; i < count; i++) {
+    const [cy, cx] = eligible[i];
+    newMapData.subtypes[cy][cx] = [TileSubtype.CHEST, chestContents[i], TileSubtype.LOCK];
+  }
+
+  return newMapData;
+}
+
+/**
+ * Place a specific number of chest keys on a map.
+ */
+export function addChestKeysToMap(mapData: MapData, keyCount: number): MapData {
+  if (keyCount <= 0) return mapData;
+
+  let result = mapData;
+  for (let i = 0; i < keyCount; i++) {
+    result = addSingleKeyToMap(result);
+  }
+  return result;
+}
+
+/**
+ * Generate a complete map for a specific floor in multi-tier mode.
+ * Uses the floor allocation to determine how many chests/keys to place.
+ */
+export function generateCompleteMapForFloor(
+  floorAllocation: { chests: number; keys: number; chestContents: TileSubtype[] },
+): MapData {
+  const base = generateMapWithSubtypes();
+  const withExit = generateMapWithExit(base);
+  const withExitKey = addExitKeyToMap(withExit);
+
+  // Place floor-specific chests and keys instead of the default 2 chests + 1 key
+  const withChests = addSpecificChestsToMap(withExitKey, floorAllocation.chestContents);
+  const withKeys = addChestKeysToMap(withChests, floorAllocation.keys);
+
+  const withPots = addPotsToMap(withKeys);
+  const withRocks = addRocksToMap(withPots);
+  const withFaultyFloors = addFaultyFloorsToMap(withRocks);
+  const withTorches = addWallTorchesToMap(withFaultyFloors);
+  return addPlayerToMap(withTorches);
+}
+
 export function addWallTorchesToMap(mapData: MapData): MapData {
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
   const grid = newMapData.tiles;

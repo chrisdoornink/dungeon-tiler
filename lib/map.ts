@@ -40,6 +40,8 @@ export {
   addExitKeyToMap,
   addChestsToMap,
   generateCompleteMap,
+  generateCompleteMapForFloor,
+  allocateChestsAndKeys,
   addWallTorchesToMap,
   findStrategicDoorWall,
 } from "./map/map-features";
@@ -72,6 +74,7 @@ export {
   initializeGameStateFromMap,
   movePlayer,
   advanceToNextFloor,
+  initializeGameStateForMultiTier,
 } from "./map/game-state";
 
 export type { GameState, CheckpointSnapshot } from "./map/game-state";

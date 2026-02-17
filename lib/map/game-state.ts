@@ -45,7 +45,7 @@ import {
   isWithinBounds,
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
-import { addRunePotsForStoneExciters, generateCompleteMap } from "./map-features";
+import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
@@ -685,6 +685,8 @@ export interface GameState {
   hasSword?: boolean;
   swordName?: string; // Player-chosen name for their sword
   hasShield?: boolean;
+  chestKeyCount?: number; // Multi-tier: consumable keys for opening locked chests (separate from universal key)
+  floorChestAllocation?: Record<number, { chests: number; keys: number; chestContents: number[] }>; // Multi-tier: pre-computed chest/key distribution across floors
   mode?: 'normal' | 'daily' | 'story';
   allowCheckpoints?: boolean;
   currentFloor?: number; // Current floor number for multi-tier daily mode (1-indexed)
@@ -942,6 +944,74 @@ export function initializeGameState(): GameState {
 }
 
 /**
+ * Initialize a new game state for floor 1 of multi-tier daily mode.
+ * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
+ */
+export function initializeGameStateForMultiTier(floor: number = 1): GameState {
+  // Compute the chest/key allocation for floors 1–4
+  const allocationMap = allocateChestsAndKeys();
+
+  // Convert Map to plain object for JSON serialization
+  const floorChestAllocation: Record<number, { chests: number; keys: number; chestContents: number[] }> = {};
+  allocationMap.forEach((val, key) => {
+    floorChestAllocation[key] = val;
+  });
+
+  const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
+  const mapData = generateCompleteMapForFloor(floorAlloc);
+
+  const playerPos = findPlayerPosition(mapData);
+  const enemies = playerPos
+    ? placeEnemies({
+        grid: mapData.tiles,
+        player: { y: playerPos[0], x: playerPos[1] },
+        count: Math.floor(Math.random() * 4) + 4,
+        minDistanceFromPlayer: 8,
+      })
+    : [];
+
+  enemyTypeAssignement(enemies, { floor });
+
+  const withRunes = addRunePotsForStoneExciters(mapData, enemies);
+  const snakesAdded = addSnakesPerRules(withRunes, enemies);
+
+  return {
+    hasKey: false,
+    hasExitKey: false,
+    hasSword: false,
+    hasShield: false,
+    chestKeyCount: 0,
+    floorChestAllocation,
+    mode: 'daily',
+    allowCheckpoints: false,
+    currentFloor: floor,
+    maxFloors: 10,
+    mapData: withRunes,
+    showFullMap: false,
+    win: false,
+    playerDirection: Direction.DOWN,
+    enemies: snakesAdded,
+    npcs: [],
+    heroHealth: 5,
+    heroAttack: 1,
+    rockCount: 0,
+    runeCount: 0,
+    heroTorchLit: true,
+    stats: {
+      damageDealt: 0,
+      damageTaken: 0,
+      enemiesDefeated: 0,
+      steps: 0,
+      byKind: createEmptyByKind(),
+    },
+    recentDeaths: [],
+    npcInteractionQueue: [],
+    storyFlags: createInitialStoryFlags(),
+    diaryEntries: [],
+  };
+}
+
+/**
  * Initialize a new game state from an existing MapData snapshot.
  * Useful for replaying the same dungeon layout (tiles/subtypes) with a fresh run.
  */
@@ -1012,10 +1082,19 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   const floorSeed = dailySeed + nextFloor;
   
   const rng = mulberry32Fn(floorSeed);
+
+  // Get the pre-computed chest/key allocation for this floor
+  const allocation = currentState.floorChestAllocation?.[nextFloor];
   
   // Generate new map with floor-specific seed
   const newMapData = withPatchedMathRandom(rng, () => {
-    const mapData = generateCompleteMap();
+    let mapData: MapData;
+    if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
+      mapData = generateCompleteMapForFloor(allocation);
+    } else {
+      // Floors 5+: no chests or keys, just a standard map without chests/keys
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] });
+    }
     // Daily-only: 1-in-6 chance to use the outdoor environment
     if (Math.random() < 1 / 6) {
       mapData.environment = "outdoor";
@@ -1033,7 +1112,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
           minDistanceFromPlayer: 8,
         });
-        enemyTypeAssignement(placed);
+        enemyTypeAssignement(placed, { floor: nextFloor });
         return placed;
       })
     : [];
@@ -1811,7 +1890,8 @@ export function movePlayer(
     // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened)
     if (
       (subtype.includes(TileSubtype.SWORD) ||
-        subtype.includes(TileSubtype.SHIELD)) &&
+        subtype.includes(TileSubtype.SHIELD) ||
+        subtype.includes(TileSubtype.SNAKE_MEDALLION)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
       if (subtype.includes(TileSubtype.SWORD)) {
@@ -1819,6 +1899,9 @@ export function movePlayer(
       }
       if (subtype.includes(TileSubtype.SHIELD)) {
         newGameState.hasShield = true;
+      }
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
+        newGameState.hasSnakeMedallion = true;
       }
       // Clearing of item happens below when we set dest tile subtypes
     }
@@ -1898,8 +1981,14 @@ export function movePlayer(
 
     // If it's a key, pick it up
     if (subtype.includes(TileSubtype.KEY)) {
-      // Universal generic key: once picked up, always available for generic locks
-      newGameState.hasKey = true;
+      const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
+      if (isMultiTier) {
+        // Multi-tier mode: keys are consumable, increment count
+        newGameState.chestKeyCount = (newGameState.chestKeyCount ?? 0) + 1;
+      } else {
+        // Universal generic key: once picked up, always available for generic locks
+        newGameState.hasKey = true;
+      }
       newMapData.subtypes[newY][newX] = [];
     }
 
@@ -1921,20 +2010,29 @@ export function movePlayer(
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
+      const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
+      const hasChestKey = isMultiTier
+        ? (newGameState.chestKeyCount ?? 0) > 0
+        : newGameState.hasKey;
+
       // If locked and no key: allow stepping onto the chest tile, but do NOT open.
-      if (isLocked && !newGameState.hasKey) {
+      if (isLocked && !hasChestKey) {
         // Fall through to normal movement logic below. The coexist rules will
         // allow PLAYER to share the tile with CHEST+LOCK, leaving it closed.
       } else {
-        // Remove LOCK if present (universal key is not consumed)
-        if (isLocked && newGameState.hasKey) {
+        // Remove LOCK if present; consume key in multi-tier mode
+        if (isLocked && hasChestKey) {
           newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
             newX
           ].filter((t) => t !== TileSubtype.LOCK);
+          if (isMultiTier) {
+            newGameState.chestKeyCount = (newGameState.chestKeyCount ?? 1) - 1;
+          }
+          // In legacy mode, universal key is not consumed
         }
 
         // Open the chest in place, but DO NOT grant item yet and DO NOT move the player
-        // Keep the item (SWORD/SHIELD) visible on top of the opened chest
+        // Keep the item (SWORD/SHIELD/SNAKE_MEDALLION) visible on top of the opened chest
         // Remove only the CHEST marker, leave item subtype as-is
         newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][
           newX
@@ -1992,7 +2090,7 @@ export function movePlayer(
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
       if (
-        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD) &&
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION) &&
         !hasClosedChest
       )
         return false;

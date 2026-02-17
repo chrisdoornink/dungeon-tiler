@@ -573,6 +573,16 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.shieldIcon}`}
           />
         )}
+        {hasOpenChest(subtypes) && hasSnakeMedallion(subtypes) && (
+          <div
+            key="medallion-revealed"
+            data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
+            className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.rockIcon}`}
+            style={{
+              backgroundImage: `url('/images/items/snake-medalion.png')`,
+            }}
+          />
+        )}
 
         {/* Render lightswitch with asset if present */}
         {hasLightswitch(subtypes) && (
@@ -763,8 +773,8 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render snake medallion */}
-        {hasSnakeMedallion(subtypes) && (
+        {/* Render snake medallion (standalone, not inside a chest) */}
+        {hasSnakeMedallion(subtypes) && !hasChest(subtypes) && !hasOpenChest(subtypes) && (
           <div
             key="snake-medallion"
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
@@ -1093,7 +1103,10 @@ export const Tile: React.FC<TileProps> = ({
                     transform: (() => {
                       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
                       if (enemyKind !== 'snake') {
-                        return enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none');
+                        if (enemyKind === 'ghost') return 'none';
+                        // Pink goblin's side sprite is left-facing, so invert the flip
+                        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
+                        return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
                       }
                       // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
                       const baseScale = 'scale(0.5)';
@@ -1626,7 +1639,10 @@ export const Tile: React.FC<TileProps> = ({
                     transform: (() => {
                       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
                       if (enemyKind !== 'snake') {
-                        return enemyKind === 'ghost' ? 'none' : (enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none');
+                        if (enemyKind === 'ghost') return 'none';
+                        // Pink goblin's side sprite is left-facing, so invert the flip
+                        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
+                        return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
                       }
                       // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
                       const baseScale = 'scale(0.5)';

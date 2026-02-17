@@ -7,52 +7,131 @@
 ## Objective
 Transform the daily challenge from a single-level dungeon into an endless progression mode where players descend through increasingly difficult floors, testing how far they can get.
 
-## Current State
-- Daily mode currently has one level with exit door
-- When player opens exit (with exit key), `gameState.win = true` is set
-- Game completes and shows `DailyCompleted` screen
-- Player can only play once per day
-- Combat: Goblin has 5 HP, 1 attack; Hero baseline similar but feels too balanced (50/50 fight)
+## Current State (as of Feb 17, 2026)
 
-## Proposed Changes
+### Already Implemented
+- [x] Multi-floor game state: `currentFloor`, `maxFloors`, `needsFloorTransition` fields on GameState
+- [x] `advanceToNextFloor()` in `lib/map/game-state.ts` — generates next floor preserving hero stats/inventory
+- [x] Floor transition handler in `TilemapGrid.tsx` (gated behind `storageSlot === 'daily-new'`)
+- [x] Exit door logic refactored in `movePlayer` — multi-tier mode advances floor instead of winning
+- [x] `daily-new` storage slot for separate save state
+- [x] `app/daily-new/page.tsx` route with `storageSlot="daily-new"`
+- [x] Combat variance rebalanced: weighted 25%/50%/25% (was uniform 33/33/33)
+- [x] 7 goblin types with unique stats and behaviors
+- [x] Weighted enemy spawn system in `lib/enemy_assignment.ts`
 
-### 1. Combat Balance Adjustment
-**Problem:** Hero vs single goblin (no items) is too even - should favor hero more
+### Not Yet Implemented
+- [ ] Floor-based difficulty scaling (enemy counts, types, map size)
+- [ ] Completion screen showing floor reached
+- [ ] Daily stats tracking best floor reached
+- [ ] Collectible gems system (stretch goal)
 
-**Goal:** Hero should have ~80% win rate against a single goblin without items
-- Adjust so hero can reliably beat 1 goblin
-- 2 goblins without health replenishment should be too much
-- Need to tweak damage ratios (hero damage given vs damage taken)
+---
 
-**Current Stats:**
-- Goblin: 5 HP, 1 attack (base)
-- Hero: Similar baseline
-- Both have damage variance: -1/0/+1 spread
+## Enemy Difficulty Ratings
 
-**Action Items:**
-- [ ] Test current hero vs goblin win rate
-- [ ] Adjust goblin HP or hero attack to achieve 80% hero win rate
-- [ ] Consider: reduce goblin HP to 4, or increase hero base attack slightly
-- [ ] Verify 2 goblins is appropriately challenging without healing
+All enemy types rated 1–10 on overall difficulty to the player. These ratings inform spawn weighting and floor-based introduction.
 
-### 2. Multi-Level Progression System
-**Current:** Exit door → win condition → game over
-**New:** Exit door → descend to next level → continue playing
+### Goblins (spawn weights in `lib/enemy_assignment.ts`)
 
-**Mechanics:**
-- Start with 10 levels (can adjust based on difficulty testing)
-- Each level gets progressively harder
-- Dungeon size increases: +1 tile width/height per level (e.g., 10x10 → 11x11 → 12x12)
-- New enemy types introduced as levels progress
-- Track "deepest floor reached" as the primary metric
+| Enemy | HP | ATK | Special | Difficulty | Spawn Weight |
+|-------|:--:|:---:|---------|:----------:|:------------:|
+| **Earth Goblin** | 3 | 1 | None | 2/10 | 20 (~23%) |
+| **Fire Goblin** | 4 | 2 | None (carries torch — visible in dark) | 3/10 | 17 (~20%) |
+| **Water Goblin** | 5 | 1 | None | 3/10 | 17 (~20%) |
+| **Earth Goblin Knives** | 3 | 3 | None | 4/10 | 12 (~14%) |
+| **Water Goblin Spear** | 5 | 4 | None | 6/10 | 8 (~9%) |
+| **Stone Goblin** | 8 | 5 | Takes exactly 1 melee dmg; instant-killed by rune | 7/10 | 6 (~7%) |
+| **Pink Goblin** | 4 | 1 | Ranged attack (1-2 dmg by distance), teleportation ring, maintains 4-5 tile distance, LOS-aware | 8/10 | 5 (~6%) |
 
-**Level Progression:**
-- Floor 1: Current difficulty (adjusted goblins)
-- Floor 2+: Gradually introduce ghosts, snakes, stone-exciters
-- Each floor: slightly more enemies or tougher compositions
-- Size scaling: `baseSize + floorNumber` for width/height
+### Non-Goblins (separate spawn rules)
 
-### 3. Collectible Gems System (Future Enhancement)
+| Enemy | HP | ATK | Special | Difficulty |
+|-------|:--:|:---:|---------|:----------:|
+| **Ghost (Lantern Wisp)** | 2 | 1 | Snuffs hero's torch when adjacent (vision penalty) | 5/10 |
+| **Snake** | 2 | 1 | Avoids player 67% of the time; mostly stays coiled; attacks when adjacent | 3/10 |
+
+### Difficulty Rationale
+- **Earth Goblin (2):** Weakest in every stat. Filler enemy.
+- **Fire Goblin (3):** Balanced baseline. Visible in dark caves (torch) which is a slight advantage for the player.
+- **Water Goblin (3):** Tanky but hits like a wet noodle. Takes time to kill but rarely threatens.
+- **Earth Goblin Knives (4):** Glass cannon — low HP but 3 ATK hurts. Punishes careless engagement.
+- **Ghost (5):** Low stats but torch-snuffing is devastating in caves. Reduces vision, making other enemies harder.
+- **Water Goblin Spear (6):** High HP + high ATK. A serious melee threat that takes multiple hits.
+- **Stone Goblin (7):** Effectively immune to melee (1 dmg per hit = 8 hits to kill). Requires runes. 5 ATK is lethal. Rune pots spawn to compensate.
+- **Pink Goblin (8):** Hardest to deal with. Ranged attack means you take damage without being able to retaliate. Teleports when out of LOS. Best strategy is avoidance.
+
+---
+
+## Difficulty Scaling Strategy (Floors 1–10)
+
+### Design Principles
+- Hero health, inventory, and stats carry between floors
+- Each floor has its own exit key
+- Map size increases slightly per floor
+- Enemy composition shifts from easy goblins to harder types + non-goblins
+- Floor seed = `dailySeed + floorNumber` for deterministic generation
+
+### Floor Progression
+
+| Floor | Map Size | Enemy Count | Goblin Pool | Non-Goblins | Notes |
+|:-----:|:--------:|:-----------:|-------------|-------------|-------|
+| 1 | Base | 4–5 | Earth, Fire, Water only | None | Intro floor, learn the controls |
+| 2 | Base+1 | 5–6 | Earth, Fire, Water, Earth Knives | None | Knives variant introduced |
+| 3 | Base+2 | 5–6 | All easy/medium goblins | 1 snake | First non-goblin |
+| 4 | Base+3 | 6 | + Water Spear eligible | 1 ghost | Ghost torch-snuff adds pressure |
+| 5 | Base+4 | 6–7 | Full weighted pool | 1 ghost, 1 snake | Midpoint — all types possible |
+| 6 | Base+5 | 6–7 | Full weighted pool | 1–2 ghosts | Ghost density increases |
+| 7 | Base+6 | 7 | Weights shift harder | 1–2 ghosts, 1 snake | Stone/Pink more likely |
+| 8 | Base+7 | 7–8 | Weights shift harder | 2 ghosts, 1 snake | High pressure |
+| 9 | Base+8 | 8 | Hard-weighted pool | 2 ghosts, 1–2 snakes | Near-max difficulty |
+| 10 | Base+9 | 8–9 | Hard-weighted pool | 2 ghosts, 2 snakes | Final floor — survival test |
+
+### Floor-Based Weight Adjustments
+Early floors should restrict or reduce the chance of hard goblins. Proposed approach:
+- **Floors 1–2:** Zero weight for Stone Goblin, Pink Goblin, Water Goblin Spear
+- **Floors 3–4:** Zero weight for Stone Goblin, Pink Goblin; Water Goblin Spear at half weight
+- **Floors 5–6:** Normal weighted pool (current weights)
+- **Floors 7–8:** Double the weight of Stone Goblin and Pink Goblin
+- **Floors 9–10:** Triple the weight of Stone Goblin and Pink Goblin
+
+---
+
+## Chest & Key System
+
+### Overview
+Keys and treasure chests replace the old "find key → open all chests" model. Each chest has a corresponding key somewhere. Keys persist between floors, so a key found on floor 1 can open a chest on floor 3.
+
+### Rules
+- **3 chests total**, randomly distributed across **floors 1–4** (not necessarily one per floor)
+- **3 keys total**, one per chest, also randomly placed across floors 1–4
+- Keys and chests are placed independently — a key doesn't have to be on the same floor as its chest
+- The generation must guarantee that the total keys across floors 1–4 equals the total chests across floors 1–4
+- Player **cannot go backwards**, so all keys must be reachable before or on the floor of the last chest
+- Keys persist in inventory between floors; exit key does **not** persist (resets each floor)
+
+### Chest Contents (one of each)
+1. **Sword** — +2 melee damage bonus
+2. **Shield** — reduces incoming damage
+3. **Snake Medallion** — portal placement ability (currently story-mode only, now available in daily)
+
+### Placement Algorithm
+During daily-new map generation for floors 1–4:
+1. Use floor seed to deterministically decide how many chests/keys go on each floor
+2. Distribute 3 chests and 3 keys across floors 1–4 (e.g., floor 1 gets 1 chest + 0 keys, floor 2 gets 0 chests + 2 keys, etc.)
+3. Constraint: cumulative keys placed ≥ cumulative chests placed at each floor (so player always has enough keys)
+4. Place chests and keys on walkable floor tiles away from player spawn
+
+### Implementation
+- [ ] Add `keyCount` to GameState (number of chest keys held, separate from exit key)
+- [ ] Modify chest interaction: consume 1 key to open, grant item
+- [ ] Floor generation: place chests/keys per the allocation for that floor
+- [ ] Ensure key/chest allocation is deterministic from daily seed
+- [ ] Snake medallion chest integration (portal ability in daily mode)
+
+---
+
+## Collectible Gems System (Future Enhancement)
 **Goal:** Add optional collectibles for completionists and sharing
 
 **Mechanics:**
@@ -70,48 +149,49 @@ Transform the daily challenge from a single-level dungeon into an endless progre
 - [ ] Include in daily stats/sharing
 
 ## Acceptance Criteria
-- [ ] Hero has ~80% win rate vs single goblin (no items)
-- [ ] Exit door transitions to next floor instead of ending game
+- [x] Combat variance rebalanced
+- [x] Exit door transitions to next floor instead of ending game (multi-tier mode)
+- [x] Weighted enemy spawn system
+- [ ] Floor-based difficulty scaling (enemy pool restrictions + weight shifts per floor)
 - [ ] Floors increase in size by 1 tile per level
-- [ ] Difficulty scales appropriately across 10 floors
+- [ ] Chest & key system: 3 chests (sword, shield, snake medallion) across floors 1–4
+- [ ] Keys persist between floors; exit key resets per floor
 - [ ] Game tracks deepest floor reached
 - [ ] Completion screen shows floor reached (and eventually gems)
 - [ ] Daily stats updated to track best floor reached
 
 ## Implementation Notes
 
-### Key Files to Modify
-- `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/enemy.ts:25-26` - Goblin base stats
-- `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/map/game-state.ts:1374` - Win condition on exit
-- `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/daily_challenge_storage.ts` - Add floor tracking
-- Daily map generation - Add floor parameter for size scaling
-- Enemy assignment - Scale counts/types by floor number
+### Key Files
+- `lib/enemies/registry.ts` — Enemy configs, stats, behaviors
+- `lib/enemy_assignment.ts` — Weighted spawn logic (needs floor-based overrides)
+- `lib/map/game-state.ts` — `advanceToNextFloor()`, `movePlayer()` exit logic, `GameState` type
+- `lib/current_game_storage.ts` — `daily-new` storage slot
+- `components/TilemapGrid.tsx` — Floor transition effect
+- `components/GameView.tsx` — Multi-tier initialization
+- `app/daily-new/page.tsx` — New daily mode route
 
 ### Architecture Decisions
-- Keep daily seed-based generation but parameterize by floor number
-- Store current floor in game state
-- On exit door: increment floor, regenerate map, keep hero stats/inventory
-- Reset enemy positions but maintain hero health/items between floors
-- Game ends on death (not on exit anymore)
-
-### Difficulty Scaling Strategy
-1. **Floors 1-3:** Goblins only, count increases
-2. **Floors 4-6:** Introduce ghosts (1-2), keep goblins
-3. **Floors 7-9:** Add snakes, increase enemy density
-4. **Floor 10+:** Stone-exciters possible, max difficulty
+- Keep daily seed-based generation, parameterized by floor: `seed = dailySeed + floorNumber`
+- `currentFloor` and `maxFloors` stored in GameState
+- On exit door: set `needsFloorTransition = true` → TilemapGrid effect calls `advanceToNextFloor()`
+- Hero health/inventory/stats persist between floors
+- Exit key, enemies, map data reset per floor
+- Game ends on death (not on reaching final exit)
 
 ## Questions/Blockers
 - Should hero health carry between floors or reset?
-  - Leaning toward: carry over (makes it harder, more strategic)
+  - **Decision:** Carry over (makes it harder, more strategic)
 - Should items persist between floors?
-  - Leaning toward: yes, keep all items/keys
+  - **Decision:** Yes, keep all items
 - How to handle exit key on each floor?
-  - Need to ensure each floor has exit key available
+  - Each floor generates its own exit key placement
 - Map generation: use same daily seed + floor offset?
-  - Could use `dailySeed + floorNumber` for deterministic but varied floors
+  - **Decision:** `dailySeed + floorNumber` for deterministic but varied floors
 
 ## Resources
-- Enemy registry: `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/enemies/registry.ts`
-- Combat system: `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/enemy.ts`
-- Win condition: `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/map/game-state.ts:1360-1379`
-- Daily flow: `@/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/lib/daily_challenge_flow.ts`
+- Enemy registry: `lib/enemies/registry.ts`
+- Enemy assignment: `lib/enemy_assignment.ts`
+- Combat system: `lib/enemy.ts`
+- Game state / floor logic: `lib/map/game-state.ts`
+- Daily flow: `lib/daily_challenge_flow.ts`
