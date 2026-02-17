@@ -32,32 +32,28 @@ function buildGoblinTestRoom(): GameState {
     }
   }
 
+  // Scatter a few small wall clusters for cover
+  const wallPositions: Array<[number, number]> = [
+    [5, 5], [5, 6],
+    [8, 14], [9, 14],
+    [14, 4], [14, 5],
+    [10, 10],
+    [17, 16], [17, 17],
+  ];
+  for (const [wy, wx] of wallPositions) {
+    tiles[wy][wx] = WALL;
+  }
+
   // Entry point in the center
   const centerY = Math.floor(height / 2);
   const centerX = Math.floor(width / 2);
   subtypes[centerY][centerX] = [TileSubtype.PLAYER];
 
-  // Place 6 goblins around the edges, spread out
+  // Single pink goblin for testing
   const enemies: Enemy[] = [];
-  
-  // Top edge - 2 goblins
-  enemies.push(new Enemy({ y: 2, x: 5 }));
-  enemies.push(new Enemy({ y: 2, x: 16 }));
-  
-  // Right edge - 1 goblin
-  enemies.push(new Enemy({ y: 11, x: 19 }));
-  
-  // Bottom edge - 2 goblins
-  enemies.push(new Enemy({ y: 19, x: 5 }));
-  enemies.push(new Enemy({ y: 19, x: 16 }));
-  
-  // Left edge - 1 goblin
-  enemies.push(new Enemy({ y: 11, x: 2 }));
-
-  // All enemies are goblins by default
-  enemies.forEach(e => {
-    e.kind = 'fire-goblin';
-  });
+  const pg = new Enemy({ y: 4, x: 15 });
+  pg.kind = 'pink-goblin';
+  enemies.push(pg);
 
   // Add some wall torches for visibility
   const torchPositions: Array<[number, number]> = [
@@ -115,12 +111,12 @@ function TestGoblinInner() {
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="text-center bg-black/70 rounded-lg p-4 backdrop-blur-sm">
-          <h1 className="text-2xl font-bold mb-2">Goblin Combat Test Room</h1>
+          <h1 className="text-2xl font-bold mb-2">Pink Goblin Test Room</h1>
           <p className="text-sm text-gray-300">
-            6 goblins spread around the edges - fight them one by one to test balance
+            1 pink goblin with wall lines for LOS testing
           </p>
           <p className="text-xs text-gray-400 mt-2">
-            Hero: 5 HP, 1 Attack | Goblin: 5 HP, 1 Attack
+            Hero: 5 HP, 1 Attack | Pink Goblin: 4 HP, ranged attack
           </p>
         </div>
         <TilemapGrid

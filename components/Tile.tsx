@@ -41,7 +41,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake';
+  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
@@ -353,6 +353,9 @@ export const Tile: React.FC<TileProps> = ({
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
   };
+  const hasPinkRing = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PINK_RING) || false;
+  };
 
   const hasTownSign = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.TOWN_SIGN) || false;
@@ -473,6 +476,7 @@ export const Tile: React.FC<TileProps> = ({
     // Filter out subtypes that have custom asset-based rendering
     return subtypes.filter(
       (subtype) =>
+        subtype !== TileSubtype.NONE &&
         subtype !== TileSubtype.SWORD &&
         subtype !== TileSubtype.SHIELD &&
         subtype !== TileSubtype.LOCK &&
@@ -495,6 +499,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.TOWN_SIGN &&
         subtype !== TileSubtype.PORTAL &&
         subtype !== TileSubtype.SNAKE_MEDALLION &&
+        subtype !== TileSubtype.PINK_RING &&
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
@@ -718,6 +723,18 @@ export const Tile: React.FC<TileProps> = ({
               }}
             />
           </>
+        )}
+
+        {/* Render pink ring (teleportation marker from pink goblin) */}
+        {hasPinkRing(subtypes) && (
+          <div
+            key="pink-ring"
+            data-testid={`subtype-icon-${TileSubtype.PINK_RING}`}
+            className={`${styles.assetIcon} ${styles.runeIcon}`}
+            style={{
+              backgroundImage: `url('/images/enemies/fire-goblin/pink-ring.png')`,
+            }}
+          />
         )}
 
         {/* Render town sign */}
@@ -1086,6 +1103,10 @@ export const Tile: React.FC<TileProps> = ({
                       }
                       return baseScale;
                     })(),
+                    // Darken non-torch-carrying enemies in cave/underground environments
+                    filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
+                      ? 'brightness(0.80)'
+                      : undefined,
                   }}
                   data-testid="enemy-sprite"
                 />
@@ -1615,6 +1636,10 @@ export const Tile: React.FC<TileProps> = ({
                       }
                       return baseScale;
                     })(),
+                    // Darken non-torch-carrying enemies in cave/underground environments
+                    filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
+                      ? 'brightness(0.80)'
+                      : undefined,
                   }}
                   data-testid="enemy-sprite"
                 />

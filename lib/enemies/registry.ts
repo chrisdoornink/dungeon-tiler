@@ -1,6 +1,7 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "ghost" | "stone-goblin" | "snake";
+import { TileSubtype } from "../map/constants";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -8,6 +9,7 @@ export type Facing = "front" | "left" | "right" | "back";
 export interface BehaviorContext {
   // grid and entities
   grid: number[][];
+  subtypes?: number[][][]; // tile subtypes for placing/removing objects (e.g., pink ring)
   enemies: Array<{ y: number; x: number; kind: EnemyKind; health: number }>;
   enemyIndex: number; // index into enemies array for this enemy
   player: { y: number; x: number; torchLit: boolean };
@@ -75,7 +77,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
     desiredMinCount: 2,
     desiredMaxCount: 3,
-    base: { health: 5, attack: 1 },
+    base: { health: 4, attack: 2 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
@@ -91,7 +93,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
     desiredMinCount: 1,
     desiredMaxCount: 2,
-    base: { health: 5, attack: 2 },
+    base: { health: 5, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
@@ -143,6 +145,270 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
+  },
+  "pink-goblin": {
+    kind: "pink-goblin",
+    displayName: "Pink Goblin",
+    assets: {
+      front: "/images/enemies/fire-goblin/pink-goblin-front.png",
+      left: "/images/enemies/fire-goblin/pink-goblin-left.png",
+      right: "/images/enemies/fire-goblin/pink-goblin-left.png",
+      back: "/images/enemies/fire-goblin/pink-goblin-back.png",
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 1,
+    base: { health: 4, attack: 1 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: (ctx) => {
+        const grid = ctx.grid;
+        const subtypes = ctx.subtypes;
+        const e = ctx.enemy;
+        const py = ctx.player.y;
+        const px = ctx.player.x;
+        const rng = ctx.rng ?? Math.random;
+        const H = grid.length;
+        const W = grid[0]?.length ?? 0;
+        const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
+        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+        const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
+
+        // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
+        const mem = e.memory as {
+          aware?: boolean;
+          ringY?: number;
+          ringX?: number;
+          ringOrigSubs?: number[];
+          ringAge?: number;
+        };
+
+        // Check if player can see this goblin (LOS + within vision range 8)
+        const playerSees = manhattan <= 8 && canSee(grid, [e.y, e.x], [py, px]);
+        if (playerSees && !mem.aware) {
+          mem.aware = true;
+        }
+
+        // Not yet aware — wander randomly
+        if (!mem.aware) {
+          const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
+            [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
+          ];
+          for (let i = dirs.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+          }
+          for (const [dy, dx, face] of dirs) {
+            const ny = e.y + dy;
+            const nx = e.x + dx;
+            if (isFloor(ny, nx)) {
+              e.y = ny;
+              e.x = nx;
+              e.facing = face;
+              e.memory.moved = true;
+              break;
+            }
+          }
+          return 0;
+        }
+
+        // --- Aware ---
+
+        // Helper: find walkable floor tiles within a distance range from a point
+        const findEligibleTiles = (
+          fromY: number, fromX: number, minDist: number, maxDist: number
+        ): Array<[number, number]> => {
+          const tiles: Array<[number, number]> = [];
+          for (let y = Math.max(0, fromY - maxDist); y <= Math.min(H - 1, fromY + maxDist); y++) {
+            for (let x = Math.max(0, fromX - maxDist); x <= Math.min(W - 1, fromX + maxDist); x++) {
+              const d = Math.abs(y - fromY) + Math.abs(x - fromX);
+              if (d >= minDist && d <= maxDist && isFloor(y, x)) {
+                const subs = subtypes?.[y]?.[x] ?? [];
+                const hasImportant = subs.length > 0 && !subs.every(s => s === TileSubtype.NONE || s === TileSubtype.FAULTY_FLOOR);
+                if (!hasImportant) tiles.push([y, x]);
+              }
+            }
+          }
+          return tiles;
+        };
+
+        // Helper: remove any existing ring from the map, restoring original subtypes
+        const removeRing = () => {
+          if (!subtypes) { delete mem.ringY; delete mem.ringX; delete mem.ringOrigSubs; return; }
+          if (typeof mem.ringY === "number" && typeof mem.ringX === "number") {
+            const orig = mem.ringOrigSubs ?? [];
+            subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+          }
+          for (let y = 0; y < H; y++) {
+            for (let x = 0; x < W; x++) {
+              const s = subtypes[y]?.[x];
+              if (!s) continue;
+              const ri = s.indexOf(TileSubtype.PINK_RING);
+              if (ri !== -1) {
+                s.splice(ri, 1);
+                if (s.length === 0) s.push(TileSubtype.NONE);
+              }
+            }
+          }
+          delete mem.ringY;
+          delete mem.ringX;
+          delete mem.ringOrigSubs;
+        };
+
+        // Helper: place ring at a tile (removes any existing rings first, saves original subtypes)
+        const placeRing = (ry: number, rx: number) => {
+          if (!subtypes) return;
+          removeRing();
+          const subs = subtypes[ry]?.[rx];
+          if (!subs) return;
+          mem.ringOrigSubs = [...subs];
+          subtypes[ry][rx] = [TileSubtype.PINK_RING];
+          mem.ringY = ry;
+          mem.ringX = rx;
+        };
+
+        // Helper: face toward player
+        const facePlayer = () => {
+          const dy = py - e.y;
+          const dx = px - e.x;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            e.facing = dx > 0 ? "RIGHT" : (dx < 0 ? "LEFT" : e.facing);
+          } else {
+            e.facing = dy > 0 ? "DOWN" : (dy < 0 ? "UP" : e.facing);
+          }
+        };
+
+        // Helper: take one greedy step toward player
+        const stepToward = () => {
+          const dy = py - e.y;
+          const dx = px - e.x;
+          const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
+          const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
+          facePlayer();
+          const tryMoves: Array<[number, number]> = [];
+          if (stepX !== 0) tryMoves.push([0, stepX]);
+          if (stepY !== 0) tryMoves.push([stepY, 0]);
+          for (const [my, mx] of tryMoves) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (ny === py && nx === px) continue; // don't step onto player
+            if (isFloor(ny, nx)) {
+              if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
+              else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              return;
+            }
+          }
+        };
+
+        // Helper: take one step to reach ideal distance (4-5) from player
+        const stepToIdealDistance = () => {
+          const dy = py - e.y;
+          const dx = px - e.x;
+          // If too close (< 4), move away; if too far (> 5), move closer
+          const awayY = dy === 0 ? 0 : dy > 0 ? -1 : 1;
+          const awayX = dx === 0 ? 0 : dx > 0 ? -1 : 1;
+          const towardY = -awayY;
+          const towardX = -awayX;
+          const [dirY, dirX] = manhattan < 4 ? [awayY, awayX] : [towardY, towardX];
+          const tryMoves: Array<[number, number]> = [];
+          if (dirX !== 0) tryMoves.push([0, dirX]);
+          if (dirY !== 0) tryMoves.push([dirY, 0]);
+          for (const [my, mx] of tryMoves) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (ny === py && nx === px) continue;
+            if (isFloor(ny, nx)) {
+              if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
+              else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              return;
+            }
+          }
+        };
+
+        // Ranged attack damage by manhattan distance
+        const rangedDamage = (dist: number): number => {
+          if (dist <= 1) return 1;
+          if (dist <= 3) return 2;
+          if (dist <= 5) return 1;
+          return 0;
+        };
+
+        const hasLOS = canSee(grid, [e.y, e.x], [py, px]);
+        const hasRing = typeof mem.ringY === "number" && typeof mem.ringX === "number";
+
+        if (hasLOS) {
+          // --- LOS mode: ranged attack + positioning, no teleportation ---
+          // Clean up any existing ring since we have direct sight
+          if (hasRing) removeRing();
+
+          facePlayer();
+
+          if (manhattan > 5) {
+            // Too far to attack — move closer
+            stepToward();
+            return 0;
+          }
+
+          // Within attack range (1-5): 50% attack, 50% reposition to ideal distance (4-5)
+          if (manhattan >= 4 && manhattan <= 5) {
+            // Already at ideal distance — always attack
+            return rangedDamage(manhattan);
+          }
+
+          // Closer than ideal (1-3): 50% attack, 50% back away to ideal distance
+          if (rng() < 0.5) {
+            return rangedDamage(manhattan);
+          } else {
+            stepToIdealDistance();
+            return 0;
+          }
+        } else {
+          // --- No LOS but aware: teleportation ring logic; stay still ---
+          if (!hasRing) {
+            // Place a ring 2-10 tiles from the hero on a walkable floor
+            const eligible = findEligibleTiles(py, px, 2, 10);
+            if (eligible.length > 0) {
+              const [ry, rx] = eligible[Math.floor(rng() * eligible.length)];
+              placeRing(ry, rx);
+              mem.ringAge = 0;
+            }
+            // Stay still — no movement when aware but no LOS
+          } else {
+            // Ring exists — increment age
+            mem.ringAge = (mem.ringAge ?? 0) + 1;
+            if (mem.ringAge >= 2) {
+              // Ring has been down for at least 2 turns — 50% teleport, else ring moves
+              if (rng() < 0.5) {
+                // Teleport to ring
+                e.y = mem.ringY!;
+                e.x = mem.ringX!;
+                e.memory.moved = true;
+                facePlayer();
+                removeRing();
+                delete mem.ringAge;
+              } else {
+                // Ring moves up to 5 tiles from itself
+                const eligible = findEligibleTiles(mem.ringY!, mem.ringX!, 1, 5);
+                if (eligible.length > 0) {
+                  removeRing();
+                  const [ry, rx] = eligible[Math.floor(rng() * eligible.length)];
+                  placeRing(ry, rx);
+                  mem.ringAge = 0;
+                }
+              }
+            }
+            // If ringAge < 2, do nothing — ring stays, goblin stays still
+          }
+          return 0;
+        }
+      },
+    },
   },
   ghost: {
     kind: "ghost",

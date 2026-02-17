@@ -359,6 +359,7 @@ export function performThrowRock(gameState: GameState): GameState {
       const newHealth = prevHealth - 2; // rock deals 2 damage
       if (newHealth <= 0) {
         // Enemy dies: remove and record for spirit VFX
+        cleanupPinkRing(target, newMapData.subtypes);
         const removed = newEnemies.splice(hitIdx, 1)[0];
         
         // Store defeated enemy info for onEnemyDefeat processing
@@ -815,6 +816,29 @@ export function reviveFromLastCheckpoint(
   return restored;
 }
 
+/** Remove the pink ring from the map when a pink goblin dies */
+function cleanupPinkRing(enemy: Enemy, subtypes: number[][][]): void {
+  if (enemy.kind !== 'pink-goblin') return;
+  const mem = enemy.behaviorMemory as { ringY?: number; ringX?: number; ringOrigSubs?: number[] };
+  // Targeted restoration at stored position
+  if (typeof mem.ringY === 'number' && typeof mem.ringX === 'number') {
+    const orig = mem.ringOrigSubs ?? [];
+    subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+  }
+  // Full sweep for any stale rings
+  for (let y = 0; y < subtypes.length; y++) {
+    for (let x = 0; x < (subtypes[y]?.length ?? 0); x++) {
+      const s = subtypes[y]?.[x];
+      if (!s) continue;
+      const ri = s.indexOf(TileSubtype.PINK_RING);
+      if (ri !== -1) {
+        s.splice(ri, 1);
+        if (s.length === 0) s.push(TileSubtype.NONE);
+      }
+    }
+  }
+}
+
 function applyEnemyHazardDeaths(state: GameState): void {
   if (!state.enemies || !Array.isArray(state.enemies)) return;
   const subtypes = state.mapData.subtypes;
@@ -829,6 +853,7 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
 
     if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
+      cleanupPinkRing(enemy, subtypes);
       defeated.push(enemy);
 
       if (!state.recentDeaths) state.recentDeaths = [];
@@ -1831,6 +1856,8 @@ export function movePlayer(
         newGameState.stats.damageDealt += heroDamage;
 
         if (enemy.health <= 0) {
+          // Clean up pink ring if a pink goblin dies
+          cleanupPinkRing(enemy, newGameState.mapData.subtypes);
           // Store defeated enemy info for onEnemyDefeat processing
           if (!newGameState.defeatedEnemies) newGameState.defeatedEnemies = [];
           const defeatedEnemy = {

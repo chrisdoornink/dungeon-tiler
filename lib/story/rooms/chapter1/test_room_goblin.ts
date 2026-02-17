@@ -21,30 +21,26 @@ export function buildTestRoomGoblin(): StoryRoom {
     }
   }
 
+  // Scatter a few small wall clusters for cover
+  const wallPositions: Array<[number, number]> = [
+    [5, 5], [5, 6],
+    [8, 14], [9, 14],
+    [14, 4], [14, 5],
+    [10, 10],
+    [17, 16], [17, 17],
+  ];
+  for (const [wy, wx] of wallPositions) {
+    tiles[wy][wx] = WALL;
+  }
+
   // Entry point in the center
   const entryPoint: [number, number] = [Math.floor(height / 2), Math.floor(width / 2)];
 
-  // Place 6 goblins around the edges, spread out
+  // Single pink goblin for testing
   const enemies: Enemy[] = [];
-  
-  // Top edge - 2 goblins
-  enemies.push(new Enemy({ y: 2, x: 5 }));
-  enemies.push(new Enemy({ y: 2, x: 16 }));
-  
-  // Right edge - 1 goblin
-  enemies.push(new Enemy({ y: 11, x: 19 }));
-  
-  // Bottom edge - 2 goblins
-  enemies.push(new Enemy({ y: 19, x: 5 }));
-  enemies.push(new Enemy({ y: 19, x: 16 }));
-  
-  // Left edge - 1 goblin
-  enemies.push(new Enemy({ y: 11, x: 2 }));
-
-  // All enemies are goblins by default
-  enemies.forEach(e => {
-    e.kind = 'fire-goblin';
-  });
+  const pg = new Enemy({ y: 4, x: 15 });
+  pg.kind = 'pink-goblin';
+  enemies.push(pg);
 
   // Add some wall torches for visibility
   const torchPositions: Array<[number, number]> = [

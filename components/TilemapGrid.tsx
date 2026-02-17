@@ -3600,6 +3600,7 @@ function renderTileGrid(
                 | "water-goblin-spear"
                 | "earth-goblin"
                 | "earth-goblin-knives"
+                | "pink-goblin"
                 | "ghost"
                 | "stone-goblin"
                 | "snake"

@@ -6,7 +6,7 @@ import { parseVisualMap, type ParsedMapData } from "./visual-map-parser";
 import type { EnvironmentId } from "../../environment";
 import type { StoryCondition, StoryEffect } from "../event_registry";
 
-type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "snake" | "ghost" | "stone-goblin";
+type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "snake" | "ghost" | "stone-goblin";
 
 /**
  * Room Builder - Shared utility for building story rooms from configuration
