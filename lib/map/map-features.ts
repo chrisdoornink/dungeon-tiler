@@ -164,7 +164,7 @@ export function addRunePotsForStoneExciters(
   const h = grid.length;
   const w = grid[0].length;
 
-  const stones = enemies.filter((e) => e.kind === "stone-exciter");
+  const stones = enemies.filter((e) => e.kind === "stone-goblin");
   if (stones.length === 0) return newMapData;
 
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));

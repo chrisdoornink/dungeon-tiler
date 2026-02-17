@@ -12,17 +12,17 @@ import { Enemy } from '../../lib/enemy';
 const makeOpen = (n = 25) => Array.from({ length: n }, () => Array(n).fill(0));
 const makeSubs = (n = 25) => Array.from({ length: n }, () => Array.from({ length: n }, () => [] as number[]));
 
-describe('HUD: Enemies in sight shows correct stone-exciter front sprite', () => {
-  test('shows stone-exciter front icon and HP in list', () => {
+describe('HUD: Enemies in sight shows correct stone-goblin front sprite', () => {
+  test('shows stone-goblin front icon and HP in list', () => {
     const tiles = makeOpen(25);
     const subtypes = makeSubs(25);
     // Place player near center
     const py = 12, px = 12;
     subtypes[py][px] = [TileSubtype.PLAYER];
 
-    // Place a stone-exciter within LOS and <= 8 tiles (right by 3)
+    // Place a stone-goblin within LOS and <= 8 tiles (right by 3)
     const exciter = new Enemy({ y: py, x: px + 3 });
-    exciter.kind = 'stone-exciter';
+    exciter.kind = 'stone-goblin';
 
     const initialGameState: GameState = {
       hasKey: false,
@@ -49,11 +49,11 @@ describe('HUD: Enemies in sight shows correct stone-exciter front sprite', () =>
     const status = screen.getByText(/Enemies in sight/i);
     expect(status).toBeInTheDocument();
 
-    // The icon span should have background image pointing to stone-exciter-front
+    // The icon span should have background image pointing to stone-goblin-front
     const iconSpans = status.parentElement!.querySelectorAll('span.inline-block');
     expect(iconSpans.length).toBeGreaterThan(0);
     const bg = (iconSpans[0] as HTMLElement).style.backgroundImage;
-    expect(bg).toContain('stone-exciter-front.png');
+    expect(bg).toContain('green-goblin-front.png');
 
     // Should show 8 heart icons for enemy health
     const hearts = screen.getAllByAltText('❤️');

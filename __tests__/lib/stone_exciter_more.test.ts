@@ -2,7 +2,7 @@ import { Enemy, EnemyState, updateEnemies } from "../../lib/enemy";
 
 function makeOpen(n = 9) { return Array.from({ length: n }, () => Array(n).fill(0)); }
 
-describe.skip("stone-exciter extended behavior", () => {
+describe.skip("stone-goblin extended behavior", () => {
   test("ghost within 4 tiles triggers hunting even if player is far", () => {
     const grid = makeOpen(9);
     const player = { y: 8, x: 8 }; // far from exciter
@@ -20,7 +20,7 @@ describe.skip("stone-exciter extended behavior", () => {
     const grid = makeOpen(9);
     const player = { y: 4, x: 0 };
     const exciter = new Enemy({ y: 4, x: 4 }); // dist 4
-    exciter.kind = 'stone-exciter';
+    exciter.kind = 'stone-goblin';
 
     // Hunt for 5 turns
     for (let t = 0; t < 5; t++) {
@@ -46,7 +46,7 @@ describe.skip("stone-exciter extended behavior", () => {
     const grid = makeOpen(7);
     // surround exciter with walls except one opening to the left
     const exciter = new Enemy({ y: 3, x: 3 });
-    exciter.kind = 'stone-exciter';
+    exciter.kind = 'stone-goblin';
     const player = { y: 0, x: 6 }; // out of range (>4) via Manhattan
     // walls around except (2,1)
     grid[2][3] = 1; // up

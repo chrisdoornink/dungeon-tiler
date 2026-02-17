@@ -31,7 +31,7 @@ const EMOJI_MAP = {
   "earth-goblin": "🟤",
   "earth-goblin-knives": "🗡️",
   ghost: "👻",
-  "stone-exciter": "🗿",
+  "stone-goblin": "🗿",
   snake: "🐍",
 
   // Stats
@@ -178,9 +178,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         let numCount = typeof count === "number" ? count : 0;
 
-        // CONSERVATIVE PATCH: Cap stone-exciter kills at 2 to prevent inflated display
-        // This addresses a known bug where stone-exciter kills can be double-counted
-        if (enemyType === "stone-exciter" && numCount >= 2) {
+        // CONSERVATIVE PATCH: Cap stone-goblin kills at 2 to prevent inflated display
+        // This addresses a known bug where stone-goblin kills can be double-counted
+        if (enemyType === "stone-goblin" && numCount >= 2) {
           numCount = numCount / 2;
         }
 
@@ -369,7 +369,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                             let numCount =
                               typeof count === "number" ? count : 0;
                             if (
-                              enemyType === "stone-exciter" &&
+                              enemyType === "stone-goblin" &&
                               numCount >= 2
                             ) {
                               numCount = numCount / 2;
@@ -382,13 +382,16 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                                   className="w-6 h-6"
                                   style={{
                                     backgroundImage: `url(/images/enemies/${
-                                      enemyType === "stone-exciter"
-                                        ? "stone-exciter-front"
-                                        : enemyType === "ghost"
-                                        ? "lantern-wisp"
-                                        : enemyType === "snake"
-                                        ? "snake-coiled-right"
-                                        : "fire-goblin/fire-goblin-front"
+                                      ({
+                                        "fire-goblin": "fire-goblin/fire-goblin-front",
+                                        "water-goblin": "fire-goblin/blue-goblin-front",
+                                        "water-goblin-spear": "fire-goblin/blue-goblin-front-spear",
+                                        "earth-goblin": "fire-goblin/brown-goblin-front",
+                                        "earth-goblin-knives": "fire-goblin/brown-goblin-front-knives",
+                                        "stone-goblin": "fire-goblin/green-goblin-front",
+                                        "ghost": "lantern-wisp",
+                                        "snake": "snake-coiled-right",
+                                      } as Record<string, string>)[enemyType] || "fire-goblin/fire-goblin-front"
                                     }.png)`,
                                     backgroundSize: "contain",
                                     backgroundRepeat: "no-repeat",

@@ -2,12 +2,12 @@ import { Enemy, EnemyState, updateEnemies } from "../../lib/enemy";
 
 function open(n = 9) { return Array.from({ length: n }, () => Array(n).fill(0)); }
 
-describe.skip("stone-exciter close-range behavior", () => {
+describe.skip("stone-goblin close-range behavior", () => {
   test("within 2 tiles: faces hero and attacks only after moving (post-arrival)", () => {
     const grid = open(9);
     const player = { y: 4, x: 4 };
     const exciter = new Enemy({ y: 4, x: 6 }); // dist = 2 horizontally
-    exciter.kind = 'stone-exciter';
+    exciter.kind = 'stone-goblin';
 
     // One tick: should perform close-range chase (two greedy steps), end adjacent at (4,5), then attack
     const dmg = updateEnemies(grid, [exciter], player);

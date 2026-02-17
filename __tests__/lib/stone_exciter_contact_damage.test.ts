@@ -4,11 +4,11 @@ const open = () => Array.from({ length: 7 }, () => Array(7).fill(0));
 
 function makeExciter(y: number, x: number) {
   const e = new Enemy({ y, x });
-  e.kind = 'stone-exciter';
+  e.kind = 'stone-goblin';
   return e;
 }
 
-describe('stone-exciter contact damage', () => {
+describe('stone-goblin contact damage', () => {
   test('deals damage when stepping into player tile during hunt', () => {
     const grid = open();
     const player = { y: 3, x: 3 };
@@ -33,7 +33,7 @@ describe('stone-exciter contact damage', () => {
     const damage = updateEnemies(grid, [exciter, blocker], player, {
       rng: () => 0.9,
       // Suppress goblin damage so we only measure exciter's contact
-      suppress: (e) => e.kind !== 'stone-exciter',
+      suppress: (e) => e.kind !== 'stone-goblin',
     });
     expect(damage).toBe(0);
   });

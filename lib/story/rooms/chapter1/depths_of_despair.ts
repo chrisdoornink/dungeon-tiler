@@ -142,7 +142,7 @@ export function buildDepthsOfDespairRoom1(): StoryRoom {
   const configs: EnemyConfig[] = [
     { kind: "fire-goblin", count: 20 },
     { kind: "ghost", count: 3 },
-    { kind: "stone-exciter", count: 5 },
+    { kind: "stone-goblin", count: 5 },
   ];
   const enemies = placeEnemies(configs, tiles, forbidden);
 
@@ -202,7 +202,7 @@ export function buildDepthsOfDespairRoom2(): StoryRoom {
   const configs: EnemyConfig[] = [
     { kind: "fire-goblin", count: 40 },
     { kind: "ghost", count: 6 },
-    { kind: "stone-exciter", count: 10 },
+    { kind: "stone-goblin", count: 10 },
   ];
   const enemies = placeEnemies(configs, tiles, forbidden);
   

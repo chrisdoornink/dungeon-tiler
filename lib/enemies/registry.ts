@@ -1,6 +1,6 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "ghost" | "stone-exciter" | "snake";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "ghost" | "stone-goblin" | "snake";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -169,14 +169,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       },
     },
   },
-  "stone-exciter": {
-    kind: "stone-exciter",
-    displayName: "Stone Guardian",
+  "stone-goblin": {
+    kind: "stone-goblin",
+    displayName: "Stone Goblin",
     assets: {
-      front: "/images/enemies/stone-exciter-front.png",
-      left: "/images/enemies/stone-exciter-right.png", // placeholder until left art exists
-      right: "/images/enemies/stone-exciter-right.png",
-      back: "/images/enemies/stone-exciter-back.png",
+      front: "/images/enemies/fire-goblin/green-goblin-front.png",
+      left: "/images/enemies/fire-goblin/green-goblin-right.png",
+      right: "/images/enemies/fire-goblin/green-goblin-right.png",
+      back: "/images/enemies/fire-goblin/green-goblin-back.png",
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,

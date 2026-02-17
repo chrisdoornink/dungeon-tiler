@@ -28,20 +28,20 @@ export class Enemy {
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
-  // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-exciter' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake' = 'fire-goblin';
+  // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
       // Set HP to 2 and ensure attack is 0 so they never hurt the hero directly.
       if (this.health > 2) this.health = 2;
       this.attack = 0;
-    } else if (k === 'stone-exciter') {
+    } else if (k === 'stone-goblin') {
       // Stone-exciter uses fixed 5 damage when contacting the hero
       this.attack = 5;
       // Stone-exciter durability tuning: 8 HP baseline
@@ -256,7 +256,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake'
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake'
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
   if (kind === 'ghost') {
@@ -274,8 +274,8 @@ function isSafeFloorForEnemy(
                               tileSubs.includes(22) || // CHECKPOINT
                               tileSubs.includes(36);   // BOOKSHELF
 
-  // Goblins and stone-exciters are allowed to step onto faulty floors; others still avoid
-  if (kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'stone-exciter') return true;
+  // Goblins and stone-goblins are allowed to step onto faulty floors; others still avoid
+  if (kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'stone-goblin') return true;
   return !isFaulty && !hasBlockingSubtype;
 }
 
@@ -325,8 +325,8 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export type PlainEnemy = {
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-exciter' | 'snake';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'ghost' | 'stone-goblin' | 'snake';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -341,9 +341,10 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
     // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
     let k: string | undefined = d?.kind ?? d?._kind;
-    // Migration: old saved games may have 'goblin' → map to 'fire-goblin'
+    // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
-    if (k === 'ghost' || k === 'stone-exciter' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'snake') {
+    if (k === 'stone-exciter') k = 'stone-goblin';
+    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'snake') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
@@ -446,7 +447,7 @@ export function updateEnemies(
     const prevKey = `${e.y},${e.x}`;
     const prevY = e.y;
     const prevX = e.x;
-    // Delegate to registry customUpdate when available (e.g., stone-exciter)
+    // Delegate to registry customUpdate when available (e.g., stone-goblin)
     const cfg = EnemyRegistry[e.kind];
     let base: number;
     if (cfg?.behavior?.customUpdate) {

@@ -116,14 +116,14 @@ export class ScoreCalculator {
     // If player died, reduce scoring potential but not too harshly
     const deathPenalty = outcome === "dead" ? 0.6 : 1.0;
 
-    // PATCH: Fix stone-exciter double counting bug
-    // If stone-exciter count seems doubled compared to other enemies, halve it
+    // PATCH: Fix stone-goblin double counting bug
+    // If stone-goblin count seems doubled compared to other enemies, halve it
     let adjustedEnemiesDefeated = stats.enemiesDefeated;
     if (stats.byKind) {
-      const stoneCount = stats.byKind["stone-exciter"] ?? 0;
+      const stoneCount = stats.byKind["stone-goblin"] ?? 0;
       const otherCount = (stats.byKind["fire-goblin"] ?? 0) + (stats.byKind["water-goblin"] ?? 0) + (stats.byKind["water-goblin-spear"] ?? 0) + (stats.byKind["earth-goblin"] ?? 0) + (stats.byKind["earth-goblin-knives"] ?? 0) + (stats.byKind.ghost ?? 0);
 
-      // If stone-exciter count is suspiciously high compared to others, likely doubled
+      // If stone-goblin count is suspiciously high compared to others, likely doubled
       if (stoneCount > 0 && (stoneCount >= otherCount * 2 || stoneCount > 4)) {
         const correctedStoneCount = Math.ceil(stoneCount / 2);
         const reduction = stoneCount - correctedStoneCount;

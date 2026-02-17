@@ -3601,7 +3601,7 @@ function renderTileGrid(
                 | "earth-goblin"
                 | "earth-goblin-knives"
                 | "ghost"
-                | "stone-exciter"
+                | "stone-goblin"
                 | "snake"
                 | undefined
             }
@@ -3610,7 +3610,7 @@ function renderTileGrid(
             )}
             enemyAura={(() => {
               if (!enemyAtTile) return false;
-              if (enemyAtTile.kind !== "stone-exciter") return false;
+              if (enemyAtTile.kind !== "stone-goblin") return false;
               if (!playerPosition) return false;
               const d =
                 Math.abs(enemyAtTile.y - playerPosition[0]) +

@@ -106,7 +106,7 @@ describe('End Page', () => {
         damageTaken: 2, 
         enemiesDefeated: 3, 
         steps: 45,
-        byKind: { 'fire-goblin': 2, ghost: 1, 'stone-exciter': 0 }
+        byKind: { 'fire-goblin': 2, ghost: 1, 'stone-goblin': 0 }
       },
       mapData: {
         tiles: Array(5).fill(0).map(() => Array(7).fill(0)),

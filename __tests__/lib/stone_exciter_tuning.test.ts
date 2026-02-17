@@ -13,23 +13,23 @@ function makeSubs(n = 25) {
   return Array.from({ length: n }, () => Array.from({ length: n }, () => [] as number[]));
 }
 
-describe("stone-exciter tuning: health and damage interactions", () => {
-  test("stone-exciter initializes with 8 health", () => {
+describe("stone-goblin tuning: health and damage interactions", () => {
+  test("stone-goblin initializes with 8 health", () => {
     const e = new Enemy({ y: 4, x: 4 });
-    e.kind = "stone-exciter";
+    e.kind = "stone-goblin";
     expect(e.health).toBe(8);
   });
 
-  test("sword attacks deal exactly 1 damage to stone-exciters (no variance)", () => {
+  test("sword attacks deal exactly 1 damage to stone-goblins (no variance)", () => {
     const size = 25;
     const tiles = makeOpen(size);
     const subs = makeSubs(size);
-    // Place player at center and stone-exciter to the right
+    // Place player at center and stone-goblin to the right
     const py = 4, px = 4;
     subs[py][px] = [TileSubtype.PLAYER];
 
     const exciter = new Enemy({ y: py, x: px + 1 });
-    exciter.kind = "stone-exciter"; // should be 8 HP
+    exciter.kind = "stone-goblin"; // should be 8 HP
 
     const gs: GameState = {
       hasKey: false,
@@ -56,13 +56,13 @@ describe("stone-exciter tuning: health and damage interactions", () => {
     // Enemy should remain and have lost exactly 1 HP
     expect(after.enemies && after.enemies.length).toBe(1);
     const post = after.enemies![0];
-    expect(post.kind).toBe("stone-exciter");
+    expect(post.kind).toBe("stone-goblin");
     expect(post.health).toBe(7);
     // Damage dealt stat should increment by 1
     expect(after.stats.damageDealt).toBe(1);
   });
 
-  test("rocks deal 2 damage to stone-exciters on hit", () => {
+  test("rocks deal 2 damage to stone-goblins on hit", () => {
     const size = 25;
     const tiles = makeOpen(size);
     const subs = makeSubs(size);
@@ -70,7 +70,7 @@ describe("stone-exciter tuning: health and damage interactions", () => {
     subs[py][px] = [TileSubtype.PLAYER];
 
     const exciter = new Enemy({ y: py, x: px + 3 });
-    exciter.kind = "stone-exciter"; // 8 HP
+    exciter.kind = "stone-goblin"; // 8 HP
 
     const gs: GameState = {
       hasKey: false,
@@ -94,7 +94,7 @@ describe("stone-exciter tuning: health and damage interactions", () => {
 
     expect(after.enemies && after.enemies.length).toBe(1);
     const post = after.enemies![0];
-    expect(post.kind).toBe("stone-exciter");
+    expect(post.kind).toBe("stone-goblin");
     expect(post.health).toBe(6); // 8 - 2
   });
 });

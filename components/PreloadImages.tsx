@@ -105,10 +105,10 @@ export default function PreloadImages() {
       "/images/enemies/fire-goblin/brown-goblin-front-knives.png",
       "/images/enemies/fire-goblin/brown-goblin-right-knives.png",
       "/images/enemies/fire-goblin/brown-goblin-back-knives.png",
+      "/images/enemies/fire-goblin/green-goblin-front.png",
+      "/images/enemies/fire-goblin/green-goblin-right.png",
+      "/images/enemies/fire-goblin/green-goblin-back.png",
       "/images/enemies/lantern-wisp.png",
-      "/images/enemies/stone-exciter-front.png",
-      "/images/enemies/stone-exciter-right.png",
-      "/images/enemies/stone-exciter-back.png",
 
       // Hero base poses (commonly visible on load)
       "/images/hero/hero-front-static.png",

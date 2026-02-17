@@ -119,7 +119,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
     expect(subtypes[enemy.y][enemy.x]).toContain(TileSubtype.FAULTY_FLOOR);
   });
 
-  test("stone-exciter is allowed to step onto faulty floor tile", () => {
+  test("stone-goblin is allowed to step onto faulty floor tile", () => {
     const grid = [
       [0, 0, 0],
       [0, 0, 0],
@@ -133,7 +133,7 @@ describe("Enemy Faulty Floor Avoidance", () => {
     ];
 
     const enemy = new Enemy({ y: 0, x: 1 });
-    enemy.kind = 'stone-exciter';
+    enemy.kind = 'stone-goblin';
     const player = { y: 2, x: 1 };
 
     enemy.update({ grid, subtypes, player });

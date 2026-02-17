@@ -69,11 +69,11 @@ export default function GameInstructions() {
           </span>
           , fearsome
           <span className="inline-flex items-center gap-1 mx-1">
-            <strong>{EnemyRegistry["stone-exciter"].displayName}s</strong>
+            <strong>{EnemyRegistry["stone-goblin"].displayName}s</strong>
             <span
               className="w-10 h-10"
               style={{
-                backgroundImage: "url(/images/enemies/stone-exciter-front.png)",
+                backgroundImage: "url(/images/enemies/fire-goblin/green-goblin-front.png)",
                 backgroundSize: "contain",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",

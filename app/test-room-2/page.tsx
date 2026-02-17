@@ -62,10 +62,10 @@ function buildTestRoom2(): GameState {
 
   const mapData: MapData = { tiles, subtypes } as MapData;
 
-  // Enemies: stone-exciter (right of player) and a ghost (left of player)
+  // Enemies: stone-goblin (right of player) and a ghost (left of player)
   const enemies: Enemy[] = [];
   const exciter = new Enemy({ y: py, x: Math.min(end, px + 4) });
-  exciter.kind = "stone-exciter"; // behavior implemented in lib/enemy
+  exciter.kind = "stone-goblin"; // behavior implemented in lib/enemy
   enemies.push(exciter);
   const ghost = new Enemy({ y: py, x: Math.max(start, px - 4) });
   ghost.kind = "ghost";

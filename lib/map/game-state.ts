@@ -310,9 +310,9 @@ export function performThrowRock(gameState: GameState): GameState {
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
       const target: Enemy = newEnemies[hitIdx];
-      // If we have a rune and the target is a stone-exciter, consume a rune to instantly kill
+      // If we have a rune and the target is a stone-goblin, consume a rune to instantly kill
       if (
-        target.kind === "stone-exciter" &&
+        target.kind === "stone-goblin" &&
         (preTickState.runeCount ?? 0) > 0
       ) {
         // Enemy dies instantly
@@ -452,7 +452,7 @@ export function performThrowRock(gameState: GameState): GameState {
  * Throw a rune up to 4 tiles. Differences from rocks:
  * - If it hits a wall or goes OOB, it lands on the last traversed floor tile before impact and can be picked up again.
  * - If it hits an enemy:
- *   - stone-exciter: instantly killed, rune is consumed (removed from inventory).
+ *   - stone-goblin: instantly killed, rune is consumed (removed from inventory).
  *   - others: deal 2 damage; if enemy dies, rune is consumed; otherwise, rune lands on the last traversed floor tile.
  */
 export function performThrowRune(gameState: GameState): GameState {
@@ -828,7 +828,7 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const tileSubs = row ? row[enemy.x] || [] : [];
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
 
-    if ((enemy.kind === "stone-exciter" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
+    if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
       defeated.push(enemy);
 
       if (!state.recentDeaths) state.recentDeaths = [];
@@ -876,7 +876,7 @@ export function initializeGameState(): GameState {
 
   enemyTypeAssignement(enemies);
 
-  // After enemies are assigned, place one rune pot per stone-exciter
+  // After enemies are assigned, place one rune pot per stone-goblin
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
 
   // Snakes: normal generation rules
@@ -1331,7 +1331,7 @@ export function movePlayer(
       }
     }
 
-    // After enemies move, apply hazard deaths (stone-exciters falling into faulty floor)
+    // After enemies move, apply hazard deaths (stone-goblins falling into faulty floor)
     applyEnemyHazardDeaths(newGameState);
 
     // console.log(`[ENEMY TURN] After enemy turn. Enemies now at:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x}) dist:${Math.abs(e.y - currentY) + Math.abs(e.x - currentX)}`).join(', '));

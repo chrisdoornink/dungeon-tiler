@@ -48,7 +48,7 @@ describe("Combat variance and equipment", () => {
     const e = new Enemy({ y: 2, x: 1 });
     e.attack = 1; // base 1
     // Use non-goblin to retain +2 crit mapping; avoid ghost (adjacent ghost attacks are suppressed)
-    e.kind = 'stone-exciter';
+    e.kind = 'stone-goblin';
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
@@ -66,7 +66,7 @@ describe("Combat variance and equipment", () => {
     const e = new Enemy({ y: 2, x: 1 });
     e.attack = 1;
     // Use non-goblin to retain +2 crit mapping; avoid ghost suppression
-    e.kind = 'stone-exciter';
+    e.kind = 'stone-goblin';
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
