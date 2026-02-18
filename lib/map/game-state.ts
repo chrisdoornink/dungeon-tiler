@@ -944,6 +944,19 @@ export function initializeGameState(): GameState {
 }
 
 /**
+ * Returns a random enemy count for a given floor, scaling from easy (floor 1) to hard (floor 10+).
+ * Floor 1: 2–3  |  Floor 2: 3–4  |  Floor 3–4: 3–5  |  Floor 5–6: 4–6  |  Floor 7+: 5–7
+ */
+function enemyCountForFloor(floor: number): number {
+  const r = Math.random();
+  if (floor <= 1) return 2 + Math.floor(r * 2);       // 2–3
+  if (floor <= 2) return 3 + Math.floor(r * 2);       // 3–4
+  if (floor <= 4) return 3 + Math.floor(r * 3);       // 3–5
+  if (floor <= 6) return 4 + Math.floor(r * 3);       // 4–6
+  return 5 + Math.floor(r * 3);                        // 5–7
+}
+
+/**
  * Initialize a new game state for floor 1 of multi-tier daily mode.
  * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
  */
@@ -965,7 +978,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     ? placeEnemies({
         grid: mapData.tiles,
         player: { y: playerPos[0], x: playerPos[1] },
-        count: Math.floor(Math.random() * 4) + 4,
+        count: enemyCountForFloor(floor),
         minDistanceFromPlayer: 8,
       })
     : [];
@@ -1109,7 +1122,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         const placed = placeEnemies({
           grid: newMapData.tiles,
           player: { y: playerPos[0], x: playerPos[1] },
-          count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
+          count: enemyCountForFloor(nextFloor),
           minDistanceFromPlayer: 8,
         });
         enemyTypeAssignement(placed, { floor: nextFloor });
