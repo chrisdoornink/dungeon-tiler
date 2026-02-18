@@ -263,7 +263,7 @@ export function performThrowRock(gameState: GameState): GameState {
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(2, result.damage);
+      const applied = Math.min(4, result.damage);
       preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
       preTickState.stats = {
         ...preTickState.stats,
@@ -499,7 +499,7 @@ export function performThrowRune(gameState: GameState): GameState {
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(2, result.damage);
+      const applied = Math.min(4, result.damage);
       preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
       preTickState.stats = {
         ...preTickState.stats,
@@ -1393,7 +1393,7 @@ export function movePlayer(
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(2, result.damage);
+      const applied = Math.min(4, result.damage);
       const playerPos = findPlayerPosition(newGameState.mapData);
       console.log(`[PLAYER DAMAGE] Taking ${applied} damage (${result.damage} before cap) during movePlayer. Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - applied)}. Player at: ${playerPos ? `(${playerPos[0]},${playerPos[1]})` : 'unknown'}`);
       console.log(`[PLAYER DAMAGE] Attacking enemies:`, result.attackingEnemies.map(e => `${e.kind} dealt ${e.damage}`).join(', '));
@@ -1420,18 +1420,17 @@ export function movePlayer(
 
       // If player dies from enemy damage, track which enemy killed them
       if (newGameState.heroHealth === 0) {
-        // Find the enemy that dealt damage (closest to player)
-        const killerEnemy = newGameState.enemies.find(
-          (e) => Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
-        );
+        // Use attackingEnemies from the result — enemies may have moved after attacking,
+        // so searching by adjacency after updateEnemies() would miss the killer.
+        const killerEnemy = result.attackingEnemies[0];
         if (killerEnemy) {
-          console.log(`[PLAYER DEATH] Killed by ${killerEnemy.kind} at (${killerEnemy.y},${killerEnemy.x}). Player was at (${currentY},${currentX})`);
+          console.log(`[PLAYER DEATH] Killed by ${killerEnemy.kind}. Player was at (${currentY},${currentX})`);
           newGameState.deathCause = {
             type: "enemy",
             enemyKind: killerEnemy.kind,
           };
         } else {
-          console.log(`[PLAYER DEATH] Health reached 0 but no adjacent enemy found. Player at (${currentY},${currentX})`);
+          console.log(`[PLAYER DEATH] Health reached 0 but no attacking enemy recorded. Player at (${currentY},${currentX})`);
         }
       }
     }

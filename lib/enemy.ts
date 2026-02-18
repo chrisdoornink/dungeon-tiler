@@ -48,13 +48,13 @@ export class Enemy {
       this.health = 8;
     } else if (k === 'fire-goblin') {
       this.health = 4;
-      this.attack = 2;
+      this.attack = 1;
     } else if (k === 'water-goblin') {
       // Water goblin: same HP as before, lower attack without spear
       this.attack = 1;
     } else if (k === 'water-goblin-spear') {
       // Water goblin with spear: similar to hero with sword (+1)
-      this.attack = 4;
+      this.attack = 3;
     } else if (k === 'earth-goblin') {
       // Earth goblin: low HP, base attack
       this.health = 3;
@@ -62,7 +62,7 @@ export class Enemy {
     } else if (k === 'earth-goblin-knives') {
       // Earth goblin with knives: low HP, high attack
       this.health = 3;
-      this.attack = 3;
+      this.attack = 2;
     } else if (k === 'pink-goblin') {
       // Pink goblin: moderate HP, low melee attack, has ranged attack + teleport
       this.health = 4;

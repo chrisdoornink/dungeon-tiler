@@ -77,7 +77,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
     desiredMinCount: 2,
     desiredMaxCount: 3,
-    base: { health: 4, attack: 2 },
+    base: { health: 4, attack: 1 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
@@ -109,7 +109,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
-    base: { health: 5, attack: 4 },
+    base: { health: 5, attack: 3 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
@@ -141,7 +141,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
-    base: { health: 3, attack: 3 },
+    base: { health: 3, attack: 2 },
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},
