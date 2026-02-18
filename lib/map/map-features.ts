@@ -7,15 +7,17 @@ import {
   TileSubtype,
 } from "./constants";
 import type { MapData } from "./types";
-import { generateMap, areAllFloorsConnected } from "./map-generation";
+import { generateMap, gridSizeForFloor, areAllFloorsConnected } from "./map-generation";
 import { addPlayerToMap } from "./player";
 
-export function generateMapWithSubtypes(): MapData {
-  const tiles = generateMap();
-  const subtypes = Array(GRID_SIZE)
+export function generateMapWithSubtypes(gridW?: number, gridH?: number): MapData {
+  const tiles = generateMap(gridW, gridH);
+  const h = tiles.length;
+  const w = tiles[0]?.length ?? 0;
+  const subtypes = Array(h)
     .fill(0)
     .map(() =>
-      Array(GRID_SIZE)
+      Array(w)
         .fill(0)
         .map(() => [] as number[])
     );
@@ -638,8 +640,10 @@ export function addChestKeysToMap(mapData: MapData, keyCount: number): MapData {
  */
 export function generateCompleteMapForFloor(
   floorAllocation: { chests: number; keys: number; chestContents: TileSubtype[] },
+  floor?: number,
 ): MapData {
-  const base = generateMapWithSubtypes();
+  const [gridW, gridH] = floor !== undefined ? gridSizeForFloor(floor) : [GRID_SIZE, GRID_SIZE];
+  const base = generateMapWithSubtypes(gridW, gridH);
   const withExit = generateMapWithExit(base);
   const withExitKey = addExitKeyToMap(withExit);
 

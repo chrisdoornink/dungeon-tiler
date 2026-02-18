@@ -183,9 +183,11 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           ringAge?: number;
         };
 
-        // Check if player can see this goblin (LOS + within vision range 8)
-        const playerSees = manhattan <= 8 && canSee(grid, [e.y, e.x], [py, px]);
-        if (playerSees && !mem.aware) {
+        // Becomes aware when player is within range 8 (regardless of LOS — it can sense nearby presence)
+        // LOS is only required for ranged attacks, not for awareness/teleport logic
+        const withinSenseRange = manhattan <= 8;
+        const playerSees = withinSenseRange && canSee(grid, [e.y, e.x], [py, px]);
+        if (withinSenseRange && !mem.aware) {
           mem.aware = true;
         }
 

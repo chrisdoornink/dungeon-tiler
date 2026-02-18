@@ -971,7 +971,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   });
 
   const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
-  const mapData = generateCompleteMapForFloor(floorAlloc);
+  const mapData = generateCompleteMapForFloor(floorAlloc, floor);
 
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
@@ -1103,10 +1103,10 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   const newMapData = withPatchedMathRandom(rng, () => {
     let mapData: MapData;
     if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
-      mapData = generateCompleteMapForFloor(allocation);
+      mapData = generateCompleteMapForFloor(allocation, nextFloor);
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
-      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] });
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor);
     }
     // Daily-only: 1-in-6 chance to use the outdoor environment
     if (Math.random() < 1 / 6) {

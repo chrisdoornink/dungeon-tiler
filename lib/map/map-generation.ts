@@ -1,5 +1,14 @@
 import { FLOOR, WALL, GRID_SIZE, MIN_ROOM_SIZE, MAX_ROOM_SIZE, dx, dy } from "./constants";
 
+/**
+ * Returns a square grid size [width, height] for a given floor.
+ * Starts at 16×16 on floor 1 and grows by 1 each floor, capping at 25×25.
+ */
+export function gridSizeForFloor(floor: number): [number, number] {
+  const size = Math.min(15 + floor, 25);
+  return [size, size];
+}
+
 export type Room = {
   x: number;
   y: number;
@@ -13,12 +22,12 @@ export function getLastRooms(): Room[] {
   return LAST_ROOMS.map((r) => ({ ...r }));
 }
 
-export function generateMap(): number[][] {
+export function generateMap(gridW: number = GRID_SIZE, gridH: number = GRID_SIZE): number[][] {
   const grid: number[][] = [];
 
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < gridH; y++) {
     const row: number[] = [];
-    for (let x = 0; x < GRID_SIZE; x++) {
+    for (let x = 0; x < gridW; x++) {
       row.push(WALL);
     }
     grid.push(row);
@@ -39,8 +48,8 @@ export function generateMap(): number[][] {
         MIN_ROOM_SIZE +
         Math.floor(Math.random() * (MAX_ROOM_SIZE - MIN_ROOM_SIZE + 1));
 
-      const x = 1 + Math.floor(Math.random() * (GRID_SIZE - width - 2));
-      const y = 1 + Math.floor(Math.random() * (GRID_SIZE - height - 2));
+      const x = 1 + Math.floor(Math.random() * (gridW - width - 2));
+      const y = 1 + Math.floor(Math.random() * (gridH - height - 2));
 
       const newRoom: Room = { x, y, width, height };
 
@@ -68,8 +77,8 @@ export function generateMap(): number[][] {
     createCorridor(grid, roomA, roomB);
   }
 
-  enforcePerimeterWalls(grid);
-  adjustFloorPercentage(grid);
+  enforcePerimeterWalls(grid, gridW, gridH);
+  adjustFloorPercentage(grid, gridW, gridH);
   ensureFloorsConnected(grid);
 
   LAST_ROOMS = rooms.map((r) => ({ ...r }));
@@ -125,18 +134,18 @@ function createCorridor(grid: number[][], roomA: Room, roomB: Room): void {
   }
 }
 
-function enforcePerimeterWalls(grid: number[][]): void {
-  for (let x = 0; x < GRID_SIZE; x++) {
+function enforcePerimeterWalls(grid: number[][], gridW: number = GRID_SIZE, gridH: number = GRID_SIZE): void {
+  for (let x = 0; x < gridW; x++) {
     if (Math.random() < 0.7) {
       grid[0][x] = WALL;
-      grid[GRID_SIZE - 1][x] = WALL;
+      grid[gridH - 1][x] = WALL;
     }
   }
 
-  for (let y = 0; y < GRID_SIZE; y++) {
+  for (let y = 0; y < gridH; y++) {
     if (Math.random() < 0.7) {
       grid[y][0] = WALL;
-      grid[y][GRID_SIZE - 1] = WALL;
+      grid[y][gridW - 1] = WALL;
     }
   }
 }
@@ -228,12 +237,12 @@ function connectRegions(
   }
 }
 
-function adjustFloorPercentage(grid: number[][]): void {
+function adjustFloorPercentage(grid: number[][], gridW: number = GRID_SIZE, gridH: number = GRID_SIZE): void {
   let floorCount = 0;
-  const totalTiles = GRID_SIZE * GRID_SIZE;
+  const totalTiles = gridW * gridH;
 
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
+  for (let y = 0; y < gridH; y++) {
+    for (let x = 0; x < gridW; x++) {
       if (grid[y][x] === FLOOR) floorCount++;
     }
   }
@@ -243,8 +252,8 @@ function adjustFloorPercentage(grid: number[][]): void {
 
   if (floorCount < minFloor) {
     while (floorCount < minFloor) {
-      const x = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
-      const y = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
+      const x = 1 + Math.floor(Math.random() * (gridW - 2));
+      const y = 1 + Math.floor(Math.random() * (gridH - 2));
 
       if (grid[y][x] === WALL) {
         grid[y][x] = FLOOR;
@@ -253,8 +262,8 @@ function adjustFloorPercentage(grid: number[][]): void {
     }
   } else if (floorCount > maxFloor) {
     while (floorCount > maxFloor) {
-      const x = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
-      const y = 1 + Math.floor(Math.random() * (GRID_SIZE - 2));
+      const x = 1 + Math.floor(Math.random() * (gridW - 2));
+      const y = 1 + Math.floor(Math.random() * (gridH - 2));
 
       if (grid[y][x] === FLOOR) {
         grid[y][x] = WALL;
