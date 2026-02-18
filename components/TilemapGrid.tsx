@@ -2807,7 +2807,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
                             : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
                         }
-                        title="Snake Medallion — Place or travel to portal"
+                        title="Snake Medallion — Place or travel to portal (press M)"
                       >
                         <span
                           aria-hidden="true"
@@ -2821,7 +2821,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             backgroundPosition: "center",
                           }}
                         />
-                        {!isCompact && <span>Snake Medallion</span>}
+                        {isCompact ? (
+                          <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            M
+                          </span>
+                        ) : (
+                          <>
+                            <span>Snake Medallion</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (M)
+                            </span>
+                          </>
+                        )}
                       </button>
                     )}
                     {(gameState.rockCount ?? 0) > 0 && (
