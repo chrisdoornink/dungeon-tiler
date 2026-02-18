@@ -507,7 +507,7 @@ const EARLY_CHEST_CONTENTS = [
 
 /**
  * Deterministically allocate chests and keys across floors.
- * - Sword & Shield: 2 chests + 2 keys randomly placed across floors 1–4
+ * - Sword & Shield: 2 chests + 2 keys randomly placed across floors 1–3
  * - Snake Medallion: 1 chest + 1 key on a random floor between 5–7
  * Uses Math.random (expected to be seeded externally).
  *
@@ -522,7 +522,7 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
     result.set(f, { chests: 0, keys: 0, chestContents: [] });
   }
 
-  // --- Early items (sword + shield) on floors 1–4 ---
+  // --- Early items (sword + shield) on floors 1–3 ---
 
   // Shuffle early chest contents to randomize which item goes where
   const earlyContents = [...EARLY_CHEST_CONTENTS];
@@ -531,18 +531,18 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
     [earlyContents[i], earlyContents[j]] = [earlyContents[j], earlyContents[i]];
   }
 
-  // Place 2 chests randomly across floors 1–4
+  // Place 2 chests randomly across floors 1–3
   const chestFloors: number[] = [];
   for (let i = 0; i < 2; i++) {
-    chestFloors.push(1 + Math.floor(Math.random() * 4)); // 1–4
+    chestFloors.push(1 + Math.floor(Math.random() * 3)); // 1–3
   }
   chestFloors.sort((a, b) => a - b);
 
-  // Place 2 keys randomly across floors 1–4, then adjust to satisfy the
+  // Place 2 keys randomly across floors 1–3, then adjust to satisfy the
   // cumulative constraint: by floor F, total keys placed ≥ total chests placed.
   const keyFloors: number[] = [];
   for (let i = 0; i < 2; i++) {
-    keyFloors.push(1 + Math.floor(Math.random() * 4)); // 1–4
+    keyFloors.push(1 + Math.floor(Math.random() * 3)); // 1–3
   }
   keyFloors.sort((a, b) => a - b);
 

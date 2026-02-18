@@ -31,6 +31,7 @@ type LastGame = {
     steps?: number;
     byKind?: { 'fire-goblin': number; 'water-goblin': number; 'water-goblin-spear': number; 'earth-goblin': number; 'earth-goblin-knives': number; 'pink-goblin': number; ghost: number; 'stone-goblin': number };
   };
+  currentFloor?: number;
 };
 
 export default function EndPage() {
@@ -91,6 +92,7 @@ export default function EndPage() {
 
   const title = last.outcome === "dead" ? "You died in the dungeon!" : "You escaped the dungeon!";
   const subtitle = last.outcome === "dead" ? "Defeated at" : "Completed at";
+  const levelReached = last.currentFloor;
 
   // Death cause specific messages and images
   const getDeathDetails = () => {
@@ -126,6 +128,9 @@ export default function EndPage() {
   const dateStr = new Date(last.completedAt).toLocaleDateString('en-CA');
   // Header
   shareLines.push(`#TorchBoy ${dateStr}`);
+  if (levelReached != null) {
+    shareLines.push(`Level ${levelReached}`);
+  }
   // Stats line: outcome, death cause, steps, damage, score
   const outcomeEmoji = last.outcome === 'dead' ? '💀' : '🏆';
   const deathEmoji = last.outcome === 'dead' && last.deathCause
@@ -157,11 +162,11 @@ export default function EndPage() {
       const n = typeof count === 'number' ? count : 0;
       if (n > 0) {
         const emoji = ({ ghost: '👻', 'fire-goblin': '👹', 'water-goblin': '🧊', 'water-goblin-spear': '🔱', 'earth-goblin': '🟤', 'earth-goblin-knives': '🗡️', 'pink-goblin': '💗', 'stone-goblin': '🗿' } as Record<string, string>)[enemyType] || '👹';
-        enemyChunks.push(emoji.repeat(n));
+        enemyChunks.push(`${emoji}x${n}`);
       }
     });
   }
-  shareLines.push(`⚔️ kills: ${enemyChunks.join('')}`);
+  shareLines.push(`⚔️ ${enemyChunks.join(' ')}`);
   // Inventory line
   const items: string[] = [];
   if (last.hasKey) items.push('🔑');
@@ -206,6 +211,9 @@ export default function EndPage() {
         <div data-testid="game-statistics-box" className="rounded-lg shadow-xl p-8 max-w-2xl mx-auto text-center">
         <h1 className="text-2xl font-semibold mb-2 text-gray-100">{title}</h1>
         <p className="text-gray-200 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
+        {levelReached != null && (
+          <p className="text-sm text-gray-400 mb-3">Reached Level {levelReached}</p>
+        )}
 
         {/* Death cause specific subtitle with image */}
         {deathDetails && (
@@ -288,24 +296,19 @@ export default function EndPage() {
                         </div>
                       ) : (
                         visible.map((i) => (
-                          <div key={i.key} className="flex items-center gap-1">
-                            {Array.from({ length: Math.min(6, i.count) }).map((_, idx) => (
-                              <div
-                                key={`${i.key}-${idx}`}
-                                aria-label={i.title}
-                                title={i.title}
-                                className="w-5 h-5"
-                                style={{
-                                  backgroundImage: `url(${i.src})`,
-                                  backgroundSize: "contain",
-                                  backgroundRepeat: "no-repeat",
-                                  backgroundPosition: "center",
-                                }}
-                              />
-                            ))}
-                            {i.count > 6 && (
-                              <span className="text-xs text-gray-600">+{i.count - 6}</span>
-                            )}
+                          <div key={i.key} className="flex items-center gap-0.5">
+                            <div
+                              aria-label={i.title}
+                              title={i.title}
+                              className="w-5 h-5"
+                              style={{
+                                backgroundImage: `url(${i.src})`,
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                              }}
+                            />
+                            <span className="text-xs text-gray-400">x{i.count}</span>
                           </div>
                         ))
                       )}

@@ -142,6 +142,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Header
     lines.push(`#TorchBoy ${today}`);
 
+    // Level reached (multi-tier mode)
+    if (lastGame?.currentFloor != null) {
+      lines.push(`Level ${lastGame.currentFloor}`);
+    }
+
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
     // If player died, add emoji for cause of death (enemy kind or faulty floor)
@@ -188,12 +193,12 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         if (numCount > 0) {
           const emoji =
             EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP["fire-goblin"];
-          enemyChunks.push(emoji.repeat(numCount));
+          enemyChunks.push(`${emoji}x${numCount}`);
         }
       });
     }
     // Remove the word 'kills' per request; keep the swords icon as a section marker
-    lines.push(`⚔️ ${enemyChunks.join("")}`);
+    lines.push(`⚔️ ${enemyChunks.join(" ")}`);
 
     // Inventory line (no label word)
     const items: string[] = [];
@@ -284,6 +289,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                 ? `You escaped the dungeon! The realm celebrates your victory.`
                 : `The dungeon has claimed another victim. Your adventure ends here.`}
             </p>
+            {lastGame?.currentFloor != null && (
+              <p className="text-sm text-gray-400 text-center mt-2">
+                Reached Level {lastGame.currentFloor}
+              </p>
+            )}
             <p className="text-sm text-gray-300 text-center mt-4">
               Return tomorrow for a new dungeon challenge!
             </p>
@@ -322,6 +332,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     <div className="mb-1">
                       #TorchBoy {new Date().toLocaleDateString("en-CA")}
                     </div>
+                    {lastGame?.currentFloor != null && (
+                      <div className="mb-1 text-gray-300">
+                        Level {lastGame.currentFloor}
+                      </div>
+                    )}
                     {/* Result + steps */}
                     <div className="flex items-center justify-center gap-2 mb-1">
                       <div
@@ -365,7 +380,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     {lastGame.stats.byKind && (
                       <div className="flex items-center justify-center gap-1 mb-1">
                         <span className="mr-1">⚔️</span>
-                        {Object.entries(lastGame.stats.byKind).flatMap(
+                        {Object.entries(lastGame.stats.byKind).map(
                           ([enemyType, count]) => {
                             let numCount =
                               typeof count === "number" ? count : 0;
@@ -375,11 +390,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                             ) {
                               numCount = numCount / 2;
                             }
-                            const enemies: React.ReactElement[] = [];
-                            for (let i = 0; i < numCount; i++) {
-                              enemies.push(
+                            if (numCount <= 0) return null;
+                            return (
+                              <div key={enemyType} className="flex items-center gap-0.5">
                                 <div
-                                  key={`${enemyType}-${i}`}
                                   className="w-6 h-6"
                                   style={{
                                     backgroundImage: `url(/images/enemies/${
@@ -401,9 +415,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                                   }}
                                   title={enemyType}
                                 />
-                              );
-                            }
-                            return enemies;
+                                <span className="text-xs text-gray-300">x{numCount}</span>
+                              </div>
+                            );
                           }
                         )}
                       </div>

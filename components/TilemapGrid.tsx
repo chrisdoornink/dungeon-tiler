@@ -1753,6 +1753,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             outcome: "win" as const,
             streak: nextStreak,
             heroHealth: gameState.heroHealth,
+            currentFloor: gameState.currentFloor,
           };
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -1793,6 +1794,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             outcome: "win" as const,
             streak: nextStreak,
             heroHealth: gameState.heroHealth,
+            currentFloor: gameState.currentFloor,
           };
           if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2067,6 +2069,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           streak: 0,
           deathCause: gameState.deathCause,
           heroHealth: 0, // Always 0 for deaths
+          currentFloor: gameState.currentFloor,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2097,6 +2100,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           streak: 0,
           deathCause: gameState.deathCause,
           heroHealth: 0, // Always 0 for deaths
+          currentFloor: gameState.currentFloor,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
