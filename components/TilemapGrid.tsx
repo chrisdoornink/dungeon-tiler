@@ -2014,6 +2014,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: gameState.stats.damageTaken,
           byKind: gameState.stats.byKind,
           deathCause: gameState.deathCause?.type,
+          deathCauseEnemyKind: gameState.deathCause?.enemyKind,
           currentFloor: gameState.currentFloor,
         });
       } catch {}
@@ -2042,6 +2043,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: gameState.stats.damageTaken,
           byKind: gameState.stats.byKind,
           deathCause: gameState.deathCause?.type,
+          deathCauseEnemyKind: gameState.deathCause?.enemyKind,
           currentFloor: gameState.currentFloor,
         });
       } catch {}
@@ -2064,6 +2066,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         damageTaken: gameState.stats.damageTaken,
         byKind: gameState.stats.byKind,
         deathCause: gameState.deathCause?.type,
+        deathCauseEnemyKind: gameState.deathCause?.enemyKind,
         currentFloor: gameState.currentFloor,
       });
     } catch {}
