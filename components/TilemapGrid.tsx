@@ -66,6 +66,7 @@ import { performExchange } from "../lib/story/exchange_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
+import { FloorTransition } from "./FloorTransition";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -217,6 +218,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [travelAnimation, setTravelAnimation] = useState<{
     phase: 'sparkle-out' | 'transition' | 'sparkle-in' | 'complete';
     startTime: number;
+  } | null>(null);
+
+  // Floor transition iris wipe state
+  const [floorTransition, setFloorTransition] = useState<{
+    closeCenter: { x: number; y: number };
+    openCenter: { x: number; y: number } | null; // null until floor swap happens
+    pendingGameState: GameState | null; // the next-floor state, computed eagerly
   } | null>(null);
 
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
@@ -1688,27 +1696,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState.showFullMap, suppressDarknessOverlay]);
 
-  // Handle floor transition for multi-tier daily mode
+  // Handle floor transition for multi-tier daily mode — start iris wipe animation
   useEffect(() => {
-    if (gameState.needsFloorTransition && isDailyChallenge && resolvedStorageSlot === 'daily-new') {
-      // Get daily seed
+    if (gameState.needsFloorTransition && isDailyChallenge && resolvedStorageSlot === 'daily-new' && !floorTransition) {
+      // Pre-compute the next floor state so it's ready when the screen goes black
       const localToday = DateUtils.getTodayString();
       const dailySeed = hashStringToSeed(localToday);
-      
-      // Advance to next floor
       const nextFloorState = advanceToNextFloor(gameState, dailySeed);
-      
-      // Clear the transition flag
       nextFloorState.needsFloorTransition = false;
-      
-      // Update game state and save
-      setGameState(nextFloorState);
-      CurrentGameStorage.saveCurrentGame(nextFloorState, resolvedStorageSlot);
-      if (onFloorChange && nextFloorState.currentFloor != null) {
-        onFloorChange(nextFloorState.currentFloor);
-      }
+
+      // Player is always centered in the 600×600 viewport
+      const viewportCenter = { x: 300, y: 300 };
+
+      setFloorTransition({
+        closeCenter: viewportCenter,
+        openCenter: viewportCenter,
+        pendingGameState: nextFloorState,
+      });
     }
-  }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot]);
+  }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot, floorTransition]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
@@ -2353,6 +2359,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (gameState.heroHealth <= 0 || heroDeathPhase !== "idle") {
         return;
       }
+      if (floorTransition) return;
       if (dialogueActive) {
         handleDialogueAdvance();
         return;
@@ -2365,6 +2372,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       handlePlayerMove,
       gameState.heroHealth,
       heroDeathPhase,
+      floorTransition,
     ]
   );
 
@@ -3257,6 +3265,26 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   )}
                 </div>
               </div>
+              {/* Floor transition iris wipe overlay */}
+              {floorTransition && (
+                <FloorTransition
+                  closeCenter={floorTransition.closeCenter}
+                  openCenter={floorTransition.openCenter ?? floorTransition.closeCenter}
+                  onSwapFloor={() => {
+                    if (floorTransition.pendingGameState) {
+                      const nextState = floorTransition.pendingGameState;
+                      setGameState(nextState);
+                      CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+                      if (onFloorChange && nextState.currentFloor != null) {
+                        onFloorChange(nextState.currentFloor);
+                      }
+                    }
+                  }}
+                  onComplete={() => {
+                    setFloorTransition(null);
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>
