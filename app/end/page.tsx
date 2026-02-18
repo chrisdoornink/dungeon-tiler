@@ -143,11 +143,11 @@ export default function EndPage() {
         ? (({
             ghost: '👻',
             'fire-goblin': '👹',
-            'water-goblin': '🧊',
-            'water-goblin-spear': '🔱',
+            'water-goblin': '🔵',
+            'water-goblin-spear': '🔵🗡️',
             'earth-goblin': '🟤',
-            'earth-goblin-knives': '🗡️',
-            'pink-goblin': '💗',
+            'earth-goblin-knives': '🟤⚔️',
+            'pink-goblin': '🔮',
             'stone-goblin': '🗿',
           } as Record<string, string>)[last.deathCause.enemyKind || 'fire-goblin'] || '👹')
         : '')
@@ -164,12 +164,12 @@ export default function EndPage() {
     Object.entries(last.stats.byKind as Record<string, number>).forEach(([enemyType, count]) => {
       const n = typeof count === 'number' ? count : 0;
       if (n > 0) {
-        const emoji = ({ ghost: '👻', 'fire-goblin': '👹', 'water-goblin': '🧊', 'water-goblin-spear': '🔱', 'earth-goblin': '🟤', 'earth-goblin-knives': '🗡️', 'pink-goblin': '💗', 'stone-goblin': '🗿' } as Record<string, string>)[enemyType] || '👹';
+        const emoji = ({ ghost: '👻', 'fire-goblin': '👹', 'water-goblin': '🔵', 'water-goblin-spear': '🔵🗡️', 'earth-goblin': '🟤', 'earth-goblin-knives': '🟤⚔️', 'pink-goblin': '🔮', 'stone-goblin': '🗿' } as Record<string, string>)[enemyType] || '👹';
         enemyChunks.push(`${emoji}x${n}`);
       }
     });
   }
-  shareLines.push(`⚔️ ${enemyChunks.join(' ')}`);
+  shareLines.push(`💀 ${enemyChunks.join(' ')}`);
   // Inventory line
   const items: string[] = [];
   if (last.hasKey) items.push('🔑');

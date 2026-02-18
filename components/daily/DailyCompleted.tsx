@@ -26,11 +26,11 @@ const EMOJI_MAP = {
 
   // Enemies
   "fire-goblin": "👹",
-  "water-goblin": "🧊",
-  "water-goblin-spear": "🔱",
+  "water-goblin": "🔵",
+  "water-goblin-spear": "🔵🗡️",
   "earth-goblin": "🟤",
-  "earth-goblin-knives": "🗡️",
-  "pink-goblin": "💗",
+  "earth-goblin-knives": "🟤⚔️",
+  "pink-goblin": "🔮",
   ghost: "👻",
   "stone-goblin": "🗿",
   snake: "🐍",
@@ -201,7 +201,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       });
     }
     // Remove the word 'kills' per request; keep the swords icon as a section marker
-    lines.push(`⚔️ ${enemyChunks.join(" ")}`);
+    lines.push(`☠️ ${enemyChunks.join(" ")}`);
 
     // Inventory line (no label word)
     const items: string[] = [];
