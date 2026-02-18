@@ -102,6 +102,7 @@ interface TilemapGridProps {
   isDailyChallenge?: boolean; // when true, handle daily challenge completion
   onDailyComplete?: (result: "won" | "lost") => void; // when daily, signal result instead of routing
   storageSlot?: GameStorageSlot;
+  onFloorChange?: (floor: number) => void; // notify parent when floor changes
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -113,6 +114,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   isDailyChallenge = false,
   onDailyComplete,
   storageSlot,
+  onFloorChange,
 }) => {
   const router = useRouter();
 
@@ -1702,6 +1704,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Update game state and save
       setGameState(nextFloorState);
       CurrentGameStorage.saveCurrentGame(nextFloorState, resolvedStorageSlot);
+      if (onFloorChange && nextFloorState.currentFloor != null) {
+        onFloorChange(nextFloorState.currentFloor);
+      }
     }
   }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot]);
 
@@ -2549,12 +2554,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 flex items-center justify-center">
           <div className="game-scale relative" data-testid="game-scale">
-            {/* Floor indicator for multi-tier daily mode */}
-            {gameState.currentFloor != null && (gameState.maxFloors ?? 0) > 1 && (
-              <div className="text-center text-xs text-gray-400 font-semibold mb-1">
-                Level {gameState.currentFloor}
-              </div>
-            )}
             {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
             <div
               className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
