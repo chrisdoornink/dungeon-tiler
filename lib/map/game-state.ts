@@ -945,7 +945,7 @@ export function initializeGameState(): GameState {
 
 /**
  * Returns a random enemy count for a given floor, scaling from easy (floor 1) to hard (floor 10+).
- * Floor 1: 2–3  |  Floor 2: 3–4  |  Floor 3–4: 3–5  |  Floor 5–6: 4–6  |  Floor 7+: 5–7
+ * Floor 1: 2–3  |  Floor 2: 3–4  |  Floor 3–4: 3–5  |  Floor 5–6: 4–6  |  Floor 7–8: 5–7  |  Floor 9: 6–8  |  Floor 10: 7–9
  */
 function enemyCountForFloor(floor: number): number {
   const r = Math.random();
@@ -953,7 +953,9 @@ function enemyCountForFloor(floor: number): number {
   if (floor <= 2) return 3 + Math.floor(r * 2);       // 3–4
   if (floor <= 4) return 3 + Math.floor(r * 3);       // 3–5
   if (floor <= 6) return 4 + Math.floor(r * 3);       // 4–6
-  return 5 + Math.floor(r * 3);                        // 5–7
+  if (floor <= 8) return 5 + Math.floor(r * 3);       // 5–7
+  if (floor <= 9) return 6 + Math.floor(r * 3);       // 6–8
+  return 7 + Math.floor(r * 3);                        // 7–9 (floor 10)
 }
 
 /**
@@ -983,10 +985,19 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
       })
     : [];
 
-  enemyTypeAssignement(enemies, { floor });
+  const ghostCount = enemyTypeAssignement(enemies, { floor });
+  if (ghostCount > 0 && playerPos) {
+    const ghosts = placeEnemies({
+      grid: mapData.tiles,
+      player: { y: playerPos[0], x: playerPos[1] },
+      count: ghostCount,
+      minDistanceFromPlayer: 6,
+    });
+    ghosts.forEach(g => { g.kind = 'ghost'; enemies.push(g); });
+  }
 
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
-  const snakesAdded = addSnakesPerRules(withRunes, enemies);
+  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
 
   return {
     hasKey: false,
@@ -1125,14 +1136,23 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           count: enemyCountForFloor(nextFloor),
           minDistanceFromPlayer: 8,
         });
-        enemyTypeAssignement(placed, { floor: nextFloor });
+        const gc = enemyTypeAssignement(placed, { floor: nextFloor });
+        if (gc > 0) {
+          const ghosts = placeEnemies({
+            grid: newMapData.tiles,
+            player: { y: playerPos[0], x: playerPos[1] },
+            count: gc,
+            minDistanceFromPlayer: 6,
+          });
+          ghosts.forEach(g => { g.kind = 'ghost'; placed.push(g); });
+        }
         return placed;
       })
     : [];
 
   // Add rune pots and snakes
   const withRunes = addRunePotsForStoneExciters(newMapData, enemies);
-  const snakesAdded = addSnakesPerRules(withRunes, enemies);
+  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor: nextFloor });
 
   // Create new game state preserving hero stats and inventory
   return {

@@ -7,17 +7,23 @@ import { findPlayerPosition } from "./player";
 export function addSnakesPerRules(
   mapData: MapData,
   enemies: Enemy[],
-  opts?: { rng?: () => number }
+  opts?: { rng?: () => number; floor?: number }
 ): Enemy[] {
   const rng = opts?.rng ?? Math.random;
+  const floor = opts?.floor ?? 1;
   const rooms = getLastRooms();
   const out = enemies.slice();
   const taken = new Set(out.map((e) => `${e.y},${e.x}`));
   const playerPos = findPlayerPosition(mapData);
   if (playerPos) taken.add(`${playerPos[0]},${playerPos[1]}`);
 
-  const roomCount = Math.max(1, rooms.length);
-  const targetSnakes = Math.min(4, Math.max(2, Math.round(roomCount * 0.33)));
+  // Scale snake count by floor with ranges:
+  // Floors 1–6: 0–1  |  Floors 7–8: 0–3  |  Floor 9: 1–3  |  Floor 10: 2–4
+  let targetSnakes: number;
+  if (floor <= 6) targetSnakes = Math.floor(rng() * 2);              // 0–1
+  else if (floor <= 8) targetSnakes = Math.floor(rng() * 4);         // 0–3
+  else if (floor <= 9) targetSnakes = 1 + Math.floor(rng() * 3);    // 1–3
+  else targetSnakes = 2 + Math.floor(rng() * 3);                     // 2–4
   const potCount = Math.min(1, Math.floor(targetSnakes * 0.25));
   const floorCount = Math.max(0, targetSnakes - potCount);
 

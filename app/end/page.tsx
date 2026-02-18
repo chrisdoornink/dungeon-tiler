@@ -32,6 +32,7 @@ type LastGame = {
     byKind?: { 'fire-goblin': number; 'water-goblin': number; 'water-goblin-spear': number; 'earth-goblin': number; 'earth-goblin-knives': number; 'pink-goblin': number; ghost: number; 'stone-goblin': number };
   };
   currentFloor?: number;
+  maxFloors?: number;
 };
 
 export default function EndPage() {
@@ -129,7 +130,9 @@ export default function EndPage() {
   // Header
   shareLines.push(`#TorchBoy ${dateStr}`);
   if (levelReached != null) {
-    shareLines.push(`Level ${levelReached}`);
+    const maxFloors = last.maxFloors ?? 10;
+    const beatGame = last.outcome === 'win' && levelReached >= maxFloors;
+    shareLines.push(beatGame ? `🎉 Escaped Floor ${levelReached}/${maxFloors}!` : `Floor ${levelReached}/${maxFloors}`);
   }
   // Stats line: outcome, death cause, steps, damage, score
   const outcomeEmoji = last.outcome === 'dead' ? '💀' : '🏆';

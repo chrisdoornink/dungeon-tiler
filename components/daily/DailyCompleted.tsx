@@ -145,7 +145,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
 
     // Level reached (multi-tier mode)
     if (lastGame?.currentFloor != null) {
-      lines.push(`Level ${lastGame.currentFloor}`);
+      const maxFloors = lastGame.maxFloors ?? 10;
+      const beatGame = isWin && lastGame.currentFloor >= maxFloors;
+      lines.push(beatGame ? `🎉 Escaped the dungeon!` : `Level ${lastGame.currentFloor}`);
     }
 
     // Result and basic stats
