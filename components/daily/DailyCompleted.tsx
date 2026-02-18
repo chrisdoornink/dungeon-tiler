@@ -68,19 +68,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const isWin = todayResult === "won";
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    try {
-      Analytics.trackDailyChallenge?.("completed", {
-        outcome: isWin ? "win" : "loss",
-        streak: data.currentStreak,
-        total_games: data.totalGamesPlayed,
-        win_rate: Math.round(
-          (data.totalGamesWon / data.totalGamesPlayed) * 100
-        ),
-      });
-    } catch {}
-  }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
-
   // Get death details from last game result stored in localStorage
   const getLastGame = () => {
     if (typeof window === "undefined") return null;
@@ -93,6 +80,20 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   };
 
   const lastGame = getLastGame();
+
+  useEffect(() => {
+    try {
+      Analytics.trackDailyChallenge?.("completed", {
+        outcome: isWin ? "win" : "loss",
+        streak: data.currentStreak,
+        total_games: data.totalGamesPlayed,
+        win_rate: Math.round(
+          (data.totalGamesWon / data.totalGamesPlayed) * 100
+        ),
+        level_reached: lastGame?.currentFloor,
+      });
+    } catch {}
+  }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
   const getDeathDetails = () => {
     if (
       isWin ||

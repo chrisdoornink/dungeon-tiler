@@ -25,6 +25,7 @@ export function trackGameComplete(params: {
   damageTaken: number;
   byKind?: Record<string, number>;
   deathCause?: string;
+  currentFloor?: number;
 }) {
   posthogAnalytics.trackGameComplete(params);
 }

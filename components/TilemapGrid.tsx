@@ -1723,6 +1723,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageDealt: gameState.stats.damageDealt,
           damageTaken: gameState.stats.damageTaken,
           byKind: gameState.stats.byKind,
+          currentFloor: gameState.currentFloor,
         });
       } catch {}
       if (isDailyChallenge) {
@@ -2002,6 +2003,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: gameState.stats.damageTaken,
           byKind: gameState.stats.byKind,
           deathCause: gameState.deathCause?.type,
+          currentFloor: gameState.currentFloor,
         });
       } catch {}
       return;
@@ -2029,6 +2031,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           damageTaken: gameState.stats.damageTaken,
           byKind: gameState.stats.byKind,
           deathCause: gameState.deathCause?.type,
+          currentFloor: gameState.currentFloor,
         });
       } catch {}
       return;
@@ -2050,6 +2053,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         damageTaken: gameState.stats.damageTaken,
         byKind: gameState.stats.byKind,
         deathCause: gameState.deathCause?.type,
+        currentFloor: gameState.currentFloor,
       });
     } catch {}
 

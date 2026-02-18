@@ -76,6 +76,7 @@ export function trackGameComplete(params: {
   damageTaken: number;
   byKind?: Record<string, number>;
   deathCause?: string;
+  currentFloor?: number;
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -88,7 +89,8 @@ export function trackGameComplete(params: {
     damage_dealt: params.damageDealt,
     damage_taken: params.damageTaken,
     enemies_by_kind: params.byKind,
-    death_cause: params.deathCause
+    death_cause: params.deathCause,
+    level_reached: params.currentFloor
   });
 }
 
