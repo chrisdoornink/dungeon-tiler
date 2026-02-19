@@ -369,6 +369,10 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.SNAKE_MEDALLION) || false;
   };
 
+  const hasExtraHeart = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.EXTRA_HEART) || false;
+  };
+
   // Bed helpers
   const hasBed = (subtypes: number[] | undefined): boolean => {
     if (!subtypes) return false;
@@ -528,7 +532,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BED_FULL_1 &&
         subtype !== TileSubtype.BED_FULL_2 &&
         subtype !== TileSubtype.BED_FULL_3 &&
-        subtype !== TileSubtype.BED_FULL_4
+        subtype !== TileSubtype.BED_FULL_4 &&
+        subtype !== TileSubtype.EXTRA_HEART
     );
   };
 
@@ -581,6 +586,13 @@ export const Tile: React.FC<TileProps> = ({
             style={{
               backgroundImage: `url('/images/items/snake-medalion.png')`,
             }}
+          />
+        )}
+        {hasOpenChest(subtypes) && hasExtraHeart(subtypes) && (
+          <div
+            key="extra-heart-revealed"
+            data-testid={`subtype-icon-${TileSubtype.EXTRA_HEART}`}
+            className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.heartIcon}`}
           />
         )}
 

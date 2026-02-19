@@ -337,6 +337,10 @@
   background-image: url("/images/items/meds-1.png");
 }
 
+.heartIcon {
+  background-image: url("/images/items/heart.png");
+}
+
 /* Rune asset */
 .runeIcon {
   background-image: url("/images/items/rune1.png");

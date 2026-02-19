@@ -511,6 +511,7 @@ const EARLY_CHEST_CONTENTS = [
  * Deterministically allocate chests and keys across floors.
  * - Sword & Shield: 2 chests + 2 keys randomly placed across floors 1–3
  * - Snake Medallion: 1 chest + 1 key on a random floor between 5–7
+ * - Extra Heart: 1 chest + 1 key on a random floor between 5–10
  * Uses Math.random (expected to be seeded externally).
  *
  * Returns a map: floor → { chests: number, keys: number, chestContents: TileSubtype[] }
@@ -520,7 +521,7 @@ const EARLY_CHEST_CONTENTS = [
  */
 export function allocateChestsAndKeys(): Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }> {
   const result = new Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }>();
-  for (let f = 1; f <= 7; f++) {
+  for (let f = 1; f <= 10; f++) {
     result.set(f, { chests: 0, keys: 0, chestContents: [] });
   }
 
@@ -575,6 +576,15 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
   // Place the key on the same floor or earlier (random floor from 5 to medallionFloor)
   const medallionKeyFloor = 5 + Math.floor(Math.random() * (medallionFloor - 4)); // 5 to medallionFloor
   result.get(medallionKeyFloor)!.keys++;
+
+  // --- Extra Heart on a random floor between 5–10 ---
+  const heartFloor = 5 + Math.floor(Math.random() * 6); // 5, 6, 7, 8, 9, or 10
+  const heartEntry = result.get(heartFloor)!;
+  heartEntry.chests++;
+  heartEntry.chestContents.push(TileSubtype.EXTRA_HEART);
+  // Place the key on the same floor or earlier (random floor from 5 to heartFloor)
+  const heartKeyFloor = 5 + Math.floor(Math.random() * (heartFloor - 4)); // 5 to heartFloor
+  result.get(heartKeyFloor)!.keys++;
 
   return result;
 }

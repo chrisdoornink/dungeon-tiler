@@ -152,9 +152,9 @@ export function performUseFood(gameState: GameState): GameState {
     }
   }
 
-  // Use the food: heal 1 HP (capped at 5) and consume 1 food
+  // Use the food: heal 1 HP (capped at heroMaxHealth) and consume 1 food
   const newGameState = { ...preTickState };
-  newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 1);
+  newGameState.heroHealth = Math.min(newGameState.heroMaxHealth ?? 5, newGameState.heroHealth + 1);
   newGameState.foodCount = count - 1;
   incrementStepsAndTime(newGameState);
 
@@ -212,9 +212,9 @@ export function performUsePotion(gameState: GameState): GameState {
     }
   }
 
-  // Use the potion: heal 2 HP (capped at 5) and consume 1 potion
+  // Use the potion: heal 2 HP (capped at heroMaxHealth) and consume 1 potion
   const newGameState = { ...preTickState };
-  newGameState.heroHealth = Math.min(5, newGameState.heroHealth + 2);
+  newGameState.heroHealth = Math.min(newGameState.heroMaxHealth ?? 5, newGameState.heroHealth + 2);
   newGameState.potionCount = count - 1;
   incrementStepsAndTime(newGameState);
 
@@ -698,6 +698,7 @@ export interface GameState {
   enemies?: Enemy[]; // Active enemies on the map
   npcs?: NPC[]; // Friendly or neutral NPCs present in the map
   heroHealth: number; // Player health points for current run
+  heroMaxHealth: number; // Maximum health points (increases when extra heart is collected)
   heroAttack: number; // Player base attack for current run
   // Optional RNG for combat variance injection in tests; falls back to Math.random
   combatRng?: () => number;
@@ -925,6 +926,7 @@ export function initializeGameState(): GameState {
     enemies: snakesAdded,
     npcs: [],
     heroHealth: 5,
+    heroMaxHealth: 5,
     heroAttack: 1,
     rockCount: 0,
     runeCount: 0,
@@ -1017,6 +1019,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     enemies: snakesAdded,
     npcs: [],
     heroHealth: 5,
+    heroMaxHealth: 5,
     heroAttack: 1,
     rockCount: 0,
     runeCount: 0,
@@ -1073,6 +1076,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     enemies: snakesAdded,
     npcs: [],
     heroHealth: 5,
+    heroMaxHealth: 5,
     heroAttack: 1,
     rockCount: 0,
     heroTorchLit: true,
@@ -1924,7 +1928,8 @@ export function movePlayer(
     if (
       (subtype.includes(TileSubtype.SWORD) ||
         subtype.includes(TileSubtype.SHIELD) ||
-        subtype.includes(TileSubtype.SNAKE_MEDALLION)) &&
+        subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
+        subtype.includes(TileSubtype.EXTRA_HEART)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
       if (subtype.includes(TileSubtype.SWORD)) {
@@ -1935,6 +1940,10 @@ export function movePlayer(
       }
       if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
         newGameState.hasSnakeMedallion = true;
+      }
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) {
+        newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
+        newGameState.heroHealth = Math.min(newGameState.heroHealth + 1, newGameState.heroMaxHealth);
       }
       // Clearing of item happens below when we set dest tile subtypes
     }
@@ -2123,7 +2132,7 @@ export function movePlayer(
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
       if (
-        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION) &&
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART) &&
         !hasClosedChest
       )
         return false;

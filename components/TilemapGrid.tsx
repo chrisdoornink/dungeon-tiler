@@ -156,6 +156,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         win: false,
         playerDirection: Direction.DOWN, // Default to facing down/front
         heroHealth: 5,
+        heroMaxHealth: 5,
         heroAttack: 1,
         rockCount: 0,
         heroTorchLit: true,
@@ -2577,6 +2578,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               <div className="text-xs font-medium mb-1">Health</div>
               <HealthDisplay
                 health={gameState.heroHealth}
+                maxHealth={gameState.heroMaxHealth ?? 5}
                 className="mb-2"
                 isPoisoned={Boolean(gameState.conditions?.poisoned?.active)}
               />
