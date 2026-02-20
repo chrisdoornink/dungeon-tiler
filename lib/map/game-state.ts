@@ -698,7 +698,7 @@ export interface GameState {
   enemies?: Enemy[]; // Active enemies on the map
   npcs?: NPC[]; // Friendly or neutral NPCs present in the map
   heroHealth: number; // Player health points for current run
-  heroMaxHealth: number; // Maximum health points (increases when extra heart is collected)
+  heroMaxHealth?: number; // Maximum health points (increases when extra heart is collected); defaults to 5
   heroAttack: number; // Player base attack for current run
   // Optional RNG for combat variance injection in tests; falls back to Math.random
   combatRng?: () => number;

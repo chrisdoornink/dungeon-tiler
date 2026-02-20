@@ -90,6 +90,7 @@ function buildTestRoom3(): GameState {
     playerDirection: Direction.DOWN,
     enemies,
     heroHealth: 5,
+    heroMaxHealth: 5,
     heroAttack: 1,
     rockCount: 0,
     stats: {

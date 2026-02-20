@@ -627,6 +627,7 @@ export function buildStoryModeState(): GameState {
     enemies: initialEnemies,
     npcs: initialNpcs,
     heroHealth: 1,
+    heroMaxHealth: 5,
     heroAttack: 1,
     heroTorchLit: false,
     rockCount: 0,

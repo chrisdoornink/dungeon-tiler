@@ -77,6 +77,7 @@ function buildGoblinTestRoom(): GameState {
     playerDirection: Direction.DOWN,
     enemies,
     heroHealth: 5,
+    heroMaxHealth: 5,
     heroAttack: 1,
     heroTorchLit: true,
     rockCount: 0,

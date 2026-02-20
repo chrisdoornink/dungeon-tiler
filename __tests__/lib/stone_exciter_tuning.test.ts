@@ -42,6 +42,7 @@ describe("stone-goblin tuning: health and damage interactions", () => {
       playerDirection: Direction.RIGHT,
       enemies: [exciter],
       heroHealth: 5,
+      heroMaxHealth: 5,
       heroAttack: 1,
       // Deterministic high roll variance; should still be capped to 1 dmg
       combatRng: () => 0.99,
@@ -83,6 +84,7 @@ describe("stone-goblin tuning: health and damage interactions", () => {
       playerDirection: Direction.RIGHT,
       enemies: [exciter],
       heroHealth: 5,
+      heroMaxHealth: 5,
       heroAttack: 1,
       combatRng: () => 0.5,
       stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
