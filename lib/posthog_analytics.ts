@@ -92,7 +92,7 @@ export function trackGameComplete(params: {
     enemies_by_kind: params.byKind,
     death_cause: params.deathCause,
     death_cause_enemy_kind: params.deathCauseEnemyKind,
-    level_reached: params.currentFloor
+    level_reached: params.currentFloor != null ? String(params.currentFloor) : undefined
   });
 }
 

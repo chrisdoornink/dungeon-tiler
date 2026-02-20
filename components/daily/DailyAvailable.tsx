@@ -78,12 +78,14 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
             Your Progress
           </h2>
           <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-gray-300">Current Streak</span>
-              <span className="font-bold text-lg text-blue-300">
-                {data.currentStreak}
-              </span>
-            </div>
+            {data.currentStreak > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="text-gray-300">Current Streak</span>
+                <span className="font-bold text-lg text-blue-300">
+                  {data.currentStreak}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-gray-300">Total Games</span>
               <span className="font-semibold text-gray-200">

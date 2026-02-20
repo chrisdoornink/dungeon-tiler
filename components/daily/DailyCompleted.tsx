@@ -527,21 +527,23 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         <div data-testid="individual-stats-list" className="max-w-lg mx-auto">
           <div className="">
             <div className="space-y-1">
-              <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                <span className="text-gray-300 font-medium">
-                  Current Streak:
-                </span>
-                <span
-                  className={`text-2xl font-bold ${
-                    isWin ? "text-green-300" : "text-red-300"
-                  }`}
-                >
-                  {data.currentStreak}
-                  {isWin && data.currentStreak > 1 && (
-                    <span className="text-sm text-green-400 ml-1">🔥</span>
-                  )}
-                </span>
-              </div>
+              {data.currentStreak > 0 && (
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300 font-medium">
+                    Current Streak:
+                  </span>
+                  <span
+                    className={`text-2xl font-bold ${
+                      isWin ? "text-green-300" : "text-red-300"
+                    }`}
+                  >
+                    {data.currentStreak}
+                    {isWin && data.currentStreak > 1 && (
+                      <span className="text-sm text-green-400 ml-1">🔥</span>
+                    )}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between items-center py-2 border-b border-gray-700">
                 <span className="text-gray-300 font-medium">Total Games:</span>
                 <span className="text-lg font-semibold text-gray-200">

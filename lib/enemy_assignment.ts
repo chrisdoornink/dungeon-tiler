@@ -14,22 +14,22 @@ import { type EnemyKind } from "./enemies/registry";
  * which counts the actual stone-goblins in the enemies array.
  */
 
-// Base spawn weights by difficulty (easier = higher weight, range 20–5):
+// Base spawn weights by difficulty (easier = higher weight):
 //   earth-goblin:        20  (difficulty 2/10 — low HP, low attack)
 //   fire-goblin:         17  (difficulty 3/10 — balanced baseline)
 //   water-goblin:        17  (difficulty 3/10 — tanky but weak attack)
 //   earth-goblin-knives: 12  (difficulty 4/10 — low HP, high attack)
-//   water-goblin-spear:   8  (difficulty 6/10 — high HP + high attack)
-//   stone-goblin:         6  (difficulty 7/10 — 1 melee dmg, needs runes)
-//   pink-goblin:          5  (difficulty 8/10 — ranged, teleports)
+//   water-goblin-spear:   9  (difficulty 6/10 — high HP + high attack; boosted late)
+//   stone-goblin:         6  (difficulty 7/10 — 1 melee dmg, needs runes; avoidable)
+//   pink-goblin:          8  (difficulty 8/10 — ranged, teleports; hardest to fight)
 const BASE_GOBLIN_WEIGHTS: Array<{ kind: EnemyKind; weight: number }> = [
   { kind: "earth-goblin",        weight: 20 },
   { kind: "fire-goblin",         weight: 17 },
   { kind: "water-goblin",        weight: 17 },
   { kind: "earth-goblin-knives", weight: 12 },
-  { kind: "water-goblin-spear",  weight:  8 },
+  { kind: "water-goblin-spear",  weight:  9 },
   { kind: "stone-goblin",        weight:  6 },
-  { kind: "pink-goblin",         weight:  5 },
+  { kind: "pink-goblin",         weight:  8 },
 ];
 
 /**
@@ -37,9 +37,9 @@ const BASE_GOBLIN_WEIGHTS: Array<{ kind: EnemyKind; weight: number }> = [
  * - Floors 1–2: Only earth, fire, water goblins
  * - Floors 3–4: Add earth-knives; water-spear at half weight; no stone/pink
  * - Floors 5–6: Normal weighted pool
- * - Floor 7: Full pool + 2× stone & pink weight
- * - Floors 8–9: Weapons+ pool (earth, knives, spear, stone, pink) + 2× stone/pink; drop fire/water
- * - Floor 10: Weapons+ pool + 3× stone & pink weight
+ * - Floor 7: Full pool + 2× spear, stone & pink weight
+ * - Floors 8–9: Weapons+ pool (earth, knives, spear, stone, pink) + 2× spear/stone/pink; drop fire/water
+ * - Floor 10: Weapons+ pool + 3× spear/stone/pink weight
  */
 function getFloorGoblinWeights(floor: number): Array<{ kind: EnemyKind; weight: number }> {
   return BASE_GOBLIN_WEIGHTS.map(({ kind, weight }) => {
@@ -60,24 +60,24 @@ function getFloorGoblinWeights(floor: number): Array<{ kind: EnemyKind; weight: 
     } else if (floor <= 6) {
       // Normal weights — no adjustment
     } else if (floor <= 7) {
-      // Full pool + 2× stone & pink
-      if (kind === "stone-goblin" || kind === "pink-goblin") {
+      // Full pool + 2× spear, stone & pink
+      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
         return { kind, weight: weight * 2 };
       }
     } else if (floor <= 9) {
-      // Weapons+ pool: drop fire-goblin and water-goblin; 2× stone & pink
+      // Weapons+ pool: drop fire-goblin and water-goblin; 2× spear/stone/pink
       if (kind === "fire-goblin" || kind === "water-goblin") {
         return { kind, weight: 0 };
       }
-      if (kind === "stone-goblin" || kind === "pink-goblin") {
+      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
         return { kind, weight: weight * 2 };
       }
     } else {
-      // Floor 10: Weapons+ pool + 3× stone & pink
+      // Floor 10: Weapons+ pool + 3× spear/stone/pink
       if (kind === "fire-goblin" || kind === "water-goblin") {
         return { kind, weight: 0 };
       }
-      if (kind === "stone-goblin" || kind === "pink-goblin") {
+      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
         return { kind, weight: weight * 3 };
       }
     }

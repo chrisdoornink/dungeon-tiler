@@ -577,8 +577,8 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
   const medallionKeyFloor = 5 + Math.floor(Math.random() * (medallionFloor - 4)); // 5 to medallionFloor
   result.get(medallionKeyFloor)!.keys++;
 
-  // --- Extra Heart on a random floor between 5–10 ---
-  const heartFloor = 5 + Math.floor(Math.random() * 6); // 5, 6, 7, 8, 9, or 10
+  // --- Extra Heart on a random floor between 5–9 ---
+  const heartFloor = 5 + Math.floor(Math.random() * 5); // 5, 6, 7, 8, or 9
   const heartEntry = result.get(heartFloor)!;
   heartEntry.chests++;
   heartEntry.chestContents.push(TileSubtype.EXTRA_HEART);
