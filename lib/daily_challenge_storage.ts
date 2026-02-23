@@ -1,4 +1,5 @@
 import { DateUtils } from './date_utils';
+import { detectAndUndoPhantomWin } from './phantom_win_detection';
 
 export interface DailyChallengeData {
   // User progression
@@ -11,6 +12,7 @@ export interface DailyChallengeData {
   lastPlayedDate: string; // ISO date string (YYYY-MM-DD) in local timezone
   todayCompleted: boolean;
   todayResult: 'won' | 'lost' | null;
+  completedAt?: string; // ISO timestamp when todayCompleted was set (for phantom detection)
   
   // Historical data
   streakHistory: Array<{
@@ -68,6 +70,16 @@ export class DailyChallengeStorage {
           this.saveData(data);
         }
       } catch {}
+
+      // Phantom-win detection: cross-check completion timestamp against lastGame
+      try {
+        const lastGameRaw = localStorage.getItem('lastGame');
+        const { data: checked, wasPhantom } = detectAndUndoPhantomWin(data, lastGameRaw);
+        data = checked;
+        if (wasPhantom) {
+          this.saveData(data);
+        }
+      } catch {}
       
       return data;
     } catch {
@@ -104,6 +116,7 @@ export class DailyChallengeStorage {
     // Update daily tracking
     data.todayCompleted = true;
     data.todayResult = result;
+    data.completedAt = new Date().toISOString();
     data.lastPlayedDate = date;
     data.totalGamesPlayed += 1;
     
@@ -137,6 +150,7 @@ export class DailyChallengeStorage {
     const data = this.loadData();
     data.todayCompleted = false;
     data.todayResult = null;
+    data.completedAt = undefined;
     this.saveData(data);
     return data;
   }
