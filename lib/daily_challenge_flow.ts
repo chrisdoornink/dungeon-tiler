@@ -80,6 +80,7 @@ export class DailyChallengeFlow {
     try {
       if (typeof window !== "undefined") {
         CurrentGameStorage.clearCurrentGame("daily");
+        CurrentGameStorage.clearCurrentGame("daily-new");
       }
     } catch {}
     return DailyChallengeStorage.recordGameResult(result, today);

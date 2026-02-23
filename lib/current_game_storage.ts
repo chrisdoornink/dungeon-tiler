@@ -4,6 +4,7 @@
  */
 
 import type { GameState } from "./map";
+import { DateUtils } from "./date_utils";
 
 const CURRENT_GAME_KEY = "currentGame";
 const DAILY_GAME_KEY = "currentDailyGame";
@@ -75,6 +76,24 @@ export class CurrentGameStorage {
         typeof parsed.heroHealth !== "number"
       ) {
         return null;
+      }
+
+      // For daily slots, reject saves that are stale (from a previous calendar day,
+      // already won, or hero is dead). These would immediately re-trigger completion.
+      if (slot === "daily" || slot === "daily-new") {
+        if (parsed.win || parsed.heroHealth <= 0) {
+          this.clearCurrentGame(slot);
+          return null;
+        }
+        // Reject saves from a previous calendar day
+        if (typeof parsed.lastSaved === "number") {
+          const savedDate = new Date(parsed.lastSaved);
+          const savedDateStr = `${savedDate.getFullYear()}-${String(savedDate.getMonth() + 1).padStart(2, '0')}-${String(savedDate.getDate()).padStart(2, '0')}`;
+          if (!DateUtils.isToday(savedDateStr)) {
+            this.clearCurrentGame(slot);
+            return null;
+          }
+        }
       }
 
       return parsed;
