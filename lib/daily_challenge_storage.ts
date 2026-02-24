@@ -26,6 +26,7 @@ export interface DailyChallengeData {
 }
 
 const STORAGE_KEY = 'dailyChallenge';
+const WIPE_VERSION = 1; // Bump this to trigger another wipe in the future
 
 export class DailyChallengeStorage {
   static getDefaultData(): DailyChallengeData {
@@ -46,6 +47,29 @@ export class DailyChallengeStorage {
     if (typeof window === 'undefined') {
       return this.getDefaultData();
     }
+
+    // One-time wipe: clear all stale daily data for users stuck by the phantom-win bug.
+    // Preserves hasSeenIntro so they don't redo the intro.
+    try {
+      const wiped = localStorage.getItem('dailyChallengeWipeVersion');
+      if (!wiped || Number(wiped) < WIPE_VERSION) {
+        const hadSeenIntro = (() => {
+          try {
+            const prev = localStorage.getItem(STORAGE_KEY);
+            return prev ? !!JSON.parse(prev).hasSeenIntro : false;
+          } catch { return false; }
+        })();
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem('currentDailyGame');
+        localStorage.removeItem('currentDailyNewGame');
+        localStorage.removeItem('lastGame');
+        localStorage.setItem('dailyChallengeWipeVersion', String(WIPE_VERSION));
+        const fresh = this.getDefaultData();
+        fresh.hasSeenIntro = hadSeenIntro;
+        this.saveData(fresh);
+        return fresh;
+      }
+    } catch {}
 
     try {
       const stored = localStorage.getItem(STORAGE_KEY);

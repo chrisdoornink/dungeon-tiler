@@ -28,6 +28,8 @@ describe("DailyChallengeStorage", () => {
   beforeEach(() => {
     localStorageMock.clear();
     jest.clearAllMocks();
+    // Bypass the one-time data wipe so tests start with a clean slate
+    localStorageMock.setItem('dailyChallengeWipeVersion', '1');
   });
 
   describe("getDefaultData", () => {
