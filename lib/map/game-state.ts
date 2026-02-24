@@ -1897,8 +1897,7 @@ export function movePlayer(
     // If it's an EXIT (floor overlay)
     if (subtype.includes(TileSubtype.EXIT)) {
       if (!newGameState.hasExitKey) {
-        // Block movement onto EXIT tile without the exit key
-        return newGameState;
+        // No exit key: allow movement onto tile but do nothing special
       } else {
         // Check if this is multi-tier mode and not the final floor
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
@@ -2114,7 +2113,8 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.ROAD_END) ||
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_90) ||
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_180) ||
-      destSubtypes.includes(TileSubtype.ROAD_ROTATE_270)
+      destSubtypes.includes(TileSubtype.ROAD_ROTATE_270) ||
+      destSubtypes.includes(TileSubtype.EXIT)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
