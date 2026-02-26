@@ -2,11 +2,14 @@ import { FLOOR, WALL, GRID_SIZE, MIN_ROOM_SIZE, MAX_ROOM_SIZE, dx, dy } from "./
 
 /**
  * Returns a square grid size [width, height] for a given floor.
- * Starts at 16×16 on floor 1 and grows by 1 each floor, capping at 25×25.
+ * Floor 1: 20×20, Floor 2: 30×30, Floor 3: 25×25
  */
 export function gridSizeForFloor(floor: number): [number, number] {
-  const size = Math.min(15 + floor, 25);
-  return [size, size];
+  if (floor === 1) return [20, 20];
+  if (floor === 2) return [30, 30];
+  if (floor === 3) return [25, 25];
+  // Fallback for any unexpected floors
+  return [25, 25];
 }
 
 export type Room = {

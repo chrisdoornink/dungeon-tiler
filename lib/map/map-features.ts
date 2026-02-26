@@ -521,70 +521,30 @@ const EARLY_CHEST_CONTENTS = [
  */
 export function allocateChestsAndKeys(): Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }> {
   const result = new Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }>();
-  for (let f = 1; f <= 10; f++) {
+  for (let f = 1; f <= 3; f++) {
     result.set(f, { chests: 0, keys: 0, chestContents: [] });
   }
 
-  // --- Early items (sword + shield) on floors 1–3 ---
-
-  // Shuffle early chest contents to randomize which item goes where
+  // Floor 1: Sword and Shield (2 chests, 2 keys)
+  const floor1 = result.get(1)!;
+  floor1.chests = 2;
+  floor1.keys = 2;
+  // Shuffle sword and shield to randomize order
   const earlyContents = [...EARLY_CHEST_CONTENTS];
   for (let i = earlyContents.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [earlyContents[i], earlyContents[j]] = [earlyContents[j], earlyContents[i]];
   }
+  floor1.chestContents = earlyContents;
 
-  // Place 2 chests randomly across floors 1–3
-  const chestFloors: number[] = [];
-  for (let i = 0; i < 2; i++) {
-    chestFloors.push(1 + Math.floor(Math.random() * 3)); // 1–3
-  }
-  chestFloors.sort((a, b) => a - b);
+  // Floor 2: Snake Medallion and Extra Heart (2 chests, 2 keys)
+  const floor2 = result.get(2)!;
+  floor2.chests = 2;
+  floor2.keys = 2;
+  floor2.chestContents = [TileSubtype.SNAKE_MEDALLION, TileSubtype.EXTRA_HEART];
 
-  // Place 2 keys randomly across floors 1–3, then adjust to satisfy the
-  // cumulative constraint: by floor F, total keys placed ≥ total chests placed.
-  const keyFloors: number[] = [];
-  for (let i = 0; i < 2; i++) {
-    keyFloors.push(1 + Math.floor(Math.random() * 3)); // 1–3
-  }
-  keyFloors.sort((a, b) => a - b);
-
-  // Enforce constraint: for each chest, ensure a key exists on or before that floor
-  for (let i = 0; i < 2; i++) {
-    if (keyFloors[i] > chestFloors[i]) {
-      keyFloors[i] = chestFloors[i];
-    }
-  }
-  keyFloors.sort((a, b) => a - b);
-
-  // Assign early items to result
-  for (let i = 0; i < 2; i++) {
-    const cf = chestFloors[i];
-    const entry = result.get(cf)!;
-    entry.chests++;
-    entry.chestContents.push(earlyContents[i]);
-
-    const kf = keyFloors[i];
-    result.get(kf)!.keys++;
-  }
-
-  // --- Snake Medallion on a random floor between 5–7 ---
-  const medallionFloor = 5 + Math.floor(Math.random() * 3); // 5, 6, or 7
-  const medallionEntry = result.get(medallionFloor)!;
-  medallionEntry.chests++;
-  medallionEntry.chestContents.push(TileSubtype.SNAKE_MEDALLION);
-  // Place the key on the same floor or earlier (random floor from 5 to medallionFloor)
-  const medallionKeyFloor = 5 + Math.floor(Math.random() * (medallionFloor - 4)); // 5 to medallionFloor
-  result.get(medallionKeyFloor)!.keys++;
-
-  // --- Extra Heart on a random floor between 5–9 ---
-  const heartFloor = 5 + Math.floor(Math.random() * 5); // 5, 6, 7, 8, or 9
-  const heartEntry = result.get(heartFloor)!;
-  heartEntry.chests++;
-  heartEntry.chestContents.push(TileSubtype.EXTRA_HEART);
-  // Place the key on the same floor or earlier (random floor from 5 to heartFloor)
-  const heartKeyFloor = 5 + Math.floor(Math.random() * (heartFloor - 4)); // 5 to heartFloor
-  result.get(heartKeyFloor)!.keys++;
+  // Floor 3: No chests or keys
+  // (already initialized to 0)
 
   return result;
 }

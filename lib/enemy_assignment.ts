@@ -33,53 +33,26 @@ const BASE_GOBLIN_WEIGHTS: Array<{ kind: EnemyKind; weight: number }> = [
 ];
 
 /**
- * Get floor-adjusted goblin weights.
- * - Floors 1–2: Only earth, fire, water goblins
- * - Floors 3–4: Add earth-knives; water-spear at half weight; no stone/pink
- * - Floors 5–6: Normal weighted pool
- * - Floor 7: Full pool + 2× spear, stone & pink weight
- * - Floors 8–9: Weapons+ pool (earth, knives, spear, stone, pink) + 2× spear/stone/pink; drop fire/water
- * - Floor 10: Weapons+ pool + 3× spear/stone/pink weight
+ * Get floor-adjusted goblin weights for 3-level daily mode.
+ * - Floor 1: Only basic goblins (fire, water, earth) without weapons
+ * - Floors 2–3: Mixed advanced goblins (pink, earth-knives, water-spear, stone, fire)
  */
 function getFloorGoblinWeights(floor: number): Array<{ kind: EnemyKind; weight: number }> {
   return BASE_GOBLIN_WEIGHTS.map(({ kind, weight }) => {
-    if (floor <= 2) {
-      // Only earth, fire, water
+    if (floor === 1) {
+      // Floor 1: Only basic goblins (fire, water, earth) - no weapons
       if (kind === "earth-goblin-knives" || kind === "water-goblin-spear" ||
           kind === "stone-goblin" || kind === "pink-goblin") {
         return { kind, weight: 0 };
       }
-    } else if (floor <= 4) {
-      // Add knives; spear at half; no stone/pink
-      if (kind === "stone-goblin" || kind === "pink-goblin") {
+    } else if (floor === 2 || floor === 3) {
+      // Floors 2 & 3: Mixed advanced goblins (pink, earth-knives, water-spear, stone, fire)
+      // Drop basic water and earth goblins to make room for advanced types
+      if (kind === "water-goblin" || kind === "earth-goblin") {
         return { kind, weight: 0 };
       }
-      if (kind === "water-goblin-spear") {
-        return { kind, weight: Math.floor(weight / 2) };
-      }
-    } else if (floor <= 6) {
-      // Normal weights — no adjustment
-    } else if (floor <= 7) {
-      // Full pool + 2× spear, stone & pink
-      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
-        return { kind, weight: weight * 2 };
-      }
-    } else if (floor <= 9) {
-      // Weapons+ pool: drop fire-goblin and water-goblin; 2× spear/stone/pink
-      if (kind === "fire-goblin" || kind === "water-goblin") {
-        return { kind, weight: 0 };
-      }
-      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
-        return { kind, weight: weight * 2 };
-      }
-    } else {
-      // Floor 10: Weapons+ pool + 3× spear/stone/pink
-      if (kind === "fire-goblin" || kind === "water-goblin") {
-        return { kind, weight: 0 };
-      }
-      if (kind === "water-goblin-spear" || kind === "stone-goblin" || kind === "pink-goblin") {
-        return { kind, weight: weight * 3 };
-      }
+      // Equal weight for all advanced types
+      return { kind, weight: 15 };
     }
     return { kind, weight };
   }).filter(g => g.weight > 0);
@@ -100,17 +73,13 @@ function pickWeightedGoblin(
 
 /**
  * Get ghost count for a given floor.
- * - Floors 1–6: 0–1 ghosts
- * - Floors 7–9: 0–2 ghosts
- * - Floor 10: 0–3 ghosts
+ * - 3-level daily mode (floors 1–3): 0–1 ghosts randomly
  * When no floor is provided (single-level daily), uses legacy 1–2 ghosts.
  */
 function getGhostCount(floor: number | undefined, rng: () => number): number {
   if (floor === undefined) return 1 + (rng() < 0.5 ? 0 : 1); // legacy: 1–2
-  if (floor <= 3) return Math.floor(rng() * 2);       // 0–1
-  if (floor <= 6) return Math.floor(rng() * 2);       // 0–1
-  if (floor <= 9) return Math.floor(rng() * 3);       // 0–2
-  return Math.floor(rng() * 4);                        // 0–3
+  // 3-level daily mode: 0–1 ghosts on any floor
+  return Math.floor(rng() * 2); // 0 or 1
 }
 
 export function enemyTypeAssignement(

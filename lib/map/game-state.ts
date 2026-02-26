@@ -946,18 +946,14 @@ export function initializeGameState(): GameState {
 }
 
 /**
- * Returns a random enemy count for a given floor, scaling from easy (floor 1) to hard (floor 10+).
- * Floor 1: 2–3  |  Floor 2: 3–4  |  Floor 3–4: 3–5  |  Floor 5–6: 4–6  |  Floor 7–8: 5–7  |  Floor 9: 6–8  |  Floor 10: 7–9
+ * Returns enemy count for a given floor in the 3-level daily mode.
+ * Floor 1: 5 enemies  |  Floor 2: 10 enemies  |  Floor 3: 10 enemies
  */
 function enemyCountForFloor(floor: number): number {
-  const r = Math.random();
-  if (floor <= 1) return 2 + Math.floor(r * 2);       // 2–3
-  if (floor <= 2) return 3 + Math.floor(r * 2);       // 3–4
-  if (floor <= 4) return 3 + Math.floor(r * 3);       // 3–5
-  if (floor <= 6) return 4 + Math.floor(r * 3);       // 4–6
-  if (floor <= 8) return 5 + Math.floor(r * 3);       // 5–7
-  if (floor <= 9) return 6 + Math.floor(r * 3);       // 6–8
-  return 7 + Math.floor(r * 3);                        // 7–9 (floor 10)
+  if (floor === 1) return 5;
+  if (floor === 2) return 10;
+  if (floor === 3) return 10;
+  return 5; // Fallback
 }
 
 /**
@@ -1011,7 +1007,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     mode: 'daily',
     allowCheckpoints: false,
     currentFloor: floor,
-    maxFloors: 10,
+    maxFloors: 3,
     mapData: withRunes,
     showFullMap: false,
     win: false,

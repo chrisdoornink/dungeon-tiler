@@ -206,14 +206,9 @@ function GameViewInner({
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
-        <h1 className="text-1xl font-bold text-center mb-1 text-gray-400">
+        <h1 className="text-1xl font-bold text-center mb-4 text-gray-400">
           Torch Boy
         </h1>
-        {currentFloor != null && (finalInitialState?.maxFloors ?? 0) > 1 && (
-          <div className="text-center text-xs text-gray-500 mb-4">
-            Level {currentFloor}
-          </div>
-        )}
         <TilemapGrid
           tilemap={finalInitialState.mapData.tiles}
           tileTypes={tileTypes}
