@@ -189,6 +189,8 @@ export const Tile: React.FC<TileProps> = ({
         return "ROAD_ROTATE_180";
       case TileSubtype.ROAD_ROTATE_270:
         return "ROAD_ROTATE_270";
+      case TileSubtype.OPEN_ABYSS:
+        return "OPEN_ABYSS";
       default:
         return String(s);
     }
@@ -232,6 +234,8 @@ export const Tile: React.FC<TileProps> = ({
       case TileSubtype.ROAD_T:
       case TileSubtype.ROAD_END:
         return "bg-amber-600";
+      case TileSubtype.OPEN_ABYSS:
+        return "bg-black";
       default:
         return "bg-gray-400";
     }
@@ -274,6 +278,8 @@ export const Tile: React.FC<TileProps> = ({
       case TileSubtype.ROAD_T:
       case TileSubtype.ROAD_END:
         return "≡";
+      case TileSubtype.OPEN_ABYSS:
+        return "";
       default:
         return "?";
     }
@@ -348,6 +354,10 @@ export const Tile: React.FC<TileProps> = ({
   };
   const hasDarkness = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.DARKNESS) || false;
+  };
+
+  const hasOpenAbyss = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.OPEN_ABYSS) || false;
   };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
@@ -507,6 +517,7 @@ export const Tile: React.FC<TileProps> = ({
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
+        subtype !== TileSubtype.OPEN_ABYSS &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
@@ -945,9 +956,10 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
-      // Check if this floor tile has darkness (collapsed faulty floor)
+      // Check if this floor tile has darkness (collapsed faulty floor) or open abyss
       const isDarkness = hasDarkness(subtype);
-      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : styles.floor} ${tierClass}`;
+      const isOpenAbyss = hasOpenAbyss(subtype);
+      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : isOpenAbyss ? styles.openAbyss : styles.floor} ${tierClass}`;
 
       // Map floor variant to NESW asset filename based on neighbors
       const floorAsset =

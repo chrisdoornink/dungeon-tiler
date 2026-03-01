@@ -91,6 +91,7 @@ export enum TileSubtype {
   BED_FULL_4 = 48,
   PINK_RING = 49,
   EXTRA_HEART = 50,
+  OPEN_ABYSS = 51,
 }
 
 /**

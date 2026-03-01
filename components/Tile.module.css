@@ -422,6 +422,35 @@
   border: 1px solid #1a1a1a;
 }
 
+/* Open abyss: triggered faulty floor with subtle pink sparkle */
+.openAbyss {
+  background-color: #0a0a0a;
+  background-image: none;
+  box-shadow: inset 0 0 20px 5px rgba(0, 0, 0, 0.8);
+  border: 1px solid #1a1a1a;
+  position: relative;
+}
+
+.openAbyss::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.15) 0%, transparent 60%);
+  animation: pinkSparkle 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes pinkSparkle {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+}
+
 @keyframes exitPulse {
   0% {
     transform: translate(-50%, -50%) scale(1);

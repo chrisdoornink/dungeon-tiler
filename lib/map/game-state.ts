@@ -856,6 +856,12 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
 
     if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
+      // Convert faulty floor to open abyss when enemy steps on it
+      subtypes[enemy.y][enemy.x] = subtypes[enemy.y][enemy.x].filter(
+        (type) => type !== TileSubtype.FAULTY_FLOOR
+      );
+      subtypes[enemy.y][enemy.x].push(TileSubtype.OPEN_ABYSS);
+      
       cleanupPinkRing(enemy, subtypes);
       defeated.push(enemy);
 
@@ -1880,9 +1886,9 @@ export function movePlayer(
 
     // If it's a FAULTY_FLOOR, trigger the trap
     if (subtype.includes(TileSubtype.FAULTY_FLOOR)) {
-      // Convert the faulty floor to darkness and kill player instantly
+      // Convert the faulty floor to open abyss and kill player instantly
       newMapData.subtypes[newY][newX] = [
-        TileSubtype.DARKNESS,
+        TileSubtype.OPEN_ABYSS,
         TileSubtype.PLAYER,
       ];
       newGameState.heroHealth = 0;
@@ -2110,7 +2116,8 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_90) ||
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_180) ||
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_270) ||
-      destSubtypes.includes(TileSubtype.EXIT)
+      destSubtypes.includes(TileSubtype.EXIT) ||
+      destSubtypes.includes(TileSubtype.OPEN_ABYSS)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);

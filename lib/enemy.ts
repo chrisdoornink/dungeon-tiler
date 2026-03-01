@@ -134,7 +134,7 @@ export class Enemy {
         for (const [dy, dx] of candMoves) {
           const ny = this.y + dy;
           const nx = this.x + dx;
-          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
+          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind, true)) {
             if (canSee(grid, [ny, nx], [player.y, player.x])) losPreserving.push([dy, dx]);
             else nonLos.push([dy, dx]);
           }
@@ -148,7 +148,7 @@ export class Enemy {
 
       // In memory mode, if the primary step is not walkable, drop pursuit immediately
       if (!seesNow) {
-        const canAnyMove = tryMoves.some(([dy, dx]) => isSafeFloorForEnemy(grid, subtypes, this.y + dy, this.x + dx, this.kind));
+        const canAnyMove = tryMoves.some(([dy, dx]) => isSafeFloorForEnemy(grid, subtypes, this.y + dy, this.x + dx, this.kind, true));
         if (!canAnyMove) {
           this.pursuitTtl = 0;
           this.state = EnemyState.IDLE;
@@ -169,7 +169,7 @@ export class Enemy {
           console.log(`[ENEMY ATTACK] ${this.kind} at (${this.y},${this.x}) attacking player at (${player.y},${player.x}) - distance: ${Math.abs(this.y - player.y) + Math.abs(this.x - player.x)}, base damage: ${this.attack}`);
           return this.attack;
         }
-        if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
+        if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind, true)) {
           // Update facing based on chosen step
           if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
           else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
@@ -204,7 +204,7 @@ export class Enemy {
               console.log(`[ENEMY ATTACK] Ghost ${this.kind} at (${this.y},${this.x}) attacking player at (${player.y},${player.x}) after phasing - distance: ${Math.abs(this.y - player.y) + Math.abs(this.x - player.x)}, base damage: ${this.attack}`);
               return this.attack;
             }
-            if (isSafeFloorForEnemy(grid, subtypes, ty, tx, this.kind)) {
+            if (isSafeFloorForEnemy(grid, subtypes, ty, tx, this.kind, true)) {
               if (dx !== 0) this.facing = dx > 0 ? 'RIGHT' : 'LEFT';
               else if (dy !== 0) this.facing = dy > 0 ? 'DOWN' : 'UP';
               this.y = ty;
@@ -245,7 +245,7 @@ export class Enemy {
           const ny = this.y + dy;
           const nx = this.x + dx;
           if (ny === player.y && nx === player.x) continue;
-          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind)) {
+          if (isSafeFloorForEnemy(grid, subtypes, ny, nx, this.kind, false)) {
             this.y = ny;
             this.x = nx;
             this.facing = face;
@@ -281,32 +281,52 @@ function isWall(grid: number[][], y: number, x: number): boolean {
 }
 
 // Variant that allows per-enemy rules: ghosts can traverse faulty floors.
+// Goblins avoid FAULTY_FLOOR when patrolling but not when chasing.
+// All enemies always avoid OPEN_ABYSS.
 function isSafeFloorForEnemy(
   grid: number[][],
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake'
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake',
+  isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
   if (kind === 'ghost') {
     // Ghosts can occupy floor or wall tiles
     return isFloor(grid, y, x) || isWall(grid, y, x);
   }
-  // Non-ghosts: must be a floor and not faulty
+  // Non-ghosts: must be a floor
   if (!isFloor(grid, y, x)) return false;
   if (!subtypes) return true;
   const tileSubs = subtypes[y]?.[x] || [];
-  const isFaulty = tileSubs.includes(18);
+  const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
+  const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
   const hasBlockingSubtype = tileSubs.includes(16) || // WALL_TORCH (used for floor torches too)
                               tileSubs.includes(37) || // TOWN_SIGN
                               tileSubs.includes(22) || // CHECKPOINT
                               tileSubs.includes(36);   // BOOKSHELF
 
-  // Goblins and stone-goblins are allowed to step onto faulty floors; others still avoid
-  if (kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'pink-goblin' || kind === 'stone-goblin') return true;
-  return !isFaulty && !hasBlockingSubtype;
+  // Always avoid open abysses
+  if (isOpenAbyss) return false;
+  
+  // Goblins avoid faulty floors when patrolling, but can step on them when chasing
+  const isGoblin = kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || 
+                   kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'pink-goblin' || 
+                   kind === 'stone-goblin';
+  
+  if (isFaulty) {
+    // Goblins can step on faulty floors only when chasing
+    if (isGoblin && isChasing) {
+      // Allow goblins to step on faulty floors when chasing
+    } else {
+      // All other cases: avoid faulty floors (snakes always, goblins when patrolling)
+      return false;
+    }
+  }
+  
+  return !hasBlockingSubtype;
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
