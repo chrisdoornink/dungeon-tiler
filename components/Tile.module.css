@@ -424,13 +424,21 @@
 
 /* Open abyss: triggered faulty floor with subtle pink sparkle */
 .openAbyss {
-  background-color: #0a0a0a;
-  background-image: none;
-  box-shadow: inset 0 0 20px 5px rgba(0, 0, 0, 0.8);
-  border: 1px solid #1a1a1a;
   position: relative;
 }
 
+/* Solid black background to completely hide floor texture */
+.openAbyss::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: #000000;
+  box-shadow: inset 0 0 20px 5px rgba(0, 0, 0, 0.9);
+  border: 1px solid #0a0a0a;
+  z-index: 1;
+}
+
+/* Pink sparkle effect on top */
 .openAbyss::after {
   content: '';
   position: absolute;
@@ -438,6 +446,7 @@
   background: radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.15) 0%, transparent 60%);
   animation: pinkSparkle 3s ease-in-out infinite;
   pointer-events: none;
+  z-index: 2;
 }
 
 @keyframes pinkSparkle {

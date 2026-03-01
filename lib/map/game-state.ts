@@ -1896,6 +1896,13 @@ export function movePlayer(
       // debug: faulty floor death
     }
 
+    // If it's an OPEN_ABYSS (already triggered faulty floor), player dies
+    if (subtype.includes(TileSubtype.OPEN_ABYSS)) {
+      newGameState.heroHealth = 0;
+      newGameState.deathCause = { type: "faulty_floor" };
+      // debug: open abyss death
+    }
+
     // If it's an EXIT (floor overlay)
     if (subtype.includes(TileSubtype.EXIT)) {
       if (!newGameState.hasExitKey) {
