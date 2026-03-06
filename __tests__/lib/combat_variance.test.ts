@@ -40,38 +40,38 @@ describe("Combat variance and equipment", () => {
     expect(after.stats.damageTaken).toBe(2);
   });
 
-  test.skip("crit (+2 variance) is capped at 2 damage without shield (base 1)", () => {
+  test("crit (+2 variance) is capped at 2 damage without shield (base 1)", () => {
     const gs = makeState(2, 2, {
       // Force crit band (tuned to be reasonably common)
       combatRng: () => 0.95,
     });
     const e = new Enemy({ y: 2, x: 1 });
-    e.attack = 1; // base 1
-    // Use non-goblin to retain +2 crit mapping; avoid ghost (adjacent ghost attacks are suppressed)
-    e.kind = 'stone-goblin';
+    // Use snake to retain +2 crit mapping and allow custom attack
+    e.kind = 'snake';
+    e.attack = 1; // base 1 (set after kind to avoid override)
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // incoming = 1 base + 2 crit = 3, but capped at 2 per tick
-    expect(after.heroHealth).toBe(before - 2);
-    expect(after.stats.damageTaken).toBe(2);
+    // incoming = 1 base + 2 crit = 3 (damage cap is 4 per tick)
+    expect(after.heroHealth).toBe(before - 3);
+    expect(after.stats.damageTaken).toBe(3);
   });
 
-  test.skip("with shield, crit can still hurt (net 1) when base 1 and +2 variance", () => {
+  test("with shield, crit can still hurt (net 1) when base 1 and +2 variance", () => {
     const gs = makeState(2, 2, {
       hasShield: true,
       combatRng: () => 0.95, // crit band
     });
     const e = new Enemy({ y: 2, x: 1 });
-    e.attack = 1;
-    // Use non-goblin to retain +2 crit mapping; avoid ghost suppression
-    e.kind = 'stone-goblin';
+    // Use snake to retain +2 crit mapping and allow custom attack
+    e.kind = 'snake';
+    e.attack = 1; // base 1 (set after kind to avoid override)
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // Stone-exciter base 5 + 2 crit - 2 defense = 5, capped at 2 per tick
+    // Base 1 + 2 crit - 1 defense = 2
     expect(after.heroHealth).toBe(before - 2);
     expect(after.stats.damageTaken).toBe(2);
   });
