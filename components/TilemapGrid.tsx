@@ -3632,6 +3632,14 @@ function renderTileGrid(
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
+      // For white goblins: count ALL white goblins on this tile (asset reflects how many are present)
+      const swarmCountAtTile = (() => {
+        if (!enemyAtTile || enemyAtTile.kind !== 'white-goblin') return undefined;
+        if (!enemies) return 1;
+        return enemies.filter(
+          e => e.kind === 'white-goblin' && e.y === rowIndex && e.x === colIndex
+        ).length || 1;
+      })();
       const npcAtTile = npcMap.get(`${rowIndex},${colIndex}`);
       const npcInteractable = (() => {
         if (!npcAtTile || !playerPosition) return false;
@@ -3680,8 +3688,10 @@ function renderTileGrid(
                 | "ghost"
                 | "stone-goblin"
                 | "snake"
+                | "white-goblin"
                 | undefined
             }
+            enemySwarmCount={swarmCountAtTile}
             enemyMoved={Boolean(
               (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.["moved"]
             )}

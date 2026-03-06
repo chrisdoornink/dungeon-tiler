@@ -5,7 +5,7 @@ import {
   rehydrateEnemies,
   type PlainEnemy,
 } from "../enemy";
-import { enemyTypeAssignement } from "../enemy_assignment";
+import { enemyTypeAssignement, assignWhiteGoblinSwarmIds } from "../enemy_assignment";
 import { EnemyRegistry, createEmptyByKind, type EnemyKind } from "../enemies/registry";
 import {
   NPC,
@@ -909,6 +909,7 @@ export function initializeGameState(): GameState {
     : [];
 
   enemyTypeAssignement(enemies);
+  assignWhiteGoblinSwarmIds(enemies);
 
   // After enemies are assigned, place one rune pot per stone-goblin
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
@@ -953,13 +954,13 @@ export function initializeGameState(): GameState {
 
 /**
  * Returns enemy count for a given floor in the 3-level daily mode.
- * Floor 1: 5 enemies  |  Floor 2: 10 enemies  |  Floor 3: 10 enemies
+ * Floor 1: 3-5 enemies  |  Floor 2: 7-9 enemies  |  Floor 3: 8-10 enemies
  */
 function enemyCountForFloor(floor: number): number {
-  if (floor === 1) return 5;
-  if (floor === 2) return 10;
-  if (floor === 3) return 10;
-  return 5; // Fallback
+  if (floor === 1) return 3 + Math.floor(Math.random() * 3); // 3-5
+  if (floor === 2) return 7 + Math.floor(Math.random() * 3); // 7-9
+  if (floor === 3) return 8 + Math.floor(Math.random() * 3); // 8-10
+  return 4 + Math.floor(Math.random() * 4); // Fallback 4-7
 }
 
 /**
@@ -989,7 +990,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
       })
     : [];
 
-  const ghostCount = enemyTypeAssignement(enemies, { floor });
+  const { ghostCount, whiteGoblinCount } = enemyTypeAssignement(enemies, { floor });
   if (ghostCount > 0 && playerPos) {
     const ghosts = placeEnemies({
       grid: mapData.tiles,
@@ -998,6 +999,16 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
       minDistanceFromPlayer: 6,
     });
     ghosts.forEach(g => { g.kind = 'ghost'; enemies.push(g); });
+  }
+  if (whiteGoblinCount > 0 && playerPos) {
+    const wg = placeEnemies({
+      grid: mapData.tiles,
+      player: { y: playerPos[0], x: playerPos[1] },
+      count: whiteGoblinCount,
+      minDistanceFromPlayer: 6,
+    });
+    wg.forEach(g => { g.kind = 'white-goblin'; enemies.push(g); });
+    assignWhiteGoblinSwarmIds(enemies);
   }
 
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
@@ -1063,6 +1074,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
     : [];
 
   enemyTypeAssignement(enemies);
+  assignWhiteGoblinSwarmIds(enemies);
   // Snakes: normal generation rules
   const snakesAdded = addSnakesPerRules(ensured, enemies);
 
@@ -1142,7 +1154,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           count: enemyCountForFloor(nextFloor),
           minDistanceFromPlayer: 8,
         });
-        const gc = enemyTypeAssignement(placed, { floor: nextFloor });
+        const { ghostCount: gc, whiteGoblinCount: wgc } = enemyTypeAssignement(placed, { floor: nextFloor });
         if (gc > 0) {
           const ghosts = placeEnemies({
             grid: newMapData.tiles,
@@ -1151,6 +1163,16 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
             minDistanceFromPlayer: 6,
           });
           ghosts.forEach(g => { g.kind = 'ghost'; placed.push(g); });
+        }
+        if (wgc > 0) {
+          const wg = placeEnemies({
+            grid: newMapData.tiles,
+            player: { y: playerPos[0], x: playerPos[1] },
+            count: wgc,
+            minDistanceFromPlayer: 6,
+          });
+          wg.forEach(g => { g.kind = 'white-goblin'; placed.push(g); });
+          assignWhiteGoblinSwarmIds(placed);
         }
         return placed;
       })

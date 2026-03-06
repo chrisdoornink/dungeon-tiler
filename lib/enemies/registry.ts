@@ -1,7 +1,7 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -10,7 +10,7 @@ export interface BehaviorContext {
   // grid and entities
   grid: number[][];
   subtypes?: number[][][]; // tile subtypes for placing/removing objects (e.g., pink ring)
-  enemies: Array<{ y: number; x: number; kind: EnemyKind; health: number }>;
+  enemies: Array<{ y: number; x: number; kind: EnemyKind; health: number; behaviorMemory?: Record<string, unknown> }>;
   enemyIndex: number; // index into enemies array for this enemy
   player: { y: number; x: number; torchLit: boolean };
   ghosts?: Array<{ y: number; x: number }>;
@@ -452,6 +452,275 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     // Takes exactly 1 melee damage regardless of sword/variance
     calcMeleeDamage: () => 1,
   },
+  "white-goblin": {
+    kind: "white-goblin",
+    displayName: "White Goblin",
+    assets: {
+      front: "/images/enemies/fire-goblin/white-goblins-front-1.png",
+      back: "/images/enemies/fire-goblin/white-goblins-back-1.png",
+      left: "/images/enemies/fire-goblin/white-goblins-right-1.png", // mirror right for left
+      right: "/images/enemies/fire-goblin/white-goblins-right-1.png",
+    },
+    desiredMinCount: 0,
+    desiredMaxCount: 0, // spawned as groups of 4 by assignment logic
+    base: { health: 1, attack: 1 },
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: (ctx) => {
+        const grid = ctx.grid;
+        const e = ctx.enemy;
+        const py = ctx.player.y;
+        const px = ctx.player.x;
+        const rng = ctx.rng ?? Math.random;
+        const H = grid.length;
+        const W = grid[0]?.length ?? 0;
+        const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
+        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+
+        const swarmId = (e.memory as Record<string, unknown>).swarmId as string | undefined;
+
+        // Find all living swarm-mates (same swarmId)
+        const swarmMates = swarmId
+          ? ctx.enemies.filter(
+              (en, idx) =>
+                idx !== ctx.enemyIndex &&
+                en.kind === "white-goblin" &&
+                en.behaviorMemory?.swarmId === swarmId
+            )
+          : [];
+
+        // Determine leader: first living member of the swarm (lowest index)
+        // Leader is the one with the lowest enemyIndex among living swarm members
+        const allSwarmMembers = swarmId
+          ? ctx.enemies
+              .map((en, idx) => ({ enemy: en, index: idx }))
+              .filter(
+                ({ enemy }) =>
+                  enemy.kind === "white-goblin" &&
+                  enemy.behaviorMemory?.swarmId === swarmId
+              )
+          : [];
+        
+        const leaderEntry = allSwarmMembers.length > 0 ? allSwarmMembers[0] : null;
+        const isLeader = leaderEntry ? leaderEntry.index === ctx.enemyIndex : true;
+        const leader = leaderEntry ? leaderEntry.enemy : null;
+
+        // Find distances to leader and nearest mate
+        const leaderDist = leader && !isLeader
+          ? Math.abs(leader.y - e.y) + Math.abs(leader.x - e.x)
+          : 0;
+        
+        let nearestMate: { y: number; x: number } | null = null;
+        let nearestMateDist = Infinity;
+        for (const m of swarmMates) {
+          const d = Math.abs(m.y - e.y) + Math.abs(m.x - e.x);
+          if (d < nearestMateDist) { nearestMateDist = d; nearestMate = m; }
+        }
+
+        // Manhattan distance to player
+        const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
+
+        // Attack if adjacent to player
+        if (manhattan === 1) {
+          if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
+            e.facing = px > e.x ? "RIGHT" : "LEFT";
+          } else {
+            e.facing = py > e.y ? "DOWN" : "UP";
+          }
+          return e.attack;
+        }
+
+        // Vision check
+        const withinRange = manhattan <= 8;
+        const seesPlayer = withinRange && canSee(grid, [e.y, e.x], [py, px]);
+
+        // Helper: face toward a target
+        const faceToward = (ty: number, tx: number) => {
+          const dy = ty - e.y;
+          const dx = tx - e.x;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            e.facing = dx > 0 ? "RIGHT" : (dx < 0 ? "LEFT" : e.facing);
+          } else {
+            e.facing = dy > 0 ? "DOWN" : (dy < 0 ? "UP" : e.facing);
+          }
+        };
+
+        // Helper: move one step toward a target position, returns true if moved
+        const stepToward = (ty: number, tx: number): boolean => {
+          const dyRaw = ty - e.y;
+          const dxRaw = tx - e.x;
+          if (dyRaw === 0 && dxRaw === 0) return false;
+          const stepY = dyRaw === 0 ? 0 : dyRaw > 0 ? 1 : -1;
+          const stepX = dxRaw === 0 ? 0 : dxRaw > 0 ? 1 : -1;
+          // Prefer the axis with greater distance
+          const candMoves: Array<[number, number]> =
+            Math.abs(dyRaw) >= Math.abs(dxRaw)
+              ? [[stepY, 0], [0, stepX]]
+              : [[0, stepX], [stepY, 0]];
+          for (const [dy, dx] of candMoves) {
+            if (dy === 0 && dx === 0) continue;
+            const ny = e.y + dy;
+            const nx = e.x + dx;
+            if (ny === py && nx === px) continue;
+            if (!isFloor(ny, nx)) continue;
+            if (dx !== 0) e.facing = dx > 0 ? "RIGHT" : "LEFT";
+            else e.facing = dy > 0 ? "DOWN" : "UP";
+            e.y = ny;
+            e.x = nx;
+            e.memory.moved = true;
+            return true;
+          }
+          return false;
+        };
+
+        // LEADER BEHAVIOR: Chase player with occasional pauses to let swarm catch up
+        if (isLeader && seesPlayer) {
+          faceToward(py, px);
+          
+          // Check if swarm is too spread out (any member >2 tiles away)
+          const maxSwarmDist = swarmMates.reduce((max, m) => {
+            const d = Math.abs(m.y - e.y) + Math.abs(m.x - e.x);
+            return Math.max(max, d);
+          }, 0);
+          
+          // If swarm is spread out (>2 tiles), pause 40% of the time to let them catch up
+          if (maxSwarmDist > 2 && rng() < 0.4) {
+            // Stay in place this turn (let followers catch up)
+            return 0;
+          }
+          
+          // Otherwise pursue player with some variation
+          const tacticRoll = rng();
+          if (tacticRoll < 0.7) {
+            // 70%: Direct pursuit
+            stepToward(py, px);
+          } else {
+            // 30%: Slight variation (adjacent move that doesn't increase distance much)
+            const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
+              [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
+            ];
+            for (let i = dirs.length - 1; i > 0; i--) {
+              const j = Math.floor(rng() * (i + 1));
+              [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+            }
+            let moved = false;
+            for (const [dy, dx, face] of dirs) {
+              const ny = e.y + dy;
+              const nx = e.x + dx;
+              if (ny === py && nx === px) continue;
+              if (!isFloor(ny, nx)) continue;
+              const newDist = Math.abs(ny - py) + Math.abs(nx - px);
+              if (newDist > manhattan + 1) continue; // don't move away from player
+              e.y = ny;
+              e.x = nx;
+              e.facing = face;
+              e.memory.moved = true;
+              moved = true;
+              break;
+            }
+            if (!moved) stepToward(py, px);
+          }
+          return 0;
+        }
+
+        // NON-LEADER BEHAVIOR: Prioritize following leader over chasing player
+        if (!isLeader && leader) {
+          // If leader can see player, non-leaders focus on staying near leader
+          const leaderSeesPlayer = leader && withinRange && canSee(grid, [leader.y, leader.x], [py, px]);
+          
+          if (leaderSeesPlayer || seesPlayer) {
+            // During combat: >60% chance to move toward leader, <40% toward player
+            const followLeader = rng() < 0.65;
+            
+            if (followLeader && leaderDist > 0) {
+              // Move toward leader to maintain swarm cohesion
+              faceToward(leader.y, leader.x);
+              stepToward(leader.y, leader.x);
+            } else if (leaderDist <= 2) {
+              // Already close to leader, can pursue player with variation
+              faceToward(py, px);
+              const tacticRoll = rng();
+              if (tacticRoll < 0.5) {
+                stepToward(py, px);
+              } else {
+                // Move adjacent to leader's position for flanking
+                const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
+                  [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
+                ];
+                for (let i = dirs.length - 1; i > 0; i--) {
+                  const j = Math.floor(rng() * (i + 1));
+                  [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+                }
+                let moved = false;
+                for (const [dy, dx, face] of dirs) {
+                  const ny = e.y + dy;
+                  const nx = e.x + dx;
+                  if (ny === py && nx === px) continue;
+                  if (!isFloor(ny, nx)) continue;
+                  // Prefer staying near leader
+                  const distToLeader = Math.abs(ny - leader.y) + Math.abs(nx - leader.x);
+                  if (distToLeader > 2) continue;
+                  e.y = ny;
+                  e.x = nx;
+                  e.facing = face;
+                  e.memory.moved = true;
+                  moved = true;
+                  break;
+                }
+                if (!moved) stepToward(py, px);
+              }
+            } else {
+              // Too far from leader, regroup
+              faceToward(leader.y, leader.x);
+              stepToward(leader.y, leader.x);
+            }
+            return 0;
+          }
+        }
+
+        // Not in combat: regroup with swarm
+        if (nearestMate && nearestMateDist > 0) {
+          // Move toward nearest mate to stack together
+          const shouldStack = rng() < 0.75; // 75% prefer stacking
+          if (shouldStack || nearestMateDist > 1) {
+            faceToward(nearestMate.y, nearestMate.x);
+            stepToward(nearestMate.y, nearestMate.x);
+            return 0;
+          }
+        }
+
+        // Idle and together: minimal wandering, stay tight
+        if (rng() < 0.3) {
+          const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
+            [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
+          ];
+          for (let i = dirs.length - 1; i > 0; i--) {
+            const j = Math.floor(rng() * (i + 1));
+            [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
+          }
+          for (const [dy, dx, face] of dirs) {
+            const ny = e.y + dy;
+            const nx = e.x + dx;
+            if (ny === py && nx === px) continue;
+            if (!isFloor(ny, nx)) continue;
+            // Only wander to adjacent tiles of current swarm position
+            if (nearestMate) {
+              const distNew = Math.abs(ny - nearestMate.y) + Math.abs(nx - nearestMate.x);
+              if (distNew > 1) continue; // stay within 1 tile of swarm
+            }
+            e.y = ny;
+            e.x = nx;
+            e.facing = face;
+            e.memory.moved = true;
+            break;
+          }
+        }
+
+        return 0;
+      },
+    },
+  },
   snake: {
     kind: "snake",
     displayName: "Snake",
@@ -566,10 +835,18 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
 
 export function getEnemyIcon(
   kind: EnemyKind,
-  facing: Facing = "front"
+  facing: Facing = "front",
+  swarmCount?: number
 ): string {
   const cfg = EnemyRegistry[kind];
   if (!cfg) return "";
+  // White goblins: select asset by count (1-4) and facing (front/back only; sideways uses front or back)
+  if (kind === "white-goblin") {
+    const count = Math.min(4, Math.max(1, swarmCount ?? 1));
+    const useFront = facing === "front" || facing === "left" || facing === "right";
+    const side = useFront ? "front" : "back";
+    return `/images/enemies/fire-goblin/white-goblins-${side}-${count}.png`;
+  }
   return cfg.assets[facing] || cfg.assets.front;
 }
 

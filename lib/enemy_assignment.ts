@@ -2,6 +2,28 @@ import { Enemy } from "./enemy";
 import { type EnemyKind } from "./enemies/registry";
 
 /**
+ * Assign swarm IDs to white goblin enemies.
+ * Each group of 4 white goblins shares a unique swarmId stored in behaviorMemory.
+ * Also sets the sidewaysFront flag randomly per member for consistent sideways rendering.
+ */
+export function assignWhiteGoblinSwarmIds(
+  enemies: Enemy[],
+  opts?: { rng?: () => number }
+): void {
+  const rng = opts?.rng ?? Math.random;
+  const whiteGoblins = enemies.filter(e => e.kind === 'white-goblin');
+  // Group them into batches of 4 and assign a shared swarmId
+  for (let i = 0; i < whiteGoblins.length; i += 4) {
+    const swarmId = `swarm-${Math.floor(rng() * 1000000)}`;
+    for (let j = i; j < Math.min(i + 4, whiteGoblins.length); j++) {
+      whiteGoblins[j].behaviorMemory.swarmId = swarmId;
+      // Random sideways rendering choice (50/50 front vs back) per member
+      whiteGoblins[j].behaviorMemory.sidewaysFront = rng() < 0.5;
+    }
+  }
+}
+
+/**
  * Assign enemy kinds for a level:
  * - Goblins weighted by difficulty (harder types spawn less often)
  * - Ghosts and snakes introduced on later floors
@@ -82,18 +104,38 @@ function getGhostCount(floor: number | undefined, rng: () => number): number {
   return Math.floor(rng() * 2); // 0 or 1
 }
 
+/**
+ * Get white goblin swarm count for a given floor.
+ * Floor 1: 0 swarms
+ * Floor 2: 0-1 swarms (10% chance)
+ * Floor 3: 0-1 swarms (20% chance)
+ * 
+ * Until ready to deploy I'm keeping this simple and just returning 0 for all floors.
+ */
+function getWhiteGoblinSwarmCount(floor: number | undefined, rng: () => number): number {
+  return 0;
+  
+  // if (floor === 1) return 0;
+  // if (floor === 2) return rng() < 0.1 ? 1 : 0;
+  // if (floor === 3) return rng() < 0.2 ? 1 : 0;
+  // return 0;
+}
+
 export function enemyTypeAssignement(
   enemies: Enemy[],
   opts?: { rng?: () => number; floor?: number }
-): number {
+): { ghostCount: number; whiteGoblinCount: number } {
   const rng = opts?.rng ?? Math.random;
   const floor = opts?.floor;
   const target = enemies.length;
 
   // Ghost count is additive — does not consume goblin slots
   const ghostCount = getGhostCount(floor, rng);
+  // White goblin swarm count (each swarm = 4 members)
+  const swarmCount = getWhiteGoblinSwarmCount(floor, rng);
+  const whiteGoblinCount = swarmCount * 4;
 
-  if (target === 0) return ghostCount;
+  if (target === 0) return { ghostCount, whiteGoblinCount };
 
   // Get floor-adjusted goblin weights
   const goblinWeights = floor !== undefined
@@ -118,6 +160,6 @@ export function enemyTypeAssignement(
     enemies[i].kind = pool[i] ?? "fire-goblin"; // safety fallback
   }
 
-  // Return ghost count so callers can place additional ghost enemies
-  return ghostCount;
+  // Return counts so callers can place additional ghost/white-goblin enemies
+  return { ghostCount, whiteGoblinCount };
 }

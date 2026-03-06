@@ -29,12 +29,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' = 'fire-goblin';
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -70,6 +70,10 @@ export class Enemy {
     } else if (k === 'snake') {
       // Snake baseline per registry: low HP, light attack
       if (this.health > 2) this.health = 2;
+      this.attack = 1;
+    } else if (k === 'white-goblin') {
+      // White goblin swarm member: very fragile, light attack
+      this.health = 1;
       this.attack = 1;
     }
   }
@@ -231,7 +235,7 @@ export class Enemy {
       }
     } else {
       // Idle goblins have a 50% chance to wander randomly each turn
-      const isGoblin = this.kind !== 'ghost' && this.kind !== 'snake';
+      const isGoblin = this.kind !== 'ghost' && this.kind !== 'snake' && this.kind !== 'white-goblin';
       if (isGoblin && Math.random() < 0.5) {
         const dirs: Array<[number, number, 'UP'|'RIGHT'|'DOWN'|'LEFT']> = [
           [-1, 0, 'UP'], [1, 0, 'DOWN'], [0, -1, 'LEFT'], [0, 1, 'RIGHT'],
@@ -288,7 +292,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake',
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin',
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -314,7 +318,7 @@ function isSafeFloorForEnemy(
   // Goblins avoid faulty floors when patrolling, but can step on them when chasing
   const isGoblin = kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || 
                    kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'pink-goblin' || 
-                   kind === 'stone-goblin';
+                   kind === 'stone-goblin' || kind === 'white-goblin';
   
   if (isFaulty) {
     // Goblins can step on faulty floors only when chasing
@@ -375,8 +379,8 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 export type PlainEnemy = {
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -394,7 +398,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake') {
+    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
@@ -511,7 +515,7 @@ export function updateEnemies(
       base = cfg.behavior.customUpdate({
         grid,
         subtypes,
-        enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health })),
+        enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health, behaviorMemory: en.behaviorMemory })),
         enemyIndex: i,
         player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
         ghosts: ghostPositions,
@@ -533,14 +537,28 @@ export function updateEnemies(
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;
     if (newKey !== prevKey) {
-      if (occupied.has(newKey)) {
+      // White goblins can stack on the same tile as their swarm-mates
+      const canStack = e.kind === 'white-goblin' && enemies.some((other, idx) => 
+        idx !== i && 
+        other.kind === 'white-goblin' && 
+        other.y === e.y && 
+        other.x === e.x &&
+        other.behaviorMemory?.swarmId === e.behaviorMemory?.swarmId
+      );
+      
+      if (occupied.has(newKey) && !canStack) {
         // Revert move; keep this enemy at previous position
         e.y = prevY;
         e.x = prevX;
       } else {
-        // Reserve new tile and release old
-        occupied.delete(prevKey);
-        occupied.add(newKey);
+        // Reserve new tile and release old (white goblins can share tiles)
+        if (!canStack) {
+          occupied.delete(prevKey);
+          occupied.add(newKey);
+        } else {
+          // Just release the old tile; the new tile is already occupied by a swarm-mate
+          occupied.delete(prevKey);
+        }
       }
     }
     // Optionally suppress this enemy's attack for this tick
@@ -550,7 +568,7 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin') {
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin') {
           // Weighted: 25% chance -1, 50% chance 0, 25% chance +1
           variance = rVal < 0.25 ? -1 : rVal < 0.75 ? 0 : 1;
         } else {

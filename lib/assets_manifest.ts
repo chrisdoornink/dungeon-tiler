@@ -132,6 +132,14 @@ export const ASSET_URLS: string[] = [
   "/images/enemies/fire-goblin/green-goblin-right.png",
   "/images/enemies/fire-goblin/green-goblin-back.png",
   "/images/enemies/lantern-wisp.png",
+  "/images/enemies/fire-goblin/white-goblins-front-1.png",
+  "/images/enemies/fire-goblin/white-goblins-front-2.png",
+  "/images/enemies/fire-goblin/white-goblins-front-3.png",
+  "/images/enemies/fire-goblin/white-goblins-front-4.png",
+  "/images/enemies/fire-goblin/white-goblins-back-1.png",
+  "/images/enemies/fire-goblin/white-goblins-back-2.png",
+  "/images/enemies/fire-goblin/white-goblins-back-3.png",
+  "/images/enemies/fire-goblin/white-goblins-back-4.png",
 
   // Remaining hero poses
   "/images/hero/hero-back-static.png",

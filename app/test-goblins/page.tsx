@@ -37,35 +37,28 @@ function buildGoblinTestRoom(): GameState {
   const centerX = Math.floor(width / 2);
   subtypes[centerY][centerX] = [TileSubtype.PLAYER];
 
-  // Place 2 of each goblin type (6 total), spread around the room
+  // 2 white goblin swarms (4 members each = 8 total)
   const enemies: Enemy[] = [];
 
-  // 2x Fire Goblins - top area
-  const fg1 = new Enemy({ y: 3, x: 5 });
-  fg1.kind = 'fire-goblin';
-  enemies.push(fg1);
+  // Swarm 1 - all 4 members stacked on one tile (top-left area)
+  const swarm1Id = 'swarm-test-1';
+  for (let i = 0; i < 4; i++) {
+    const wg = new Enemy({ y: 4, x: 5 });
+    wg.kind = 'white-goblin';
+    wg.behaviorMemory.swarmId = swarm1Id;
+    wg.behaviorMemory.sidewaysFront = Math.random() < 0.5;
+    enemies.push(wg);
+  }
 
-  const fg2 = new Enemy({ y: 3, x: 16 });
-  fg2.kind = 'fire-goblin';
-  enemies.push(fg2);
-
-  // 2x Water Goblins - middle sides
-  const wg1 = new Enemy({ y: 11, x: 2 });
-  wg1.kind = 'water-goblin';
-  enemies.push(wg1);
-
-  const wg2 = new Enemy({ y: 11, x: 19 });
-  wg2.kind = 'water-goblin';
-  enemies.push(wg2);
-
-  // 2x Water Goblin Spearmen - bottom area
-  const wgs1 = new Enemy({ y: 18, x: 5 });
-  wgs1.kind = 'water-goblin-spear';
-  enemies.push(wgs1);
-
-  const wgs2 = new Enemy({ y: 18, x: 16 });
-  wgs2.kind = 'water-goblin-spear';
-  enemies.push(wgs2);
+  // Swarm 2 - all 4 members stacked on one tile (top-right area)
+  const swarm2Id = 'swarm-test-2';
+  for (let i = 0; i < 4; i++) {
+    const wg = new Enemy({ y: 4, x: 16 });
+    wg.kind = 'white-goblin';
+    wg.behaviorMemory.swarmId = swarm2Id;
+    wg.behaviorMemory.sidewaysFront = Math.random() < 0.5;
+    enemies.push(wg);
+  }
 
   // Add wall torches for visibility
   const torchPositions: Array<[number, number]> = [
@@ -127,14 +120,12 @@ function TestGoblinsInner() {
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="relative z-10 flex flex-col items-center gap-4">
         <div className="text-center bg-black/70 rounded-lg p-4 backdrop-blur-sm">
-          <h1 className="text-2xl font-bold mb-2">All Goblin Types Test Room</h1>
+          <h1 className="text-2xl font-bold mb-2">White Goblin Swarm Test Room</h1>
           <p className="text-sm text-gray-300">
-            2 of each goblin type — 6 total
+            2 swarms of 4 white goblins — 8 total
           </p>
           <div className="text-xs text-gray-400 mt-2 space-y-1">
-            <p>🔥 Fire Goblin: 5 HP, 1 ATK (top)</p>
-            <p>🧊 Water Goblin: 5 HP, 2 ATK (sides)</p>
-            <p>🔱 Water Goblin Spearman: 5 HP, 4 ATK (bottom)</p>
+            <p>⬜ White Goblin: 1 HP, 1 ATK each (4 AP combined per swarm)</p>
             <p>Hero: 5 HP, 1 ATK + Sword (+2)</p>
           </div>
         </div>

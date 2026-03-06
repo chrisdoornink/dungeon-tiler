@@ -41,8 +41,9 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake';
+  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
+  enemySwarmCount?: number; // for white-goblin: how many swarm members share this tile (1-4)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
   npcVisible?: boolean;
@@ -74,6 +75,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyFacing,
   enemyKind,
   enemyMoved,
+  enemySwarmCount,
   enemyAura,
   npc,
   npcVisible = undefined,
@@ -1117,6 +1119,15 @@ export const Tile: React.FC<TileProps> = ({
                         // coiled sprite follows facing (front/back/right are coiled)
                         return getEnemyIcon('snake', toFacing(f));
                       }
+                      // White goblins: no side asset; sideways uses front or back based on swarm count parity
+                      if (kind === 'white-goblin') {
+                        const f = enemyFacing;
+                        const isSideways = f === 'LEFT' || f === 'RIGHT';
+                        const facing: Facing = isSideways
+                          ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
+                          : toFacing(f);
+                        return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
+                      }
                       const facing: Facing = toFacing(enemyFacing);
                       return getEnemyIcon(kind, facing);
                     })()})`,
@@ -1128,6 +1139,7 @@ export const Tile: React.FC<TileProps> = ({
                       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
                       if (enemyKind !== 'snake') {
                         if (enemyKind === 'ghost') return 'none';
+                        if (enemyKind === 'white-goblin') return 'none';
                         // Pink goblin's side sprite is left-facing, so invert the flip
                         if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
                         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
@@ -1653,6 +1665,15 @@ export const Tile: React.FC<TileProps> = ({
                         // coiled sprite follows facing (front/back/right are coiled)
                         return getEnemyIcon('snake', toFacing(f));
                       }
+                      // White goblins: no side asset; sideways uses front or back based on swarm count parity
+                      if (kind === 'white-goblin') {
+                        const f = enemyFacing;
+                        const isSideways = f === 'LEFT' || f === 'RIGHT';
+                        const facing: Facing = isSideways
+                          ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
+                          : toFacing(f);
+                        return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
+                      }
                       const facing: Facing = toFacing(enemyFacing);
                       return getEnemyIcon(kind, facing);
                     })()})`,
@@ -1664,6 +1685,7 @@ export const Tile: React.FC<TileProps> = ({
                       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
                       if (enemyKind !== 'snake') {
                         if (enemyKind === 'ghost') return 'none';
+                        if (enemyKind === 'white-goblin') return 'none';
                         // Pink goblin's side sprite is left-facing, so invert the flip
                         if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
                         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
