@@ -107,18 +107,27 @@ function getGhostCount(floor: number | undefined, rng: () => number): number {
 /**
  * Get white goblin swarm count for a given floor.
  * Floor 1: 0 swarms
- * Floor 2: 0-1 swarms (10% chance)
- * Floor 3: 0-1 swarms (20% chance)
+ * Floor 2: 1 swarm (10% chance)
+ * Floor 3: any swarms (26% chance) 
+ *  - 1 swarm (20% chance), 
+ *  - 2 swarms (5% chance), 
+ *  - 3 swarms (1% chance)
  * 
+ * Uses multiple rng() calls for floor 3 to ensure independence from floor 2.
  * Until ready to deploy I'm keeping this simple and just returning 0 for all floors.
  */
-function getWhiteGoblinSwarmCount(floor: number | undefined, rng: () => number): number {
-  return 0;
+function getWhiteGoblinSwarmCount(floor: number | undefined, rng: () => number): number {  
+  if (floor === 1) return 0;
+  if (floor === 2) return rng() < 0.1 ? 1 : 0;
+  if (floor === 3) {
+    const roll = rng();
+    if (roll >= 0.08 && roll < 0.28) return 1;
+    if (roll >= 0.29 && roll < 0.34) return 2;
+    if (roll >= 0.35 && roll < 0.36) return 3;
+    return 0;
+  }
   
-  // if (floor === 1) return 0;
-  // if (floor === 2) return rng() < 0.1 ? 1 : 0;
-  // if (floor === 3) return rng() < 0.2 ? 1 : 0;
-  // return 0;
+  return 0;
 }
 
 export function enemyTypeAssignement(

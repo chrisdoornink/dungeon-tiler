@@ -75,6 +75,10 @@ export class Enemy {
       // White goblin swarm member: very fragile, light attack
       this.health = 1;
       this.attack = 1;
+    } else if (k === 'white-goblin') {
+      // White goblin swarm member: very fragile, light attack
+      this.health = 1;
+      this.attack = 1;
     }
   }
   // Pursuit memory: how many ticks to keep chasing after losing LOS
@@ -553,8 +557,8 @@ export function updateEnemies(
       } else {
         // Reserve new tile and release old (white goblins can share tiles)
         if (!canStack) {
-          occupied.delete(prevKey);
-          occupied.add(newKey);
+        occupied.delete(prevKey);
+        occupied.add(newKey);
         } else {
           // Just release the old tile; the new tile is already occupied by a swarm-mate
           occupied.delete(prevKey);
