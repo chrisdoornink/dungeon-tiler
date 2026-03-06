@@ -9,6 +9,7 @@ import {
   EnemyKind,
   getEnemyIcon,
 } from "../../lib/enemies/registry";
+import DailyPollModal, { PollResponses } from "../DailyPollModal";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -67,6 +68,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const todayResult = data.todayResult;
   const isWin = todayResult === "won";
   const [copied, setCopied] = useState(false);
+  const [showPoll, setShowPoll] = useState(false);
 
   // Get death details from last game result stored in localStorage
   const getLastGame = () => {
@@ -93,6 +95,19 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         level_reached: lastGame?.currentFloor,
       });
     } catch {}
+    
+    // Check if we should show the poll
+    if (typeof window !== "undefined") {
+      const pollShown = window.localStorage.getItem("dailyPollShown");
+      const currentDate = new Date();
+      const cutoffDate = new Date('2026-03-10'); // March 10, 2026
+      
+      // Only show if not shown before AND before the cutoff date
+      if (!pollShown && currentDate < cutoffDate) {
+        // Delay showing the poll slightly so the end screen loads first
+        setTimeout(() => setShowPoll(true), 1000);
+      }
+    }
   }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
   const getDeathDetails = () => {
     if (
@@ -245,6 +260,42 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     } catch {
       // ignore share errors
+    }
+  };
+
+  const handlePollSubmit = (responses: PollResponses) => {
+    // Save poll responses and mark as shown
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("dailyPollShown", "true");
+      window.localStorage.setItem("dailyPollResponses", JSON.stringify({
+        ...responses,
+        submittedAt: new Date().toISOString(),
+      }));
+    }
+    
+    // Track analytics - always track poll submission
+    try {
+      // Track the feedback using the existing trackFeedback method
+      Analytics.trackFeedback?.({
+        message: `Daily Challenge Poll - Mode Preference: ${responses.preferredMode || 'no preference'}${responses.otherFeedback ? ` | Additional feedback: ${responses.otherFeedback}` : ''}`,
+      });
+      
+      // Also track as a daily challenge event for better categorization
+      Analytics.trackDailyChallenge?.("completed", {
+        poll_submitted: true,
+        poll_mode_preference: responses.preferredMode || "none",
+        poll_has_feedback: !!responses.otherFeedback,
+      });
+    } catch (error) {
+      console.warn("Failed to track poll submission:", error);
+    }
+  };
+
+  const handlePollClose = () => {
+    setShowPoll(false);
+    // Mark as shown even if they skip
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("dailyPollShown", "true");
     }
   };
 
@@ -628,6 +679,13 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           </div>
         </div>
       </div>
+      
+      {/* Daily Challenge Poll Modal */}
+      <DailyPollModal
+        open={showPoll}
+        onClose={handlePollClose}
+        onSubmit={handlePollSubmit}
+      />
     </div>
   );
 }
