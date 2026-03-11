@@ -156,6 +156,11 @@ export function performUseFood(gameState: GameState): GameState {
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(newGameState.heroMaxHealth ?? 5, newGameState.heroHealth + 1);
   newGameState.foodCount = count - 1;
+  newGameState.stats = {
+    ...newGameState.stats,
+    foodUsed: (newGameState.stats.foodUsed ?? 0) + 1,
+    maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
+  };
   incrementStepsAndTime(newGameState);
 
   // debug: used food
@@ -216,6 +221,11 @@ export function performUsePotion(gameState: GameState): GameState {
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(newGameState.heroMaxHealth ?? 5, newGameState.heroHealth + 2);
   newGameState.potionCount = count - 1;
+  newGameState.stats = {
+    ...newGameState.stats,
+    potionsUsed: (newGameState.stats.potionsUsed ?? 0) + 1,
+    maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
+  };
   incrementStepsAndTime(newGameState);
 
   // Cure poison condition
@@ -302,7 +312,14 @@ export function performThrowRock(gameState: GameState): GameState {
     tx += vx;
     if (!isWithinBounds(preTickState.mapData, ty, tx)) {
       // Early stop: consume a rock, no placement (future: collide/bam)
-      return { ...preTickState, rockCount: count - 1 };
+      return { 
+        ...preTickState, 
+        rockCount: count - 1,
+        stats: {
+          ...preTickState.stats,
+          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+        },
+      };
     }
     // Check enemy collision first
     const enemies = preTickState.enemies ?? [];
@@ -330,6 +347,9 @@ export function performThrowRock(gameState: GameState): GameState {
         const newStats = {
           ...preTickState.stats,
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+          enemiesKilledByRune: (preTickState.stats.enemiesKilledByRune ?? 0) + 1,
+          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          runesUsed: (preTickState.stats.runesUsed ?? 0) + 1,
         };
         const byKind = newStats.byKind || createEmptyByKind();
         const k = removed.kind as EnemyKind;
@@ -376,6 +396,8 @@ export function performThrowRock(gameState: GameState): GameState {
           // Count full remaining health as damage dealt when we finish the kill
           damageDealt: preTickState.stats.damageDealt + Math.min(2, prevHealth),
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
+          enemiesKilledByRock: (preTickState.stats.enemiesKilledByRock ?? 0) + 1,
+          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
         };
         // Track per-kind kill for rock kills
         const byKind = newStats.byKind || createEmptyByKind();
@@ -411,6 +433,7 @@ export function performThrowRock(gameState: GameState): GameState {
           stats: {
             ...preTickState.stats,
             damageDealt: preTickState.stats.damageDealt + 2,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
           },
           rockCount: count - 1,
         };
@@ -432,7 +455,15 @@ export function performThrowRock(gameState: GameState): GameState {
         // Remove only the pot marker; keep other tags (e.g., ROAD)
         newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
       }
-      return { ...preTickState, mapData: newMapData, rockCount: count - 1 };
+      return { 
+        ...preTickState, 
+        mapData: newMapData, 
+        rockCount: count - 1,
+        stats: {
+          ...preTickState.stats,
+          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+        },
+      };
     }
   }
 
@@ -446,6 +477,10 @@ export function performThrowRock(gameState: GameState): GameState {
     ...preTickState,
     mapData: newMapData,
     rockCount: count - 1,
+    stats: {
+      ...preTickState.stats,
+      rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+    },
   };
 }
 
@@ -714,6 +749,20 @@ export interface GameState {
     enemiesDefeated: number;
     steps: number;
     byKind?: Record<EnemyKind, number>;
+    // Extended stats for badge system
+    rocksThrown?: number;
+    rocksCollected?: number;
+    runesUsed?: number;
+    foodUsed?: number;
+    potionsUsed?: number;
+    enemiesKilledBySword?: number;
+    enemiesKilledByRock?: number;
+    enemiesKilledByRune?: number;
+    chestsOpened?: number;
+    itemsCollected?: number; // Total items picked up
+    maxHealth?: number; // Highest health reached
+    poisonSteps?: number; // Steps taken while poisoned
+    ghostsVanished?: number; // Ghosts that vanished by getting close
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
@@ -1518,6 +1567,7 @@ export function movePlayer(
       }
       // Count them as defeated
       newGameState.stats.enemiesDefeated += adjacentGhosts.length;
+      newGameState.stats.ghostsVanished = (newGameState.stats.ghostsVanished ?? 0) + adjacentGhosts.length;
       // Track type-specific defeats (all ghosts here)
       if (!newGameState.stats.byKind)
         newGameState.stats.byKind = createEmptyByKind();
@@ -1891,9 +1941,11 @@ export function movePlayer(
       if (subtype.includes(TileSubtype.FOOD)) {
         // Food: always goes to inventory
         newGameState.foodCount = (newGameState.foodCount || 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       } else {
         // MED/Potion: always goes to inventory
         newGameState.potionCount = (newGameState.potionCount || 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       moved = true;
     }
@@ -1901,6 +1953,7 @@ export function movePlayer(
     // If it's a RUNE, pick it up and clear the tile
     if (subtype.includes(TileSubtype.RUNE)) {
       newGameState.runeCount = (newGameState.runeCount || 0) + 1;
+      newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       // Remove only the RUNE tag; preserve other overlays like ROAD
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.RUNE);
       // debug: rune picked up
@@ -1964,16 +2017,21 @@ export function movePlayer(
     ) {
       if (subtype.includes(TileSubtype.SWORD)) {
         newGameState.hasSword = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       if (subtype.includes(TileSubtype.SHIELD)) {
         newGameState.hasShield = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
         newGameState.hasSnakeMedallion = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       if (subtype.includes(TileSubtype.EXTRA_HEART)) {
         newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
         newGameState.heroHealth = Math.min(newGameState.heroHealth + 1, newGameState.heroMaxHealth);
+        newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       // Clearing of item happens below when we set dest tile subtypes
     }
@@ -1981,6 +2039,8 @@ export function movePlayer(
     // If it's a ROCK, pick it up (increment inventory) and clear the tile
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
+      newGameState.stats.rocksCollected = (newGameState.stats.rocksCollected ?? 0) + 1;
+      newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       // Remove only the ROCK tag; preserve other overlays like ROAD
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.ROCK);
       // debug: rock picked up
@@ -2030,6 +2090,7 @@ export function movePlayer(
           // Remove enemy; player stays in current position (do not step into enemy tile)
           newGameState.enemies.splice(idx, 1);
           newGameState.stats.enemiesDefeated += 1;
+          newGameState.stats.enemiesKilledBySword = (newGameState.stats.enemiesKilledBySword ?? 0) + 1;
           // Track per-kind kill for melee
           if (!newGameState.stats.byKind)
             newGameState.stats.byKind = createEmptyByKind();
@@ -2112,6 +2173,8 @@ export function movePlayer(
         if (!newMapData.subtypes[newY][newX].includes(TileSubtype.OPEN_CHEST)) {
           newMapData.subtypes[newY][newX].push(TileSubtype.OPEN_CHEST);
         }
+        // Track chest opening
+        newGameState.stats.chestsOpened = (newGameState.stats.chestsOpened ?? 0) + 1;
         // Return without moving
         return newGameState;
       }
@@ -2227,6 +2290,8 @@ export function movePlayer(
   if (newGameState.conditions?.poisoned?.active && moved) {
     const poison = newGameState.conditions.poisoned;
     poison.stepsSinceLastDamage += 1;
+    // Track steps taken while poisoned
+    newGameState.stats.poisonSteps = (newGameState.stats.poisonSteps ?? 0) + 1;
     if (poison.stepsSinceLastDamage >= poison.stepInterval) {
       // Apply poison damage
       const poisonDamage = poison.damagePerInterval;

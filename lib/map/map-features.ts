@@ -255,7 +255,7 @@ function canPlaceFaultyFloorSafely(
   return areAllFloorsConnected(testGrid);
 }
 
-export function addRocksToMap(mapData: MapData): MapData {
+export function addRocksToMap(mapData: MapData, floor?: number): MapData {
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
   const grid = newMapData.tiles;
   const gridHeight = grid.length;
@@ -279,7 +279,13 @@ export function addRocksToMap(mapData: MapData): MapData {
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
-  const toPlace = Math.min(3, eligible.length);
+  // Vary rocks by floor: Floor 1 = 5, Floor 2 = 4, Floor 3 = 3, default = 3
+  let toPlace = 3;
+  if (floor === 1) toPlace = 5;
+  else if (floor === 2) toPlace = 4;
+  else if (floor === 3) toPlace = 3;
+  
+  toPlace = Math.min(toPlace, eligible.length);
   for (let i = 0; i < toPlace; i++) {
     const [ry, rx] = eligible[i];
     newMapData.subtypes[ry][rx] = [TileSubtype.ROCK];
@@ -622,7 +628,7 @@ export function generateCompleteMapForFloor(
   const withKeys = addChestKeysToMap(withChests, floorAllocation.keys);
 
   const withPots = addPotsToMap(withKeys);
-  const withRocks = addRocksToMap(withPots);
+  const withRocks = addRocksToMap(withPots, floor);
   const withFaultyFloors = addFaultyFloorsToMap(withRocks);
   const withTorches = addWallTorchesToMap(withFaultyFloors);
   return addPlayerToMap(withTorches);

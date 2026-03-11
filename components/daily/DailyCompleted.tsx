@@ -10,6 +10,7 @@ import {
   getEnemyIcon,
 } from "../../lib/enemies/registry";
 import DailyPollModal, { PollResponses } from "../DailyPollModal";
+import { calculateBadges, type Badge } from "../../lib/badges";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -69,6 +70,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const isWin = todayResult === "won";
   const [copied, setCopied] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
+  const [badges, setBadges] = useState<Badge[]>([]);
+  
+  // Determine defeat image number once to prevent flickering
+  const [defeatImageNum] = useState(() => Math.random() < 0.5 ? 1 : 2);
 
   // Get death details from last game result stored in localStorage
   const getLastGame = () => {
@@ -82,6 +87,75 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   };
 
   const lastGame = getLastGame();
+
+  // Generate dynamic badge descriptions based on actual stats
+  const getDynamicBadgeDescription = (badge: Badge, game: any) => {
+    if (!game?.stats) return badge.description;
+    
+    const stats = game.stats;
+    switch (badge.id) {
+      case 'monster-hunter':
+      case 'exterminator':
+      case 'dungeon-cleaner':
+        return `${stats.enemiesDefeated} enemies defeated`;
+      case 'swordmaster':
+        return `${stats.enemiesKilledBySword || 0} sword kills`;
+      case 'rock-thrower':
+        return `${stats.enemiesKilledByRock || 0} rock kills`;
+      case 'rune-master':
+        return `${stats.enemiesKilledByRune || 0} rune kills`;
+      case 'untouchable':
+        return 'No damage taken';
+      case 'survivor':
+        return `Won with ${game.heroHealth} HP`;
+      case 'healthy':
+        return 'Won at full health';
+      case 'rock-finder':
+        return `${stats.rocksCollected || 0}/12 rocks found`;
+      case 'pitcher':
+        return `${stats.rocksThrown || 0} rocks thrown`;
+      case 'rock-collector':
+        return `${game.rockCount || 0} rocks saved`;
+      case 'hoarder':
+        return `${stats.itemsCollected || 0} items collected`;
+      case 'treasure-hunter':
+        return `${stats.chestsOpened || 0}/4 chests opened`;
+      case 'speedrunner':
+        return `${stats.steps} steps`;
+      case 'marathon':
+        return `${stats.steps} steps taken`;
+      case 'poisoned':
+        return `${stats.poisonSteps || 0} poison steps`;
+      case 'ghost-whisperer':
+        return `${stats.ghostsVanished || 0} ghosts vanished`;
+      case 'pacifist':
+        return `${stats.enemiesDefeated} enemies killed`;
+      case 'minimalist':
+        return 'No items used';
+      case 'snake-hater':
+        return `${stats.byKind?.snake || 0} snakes killed`;
+      default:
+        return badge.description;
+    }
+  };
+
+  // Calculate badges earned
+  useEffect(() => {
+    if (lastGame?.stats) {
+      const earnedBadges = calculateBadges(lastGame.stats, {
+        win: lastGame.outcome === 'win',
+        currentFloor: lastGame.currentFloor,
+        maxFloors: lastGame.maxFloors,
+        heroHealth: lastGame.heroHealth,
+        heroMaxHealth: lastGame.heroMaxHealth ?? 5,
+        hasSword: lastGame.hasSword,
+        hasShield: lastGame.hasShield,
+        hasKey: lastGame.hasKey,
+        hasExitKey: lastGame.hasExitKey,
+      });
+      setBadges(earnedBadges);
+    }
+  }, [lastGame]);
 
   useEffect(() => {
     try {
@@ -196,8 +270,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Streak
     lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
 
-    // Kills line (by enemy kind, repeated emoji)
-    const enemyChunks: string[] = [];
+    // Kills line (individual enemy emojis)
+    const enemyEmojis: string[] = [];
+    let totalKills = 0;
     if (lastGame?.stats?.byKind) {
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         let numCount = typeof count === "number" ? count : 0;
@@ -209,14 +284,37 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         }
 
         if (numCount > 0) {
+          totalKills += numCount;
           const emoji =
             EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP["fire-goblin"];
-          enemyChunks.push(`${emoji}x${numCount}`);
+          // Add individual emojis for each kill
+          for (let i = 0; i < numCount; i++) {
+            enemyEmojis.push(emoji);
+          }
         }
       });
     }
-    // Remove the word 'kills' per request; keep the swords icon as a section marker
-    lines.push(`☠️ ${enemyChunks.join(" ")}`);
+    // Show individual emojis followed by total count
+    lines.push(`☠️ ${enemyEmojis.join(" ")} (${totalKills} total)`);
+
+    // Badges line - show only high-rated (8+) badges, max 2
+    if (badges.length > 0) {
+      // Only show legendary and high-epic badges (rated 8+ in our system)
+      const highRatedBadges = badges.filter(b => 
+        b.id === 'exterminator' || 
+        b.id === 'rune-master' || 
+        b.id === 'untouchable' || 
+        b.id === 'hoarder' || 
+        b.id === 'speedrunner' || 
+        b.id === 'pacifist' || 
+        b.id === 'minimalist'
+      );
+      
+      if (highRatedBadges.length > 0) {
+        const badgeEmojis = highRatedBadges.slice(0, 2).map(b => b.icon).join(" ");
+        lines.push(`🏅 ${badgeEmojis}`);
+      }
+    }
 
     // Inventory line (no label word)
     const items: string[] = [];
@@ -322,9 +420,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               style={{
                 backgroundImage: isWin
                   ? "url(/images/presentational/game-over-win-1.png)"
-                  : `url(/images/presentational/game-over-loss-${
-                      Math.random() < 0.5 ? "1" : "2"
-                    }.png)`,
+                  : `url(/images/presentational/game-over-loss-${defeatImageNum}.png)`,
                 backgroundSize: "contain",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -430,24 +526,27 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     </div>
                     {/* Streak */}
                     <div className="mb-2">streak: {data.currentStreak}</div>
-                    {/* Enemies row (no label) */}
+                    {/* Enemies row (individual icons) */}
                     {lastGame.stats.byKind && (
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <span className="mr-1">⚔️</span>
-                        {Object.entries(lastGame.stats.byKind).map(
-                          ([enemyType, count]) => {
-                            let numCount =
-                              typeof count === "number" ? count : 0;
-                            if (
-                              enemyType === "stone-goblin" &&
-                              numCount >= 2
-                            ) {
-                              numCount = numCount / 2;
-                            }
-                            if (numCount <= 0) return null;
-                            return (
-                              <div key={enemyType} className="flex items-center gap-0.5">
+                      <div className="mb-1">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                          <span className="mr-1">⚔️</span>
+                          {Object.entries(lastGame.stats.byKind).flatMap(
+                            ([enemyType, count]) => {
+                              let numCount =
+                                typeof count === "number" ? count : 0;
+                              if (
+                                enemyType === "stone-goblin" &&
+                                numCount >= 2
+                              ) {
+                                numCount = numCount / 2;
+                              }
+                              if (numCount <= 0) return [];
+                              
+                              // Create an array of individual enemy icons
+                              return Array.from({ length: numCount }, (_, idx) => (
                                 <div
+                                  key={`${enemyType}-${idx}`}
                                   className="w-6 h-6"
                                   style={{
                                     backgroundImage: `url(/images/enemies/${
@@ -469,11 +568,20 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                                   }}
                                   title={enemyType}
                                 />
-                                <span className="text-xs text-gray-300">x{numCount}</span>
-                              </div>
-                            );
-                          }
-                        )}
+                              ));
+                            }
+                          )}
+                        </div>
+                        {/* Total deaths count */}
+                        <div className="text-center text-xs text-gray-400 mt-1">
+                          Total: {Object.entries(lastGame.stats.byKind).reduce((total, [enemyType, count]) => {
+                            let numCount = typeof count === "number" ? count : 0;
+                            if (enemyType === "stone-goblin" && numCount >= 2) {
+                              numCount = numCount / 2;
+                            }
+                            return total + numCount;
+                          }, 0)} defeated
+                        </div>
                       </div>
                     )}
                     {/* Inventory row (no label) */}
@@ -573,6 +681,48 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             </div>
           </div>
         </div>
+
+        {/* Badges Section - Show earned badges */}
+        {badges.length > 0 && (
+          <div className="max-w-2xl mx-auto">
+            <div className="rounded-lg shadow-xl p-6 bg-black/50 border border-gray-600">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
+                Badges Earned
+              </h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {badges
+                  .sort((a, b) => {
+                    // Sort by rarity: legendary > epic > rare > common
+                    const rarityOrder = { legendary: 4, epic: 3, rare: 2, common: 1 };
+                    return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
+                  })
+                  .slice(0, 5)
+                  .map((badge) => (
+                  <div
+                    key={badge.id}
+                    className={`rounded-lg p-3 text-center transition-all hover:scale-105 min-w-0 ${
+                      badge.rarity === "legendary"
+                        ? "bg-gradient-to-br from-yellow-600/20 to-orange-600/20 border border-yellow-500"
+                        : badge.rarity === "epic"
+                        ? "bg-gradient-to-br from-purple-600/20 to-pink-600/20 border border-purple-500"
+                        : badge.rarity === "rare"
+                        ? "bg-gradient-to-br from-blue-600/20 to-cyan-600/20 border border-blue-500"
+                        : "bg-gray-700/50 border border-gray-600"
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{badge.icon}</div>
+                    <div className="text-[11px] font-medium text-gray-200 leading-tight">
+                      {badge.name}
+                    </div>
+                    <div className="text-[10px] text-gray-400 mt-0.5">
+                      {getDynamicBadgeDescription(badge, lastGame)}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Individual Stats List - Simple list below Game Statistics box */}
         <div data-testid="individual-stats-list" className="max-w-lg mx-auto">
