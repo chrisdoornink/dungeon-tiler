@@ -232,13 +232,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Header
     lines.push(`#TorchBoy ${today}`);
 
-    // Level reached (multi-tier mode)
-    if (lastGame?.currentFloor != null) {
-      const maxFloors = lastGame.maxFloors ?? 10;
-      const beatGame = isWin && lastGame.currentFloor >= maxFloors;
-      lines.push(beatGame ? `🎉 Escaped the dungeon!` : `Level ${lastGame.currentFloor}`);
-    }
-
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
     // If player died, add emoji for cause of death (enemy kind or faulty floor)
@@ -270,32 +263,47 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Streak
     lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
 
-    // Kills line (individual enemy emojis)
-    const enemyEmojis: string[] = [];
-    let totalKills = 0;
-    if (lastGame?.stats?.byKind) {
+    // Kills by floor
+    if (lastGame?.stats?.byFloor) {
+      const floors = Object.keys(lastGame.stats.byFloor).sort((a, b) => Number(a) - Number(b));
+      
+      for (const floor of floors) {
+        const floorKills = lastGame.stats.byFloor[Number(floor)];
+        const floorEmojis: string[] = [];
+        
+        Object.entries(floorKills).forEach(([enemyType, count]) => {
+          let numCount = typeof count === "number" ? count : 0;
+          if (numCount > 0) {
+            const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || '❓';
+            // Add individual emojis for each kill
+            for (let i = 0; i < numCount; i++) {
+              floorEmojis.push(emoji);
+            }
+          }
+        });
+        
+        if (floorEmojis.length > 0) {
+          lines.push(`L${floor}: ${floorEmojis.join(" ")}`);
+        }
+      }
+    } else if (lastGame?.stats?.byKind) {
+      // Fallback to old format if no floor data
+      const enemyEmojis: string[] = [];
+      let totalKills = 0;
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         let numCount = typeof count === "number" ? count : 0;
-
-        // CONSERVATIVE PATCH: Cap stone-goblin kills at 2 to prevent inflated display
-        // This addresses a known bug where stone-goblin kills can be double-counted
-        if (enemyType === "stone-goblin" && numCount >= 2) {
-          numCount = numCount / 2;
-        }
-
         if (numCount > 0) {
           totalKills += numCount;
-          const emoji =
-            EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || EMOJI_MAP["fire-goblin"];
-          // Add individual emojis for each kill
+          const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || '❓';
           for (let i = 0; i < numCount; i++) {
             enemyEmojis.push(emoji);
           }
         }
       });
+      if (totalKills > 0) {
+        lines.push(`☠️ ${enemyEmojis.join(" ")} (${totalKills} total)`);
+      }
     }
-    // Show individual emojis followed by total count
-    lines.push(`☠️ ${enemyEmojis.join(" ")} (${totalKills} total)`);
 
     // Badges line - show only high-rated (8+) badges, max 2
     if (badges.length > 0) {

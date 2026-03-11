@@ -52,6 +52,18 @@ import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
 
+// Helper function to track enemy kills by type and floor
+function trackEnemyKill(stats: GameState["stats"], enemyKind: EnemyKind, floor: number): void {
+  // Track by kind
+  if (!stats.byKind) stats.byKind = createEmptyByKind();
+  stats.byKind[enemyKind] = (stats.byKind[enemyKind] ?? 0) + 1;
+  
+  // Track by floor
+  if (!stats.byFloor) stats.byFloor = {};
+  if (!stats.byFloor[floor]) stats.byFloor[floor] = createEmptyByKind();
+  stats.byFloor[floor][enemyKind] = (stats.byFloor[floor][enemyKind] ?? 0) + 1;
+}
+
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
   if (amount <= 0) return;
   const currentStats = state.stats;
@@ -351,10 +363,7 @@ export function performThrowRock(gameState: GameState): GameState {
           rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
           runesUsed: (preTickState.stats.runesUsed ?? 0) + 1,
         };
-        const byKind = newStats.byKind || createEmptyByKind();
-        const k = removed.kind as EnemyKind;
-        byKind[k] = (byKind[k] ?? 0) + 1;
-        newStats.byKind = byKind;
+        trackEnemyKill(newStats, removed.kind as EnemyKind, preTickState.currentFloor ?? 1);
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
         ).concat([[removed.y, removed.x] as [number, number]]);
@@ -400,10 +409,7 @@ export function performThrowRock(gameState: GameState): GameState {
           rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
         };
         // Track per-kind kill for rock kills
-        const byKind = newStats.byKind || createEmptyByKind();
-        const k = removed.kind as EnemyKind;
-        byKind[k] = (byKind[k] ?? 0) + 1;
-        newStats.byKind = byKind;
+        trackEnemyKill(newStats, removed.kind as EnemyKind, preTickState.currentFloor ?? 1);
         const newRecent = (
           preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
         ).concat([[removed.y, removed.x] as [number, number]]);
@@ -606,10 +612,7 @@ export function performThrowRune(gameState: GameState): GameState {
         damageDealt: preTickState.stats.damageDealt + dealt,
         enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
       };
-      const byKind = newStats.byKind || createEmptyByKind();
-      const k = removed.kind as EnemyKind;
-      byKind[k] = (byKind[k] ?? 0) + 1;
-      newStats.byKind = byKind;
+      trackEnemyKill(newStats, removed.kind as EnemyKind, preTickState.currentFloor ?? 1);
       const newRecent = (
         preTickState.recentDeaths ? preTickState.recentDeaths.slice() : []
       ).concat([[removed.y, removed.x] as [number, number]]);
@@ -749,6 +752,7 @@ export interface GameState {
     enemiesDefeated: number;
     steps: number;
     byKind?: Record<EnemyKind, number>;
+    byFloor?: Record<number, Record<EnemyKind, number>>; // Track kills by floor
     // Extended stats for badge system
     rocksThrown?: number;
     rocksCollected?: number;
@@ -918,9 +922,7 @@ function applyEnemyHazardDeaths(state: GameState): void {
       state.recentDeaths.push([enemy.y, enemy.x]);
 
       state.stats.enemiesDefeated += 1;
-      if (!state.stats.byKind) state.stats.byKind = createEmptyByKind();
-      const k = enemy.kind as EnemyKind;
-      state.stats.byKind[k] = (state.stats.byKind[k] ?? 0) + 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
 
       if (!state.defeatedEnemies) state.defeatedEnemies = [];
       state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
@@ -2092,13 +2094,7 @@ export function movePlayer(
           newGameState.stats.enemiesDefeated += 1;
           newGameState.stats.enemiesKilledBySword = (newGameState.stats.enemiesKilledBySword ?? 0) + 1;
           // Track per-kind kill for melee
-          if (!newGameState.stats.byKind)
-            newGameState.stats.byKind = createEmptyByKind();
-          {
-            const k = enemy.kind as EnemyKind;
-            newGameState.stats.byKind[k] =
-              (newGameState.stats.byKind[k] ?? 0) + 1;
-          }
+          trackEnemyKill(newGameState.stats, enemy.kind as EnemyKind, newGameState.currentFloor ?? 1);
           // Record death at the enemy's tile (newY, newX)
           if (!newGameState.recentDeaths) newGameState.recentDeaths = [];
           newGameState.recentDeaths.push([newY, newX]);
