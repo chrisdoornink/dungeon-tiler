@@ -27,14 +27,14 @@ const EMOJI_MAP = {
   map: "🗺️",
 
   // Enemies
-  "fire-goblin": "👹",
+  "fire-goblin": "🔴",
   "water-goblin": "🔵",
-  "water-goblin-spear": "🔵🗡️",
+  "water-goblin-spear": "🔵",  // Ignoring spear for clarity
   "earth-goblin": "🟤",
-  "earth-goblin-knives": "🟤⚔️",
-  "pink-goblin": "🔮",
+  "earth-goblin-knives": "🟤",  // Ignoring knives for clarity
+  "pink-goblin": "🟣",
   ghost: "👻",
-  "stone-goblin": "🗿",
+  "stone-goblin": "⚫",
   snake: "🐍",
 
   // Stats
@@ -283,25 +283,61 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         });
         
         if (floorEmojis.length > 0) {
-          lines.push(`L${floor}: ${floorEmojis.join(" ")}`);
+          // Group goblins together with single goblin face
+          const goblinEmojis = floorEmojis.filter(e => 
+            ['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
+          );
+          const nonGoblinEmojis = floorEmojis.filter(e => 
+            !['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
+          );
+          
+          let floorLine = `L${floor}: `;
+          if (goblinEmojis.length > 0) {
+            floorLine += `👹${goblinEmojis.join("")}`;
+            if (nonGoblinEmojis.length > 0) {
+              floorLine += ` ${nonGoblinEmojis.join(" ")}`;
+            }
+          } else {
+            floorLine += nonGoblinEmojis.join(" ");
+          }
+          lines.push(floorLine);
         }
       }
     } else if (lastGame?.stats?.byKind) {
-      // Fallback to old format if no floor data
-      const enemyEmojis: string[] = [];
-      let totalKills = 0;
+      // Fallback to old format if no floor data - group all kills together
+      const allEmojis: string[] = [];
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
         let numCount = typeof count === "number" ? count : 0;
         if (numCount > 0) {
-          totalKills += numCount;
-          const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || '❓';
-          for (let i = 0; i < numCount; i++) {
-            enemyEmojis.push(emoji);
+          const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP];
+          if (emoji) {
+            for (let i = 0; i < numCount; i++) {
+              allEmojis.push(emoji);
+            }
           }
         }
       });
-      if (totalKills > 0) {
-        lines.push(`☠️ ${enemyEmojis.join(" ")} (${totalKills} total)`);
+      
+      if (allEmojis.length > 0) {
+        // Group goblins together with single goblin face
+        const goblinEmojis = allEmojis.filter(e => 
+          ['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
+        );
+        const nonGoblinEmojis = allEmojis.filter(e => 
+          !['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
+        );
+        
+        let killLine = '☠️ ';
+        if (goblinEmojis.length > 0) {
+          killLine += `👹${goblinEmojis.join("")}`;
+          if (nonGoblinEmojis.length > 0) {
+            killLine += ` ${nonGoblinEmojis.join(" ")}`;
+          }
+        } else {
+          killLine += nonGoblinEmojis.join(" ");
+        }
+        killLine += ` (${allEmojis.length} total)`;
+        lines.push(killLine);
       }
     }
 

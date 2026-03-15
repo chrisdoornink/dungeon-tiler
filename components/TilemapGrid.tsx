@@ -815,7 +815,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               const currentRoomId = prev.currentRoomId ?? '__base__';
               
               // Remove old portal from old location
-              if (prev.portalLocation && prev.rooms) {
+              let updatedRooms = prev.rooms;
+              if (prev.portalLocation) {
                 const oldRoomId = prev.portalLocation.roomId;
                 const oldPos = prev.portalLocation.position;
                 
@@ -843,10 +844,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   };
                   CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
                   return nextState;
+                } else if (prev.rooms) {
+                  // Different room - remove portal from old room's snapshot
+                  updatedRooms = { ...prev.rooms };
+                  const oldRoomSnapshot = updatedRooms[oldRoomId];
+                  if (oldRoomSnapshot && oldRoomSnapshot.mapData) {
+                    const oldRoomMapData = JSON.parse(JSON.stringify(oldRoomSnapshot.mapData));
+                    const oldSubs = oldRoomMapData.subtypes[oldPos[0]][oldPos[1]] || [];
+                    oldRoomMapData.subtypes[oldPos[0]][oldPos[1]] = oldSubs.filter(
+                      (s: number) => s !== TileSubtype.PORTAL
+                    );
+                    updatedRooms[oldRoomId] = {
+                      ...oldRoomSnapshot,
+                      mapData: oldRoomMapData,
+                    };
+                  }
                 }
               }
               
-              // Different room or no rooms - just update current location
+              // Add portal to new location in current map
               const newMapData = JSON.parse(JSON.stringify(prev.mapData));
               const newSubs = newMapData.subtypes[py][px] || [];
               if (!newSubs.includes(TileSubtype.PORTAL)) {
@@ -856,6 +872,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               const nextState: GameState = {
                 ...prev,
                 mapData: newMapData,
+                rooms: updatedRooms,
                 portalLocation: {
                   roomId: currentRoomId,
                   position: [py, px],
