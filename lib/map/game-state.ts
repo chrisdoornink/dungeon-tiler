@@ -1052,13 +1052,24 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     ghosts.forEach(g => { g.kind = 'ghost'; enemies.push(g); });
   }
   if (whiteGoblinCount > 0 && playerPos) {
-    const wg = placeEnemies({
+    // Place swarms at single locations (4 goblins per swarm)
+    const swarmCount = Math.floor(whiteGoblinCount / 4);
+    const swarmLocations = placeEnemies({
       grid: mapData.tiles,
       player: { y: playerPos[0], x: playerPos[1] },
-      count: whiteGoblinCount,
+      count: swarmCount,
       minDistanceFromPlayer: 6,
     });
-    wg.forEach(g => { g.kind = 'white-goblin'; enemies.push(g); });
+    
+    // Create 4 white goblins at each swarm location
+    swarmLocations.forEach(location => {
+      for (let i = 0; i < 4; i++) {
+        const goblin = new Enemy({ y: location.y, x: location.x });
+        goblin.kind = 'white-goblin';
+        enemies.push(goblin);
+      }
+    });
+    
     assignWhiteGoblinSwarmIds(enemies);
   }
 
@@ -1216,13 +1227,24 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           ghosts.forEach(g => { g.kind = 'ghost'; placed.push(g); });
         }
         if (wgc > 0) {
-          const wg = placeEnemies({
+          // Place swarms at single locations (4 goblins per swarm)
+          const swarmCount = Math.floor(wgc / 4);
+          const swarmLocations = placeEnemies({
             grid: newMapData.tiles,
             player: { y: playerPos[0], x: playerPos[1] },
-            count: wgc,
+            count: swarmCount,
             minDistanceFromPlayer: 6,
           });
-          wg.forEach(g => { g.kind = 'white-goblin'; placed.push(g); });
+          
+          // Create 4 white goblins at each swarm location
+          swarmLocations.forEach(location => {
+            for (let i = 0; i < 4; i++) {
+              const goblin = new Enemy({ y: location.y, x: location.x });
+              goblin.kind = 'white-goblin';
+              placed.push(goblin);
+            }
+          });
+          
           assignWhiteGoblinSwarmIds(placed);
         }
         return placed;
