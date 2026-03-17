@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 // import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
+import { GameState } from "../../lib/map/game-state";
 import {
   EnemyRegistry,
   EnemyKind,
@@ -89,7 +90,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const lastGame = getLastGame();
 
   // Generate dynamic badge descriptions based on actual stats
-  const getDynamicBadgeDescription = (badge: Badge, game: any) => {
+  const getDynamicBadgeDescription = (badge: Badge, game: GameState) => {
     if (!game?.stats) return badge.description;
     
     const stats = game.stats;
@@ -272,7 +273,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         const floorEmojis: string[] = [];
         
         Object.entries(floorKills).forEach(([enemyType, count]) => {
-          let numCount = typeof count === "number" ? count : 0;
+          const numCount = typeof count === "number" ? count : 0;
           if (numCount > 0) {
             const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || '❓';
             // Add individual emojis for each kill
@@ -307,7 +308,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       // Fallback to old format if no floor data - group all kills together
       const allEmojis: string[] = [];
       Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
-        let numCount = typeof count === "number" ? count : 0;
+        const numCount = typeof count === "number" ? count : 0;
         if (numCount > 0) {
           const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP];
           if (emoji) {
