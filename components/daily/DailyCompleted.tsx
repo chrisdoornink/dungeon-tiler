@@ -342,25 +342,6 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     }
 
-    // Badges line - show only high-rated (8+) badges, max 2
-    if (badges.length > 0) {
-      // Only show legendary and high-epic badges (rated 8+ in our system)
-      const highRatedBadges = badges.filter(b => 
-        b.id === 'exterminator' || 
-        b.id === 'rune-master' || 
-        b.id === 'untouchable' || 
-        b.id === 'hoarder' || 
-        b.id === 'speedrunner' || 
-        b.id === 'pacifist' || 
-        b.id === 'minimalist'
-      );
-      
-      if (highRatedBadges.length > 0) {
-        const badgeEmojis = highRatedBadges.slice(0, 2).map(b => b.icon).join(" ");
-        lines.push(`🏅 ${badgeEmojis}`);
-      }
-    }
-
     // Inventory line (no label word)
     const items: string[] = [];
     if (lastGame?.hasKey) items.push(EMOJI_MAP.key);
@@ -741,7 +722,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     const rarityOrder = { legendary: 4, epic: 3, rare: 2, common: 1 };
                     return (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0);
                   })
-                  .slice(0, 5)
+                  .slice(0, 2)
                   .map((badge) => (
                   <div
                     key={badge.id}

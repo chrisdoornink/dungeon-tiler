@@ -17,7 +17,7 @@ export const BADGES: Badge[] = [
     description: "Defeat 10 enemies in a single run",
     icon: "🏹",
     criteria: (stats) => stats.enemiesDefeated >= 10,
-    rarity: "rare",
+    rarity: "common",
   },
   {
     id: "exterminator",
@@ -119,7 +119,7 @@ export const BADGES: Badge[] = [
     description: "Collect 20 total items in a single run",
     icon: "🎒",
     criteria: (stats) => (stats.itemsCollected ?? 0) >= 20,
-    rarity: "legendary",
+    rarity: "common",
   },
   {
     id: "treasure-hunter",
