@@ -39,3 +39,4 @@ Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `
 
 - Do not modify `lib/rng.ts` without understanding downstream effects on daily seeds
 - Do not add emojis to code or comments unless already present
+- Never commit or push unless explicitly asked to in that message

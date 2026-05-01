@@ -135,25 +135,36 @@ function hasVerticalLineOfSight(grid: number[][], x: number, y1: number, y2: num
  * @returns true if there is a clear line of sight, false if vision is blocked
  */
 function hasDiagonalLineOfSight(grid: number[][], y1: number, x1: number, y2: number, x2: number): boolean {
-  // Get all points along the line using Bresenham's algorithm
   const linePoints = plotLine(y1, x1, y2, x2);
-  
-  // Check all points along the line except the start and end points
+
+  // Check all intermediate points for walls
   for (let i = 1; i < linePoints.length - 1; i++) {
     const [y, x] = linePoints[i];
-    
-    // If the point is out of bounds or is a wall, vision is blocked
-    if (
-      y < 0 || y >= grid.length || 
-      x < 0 || x >= grid[0].length || 
-      grid[y][x] === 1
-    ) {
+    if (y < 0 || y >= grid.length || x < 0 || x >= grid[0].length || grid[y][x] === 1) {
       return false;
     }
   }
-  
-  // No walls found along the line
+
+  // Corner-clipping check: when the line takes a diagonal step, the ray passes through
+  // the shared corner of two tiles. If both tiles on either side of that corner are walls,
+  // vision is blocked (e.g. wall top-left + wall bottom-right blocks sight across the gap).
+  for (let i = 0; i < linePoints.length - 1; i++) {
+    const [ay, ax] = linePoints[i];
+    const [by, bx] = linePoints[i + 1];
+    if (ay !== by && ax !== bx) {
+      const corner1IsWall = isWallOrOob(grid, ay, bx);
+      const corner2IsWall = isWallOrOob(grid, by, ax);
+      if (corner1IsWall && corner2IsWall) {
+        return false;
+      }
+    }
+  }
+
   return true;
+}
+
+function isWallOrOob(grid: number[][], y: number, x: number): boolean {
+  return y < 0 || y >= grid.length || x < 0 || x >= grid[y].length || grid[y][x] === 1;
 }
 
 /**
