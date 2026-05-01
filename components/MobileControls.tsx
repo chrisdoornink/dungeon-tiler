@@ -96,7 +96,8 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   return (
     <div 
       data-testid="mobile-controls" 
-      className={`fixed bottom-4 right-4 z-10 ${!isMobile ? 'opacity-70 scale-90' : ''}`}
+      className={`fixed right-4 z-10 ${!isMobile ? 'opacity-70 scale-90' : ''}`}
+      style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
     >
       {/* Action bar above d-pad: Rock and Rune buttons */}
       <div className="flex justify-end gap-2 mb-2">
