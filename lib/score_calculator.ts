@@ -116,35 +116,10 @@ export class ScoreCalculator {
     // If player died, reduce scoring potential but not too harshly
     const deathPenalty = outcome === "dead" ? 0.6 : 1.0;
 
-    // PATCH: Fix stone-goblin double counting bug
-    // If stone-goblin count seems doubled compared to other enemies, halve it
-    let adjustedEnemiesDefeated = stats.enemiesDefeated;
-    if (stats.byKind) {
-      const stoneCount = stats.byKind["stone-goblin"] ?? 0;
-      const otherCount = (stats.byKind["fire-goblin"] ?? 0) + (stats.byKind["water-goblin"] ?? 0) + (stats.byKind["water-goblin-spear"] ?? 0) + (stats.byKind["earth-goblin"] ?? 0) + (stats.byKind["earth-goblin-knives"] ?? 0) + (stats.byKind.ghost ?? 0);
-
-      // If stone-goblin count is suspiciously high compared to others, likely doubled
-      if (stoneCount > 0 && (stoneCount >= otherCount * 2 || stoneCount > 4)) {
-        const correctedStoneCount = Math.ceil(stoneCount / 2);
-        const reduction = stoneCount - correctedStoneCount;
-        adjustedEnemiesDefeated = Math.max(
-          0,
-          stats.enemiesDefeated - reduction
-        );
-
-        // Log the correction for debugging
-        try {
-          console.log(
-            `Stone-exciter double count detected: ${stoneCount} -> ${correctedStoneCount}, total enemies: ${stats.enemiesDefeated} -> ${adjustedEnemiesDefeated}`
-          );
-        } catch {}
-      }
-    }
-
     // Base combat scoring
     let combatBonus = 0;
     combatBonus += stats.damageDealt * WEIGHTS.DAMAGE_DEALT;
-    combatBonus += adjustedEnemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
+    combatBonus += stats.enemiesDefeated * WEIGHTS.ENEMY_DEFEATED;
 
     // No enemy type bonuses - all enemies worth same base amount
 

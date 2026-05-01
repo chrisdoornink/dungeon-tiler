@@ -559,14 +559,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                           <span className="mr-1">⚔️</span>
                           {Object.entries(lastGame.stats.byKind).flatMap(
                             ([enemyType, count]) => {
-                              let numCount =
+                              const numCount =
                                 typeof count === "number" ? count : 0;
-                              if (
-                                enemyType === "stone-goblin" &&
-                                numCount >= 2
-                              ) {
-                                numCount = numCount / 2;
-                              }
                               if (numCount <= 0) return [];
                               
                               // Create an array of individual enemy icons
@@ -600,12 +594,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         </div>
                         {/* Total deaths count */}
                         <div className="text-center text-xs text-gray-400 mt-1">
-                          Total: {Object.entries(lastGame.stats.byKind).reduce((total, [enemyType, count]) => {
-                            let numCount = typeof count === "number" ? count : 0;
-                            if (enemyType === "stone-goblin" && numCount >= 2) {
-                              numCount = numCount / 2;
-                            }
-                            return total + numCount;
+                          Total: {Object.entries(lastGame.stats.byKind).reduce((total, [, count]) => {
+                            return total + (typeof count === "number" ? count : 0);
                           }, 0)} defeated
                         </div>
                       </div>
