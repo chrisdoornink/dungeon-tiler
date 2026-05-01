@@ -163,9 +163,8 @@ export class ScoreCalculator {
         adjustedPerfectBonus
     );
 
-    // Calculate percentage based on actual enemy count (use adjusted count)
     const maxPossibleScore = ScoreCalculator.calculateMaxScore(
-      adjustedEnemiesDefeated
+      stats.enemiesDefeated
     );
     const percentage = Math.min(
       100,
