@@ -17,13 +17,18 @@ export function addSnakesPerRules(
   const playerPos = findPlayerPosition(mapData);
   if (playerPos) taken.add(`${playerPos[0]},${playerPos[1]}`);
 
-  // Scale snake count by floor with ranges:
-  // Floors 1–6: 0–1  |  Floors 7–8: 0–3  |  Floor 9: 1–3  |  Floor 10: 2–4
+  // 5% chance for a rare snake swarm event
   let targetSnakes: number;
-  if (floor <= 6) targetSnakes = Math.floor(rng() * 2);              // 0–1
-  else if (floor <= 8) targetSnakes = Math.floor(rng() * 4);         // 0–3
-  else if (floor <= 9) targetSnakes = 1 + Math.floor(rng() * 3);    // 1–3
-  else targetSnakes = 2 + Math.floor(rng() * 3);                     // 2–4
+  if (rng() < 0.05) {
+    targetSnakes = 7;
+  } else {
+    // Scale snake count by floor with ranges:
+    // Floors 1–6: 0–1  |  Floors 7–8: 0–3  |  Floor 9: 1–3  |  Floor 10: 2–4
+    if (floor <= 6) targetSnakes = Math.floor(rng() * 2);              // 0–1
+    else if (floor <= 8) targetSnakes = Math.floor(rng() * 4);         // 0–3
+    else if (floor <= 9) targetSnakes = 1 + Math.floor(rng() * 3);    // 1–3
+    else targetSnakes = 2 + Math.floor(rng() * 3);                     // 2–4
+  }
   const potCount = Math.min(1, Math.floor(targetSnakes * 0.25));
   const floorCount = Math.max(0, targetSnakes - potCount);
 
