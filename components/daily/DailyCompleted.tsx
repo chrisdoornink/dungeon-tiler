@@ -780,14 +780,19 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
                 Today&apos;s Adventurers
               </h2>
-              <p className="text-center text-sm text-gray-400 mb-4">
-                {dailyStats.totalPlayers} {dailyStats.totalPlayers === 1 ? "adventurer has" : "adventurers have"} played today
-              </p>
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-gray-700">
-                  <span className="text-gray-300">Escape rate</span>
-                  <span className={`font-semibold ${dailyStats.winRate >= 50 ? "text-green-300" : "text-red-300"}`}>
-                    {dailyStats.winRate}%
+                  <span className="text-gray-300">Dungeon difficulty</span>
+                  <span className={`font-semibold ${
+                    dailyStats.winRate >= 70 ? "text-green-300" :
+                    dailyStats.winRate >= 40 ? "text-yellow-300" :
+                    dailyStats.winRate >= 20 ? "text-orange-300" :
+                    "text-red-300"
+                  }`}>
+                    {dailyStats.winRate >= 70 ? "Forgiving" :
+                     dailyStats.winRate >= 40 ? "Perilous" :
+                     dailyStats.winRate >= 20 ? "Deadly" :
+                     "Merciless"}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-2 border-b border-gray-700">
