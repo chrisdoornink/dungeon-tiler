@@ -784,14 +784,14 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                 <div className="flex justify-between items-center py-2 border-b border-gray-700">
                   <span className="text-gray-300">Dungeon difficulty</span>
                   <span className={`font-semibold ${
-                    dailyStats.winRate >= 70 ? "text-green-300" :
-                    dailyStats.winRate >= 40 ? "text-yellow-300" :
-                    dailyStats.winRate >= 20 ? "text-orange-300" :
+                    dailyStats.winRate >= 50 ? "text-green-300" :
+                    dailyStats.winRate >= 30 ? "text-yellow-300" :
+                    dailyStats.winRate >= 10 ? "text-orange-300" :
                     "text-red-300"
                   }`}>
-                    {dailyStats.winRate >= 70 ? "Forgiving" :
-                     dailyStats.winRate >= 40 ? "Perilous" :
-                     dailyStats.winRate >= 20 ? "Deadly" :
+                    {dailyStats.winRate >= 50 ? "Forgiving" :
+                     dailyStats.winRate >= 30 ? "Perilous" :
+                     dailyStats.winRate >= 10 ? "Deadly" :
                      "Merciless"}
                   </span>
                 </div>
