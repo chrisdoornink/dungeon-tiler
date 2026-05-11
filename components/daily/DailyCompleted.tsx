@@ -12,6 +12,7 @@ import {
 } from "../../lib/enemies/registry";
 import DailyPollModal, { PollResponses } from "../DailyPollModal";
 import { calculateBadges, type Badge } from "../../lib/badges";
+import type { DailyStats } from "../../lib/redis";
 // Using localStorage directly instead of separate module
 
 // Emoji translation map for game entities
@@ -72,6 +73,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const [copied, setCopied] = useState(false);
   const [showPoll, setShowPoll] = useState(false);
   const [badges, setBadges] = useState<Badge[]>([]);
+  const [dailyStats, setDailyStats] = useState<DailyStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
   
   // Determine defeat image number once to prevent flickering
   const [defeatImageNum] = useState(() => Math.random() < 0.5 ? 1 : 2);
@@ -184,6 +187,36 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       }
     }
   }, [isWin, data.currentStreak, data.totalGamesPlayed, data.totalGamesWon]);
+  // Save this session to Redis once, then fetch today's aggregate
+  useEffect(() => {
+    const date = new Date().toLocaleDateString("en-CA");
+    const savedKey = `dailyStatsSaved:${date}`;
+
+    if (lastGame && typeof window !== "undefined" && !window.localStorage.getItem(savedKey)) {
+      fetch("/api/daily-stats", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          date,
+          outcome: lastGame.outcome === "win" ? "win" : "dead",
+          floor: lastGame.currentFloor ?? 1,
+          steps: lastGame.stats?.steps ?? 0,
+          enemiesDefeated: lastGame.stats?.enemiesDefeated ?? 0,
+          heroHealth: lastGame.heroHealth ?? 0,
+        }),
+      })
+        .then(() => window.localStorage.setItem(savedKey, "true"))
+        .catch(() => {});
+    }
+
+    fetch(`/api/daily-stats?date=${date}`)
+      .then((r) => r.json())
+      .then((stats) => setDailyStats(stats))
+      .catch(() => {})
+      .finally(() => setStatsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const getDeathDetails = () => {
     if (
       isWin ||
@@ -735,6 +768,61 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     </div>
                   </div>
                 ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Today's Adventurers - Community Comparison */}
+        {!statsLoading && dailyStats && dailyStats.totalPlayers >= 2 && (
+          <div className="max-w-2xl mx-auto">
+            <div className="rounded-lg shadow-xl p-6 bg-black/50 border border-gray-600">
+              <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
+                Today&apos;s Adventurers
+              </h2>
+              <p className="text-center text-sm text-gray-400 mb-4">
+                {dailyStats.totalPlayers} {dailyStats.totalPlayers === 1 ? "adventurer has" : "adventurers have"} played today
+              </p>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Escape rate</span>
+                  <span className={`font-semibold ${dailyStats.winRate >= 50 ? "text-green-300" : "text-red-300"}`}>
+                    {dailyStats.winRate}%
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Avg floor reached</span>
+                  <span className="font-semibold text-gray-200">
+                    {dailyStats.avgFloor}
+                    {lastGame?.currentFloor != null && (
+                      <span className="text-xs text-gray-400 ml-2">
+                        (you: {lastGame.currentFloor})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2 border-b border-gray-700">
+                  <span className="text-gray-300">Avg enemies defeated</span>
+                  <span className="font-semibold text-gray-200">
+                    {dailyStats.avgEnemiesDefeated}
+                    {lastGame?.stats?.enemiesDefeated != null && (
+                      <span className={`text-xs ml-2 ${lastGame.stats.enemiesDefeated >= dailyStats.avgEnemiesDefeated ? "text-green-400" : "text-gray-400"}`}>
+                        (you: {lastGame.stats.enemiesDefeated})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-gray-300">Avg steps taken</span>
+                  <span className="font-semibold text-gray-200">
+                    {dailyStats.avgSteps}
+                    {lastGame?.stats?.steps != null && (
+                      <span className={`text-xs ml-2 ${lastGame.stats.steps <= dailyStats.avgSteps ? "text-green-400" : "text-gray-400"}`}>
+                        (you: {lastGame.stats.steps})
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
