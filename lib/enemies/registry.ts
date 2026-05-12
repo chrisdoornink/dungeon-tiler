@@ -476,7 +476,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const H = grid.length;
         const W = grid[0]?.length ?? 0;
         const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
-        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+
+        const isFloor = (y: number, x: number) => {
+          if (!isIn(y, x) || grid[y][x] !== 0) return false;
+          const subs = ctx.subtypes?.[y]?.[x] ?? [];
+          return !subs.includes(TileSubtype.OPEN_ABYSS);
+        };
 
         const swarmId = (e.memory as Record<string, unknown>).swarmId as string | undefined;
 
@@ -760,7 +765,11 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const H = grid.length;
         const W = grid[0].length;
         const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
-        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+        const isFloor = (y: number, x: number) => {
+          if (!isIn(y, x) || grid[y][x] !== 0) return false;
+          const subs = ctx.subtypes?.[y]?.[x] ?? [];
+          return !subs.includes(TileSubtype.OPEN_ABYSS);
+        };
 
         // If can see player, decide each tick: 33% approach, 67% avoid (move away)
         const sees = canSee(grid, [e.y, e.x], [py, px]);
