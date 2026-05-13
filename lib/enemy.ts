@@ -573,8 +573,8 @@ export function updateEnemies(
       if (rng) {
         rVal = rng();
         if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin') {
-          // Weighted: 25% chance -1, 50% chance 0, 25% chance +1
-          variance = rVal < 0.25 ? -1 : rVal < 0.75 ? 0 : 1;
+          // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
+          variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
         } else {
           variance = rVal >= 0.75 ? 2 : rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
         }
