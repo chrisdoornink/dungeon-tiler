@@ -18,7 +18,7 @@ export interface GameViewProps {
   isDailyChallenge?: boolean;
   forceDaylightDefault?: boolean;
   onDailyComplete?: (result: "won" | "lost") => void;
-  storageSlot?: "default" | "daily" | "daily-new" | "story";
+  storageSlot?: "default" | "daily-new" | "story";
 }
 
 function GameViewInner({
@@ -44,7 +44,7 @@ function GameViewInner({
     let state: GameState | undefined;
 
     // First priority: check for current game in progress (auto-save/restore)
-    const slot = storageSlot ?? (isDailyChallenge ? 'daily' : 'default');
+    const slot = storageSlot ?? (isDailyChallenge ? 'daily-new' : 'default');
 
     if (!replayExact && !mapId && typeof window !== "undefined") {
       const savedGame = CurrentGameStorage.loadCurrentGame(slot);

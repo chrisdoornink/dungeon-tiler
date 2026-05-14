@@ -25,24 +25,6 @@ export class DailyChallengeFlow {
 
     // First time user - show intro
     if (!data.hasSeenIntro) {
-      // If there's any prior saved game, skip intro automatically.
-      // Requirement: only show intro when there is no saved game data.
-      try {
-        if (typeof window !== "undefined") {
-          const dailyChallenge = window.localStorage.getItem("dailyChallenge");
-          if (!dailyChallenge) return DailyChallengeState.FIRST_TIME;
-          const parsed = JSON.parse(dailyChallenge);
-          if (
-            parsed?.lastPlayedDate &&
-            DateUtils.isToday(parsed.lastPlayedDate)
-          ) {
-            return DailyChallengeState.DAILY_COMPLETED;
-          }
-          return DailyChallengeState.DAILY_AVAILABLE;
-        }
-      } catch {
-        // ignore storage access errors and fall back to intro
-      }
       return DailyChallengeState.FIRST_TIME;
     }
 
@@ -79,7 +61,6 @@ export class DailyChallengeFlow {
     const today = DateUtils.getTodayString();
     try {
       if (typeof window !== "undefined") {
-        CurrentGameStorage.clearCurrentGame("daily");
         CurrentGameStorage.clearCurrentGame("daily-new");
       }
     } catch {}

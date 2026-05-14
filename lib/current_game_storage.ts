@@ -7,16 +7,13 @@ import type { GameState } from "./map";
 import { DateUtils } from "./date_utils";
 
 const CURRENT_GAME_KEY = "currentGame";
-const DAILY_GAME_KEY = "currentDailyGame";
 const DAILY_NEW_GAME_KEY = "currentDailyNewGame";
 const STORY_GAME_KEY = "currentStoryGame";
 
-export type GameStorageSlot = "default" | "daily" | "daily-new" | "story";
+export type GameStorageSlot = "default" | "daily-new" | "story";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
-    case "daily":
-      return DAILY_GAME_KEY;
     case "daily-new":
       return DAILY_NEW_GAME_KEY;
     case "story":
@@ -45,7 +42,7 @@ export class CurrentGameStorage {
       const storedState: StoredGameState = {
         ...gameState,
         lastSaved: Date.now(),
-        isDailyChallenge: slot === "daily" || slot === "daily-new",
+        isDailyChallenge: slot === "daily-new",
       };
       const key = keyForSlot(slot);
       window.localStorage.setItem(key, JSON.stringify(storedState));
@@ -80,7 +77,7 @@ export class CurrentGameStorage {
 
       // For daily slots, reject saves that are stale (from a previous calendar day,
       // already won, or hero is dead). These would immediately re-trigger completion.
-      if (slot === "daily" || slot === "daily-new") {
+      if (slot === "daily-new") {
         if (parsed.win || parsed.heroHealth <= 0) {
           this.clearCurrentGame(slot);
           return null;

@@ -122,7 +122,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const resolvedStorageSlot: GameStorageSlot = storageSlot
     ? storageSlot
     : isDailyChallenge
-    ? 'daily'
+    ? 'daily-new'
     : 'default';
 
   const shouldAnimateHeroDeath = resolvedStorageSlot === 'story';
