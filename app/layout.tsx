@@ -4,6 +4,7 @@ import "./globals.css";
 import PreloadImages from "../components/PreloadImages";
 import PostHogProvider from "../components/PostHogProvider";
 import FeedbackButton from "../components/FeedbackButton";
+import HowToPlayButton from "../components/HowToPlayButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -84,6 +85,7 @@ export default function RootLayout({
           <PreloadImages />
           {children}
           <FeedbackButton />
+          <HowToPlayButton />
         </PostHogProvider>
       </body>
     </html>
