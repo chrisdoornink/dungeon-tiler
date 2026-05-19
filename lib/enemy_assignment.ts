@@ -67,14 +67,32 @@ function getFloorGoblinWeights(floor: number): Array<{ kind: EnemyKind; weight: 
           kind === "stone-goblin" || kind === "pink-goblin") {
         return { kind, weight: 0 };
       }
-    } else if (floor === 2 || floor === 3) {
-      // Floors 2 & 3: Mixed advanced goblins (pink, earth-knives, water-spear, stone, fire)
-      // Drop basic water and earth goblins to make room for advanced types
+    } else if (floor === 2) {
+      // Floor 2: Mixed advanced goblins, weighted toward weapon-wielders (knives + spear).
+      // Basic unarmed water/earth goblins are excluded — they're floor 1 only.
       if (kind === "water-goblin" || kind === "earth-goblin") {
         return { kind, weight: 0 };
       }
-      // Equal weight for all advanced types
-      return { kind, weight: 15 };
+      // Approx shares (total 85): knives 26%, spear 26%, stone 21%, pink 21%, fire 6%
+      if (kind === "earth-goblin-knives") return { kind, weight: 22 };
+      if (kind === "water-goblin-spear")  return { kind, weight: 22 };
+      if (kind === "stone-goblin")        return { kind, weight: 18 };
+      if (kind === "pink-goblin")         return { kind, weight: 18 };
+      if (kind === "fire-goblin")         return { kind, weight:  5 };
+      return { kind, weight: 0 };
+    } else if (floor === 3) {
+      // Floor 3: Heavier emphasis on weapon-wielders, plus a bump to stone-goblin
+      // to reinforce the "slightly harder" feel by the last floor.
+      if (kind === "water-goblin" || kind === "earth-goblin") {
+        return { kind, weight: 0 };
+      }
+      // Approx shares (total 95): knives 26%, spear 26%, stone 23%, pink 19%, fire 5%
+      if (kind === "earth-goblin-knives") return { kind, weight: 25 };
+      if (kind === "water-goblin-spear")  return { kind, weight: 25 };
+      if (kind === "stone-goblin")        return { kind, weight: 22 };
+      if (kind === "pink-goblin")         return { kind, weight: 18 };
+      if (kind === "fire-goblin")         return { kind, weight:  5 };
+      return { kind, weight: 0 };
     }
     return { kind, weight };
   }).filter(g => g.weight > 0);

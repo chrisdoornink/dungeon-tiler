@@ -357,13 +357,19 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             return 0;
           }
 
-          // Within attack range (1-5): 50% attack, 50% reposition to ideal distance (4-5)
+          // Adjacent (manhattan === 1): always melee, no back-away. Pink goblins should
+          // be at least as threatening as a basic goblin when the hero stands right in
+          // front of them — base 1 damage matching fire/water/earth goblins.
+          if (manhattan === 1) {
+            return 1;
+          }
+
+          // Within attack range (4-5): always attack at ideal distance
           if (manhattan >= 4 && manhattan <= 5) {
-            // Already at ideal distance — always attack
             return rangedDamage(manhattan);
           }
 
-          // Closer than ideal (1-3): 50% attack, 50% back away to ideal distance
+          // Mid-close (2-3): 50% attack, 50% back away to ideal distance
           if (rng() < 0.5) {
             return rangedDamage(manhattan);
           } else {
