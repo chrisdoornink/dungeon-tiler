@@ -266,7 +266,46 @@ export function performThrowRock(gameState: GameState): GameState {
   const preTickState: GameState = { ...gameState };
   // Reset transient deaths for this tick
   preTickState.recentDeaths = [];
+
+  // Pre-scan the rock's trajectory using current (pre-move) positions so that any
+  // enemy the rock will hit and kill this turn is fully skipped during the enemy
+  // tick — they don't move, don't attack, and don't trigger proximity hooks like
+  // the ghost torch-snuff. Fixes "ghost snuffs torch even when killed by rock".
+  let preScanVx = 0, preScanVy = 0;
+  switch (preTickState.playerDirection) {
+    case Direction.UP: preScanVy = -1; break;
+    case Direction.RIGHT: preScanVx = 1; break;
+    case Direction.DOWN: preScanVy = 1; break;
+    case Direction.LEFT: preScanVx = -1; break;
+  }
+  let rockKillTargetIdx: number | null = null;
+  {
+    const enemiesNow = preTickState.enemies ?? [];
+    let scanY = py;
+    let scanX = px;
+    for (let step = 1; step <= 4; step++) {
+      scanY += preScanVy;
+      scanX += preScanVx;
+      if (!isWithinBounds(preTickState.mapData, scanY, scanX)) break;
+      const hitIdx = enemiesNow.findIndex((e) => e.y === scanY && e.x === scanX);
+      if (hitIdx !== -1) {
+        const target = enemiesNow[hitIdx];
+        const targetHp = target.health ?? 1;
+        // Only skip the enemy's turn if the rock will outright kill it (2 dmg).
+        // Surviving targets still get to act this tick.
+        if (targetHp <= 2) {
+          rockKillTargetIdx = hitIdx;
+        }
+        break; // rock stops at first enemy regardless
+      }
+      if (preTickState.mapData.tiles[scanY][scanX] !== FLOOR) break;
+      const subs = preTickState.mapData.subtypes[scanY][scanX] || [];
+      if (subs.includes(TileSubtype.POT)) break;
+    }
+  }
+
   if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const enemiesRef = preTickState.enemies;
     const result = updateEnemies(
       preTickState.mapData.tiles,
       preTickState.mapData.subtypes,
@@ -282,6 +321,10 @@ export function performThrowRock(gameState: GameState): GameState {
         // Ghosts adjacent this tick should not deal damage
         suppress: (e: Enemy) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
+        // Fully skip any enemy the rock will kill this turn (no move, no attack,
+        // no proximity hook). Prevents ghost-snuff-before-rock-hits race.
+        skipEnemy: (e: Enemy) =>
+          rockKillTargetIdx !== null && enemiesRef[rockKillTargetIdx] === e,
       }
     );
     if (result.damage > 0) {

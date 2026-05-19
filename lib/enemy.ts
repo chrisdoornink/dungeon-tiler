@@ -434,6 +434,7 @@ export function updateEnemies(
     rng?: () => number;
     defense?: number;
     suppress?: (e: Enemy) => boolean;
+    skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
   }
@@ -447,6 +448,7 @@ export function updateEnemies(
     rng?: () => number;
     defense?: number;
     suppress?: (e: Enemy) => boolean;
+    skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
   }
@@ -459,6 +461,7 @@ export function updateEnemies(
     rng?: () => number;
     defense?: number;
     suppress?: (e: Enemy) => boolean;
+    skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
   },
@@ -466,6 +469,7 @@ export function updateEnemies(
     rng?: () => number;
     defense?: number;
     suppress?: (e: Enemy) => boolean;
+    skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
   }
@@ -493,6 +497,7 @@ export function updateEnemies(
   const rng = finalOpts?.rng; // undefined means no variance
   const defense = finalOpts?.defense ?? 0;
   const suppress = finalOpts?.suppress;
+  const skipEnemy = finalOpts?.skipEnemy;
   let totalDamage = 0;
   const attackingEnemies: Array<{ kind: string; damage: number }> = [];
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
@@ -502,6 +507,9 @@ export function updateEnemies(
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
   for (let i = 0; i < enemies.length; i++) {
     const e = enemies[i];
+    // Skip enemies marked for skip (e.g., about to die to a player's projectile this turn).
+    // Skipped enemies do not move, attack, or trigger proximity hooks.
+    if (skipEnemy?.(e)) continue;
     const prevKey = `${e.y},${e.x}`;
     const prevY = e.y;
     const prevX = e.x;
