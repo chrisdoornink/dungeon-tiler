@@ -7,6 +7,12 @@ export interface MapData {
   tiles: number[][];
   subtypes: number[][][];
   environment?: EnvironmentId;
+  /**
+   * Marks the rare snake-swarm event level. Set during map generation when the
+   * swarm RNG roll triggers. Used downstream (e.g. pot reveals) to guarantee
+   * at least 2 healing potions are available on this floor.
+   */
+  snakeSwarm?: boolean;
 }
 
 export interface RoomSnapshot {

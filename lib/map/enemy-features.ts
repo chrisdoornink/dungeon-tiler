@@ -21,6 +21,8 @@ export function addSnakesPerRules(
   let targetSnakes: number;
   if (rng() < 0.05) {
     targetSnakes = 7;
+    // Mark the level so pot-reveal logic can guarantee at least 2 potions.
+    mapData.snakeSwarm = true;
   } else {
     // Scale snake count by floor with ranges:
     // Floors 1–6: 0–1  |  Floors 7–8: 0–3  |  Floor 9: 1–3  |  Floor 10: 2–4

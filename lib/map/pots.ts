@@ -23,30 +23,23 @@ export function pickPotRevealDeterministic(
       hash = (hash * 0x01000193) >>> 0;
     }
 
-    // Check if this is a swarm level (7 snakes) - if so, guarantee 2 potions
-    let snakeCount = 0;
-    for (let yy = 0; yy < mapData.subtypes.length; yy++) {
-      for (let xx = 0; xx < mapData.subtypes[yy].length; xx++) {
-        if (mapData.subtypes[yy][xx].includes(TileSubtype.SNAKE)) {
-          snakeCount++;
-        }
-      }
-    }
-
-    const isSwarmLevel = snakeCount >= 7;
-    if (isSwarmLevel) {
-      let potCount = 0;
-      let potIndex = -1;
+    // Snake-swarm level: guarantee at least 2 healing potions among the
+    // non-snake pots. The flag is set at map generation time (see
+    // addSnakesPerRules) because runtime subtype counting misses floor snakes
+    // and incorrectly counts the snake-pot itself.
+    if (mapData.snakeSwarm) {
+      let nonSnakePotIndex = -1;
+      let nonSnakePotCount = 0;
       for (let yy = 0; yy < mapData.subtypes.length; yy++) {
         for (let xx = 0; xx < mapData.subtypes[yy].length; xx++) {
           const subs = mapData.subtypes[yy][xx];
-          if (subs.includes(TileSubtype.POT)) {
-            if (yy === y && xx === x) potIndex = potCount;
-            potCount++;
-          }
+          if (!subs.includes(TileSubtype.POT)) continue;
+          if (subs.includes(TileSubtype.SNAKE)) continue;
+          if (yy === y && xx === x) nonSnakePotIndex = nonSnakePotCount;
+          nonSnakePotCount++;
         }
       }
-      if (potIndex >= 0 && potIndex < 2) {
+      if (nonSnakePotIndex >= 0 && nonSnakePotIndex < 2) {
         return TileSubtype.MED;
       }
     }
