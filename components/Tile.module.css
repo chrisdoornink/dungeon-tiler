@@ -325,6 +325,33 @@
   background-image: url("/images/items/pot-1.png");
 }
 
+/*
+ * Snake-pot wiggle: a subtle, occasional twitch hinting that something inside
+ * is alive. The animation cycle is long (5s) and the actual movement only
+ * occupies a small fraction of it, so the pot looks still most of the time —
+ * an attentive player will catch the twitch and think twice before opening.
+ * Per-tile random delay (set inline via --snake-pot-delay) prevents all
+ * snake-pots from twitching in sync.
+ */
+.potIconSnake {
+  animation: snake-pot-wiggle 5s ease-in-out infinite;
+  animation-delay: var(--snake-pot-delay, 0s);
+  transform-origin: 50% 80%;
+  will-change: transform;
+}
+
+@keyframes snake-pot-wiggle {
+  0%, 86%, 100% { transform: rotate(0deg) translateY(0); }
+  88% { transform: rotate(-3deg) translateY(-1px); }
+  91% { transform: rotate(3deg) translateY(-1px); }
+  94% { transform: rotate(-2deg) translateY(0); }
+  97% { transform: rotate(1deg) translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .potIconSnake { animation: none; }
+}
+
 .rockIcon {
   background-image: url("/images/items/rock-1.png");
 }

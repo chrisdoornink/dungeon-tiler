@@ -692,20 +692,31 @@ export const Tile: React.FC<TileProps> = ({
         )}
 
         {/* Render POT/ROCK/FOOD/MED with assets if present */}
-        {hasPot(subtypes) && (
-          <div
-            key="pot"
-            data-testid={`subtype-icon-${TileSubtype.POT}`}
-            className={`${styles.assetIcon} ${styles.potIcon}`}
-            style={{
-              backgroundImage: `url(${pickVariant([
-                '/images/items/pot-1.png',
-                '/images/items/pot-2.png',
-                '/images/items/pot-3.png',
-              ])})`,
-            }}
-          />
-        )}
+        {hasPot(subtypes) && (() => {
+          const isSnakePot = subtypes?.includes(TileSubtype.SNAKE) ?? false;
+          // Deterministic per-tile delay so multiple snake-pots don't twitch
+          // in sync. Range 0-4.9s within the 5s animation window.
+          const y = typeof row === 'number' ? row : 0;
+          const x = typeof col === 'number' ? col : 0;
+          const delayMs = (((y * 73 + x * 131) % 49) / 10).toFixed(1);
+          return (
+            <div
+              key="pot"
+              data-testid={`subtype-icon-${TileSubtype.POT}`}
+              className={`${styles.assetIcon} ${styles.potIcon}${isSnakePot ? ` ${styles.potIconSnake}` : ''}`}
+              style={{
+                backgroundImage: `url(${pickVariant([
+                  '/images/items/pot-1.png',
+                  '/images/items/pot-2.png',
+                  '/images/items/pot-3.png',
+                ])})`,
+                ...(isSnakePot
+                  ? ({ ['--snake-pot-delay' as string]: `${delayMs}s` } as React.CSSProperties)
+                  : {}),
+              }}
+            />
+          );
+        })()}
         {hasRock(subtypes) && (
           <div
             key="rock"
