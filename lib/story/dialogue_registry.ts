@@ -100,6 +100,15 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "tutorial-chest-locked": {
+    id: "tutorial-chest-locked",
+    lines: [
+      {
+        speaker: "",
+        text: "It's locked; you might need a key.",
+      },
+    ],
+  },
   "elder-rowan-intro": {
     id: "elder-rowan-intro",
     lines: [

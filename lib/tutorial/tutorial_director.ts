@@ -1,9 +1,15 @@
 // Import from leaf modules (not the ../map index) to avoid a circular import:
 // game-state.ts imports this director, and the ../map index re-exports
 // game-state.ts. Pulling types directly breaks that cycle.
+import { TileSubtype } from "../map/constants";
 import type { GameState } from "../map/game-state";
 import { makeTutorialDialogueEvent } from "./tutorial_dialogue";
-import { TUTORIAL_ROOM_ENTER_COL } from "./rooms/opening_room";
+// Import coordinates from the dependency-free constants module (NOT the room
+// builder) to avoid an import cycle back through the lib/map barrel.
+import {
+  TUTORIAL_ROOM_ENTER_COL,
+  TUTORIAL_CHEST_POS,
+} from "./tutorial_constants";
 
 /**
  * Beat keys tracked on `GameState.tutorialBeats` so each fires exactly once.
@@ -12,6 +18,7 @@ const BEAT_GHOST_SPOTTED = "ghost-spotted";
 const BEAT_GHOST_SNUFFED = "ghost-snuffed";
 const BEAT_GOBLIN_INTRO = "goblin-intro";
 const BEAT_GOBLIN_DEFEATED = "goblin-defeated";
+const BEAT_CHEST_LOCKED = "chest-locked";
 
 /** True once no fire-goblin remains in the enemies list. */
 function goblinDefeated(state: GameState): boolean {
@@ -93,6 +100,22 @@ export function applyTutorialDirector(
   ) {
     queueDialogue(state, "tutorial-goblin-defeated");
     beats[BEAT_GOBLIN_DEFEATED] = true;
+  }
+
+  // Beat: chest-locked dialogue when the player steps onto the locked chest
+  // without a key. Fires once. The chest tile keeps its LOCK subtype until the
+  // player has a key, so checking the live tile keeps this honest.
+  if (
+    !beats[BEAT_CHEST_LOCKED] &&
+    playerPos.y === TUTORIAL_CHEST_POS[0] &&
+    playerPos.x === TUTORIAL_CHEST_POS[1] &&
+    !state.hasKey
+  ) {
+    const chestTile = state.mapData.subtypes[playerPos.y]?.[playerPos.x] ?? [];
+    if (chestTile.includes(TileSubtype.LOCK)) {
+      queueDialogue(state, "tutorial-chest-locked");
+      beats[BEAT_CHEST_LOCKED] = true;
+    }
   }
 
   state.tutorialBeats = beats;

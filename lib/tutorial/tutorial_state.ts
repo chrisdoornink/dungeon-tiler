@@ -88,5 +88,6 @@ export function buildTutorialState(): GameState {
     mode: "tutorial",
     allowCheckpoints: false,
     tutorialBeats: {},
+    potOverrides: room.potOverrides,
   };
 }
