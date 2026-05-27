@@ -1,5 +1,6 @@
 import { canSee } from "./line_of_sight";
 import { EnemyRegistry, BehaviorContext } from "./enemies/registry";
+import { orderPursuitSteps } from "./enemies/pursuit";
 
 export const ENEMY_PURSUIT_TTL = 5;
 // Maximum vision radius for enemies, measured in Manhattan distance.
@@ -16,6 +17,9 @@ export type EnemyUpdateContext = {
   subtypes?: number[][][];
   player: { y: number; x: number };
   ghosts?: Array<{ y: number; x: number }>;
+  // Optional RNG (0..1) used for unpredictable pursuit-axis selection. Defaults
+  // to Math.random when omitted (matching runtime combat variance behavior).
+  rng?: () => number;
 };
 
 export class Enemy {
@@ -118,8 +122,6 @@ export class Enemy {
       // Take one greedy step toward the target, biasing to retain line-of-sight when we currently see them.
       const dyRaw = targetPos.y - this.y;
       const dxRaw = targetPos.x - this.x;
-      const stepY = dyRaw === 0 ? 0 : dyRaw > 0 ? 1 : -1;
-      const stepX = dxRaw === 0 ? 0 : dxRaw > 0 ? 1 : -1;
 
       // Always face toward the target when pursuing, even if we cannot move this tick
       if (Math.abs(dxRaw) >= Math.abs(dyRaw)) {
@@ -128,10 +130,11 @@ export class Enemy {
         this.facing = dyRaw > 0 ? 'DOWN' : (dyRaw < 0 ? 'UP' : this.facing);
       }
 
-      // Candidate moves toward the target
-      const candMoves: Array<[number, number]> = [];
-      if (stepX !== 0) candMoves.push([0, stepX]);
-      if (stepY !== 0) candMoves.push([stepY, 0]);
+      // Candidate moves toward the target. Bias toward the axis with the
+      // larger remaining gap, but randomize the choice so enemies cannot be
+      // read with certainty (no more "always close the column first").
+      const rng = ctx.rng ?? Math.random;
+      const candMoves: Array<[number, number]> = orderPursuitSteps(dyRaw, dxRaw, rng);
 
       // Determine move ordering
       let tryMoves: Array<[number, number]> = [];
@@ -551,7 +554,7 @@ export function updateEnemies(
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
       }
     } else {
-      base = e.update({ grid, subtypes, player, ghosts: ghostPositions });
+      base = e.update({ grid, subtypes, player, ghosts: ghostPositions, rng });
     }
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;

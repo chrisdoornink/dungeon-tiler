@@ -1,6 +1,7 @@
 // Centralized enemy registry: assets and behaviors
 import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
+import { orderPursuitSteps } from "./pursuit";
 export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin";
 
 export type Facing = "front" | "left" | "right" | "back";
@@ -284,12 +285,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const stepToward = () => {
           const dy = py - e.y;
           const dx = px - e.x;
-          const stepY = dy === 0 ? 0 : dy > 0 ? 1 : -1;
-          const stepX = dx === 0 ? 0 : dx > 0 ? 1 : -1;
           facePlayer();
-          const tryMoves: Array<[number, number]> = [];
-          if (stepX !== 0) tryMoves.push([0, stepX]);
-          if (stepY !== 0) tryMoves.push([stepY, 0]);
+          // Bias toward the larger-gap axis but keep it unpredictable, so the
+          // pink goblin's approach can't be read as easily as before.
+          const tryMoves = orderPursuitSteps(dy, dx, rng);
           for (const [my, mx] of tryMoves) {
             const ny = e.y + my;
             const nx = e.x + mx;
