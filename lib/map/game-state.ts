@@ -51,6 +51,7 @@ import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
+import { applyTutorialDirector } from "../tutorial/tutorial_director";
 
 // Helper function to track enemy kills by type and floor
 function trackEnemyKill(stats: GameState["stats"], enemyKind: EnemyKind, floor: number): void {
@@ -768,8 +769,10 @@ export interface GameState {
   hasShield?: boolean;
   chestKeyCount?: number; // Multi-tier: consumable keys for opening locked chests (separate from universal key)
   floorChestAllocation?: Record<number, { chests: number; keys: number; chestContents: number[] }>; // Multi-tier: pre-computed chest/key distribution across floors
-  mode?: 'normal' | 'daily' | 'story';
+  mode?: 'normal' | 'daily' | 'story' | 'tutorial';
   allowCheckpoints?: boolean;
+  /** Tutorial-only: tracks which scripted beats have already fired. */
+  tutorialBeats?: Record<string, boolean>;
   currentFloor?: number; // Current floor number for multi-tier daily mode (1-indexed)
   maxFloors?: number; // Maximum number of floors for multi-tier daily mode
   mapData: MapData;
@@ -1577,6 +1580,13 @@ export function movePlayer(
       newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
       newGameState.stats.damageTaken += applied;
 
+      // Tutorial guardrail: never let the hero die during the tutorial. They
+      // can drop to 1 heart but no further. Removed for the real game once
+      // deaths are allowed.
+      if (newGameState.mode === "tutorial" && newGameState.heroHealth < 1) {
+        newGameState.heroHealth = 1;
+      }
+
       // Apply poison condition if snake attacked
       const snakeAttacked = result.attackingEnemies.some(enemy => enemy.kind === 'snake');
       if (snakeAttacked) {
@@ -2370,6 +2380,10 @@ export function movePlayer(
         };
       }
     }
+  }
+
+  if (newGameState.mode === "tutorial") {
+    newGameState = applyTutorialDirector(newGameState, { y: newY, x: newX });
   }
 
   return newGameState;

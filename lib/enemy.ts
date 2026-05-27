@@ -516,7 +516,14 @@ export function updateEnemies(
     // Delegate to registry customUpdate when available (e.g., stone-goblin)
     const cfg = EnemyRegistry[e.kind];
     let base: number;
-    if (cfg?.behavior?.customUpdate) {
+    // Frozen enemies (e.g., the scripted tutorial ghost) do not move or attack
+    // this tick, but they DO still run proximity hooks below — so a frozen
+    // ghost can still snuff the torch when the player steps adjacent to it.
+    const isFrozen =
+      (e.behaviorMemory as Record<string, unknown> | undefined)?.["frozen"] === true;
+    if (isFrozen) {
+      base = 0;
+    } else if (cfg?.behavior?.customUpdate) {
       const enemyCtx: BehaviorContext['enemy'] = {
         y: e.y,
         x: e.x,

@@ -40,6 +40,66 @@ export interface DialogueScript {
 }
 
 const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
+  // Tutorial scripts — played from the /tutorial sandbox and (eventually)
+  // from the gated day-1 tutorial flow. Speaker "" hides the name banner so
+  // these read as narrator/system text rather than NPC dialogue.
+  "tutorial-welcome": {
+    id: "tutorial-welcome",
+    lines: [
+      {
+        speaker: "",
+        text: "Welcome to TorchBoy. You're a boy with a torch.",
+      },
+    ],
+  },
+  "tutorial-ghost-spotted": {
+    id: "tutorial-ghost-spotted",
+    lines: [
+      {
+        speaker: "",
+        text: "This is a ghost.",
+      },
+    ],
+  },
+  "tutorial-ghost-snuffed": {
+    id: "tutorial-ghost-snuffed",
+    lines: [
+      {
+        speaker: "",
+        text: "Ghosts steal your light. Find another flame to relight yours.",
+      },
+    ],
+  },
+  "tutorial-goblin-intro": {
+    id: "tutorial-goblin-intro",
+    lines: [
+      {
+        speaker: "",
+        text: "A goblin! He wants to hurt you.",
+      },
+      {
+        speaker: "",
+        text: "He's unarmed — no blade, no spear. Just fists.",
+      },
+      {
+        speaker: "",
+        text: "Walk straight into him to attack. Each step is a swing.",
+      },
+    ],
+  },
+  "tutorial-goblin-defeated": {
+    id: "tutorial-goblin-defeated",
+    lines: [
+      {
+        speaker: "",
+        text: "That was harder than it needs to be.",
+      },
+      {
+        speaker: "",
+        text: "Maybe you should find a weapon so you don't have to use your fists.",
+      },
+    ],
+  },
   "elder-rowan-intro": {
     id: "elder-rowan-intro",
     lines: [
