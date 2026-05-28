@@ -102,6 +102,13 @@ interface TilemapGridProps {
   forceDaylight?: boolean; // when true, override lighting to full visibility
   isDailyChallenge?: boolean; // when true, handle daily challenge completion
   onDailyComplete?: (result: "won" | "lost") => void; // when daily, signal result instead of routing
+  /**
+   * Non-daily win hook. Fires once when the player wins outside daily mode.
+   * When provided, suppresses the default `/end` redirect + lastGame save —
+   * the parent takes full responsibility for what comes next (e.g. /new
+   * uses this to hand off to /daily-new floor 2 with carried inventory).
+   */
+  onWin?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
   onFloorChange?: (floor: number) => void; // notify parent when floor changes
 }
@@ -114,6 +121,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   forceDaylight = process.env.NODE_ENV !== "test",
   isDailyChallenge = false,
   onDailyComplete,
+  onWin,
   storageSlot,
   onFloorChange,
 }) => {
@@ -1796,6 +1804,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         } else {
           router.push("/daily");
         }
+      } else if (onWin) {
+        // Custom non-daily win flow (e.g. /new tutorial → daily floor 2
+        // handoff). The parent takes responsibility for what happens next:
+        // we skip the default /end redirect and the lastGame snapshot, but
+        // still clear our own slot so a refresh can't resume a won run.
+        try {
+          if (typeof window !== "undefined") {
+            CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
+          }
+        } catch {
+          // ignore storage errors
+        }
+        onWin(gameState);
       } else {
         // Handle regular game completion
         try {
@@ -1850,6 +1871,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.stats,
     isDailyChallenge,
     onDailyComplete,
+    onWin,
     router,
     resolvedStorageSlot,
   ]);

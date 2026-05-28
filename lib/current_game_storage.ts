@@ -9,8 +9,9 @@ import { DateUtils } from "./date_utils";
 const CURRENT_GAME_KEY = "currentGame";
 const DAILY_NEW_GAME_KEY = "currentDailyNewGame";
 const STORY_GAME_KEY = "currentStoryGame";
+const TUTORIAL_GAME_KEY = "currentTutorialGame";
 
-export type GameStorageSlot = "default" | "daily-new" | "story";
+export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
@@ -18,6 +19,8 @@ function keyForSlot(slot: GameStorageSlot): string {
       return DAILY_NEW_GAME_KEY;
     case "story":
       return STORY_GAME_KEY;
+    case "tutorial":
+      return TUTORIAL_GAME_KEY;
     default:
       return CURRENT_GAME_KEY;
   }
