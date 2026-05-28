@@ -2231,8 +2231,14 @@ export function movePlayer(
           ].filter((t) => t !== TileSubtype.LOCK);
           if (isMultiTier) {
             newGameState.chestKeyCount = (newGameState.chestKeyCount ?? 1) - 1;
+          } else if (newGameState.mode === "tutorial") {
+            // Tutorial mirrors the daily-challenge "one key per chest" rule
+            // by consuming the universal hasKey flag on unlock. Story/other
+            // legacy modes deliberately keep the don't-consume behavior they
+            // rely on.
+            newGameState.hasKey = false;
           }
-          // In legacy mode, universal key is not consumed
+          // In legacy non-tutorial mode, universal key is not consumed
         }
 
         // Open the chest in place, but DO NOT grant item yet and DO NOT move the player

@@ -1,31 +1,85 @@
 // Import from leaf modules (not the ../map index) to avoid a circular import:
 // game-state.ts imports this director, and the ../map index re-exports
 // game-state.ts. Pulling types directly breaks that cycle.
-import { TileSubtype } from "../map/constants";
+import { TileSubtype, FLOOR } from "../map/constants";
 import type { GameState } from "../map/game-state";
 import { makeTutorialDialogueEvent } from "./tutorial_dialogue";
+// lib/line_of_sight has no imports, so pulling it in here is cycle-safe.
+import { canSee } from "../line_of_sight";
 // Import coordinates from the dependency-free constants module (NOT the room
 // builder) to avoid an import cycle back through the lib/map barrel.
-import {
-  TUTORIAL_ROOM_ENTER_COL,
-  TUTORIAL_CHEST_POS,
-} from "./tutorial_constants";
+import { TUTORIAL_ROOM_ENTER_COL } from "./tutorial_constants";
 
 /**
  * Beat keys tracked on `GameState.tutorialBeats` so each fires exactly once.
  */
 const BEAT_GHOST_SPOTTED = "ghost-spotted";
 const BEAT_GHOST_SNUFFED = "ghost-snuffed";
+const BEAT_LIGHT_RELIT = "light-relit";
+const BEAT_ROCK_PICKUP = "rock-pickup";
 const BEAT_GOBLIN_INTRO = "goblin-intro";
 const BEAT_GOBLIN_DEFEATED = "goblin-defeated";
 const BEAT_CHEST_LOCKED = "chest-locked";
+const BEAT_ROOM_ABOVE_ENGAGE = "room-above-engage";
+const BEAT_SWORD_PICKUP = "sword-pickup";
+const BEAT_SHIELD_PICKUP = "shield-pickup";
+const BEAT_LOW_HEALTH = "low-health";
+const BEAT_EXIT_APPROACH = "exit-approach";
+
+/**
+ * Row at which the hero is fully inside the room above (rows 1-5), past the
+ * vertical chokepoint corridor at col 15. The room-above goblins gain line of
+ * sight on the hero the moment they step out of the corridor.
+ */
+const ROOM_ABOVE_THAW_ROW = 5;
+/**
+ * Highest row that still belongs to the room-above interior. Used to scope
+ * the runtime thaw to just the enemies in that region (everything else —
+ * the goblin-room fire-goblin, the hallway ghost — has y > this).
+ */
+const ROOM_ABOVE_MAX_Y = 5;
+
+/**
+ * Distance at which an enemy starts appearing in the "Enemies in sight" HUD
+ * (see TilemapGrid.tsx — same filter is used here so the goblin-intro
+ * dialogue fires the moment the goblin appears in that HUD, not earlier).
+ */
+const HUD_SIGHT_DISTANCE = 8;
 
 /** True once no fire-goblin remains in the enemies list. */
 function goblinDefeated(state: GameState): boolean {
   return !(state.enemies ?? []).some((e) => e.kind === "fire-goblin");
 }
 
-/** Manhattan distance from the player to the nearest ghost, or Infinity. */
+/**
+ * True if there is a fire-goblin the hero can actually see — same filter the
+ * "Enemies in sight" HUD uses: clear line of sight via `canSee` plus Manhattan
+ * distance within HUD_SIGHT_DISTANCE. This matches the player's expectation
+ * that the goblin-intro dialogue fires when the goblin shows up in their HUD,
+ * not when the goblin's own AI starts pursuing from across the map.
+ */
+function fireGoblinIsInSight(
+  state: GameState,
+  playerPos: { y: number; x: number }
+): boolean {
+  for (const e of state.enemies ?? []) {
+    if (e.kind !== "fire-goblin") continue;
+    if (!canSee(state.mapData.tiles, [playerPos.y, playerPos.x], [e.y, e.x])) {
+      continue;
+    }
+    const dist = Math.abs(playerPos.y - e.y) + Math.abs(playerPos.x - e.x);
+    if (dist <= HUD_SIGHT_DISTANCE) return true;
+  }
+  return false;
+}
+
+/**
+ * Manhattan distance from the player to the nearest VISIBLE ghost, or
+ * Infinity. "Visible" here means the ghost is standing on a floor tile —
+ * ghosts inside walls (Q glyph in VISUAL_MAP) are invisible to the hero and
+ * deliberately don't count, so the "This is a ghost" dialogue waits until
+ * the ghost has actually emerged into the open.
+ */
 function nearestGhostDistance(
   state: GameState,
   playerPos: { y: number; x: number }
@@ -33,6 +87,8 @@ function nearestGhostDistance(
   let min = Infinity;
   for (const e of state.enemies ?? []) {
     if (e.kind !== "ghost") continue;
+    const tile = state.mapData.tiles[e.y]?.[e.x];
+    if (tile !== FLOOR) continue;
     const d = Math.abs(e.y - playerPos.y) + Math.abs(e.x - playerPos.x);
     if (d < min) min = d;
   }
@@ -41,7 +97,20 @@ function nearestGhostDistance(
 
 function queueDialogue(state: GameState, dialogueId: string): void {
   const queue = state.npcInteractionQueue ? [...state.npcInteractionQueue] : [];
-  queue.push(makeTutorialDialogueEvent(dialogueId, Date.now()));
+  // TilemapGrid's consumeNpcInteraction filters the queue by exact timestamp
+  // match (queue.filter(e => e.timestamp !== consumed)), so any two events
+  // queued in the same millisecond would be consumed together — dismissing
+  // one would silently eat the other. That collision is easy to hit here:
+  // multiple beats can fire on a single player turn (e.g. ghost-snuffed AND
+  // goblin-intro both firing as the ghost rushes adjacency while the goblin
+  // starts pursuing). Force strictly-increasing timestamps to keep each
+  // tutorial dialogue independently dismissable.
+  const maxTs = queue.reduce(
+    (m, e) => (e.timestamp > m ? e.timestamp : m),
+    0
+  );
+  const timestamp = Math.max(Date.now(), maxTs + 1);
+  queue.push(makeTutorialDialogueEvent(dialogueId, timestamp));
   state.npcInteractionQueue = queue;
 }
 
@@ -66,13 +135,18 @@ export function applyTutorialDirector(
 
   const beats = { ...(state.tutorialBeats ?? {}) };
 
-  // Beat: "This is a ghost." — fires when the player is one slot away from the
-  // (frozen) ghost with the torch still lit. The frozen ghost guarantees the
-  // player reaches exactly distance 2 before stepping adjacent.
+  // Beat: "This is a ghost." — fires when a ghost is within two tiles of the
+  // hero and the torch is still lit. The ghost is no longer frozen, so the
+  // relative distance can jump (player +1 east, ghost +1 west on the same
+  // turn). The `<= 2` check fires on either of those landing positions; if
+  // the ghost rushes straight into adjacency and snuffs the torch on the
+  // same turn this beat can be skipped — that's acceptable, since the
+  // ghost-snuffed beat below carries the essential "ghosts steal your light"
+  // lesson on its own.
   if (
     !beats[BEAT_GHOST_SPOTTED] &&
     state.heroTorchLit === true &&
-    nearestGhostDistance(state, playerPos) === 2
+    nearestGhostDistance(state, playerPos) <= 2
   ) {
     queueDialogue(state, "tutorial-ghost-spotted");
     beats[BEAT_GHOST_SPOTTED] = true;
@@ -85,10 +159,38 @@ export function applyTutorialDirector(
     beats[BEAT_GHOST_SNUFFED] = true;
   }
 
-  // Beat: goblin-intro dialogue once the player crosses into the wide room.
-  if (!beats[BEAT_GOBLIN_INTRO] && playerPos.x >= TUTORIAL_ROOM_ENTER_COL) {
+  // Beat: "That's better." — fires the first time the hero is back in the
+  // light after a ghost had snuffed their torch. Gated on ghost-snuffed
+  // having fired so we know the current lit state is a relight, not the
+  // initial spawn condition.
+  if (
+    !beats[BEAT_LIGHT_RELIT] &&
+    beats[BEAT_GHOST_SNUFFED] &&
+    state.heroTorchLit === true
+  ) {
+    queueDialogue(state, "tutorial-light-relit");
+    beats[BEAT_LIGHT_RELIT] = true;
+  }
+
+  // Beat: goblin-intro dialogue. Fires the moment the fire-goblin is visible
+  // to the hero — exactly the criterion the "Enemies in sight" HUD uses.
+  // The col-11 room entry remains as a fallback in case the goblin has
+  // already been defeated (or otherwise won't be seen).
+  if (
+    !beats[BEAT_GOBLIN_INTRO] &&
+    (fireGoblinIsInSight(state, playerPos) ||
+      playerPos.x >= TUTORIAL_ROOM_ENTER_COL)
+  ) {
     queueDialogue(state, "tutorial-goblin-intro");
     beats[BEAT_GOBLIN_INTRO] = true;
+  }
+
+  // Beat: rock-pickup — fires once the player has collected their first rock.
+  // Rocks are placed on the goblin room floor on the way to the fight; pickup
+  // increments rockCount during movePlayer, which runs before this hook.
+  if (!beats[BEAT_ROCK_PICKUP] && (state.rockCount ?? 0) > 0) {
+    queueDialogue(state, "tutorial-rock-pickup");
+    beats[BEAT_ROCK_PICKUP] = true;
   }
 
   // Beat: goblin-defeated dialogue once the goblin is gone (only after its
@@ -102,19 +204,87 @@ export function applyTutorialDirector(
     beats[BEAT_GOBLIN_DEFEATED] = true;
   }
 
-  // Beat: chest-locked dialogue when the player steps onto the locked chest
-  // without a key. Fires once. The chest tile keeps its LOCK subtype until the
-  // player has a key, so checking the live tile keeps this honest.
+  // Beat: room-above-engage — thaws the frozen room-above goblins the moment
+  // the player crosses into the room above proper. No dialogue any more —
+  // the previous "Two more, they've seen you" line didn't match the layout
+  // the player was actually looking at, so it's been dropped. The thaw still
+  // happens here so the goblins start pursuing on the player's next move.
+  if (
+    !beats[BEAT_ROOM_ABOVE_ENGAGE] &&
+    playerPos.y <= ROOM_ABOVE_THAW_ROW
+  ) {
+    for (const enemy of state.enemies ?? []) {
+      if (enemy.y > ROOM_ABOVE_MAX_Y) continue;
+      const memory = enemy.behaviorMemory as Record<string, unknown> | undefined;
+      if (memory && memory.frozen === true) {
+        memory.frozen = false;
+      }
+    }
+    beats[BEAT_ROOM_ABOVE_ENGAGE] = true;
+  }
+
+  // Beat: chest-locked dialogue the first time the hero steps onto ANY
+  // locked chest tile without a key. The dialogue is a generic "It's locked;
+  // you might need a key.", so firing on whichever locked chest the player
+  // encounters first is what we want — works for both the goblin-room sword
+  // chest and the room-above shield chest, in whatever order the player
+  // hits them, without anchoring to a hard-coded position.
+  const chestTile = state.mapData.subtypes[playerPos.y]?.[playerPos.x] ?? [];
   if (
     !beats[BEAT_CHEST_LOCKED] &&
-    playerPos.y === TUTORIAL_CHEST_POS[0] &&
-    playerPos.x === TUTORIAL_CHEST_POS[1] &&
-    !state.hasKey
+    !state.hasKey &&
+    chestTile.includes(TileSubtype.CHEST) &&
+    chestTile.includes(TileSubtype.LOCK)
   ) {
-    const chestTile = state.mapData.subtypes[playerPos.y]?.[playerPos.x] ?? [];
-    if (chestTile.includes(TileSubtype.LOCK)) {
-      queueDialogue(state, "tutorial-chest-locked");
-      beats[BEAT_CHEST_LOCKED] = true;
+    queueDialogue(state, "tutorial-chest-locked");
+    beats[BEAT_CHEST_LOCKED] = true;
+  }
+
+  // Beat: sword-pickup — fires the first turn the hero is carrying a sword.
+  if (!beats[BEAT_SWORD_PICKUP] && state.hasSword === true) {
+    queueDialogue(state, "tutorial-sword-pickup");
+    beats[BEAT_SWORD_PICKUP] = true;
+  }
+
+  // Beat: shield-pickup — fires the first turn the hero is carrying a shield.
+  if (!beats[BEAT_SHIELD_PICKUP] && state.hasShield === true) {
+    queueDialogue(state, "tutorial-shield-pickup");
+    beats[BEAT_SHIELD_PICKUP] = true;
+  }
+
+  // Beat: low-health — fires the first time the hero drops to 1 HP. The
+  // food/no-food variant picks the dialogue at trigger time so we don't tell
+  // a player to press F if they don't have any food yet.
+  if (!beats[BEAT_LOW_HEALTH] && state.heroHealth === 1) {
+    const hasFood = (state.foodCount ?? 0) > 0;
+    queueDialogue(
+      state,
+      hasFood ? "tutorial-low-health-with-food" : "tutorial-low-health-no-food"
+    );
+    beats[BEAT_LOW_HEALTH] = true;
+  }
+
+  // Beat: exit-approach outro — fires when the hero is standing adjacent to
+  // the exit door AND already holds the exit key (so they're about to step
+  // through, not just sightseeing). Subtype scan rather than a hard-coded
+  // position so the level designer can move the door in VISUAL_MAP without
+  // touching code.
+  if (!beats[BEAT_EXIT_APPROACH] && state.hasExitKey === true) {
+    let exitAdjacent = false;
+    outer: for (let y = 0; y < state.mapData.subtypes.length; y++) {
+      const row = state.mapData.subtypes[y];
+      for (let x = 0; x < row.length; x++) {
+        if (!row[x].includes(TileSubtype.EXIT)) continue;
+        const dist = Math.abs(playerPos.y - y) + Math.abs(playerPos.x - x);
+        if (dist === 1) {
+          exitAdjacent = true;
+          break outer;
+        }
+      }
+    }
+    if (exitAdjacent) {
+      queueDialogue(state, "tutorial-exit-approach");
+      beats[BEAT_EXIT_APPROACH] = true;
     }
   }
 

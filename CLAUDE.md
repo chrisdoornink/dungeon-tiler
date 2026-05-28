@@ -9,11 +9,14 @@ TorchBoy is a daily dungeon-crawling roguelite built with Next.js (App Router) a
 ## Key Commands
 
 ```bash
-npm run dev       # Start dev server
-npm run build     # Production build
+npm run dev       # Start dev server (port 4000)
+npm run build     # Production build — DO NOT run while dev server is up (see DO NOTs)
+npm run typecheck # tsc --noEmit — safe verification during dev, writes nothing
 npm run test      # Run Jest test suite
 npm run lint      # ESLint
 ```
+
+**During iteration, prefer `npm run typecheck` over `npm run build` for sanity checks.** Both `next dev` and `next build` write to the same `.next/` directory, so a build run while dev is up corrupts the dev server's chunk manifest and every browser refresh 404s on `_next/static/*` assets until you stop dev, `rm -rf .next`, and restart. `typecheck` catches type errors without touching `.next/`.
 
 ## Architecture
 
@@ -40,3 +43,4 @@ Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `
 - Do not modify `lib/rng.ts` without understanding downstream effects on daily seeds
 - Do not add emojis to code or comments unless already present
 - Never commit or push unless explicitly asked to in that message
+- **Do not run `npm run build` while the dev server is running.** It overwrites `.next/` with production-hashed chunks, after which the dev server keeps serving HTML referencing dev-mode chunk paths that no longer exist → every refresh 404s. Use `npm run typecheck` for in-session verification; only run `npm run build` after the user has stopped dev (e.g. right before `/ship`).

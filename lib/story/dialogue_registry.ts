@@ -109,6 +109,89 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "tutorial-rock-pickup": {
+    id: "tutorial-rock-pickup",
+    lines: [
+      {
+        speaker: "",
+        text: "A rock — handy.",
+      },
+      {
+        speaker: "",
+        text: "Press R to throw it. A short-range attack, good for hitting something before it reaches you.",
+      },
+    ],
+  },
+  "tutorial-light-relit": {
+    id: "tutorial-light-relit",
+    lines: [
+      {
+        speaker: "",
+        text: "That's better.",
+      },
+    ],
+  },
+  "tutorial-sword-pickup": {
+    id: "tutorial-sword-pickup",
+    lines: [
+      {
+        speaker: "",
+        text: "Oh yeah, now we're talking.",
+      },
+    ],
+  },
+  "tutorial-shield-pickup": {
+    id: "tutorial-shield-pickup",
+    lines: [
+      {
+        speaker: "",
+        text: "Shield: nice!",
+      },
+      {
+        speaker: "",
+        text: "This will help you take less damage, especially if any of these goblins have weapons later on.",
+      },
+    ],
+  },
+  "tutorial-low-health-no-food": {
+    id: "tutorial-low-health-no-food",
+    lines: [
+      {
+        speaker: "",
+        text: "You're barely hanging on there — you should eat some food.",
+      },
+    ],
+  },
+  "tutorial-low-health-with-food": {
+    id: "tutorial-low-health-with-food",
+    lines: [
+      {
+        speaker: "",
+        text: "You're barely hanging on there — you should eat some food.",
+      },
+      {
+        speaker: "",
+        text: "Click the food in your inventory, or tap the F key, to restore health.",
+      },
+    ],
+  },
+  "tutorial-exit-approach": {
+    id: "tutorial-exit-approach",
+    lines: [
+      {
+        speaker: "",
+        text: "Make sure you've collected all the rocks and food that you can find. You may need it up ahead.",
+      },
+      {
+        speaker: "",
+        text: "You're on your own now.",
+      },
+      {
+        speaker: "",
+        text: "Good luck out there. Two more levels to go.",
+      },
+    ],
+  },
   "elder-rowan-intro": {
     id: "elder-rowan-intro",
     lines: [
