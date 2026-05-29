@@ -8,16 +8,13 @@ import { buildTutorialState } from "../../lib/tutorial/tutorial_state";
 import { buildDailyFloor2FromTutorial } from "../../lib/tutorial/tutorial_to_daily";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { DailyChallengeStorage } from "../../lib/daily_challenge_storage";
-import { DateUtils } from "../../lib/date_utils";
 
 /**
  * `/new` — first-run / share-link entry point.
  *
  * Flow:
- *   1. Gate: if the visitor already has progress in today's daily challenge
- *      (mid-run or already completed), redirect them straight to / — the
- *      daily route. The tutorial is only for players who haven't started
- *      today's run.
+ *   1. Gate: if the visitor is a returning player (hasSeenIntro), redirect
+ *      them straight to / — the tutorial is only for brand-new players.
  *   2. Otherwise, render the tutorial map in its own storage slot
  *      ("tutorial") so saves don't collide with daily / story state.
  *   3. On tutorial win, synthesize today's floor-2 daily state with the
@@ -39,20 +36,13 @@ function NewPageInner() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // Gate 1: is there an in-progress daily run today? If so, send the
-    // player to /daily-new so they resume from where they left off.
-    const dailyInProgress = CurrentGameStorage.loadCurrentGame("daily-new");
-    if (dailyInProgress) {
-      router.replace("/");
-      return;
-    }
-
-    // Gate 2: did the player already complete today's daily? If so,
-    // /daily-new will render the "you already played today" screen.
+    // Gate: returning players go straight to the daily route. The
+    // tutorial is only for brand-new players who have never seen the
+    // intro. This also covers mid-run and already-completed cases since
+    // hasSeenIntro is always true for those players.
     try {
       const daily = DailyChallengeStorage.loadData();
-      const today = DateUtils.getTodayString();
-      if (daily.todayCompleted && daily.lastPlayedDate === today) {
+      if (daily.hasSeenIntro) {
         router.replace("/");
         return;
       }
@@ -75,6 +65,10 @@ function NewPageInner() {
         // route anyway — it will boot a normal floor 1 run.
         console.error("Tutorial-to-daily handoff failed:", err);
       }
+      // Mark the intro as seen so the daily flow goes straight to
+      // DAILY_AVAILABLE (which detects the saved game and renders it)
+      // instead of showing the first-time intro screen.
+      DailyChallengeStorage.markIntroSeen();
       router.push("/");
     },
     [router]

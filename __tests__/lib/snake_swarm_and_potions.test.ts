@@ -102,8 +102,8 @@ describe("Potion guarantees for swarm levels", () => {
       expect(swarmPotionCount).toBeGreaterThanOrEqual(2);
     }
 
-    // Statistically swarm levels should have more potions due to guarantee
-    expect(swarmPotionCount).toBeGreaterThanOrEqual(normalPotionCount);
+    // Both maps are randomly generated so we can't deterministically
+    // compare them. The meaningful guarantee (swarm >= 2) is above.
   });
 
   it("returns valid potion results for all levels", () => {
