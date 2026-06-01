@@ -8,6 +8,11 @@ import { buildTutorialState } from "../../lib/tutorial/tutorial_state";
 import { buildDailyFloor2FromTutorial } from "../../lib/tutorial/tutorial_to_daily";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { DailyChallengeStorage } from "../../lib/daily_challenge_storage";
+import {
+  markNewPlayer,
+  trackTutorialLanded,
+  trackTutorialCompleted,
+} from "../../lib/posthog_analytics";
 
 /**
  * `/new` — first-run / share-link entry point.
@@ -43,6 +48,9 @@ function NewPageInner() {
     try {
       const daily = DailyChallengeStorage.loadData();
       if (daily.hasSeenIntro) {
+        // Still count the /new hit so we know total inbound traffic, but
+        // record that this visitor was bounced to the daily.
+        trackTutorialLanded({ outcome: "redirected", reason: "returning_player" });
         router.replace("/");
         return;
       }
@@ -51,12 +59,27 @@ function NewPageInner() {
       // the tutorial — better to show the tutorial than to crash here.
     }
 
-    // Fresh tutorial run.
+    // Fresh tutorial run. Tag this person as a new player so every event
+    // they fire from here on (tutorial beats AND their later daily run) is
+    // sliceable by player_type=new_player, then record the start.
+    markNewPlayer();
+    trackTutorialLanded({ outcome: "started" });
     setInitialState(buildTutorialState());
   }, [router]);
 
   const handleTutorialWin = useCallback(
     (finalState: GameState) => {
+      // Final funnel step: the player finished the tutorial and is being
+      // merged into today's real daily run. Capture the inventory they're
+      // carrying over so we can see how well-equipped completers are.
+      trackTutorialCompleted({
+        heroHealth: finalState.heroHealth,
+        hasSword: finalState.hasSword,
+        hasShield: finalState.hasShield,
+        foodCount: finalState.foodCount,
+        rockCount: finalState.rockCount,
+      });
+
       try {
         const floor2 = buildDailyFloor2FromTutorial(finalState);
         CurrentGameStorage.saveCurrentGame(floor2, "daily-new");

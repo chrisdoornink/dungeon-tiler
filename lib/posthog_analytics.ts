@@ -23,7 +23,7 @@ function getOrCreateUserId(): string {
 // Initialize user identification
 export function identifyUser() {
   if (typeof window === 'undefined') return;
-  
+
   try {
     const userId = getOrCreateUserId();
     posthog.identify(userId, {
@@ -32,6 +32,34 @@ export function identifyUser() {
     });
   } catch (error) {
     console.warn('PostHog identify failed:', error);
+  }
+}
+
+/**
+ * Tag this person as a "new player" who entered through the /new tutorial.
+ *
+ * Sets BOTH:
+ *   - a super property (posthog.register) so `player_type=new_player` rides
+ *     on every subsequent event this person fires — including their later
+ *     daily `game_start` / `game_complete` — letting us slice the entire
+ *     reporting tree by who came in through the tutorial.
+ *   - a person property so the flag survives in PostHog for cohort / funnel
+ *     filtering even across devices once identified.
+ *
+ * `first_tutorial_at` is set-once so re-entries don't overwrite the original
+ * acquisition timestamp.
+ */
+export function markNewPlayer() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    posthog.register({ player_type: 'new_player' });
+    posthog.setPersonProperties(
+      { player_type: 'new_player', entered_via_tutorial: true },
+      { first_tutorial_at: new Date().toISOString() }
+    );
+  } catch (error) {
+    console.warn('PostHog markNewPlayer failed:', error);
   }
 }
 
@@ -147,5 +175,86 @@ export function trackFeedback(params: {
     message: params.message,
     email: params.email,
     url: params.url,
+  });
+}
+
+// --- Tutorial funnel ---------------------------------------------------------
+//
+// The /new tutorial funnel in PostHog is built from three event types:
+//   1. tutorial_landed (outcome=started)  — player kept on /new, tutorial began
+//   2. tutorial_beat (one per dialogue)    — each scripted beat they reach
+//   3. tutorial_completed                  — finished tutorial, handed to daily
+//
+// Returning / non-new players that hit /new fire tutorial_landed
+// (outcome=redirected) so we can still count total /new traffic.
+
+/**
+ * Canonical order of tutorial beats for funnel step numbering. The real
+ * play order isn't strictly linear (rock / chest / sword / shield can vary by
+ * route), so `beat_step` is a best-effort ordinal — PostHog funnels can also
+ * just key off `beat` directly when order matters less than reach.
+ */
+const TUTORIAL_BEAT_ORDER: string[] = [
+  'welcome',
+  'ghost-spotted',
+  'ghost-snuffed',
+  'light-relit',
+  'goblin-intro',
+  'rock-pickup',
+  'goblin-defeated',
+  'chest-locked',
+  'sword-pickup',
+  'shield-pickup',
+  'low-health',
+  'exit-approach',
+];
+
+/** Strip the `tutorial-` prefix and collapse the two low-health variants. */
+function normalizeTutorialBeat(dialogueId: string): string {
+  const base = dialogueId.replace(/^tutorial-/, '');
+  if (base === 'low-health-no-food' || base === 'low-health-with-food') {
+    return 'low-health';
+  }
+  return base;
+}
+
+export function trackTutorialLanded(params: {
+  outcome: 'started' | 'redirected';
+  reason?: string;
+}) {
+  captureEvent('tutorial_landed', {
+    outcome: params.outcome,
+    reason: params.reason,
+  });
+}
+
+/**
+ * Fire once per scripted dialogue the player actually reaches. Called the
+ * moment the queued dialogue becomes the active session (i.e. they got that
+ * far), so each event marks real progress through the tutorial.
+ */
+export function trackTutorialBeat(dialogueId: string) {
+  const beat = normalizeTutorialBeat(dialogueId);
+  const idx = TUTORIAL_BEAT_ORDER.indexOf(beat);
+  captureEvent('tutorial_beat', {
+    beat,
+    dialogue_id: dialogueId,
+    beat_step: idx >= 0 ? idx + 1 : undefined,
+  });
+}
+
+export function trackTutorialCompleted(params?: {
+  heroHealth?: number;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  foodCount?: number;
+  rockCount?: number;
+}) {
+  captureEvent('tutorial_completed', {
+    hero_health: params?.heroHealth,
+    has_sword: params?.hasSword,
+    has_shield: params?.hasShield,
+    food_count: params?.foodCount,
+    rock_count: params?.rockCount,
   });
 }

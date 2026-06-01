@@ -61,6 +61,7 @@ import {
   type DialogueLine,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
+import { trackTutorialBeat } from "../lib/posthog_analytics";
 import { createInitialStoryFlags, type StoryEffect } from "../lib/story/event_registry";
 import { performExchange } from "../lib/story/exchange_registry";
 import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
@@ -1457,6 +1458,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       dialogueId,
       consumedScriptIds: [dialogueId],
     });
+    // Tutorial funnel: a scripted beat just became visible, meaning the
+    // player reached this far. Fires once per dialogue since the queue
+    // entry is consumed immediately below.
+    if (dialogueId.startsWith("tutorial-")) {
+      trackTutorialBeat(dialogueId);
+    }
     setSelectedChoiceIndex(0);
     consumeNpcInteraction(nextEvent.timestamp);
     resetDialogue();
