@@ -23,6 +23,7 @@ const BEAT_CHEST_LOCKED = "chest-locked";
 const BEAT_SWORD_PICKUP = "sword-pickup";
 const BEAT_SHIELD_PICKUP = "shield-pickup";
 const BEAT_LOW_HEALTH = "low-health";
+const BEAT_EXIT_LOCKED = "exit-locked";
 const BEAT_EXIT_APPROACH = "exit-approach";
 
 /**
@@ -79,6 +80,29 @@ function nearestGhostDistance(
     if (d < min) min = d;
   }
   return min;
+}
+
+/**
+ * True if the hero is standing directly adjacent (Manhattan distance 1) to an
+ * EXIT door tile. Subtype scan rather than a hard-coded position so the level
+ * designer can move the door in VISUAL_MAP without touching code. Without the
+ * exit key the EXIT tile blocks movement (see game-state.ts), so the hero ends
+ * up adjacent rather than on it — distance 1 is the right trigger for both the
+ * locked-hint and the with-key outro beats.
+ */
+function isAdjacentToExit(
+  state: GameState,
+  playerPos: { y: number; x: number }
+): boolean {
+  for (let y = 0; y < state.mapData.subtypes.length; y++) {
+    const row = state.mapData.subtypes[y];
+    for (let x = 0; x < row.length; x++) {
+      if (!row[x].includes(TileSubtype.EXIT)) continue;
+      const dist = Math.abs(playerPos.y - y) + Math.abs(playerPos.x - x);
+      if (dist === 1) return true;
+    }
+  }
+  return false;
 }
 
 function queueDialogue(state: GameState, dialogueId: string): void {
@@ -243,28 +267,28 @@ export function applyTutorialDirector(
     beats[BEAT_LOW_HEALTH] = true;
   }
 
+  // Beat: exit-locked hint — fires when the hero reaches the exit door
+  // WITHOUT the exit key. The door blocks them, so this nudges them to go
+  // find the key rather than getting stuck wondering why it won't open.
+  if (
+    !beats[BEAT_EXIT_LOCKED] &&
+    state.hasExitKey !== true &&
+    isAdjacentToExit(state, playerPos)
+  ) {
+    queueDialogue(state, "tutorial-exit-locked");
+    beats[BEAT_EXIT_LOCKED] = true;
+  }
+
   // Beat: exit-approach outro — fires when the hero is standing adjacent to
   // the exit door AND already holds the exit key (so they're about to step
-  // through, not just sightseeing). Subtype scan rather than a hard-coded
-  // position so the level designer can move the door in VISUAL_MAP without
-  // touching code.
-  if (!beats[BEAT_EXIT_APPROACH] && state.hasExitKey === true) {
-    let exitAdjacent = false;
-    outer: for (let y = 0; y < state.mapData.subtypes.length; y++) {
-      const row = state.mapData.subtypes[y];
-      for (let x = 0; x < row.length; x++) {
-        if (!row[x].includes(TileSubtype.EXIT)) continue;
-        const dist = Math.abs(playerPos.y - y) + Math.abs(playerPos.x - x);
-        if (dist === 1) {
-          exitAdjacent = true;
-          break outer;
-        }
-      }
-    }
-    if (exitAdjacent) {
-      queueDialogue(state, "tutorial-exit-approach");
-      beats[BEAT_EXIT_APPROACH] = true;
-    }
+  // through, not just sightseeing).
+  if (
+    !beats[BEAT_EXIT_APPROACH] &&
+    state.hasExitKey === true &&
+    isAdjacentToExit(state, playerPos)
+  ) {
+    queueDialogue(state, "tutorial-exit-approach");
+    beats[BEAT_EXIT_APPROACH] = true;
   }
 
   state.tutorialBeats = beats;

@@ -175,6 +175,15 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
     ],
   },
+  "tutorial-exit-locked": {
+    id: "tutorial-exit-locked",
+    lines: [
+      {
+        speaker: "",
+        text: "Looks like you may need a special key to get out. Must be somewhere around here...",
+      },
+    ],
+  },
   "tutorial-exit-approach": {
     id: "tutorial-exit-approach",
     lines: [
