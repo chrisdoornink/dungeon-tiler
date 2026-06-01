@@ -26,11 +26,13 @@ export {
  *     W  ghost              G  fire-goblin       p  food pot
  *     d  door               t  torch
  *
+ *   (G spawns frozen; thaws when the goblin-intro dialogue fires on sight.)
+ *
  * Tutorial-specific glyphs (interpreted by the post-pass below — the shared
  * parser sees them all as plain floor):
  *
- *     g  earth-goblin (spawned frozen; thaws on room-above entry)
- *     u  water-goblin (spawned frozen; thaws on room-above entry)
+ *     g  earth-goblin (active from spawn — pursues like a normal enemy)
+ *     u  water-goblin (active from spawn — pursues like a normal enemy)
  *     j  key (universal — unlocks the next locked chest the hero steps on)
  *     x  locked treasure chest containing a SWORD
  *     y  locked treasure chest containing a SHIELD
@@ -47,8 +49,8 @@ export {
  * ## Regions
  *
  *   - "Room above" (rows 1-5): a wide horizontal hall stretching most of
- *     the way across the level. Holds the two frozen goblins, the locked
- *     shield chest, the key for it, the floor sword, rocks, and food pots.
+ *     the way across the level. Holds the two goblins, the locked shield
+ *     chest, the key for it, the floor sword, rocks, and food pots.
  *   - Descent (rows 6-12): geometry varies — currently has two branching
  *     corridors and a ghost guarding one of them. The hero must thread it
  *     to reach the goblin room below.
@@ -63,11 +65,11 @@ const VISUAL_MAP = [
   // Row 0  — top wall
   "# w # # # # # # # # # # # # # # # # # # # # # # # #",
   // Rows 1-5 — room above
-  "# y . . . . . . g . . . . . . . . # c . . . W # # #",
-  "# . . . . . . . . . . . # . . . . . # # # u . # # #",
-  "# . . j . . . o . . . . . . . . . . o . . . . # # #",
-  "# . . . l . . . . o . . . . . . . # . . p p . # # #",
-  "# . . . . . o . . . . . . . . . . . . . p p . # # #",
+  "# y . . . . . . g . . . # . . . . # c . . . . # # #",
+  "# . . . . . . . . . . . # . . . . # # # # u . # # #",
+  "# . . j . # # o . . # . . . . . . . o . . . . # # #",
+  "# . . . l . . . . o # # . . . . . # . . p p . # # #",
+  "# . . . . . o . . . . # . . . . . . . . p p . # # #",
   // Rows 6-12 — descent corridors
   "# # . . . . # # # . . . . # # . # # # # # . # # # #",
   "# # # w . . w # # # . . . . # . # # # # # . . . # #",
@@ -79,10 +81,10 @@ const VISUAL_MAP = [
   // Rows 13-15 — goblin room, hallway, key room
   "# # # # # Q # w # # # . . . . . . . . . . # t . t #",
   "# . . . . . . . . . . . . . . . G . . o . . . j . #",
-  "# # # # # # # # # # # . . . . . o . . . . # t . t #",
+  "# # # # # # # # # # # . . . . . o . . . # # t . t #",
   // Rows 16-17 — goblin room bottom
-  "# # # # # # # # # # # . . o . . . . . . . # # # # #",
-  "# # # # # # # # # # # . . . . o . . . . . # # # # #",
+  "# # # # # # # # # # # # . o . . . . . . # # # # # #",
+  "# # # # # # # # # # # # # . . o . . . # # # # # # #",
   // Row 18 — bottom wall
   "# # # # # # # # # # # # # # # # # # # # # # # # # #",
 ];
@@ -132,11 +134,20 @@ export function buildTutorialOpeningRoom(): StoryRoom {
   const parsed = parseVisualMap(VISUAL_MAP, ROOM_WIDTH, ROOM_HEIGHT);
 
   // --- Enemies from the parsed map (W → ghost, G → fire-goblin) ---
-  // No freeze on these — the hallway/descent ghost and the goblin-room
-  // fire-goblin both advance on the hero like normal enemies.
+  // The goblin-room fire-goblin spawns FROZEN: row 14 is a straight open
+  // corridor back to the hero's spawn, so an unfrozen goblin would pursue,
+  // close the distance, and pop into sight range while the hero is still in
+  // the ghost-snuff / torch-relight zone — firing its intro dialogue
+  // mid-relight. Frozen, it stays put at the far end of the goblin room and
+  // can't be seen until the hero is well past the relight. The director
+  // thaws it when the goblin-intro beat fires (on sight). Ghosts are NOT
+  // frozen — they must advance to snuff the torch (the ghost lesson).
   const enemies: Enemy[] = parsed.enemies.map(({ y, x, kind }) => {
     const e = new Enemy({ y, x });
     e.kind = PARSER_KIND_MAP[kind] ?? "ghost";
+    if (e.kind === "fire-goblin") {
+      (e.behaviorMemory as Record<string, unknown>)["frozen"] = true;
+    }
     return e;
   });
 
@@ -188,14 +199,12 @@ export function buildTutorialOpeningRoom(): StoryRoom {
         case "g": {
           const eg = new Enemy({ y, x });
           eg.kind = "earth-goblin";
-          (eg.behaviorMemory as Record<string, unknown>)["frozen"] = true;
           enemies.push(eg);
           break;
         }
         case "u": {
           const wg = new Enemy({ y, x });
           wg.kind = "water-goblin";
-          (wg.behaviorMemory as Record<string, unknown>)["frozen"] = true;
           enemies.push(wg);
           break;
         }

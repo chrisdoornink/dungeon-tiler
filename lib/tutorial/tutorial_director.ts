@@ -20,24 +20,10 @@ const BEAT_ROCK_PICKUP = "rock-pickup";
 const BEAT_GOBLIN_INTRO = "goblin-intro";
 const BEAT_GOBLIN_DEFEATED = "goblin-defeated";
 const BEAT_CHEST_LOCKED = "chest-locked";
-const BEAT_ROOM_ABOVE_ENGAGE = "room-above-engage";
 const BEAT_SWORD_PICKUP = "sword-pickup";
 const BEAT_SHIELD_PICKUP = "shield-pickup";
 const BEAT_LOW_HEALTH = "low-health";
 const BEAT_EXIT_APPROACH = "exit-approach";
-
-/**
- * Row at which the hero is fully inside the room above (rows 1-5), past the
- * vertical chokepoint corridor at col 15. The room-above goblins gain line of
- * sight on the hero the moment they step out of the corridor.
- */
-const ROOM_ABOVE_THAW_ROW = 5;
-/**
- * Highest row that still belongs to the room-above interior. Used to scope
- * the runtime thaw to just the enemies in that region (everything else —
- * the goblin-room fire-goblin, the hallway ghost — has y > this).
- */
-const ROOM_ABOVE_MAX_Y = 5;
 
 /**
  * Distance at which an enemy starts appearing in the "Enemies in sight" HUD
@@ -175,13 +161,22 @@ export function applyTutorialDirector(
   // Beat: goblin-intro dialogue. Fires the moment the fire-goblin is visible
   // to the hero — exactly the criterion the "Enemies in sight" HUD uses.
   // The col-11 room entry remains as a fallback in case the goblin has
-  // already been defeated (or otherwise won't be seen).
+  // already been defeated (or otherwise won't be seen). The goblin spawns
+  // frozen (see rooms/opening_room.ts); thaw it here so it starts pursuing
+  // now that it's been introduced and the player has been told to engage.
   if (
     !beats[BEAT_GOBLIN_INTRO] &&
     (fireGoblinIsInSight(state, playerPos) ||
       playerPos.x >= TUTORIAL_ROOM_ENTER_COL)
   ) {
     queueDialogue(state, "tutorial-goblin-intro");
+    for (const enemy of state.enemies ?? []) {
+      if (enemy.kind !== "fire-goblin") continue;
+      const memory = enemy.behaviorMemory as Record<string, unknown> | undefined;
+      if (memory && memory.frozen === true) {
+        memory.frozen = false;
+      }
+    }
     beats[BEAT_GOBLIN_INTRO] = true;
   }
 
@@ -204,24 +199,8 @@ export function applyTutorialDirector(
     beats[BEAT_GOBLIN_DEFEATED] = true;
   }
 
-  // Beat: room-above-engage — thaws the frozen room-above goblins the moment
-  // the player crosses into the room above proper. No dialogue any more —
-  // the previous "Two more, they've seen you" line didn't match the layout
-  // the player was actually looking at, so it's been dropped. The thaw still
-  // happens here so the goblins start pursuing on the player's next move.
-  if (
-    !beats[BEAT_ROOM_ABOVE_ENGAGE] &&
-    playerPos.y <= ROOM_ABOVE_THAW_ROW
-  ) {
-    for (const enemy of state.enemies ?? []) {
-      if (enemy.y > ROOM_ABOVE_MAX_Y) continue;
-      const memory = enemy.behaviorMemory as Record<string, unknown> | undefined;
-      if (memory && memory.frozen === true) {
-        memory.frozen = false;
-      }
-    }
-    beats[BEAT_ROOM_ABOVE_ENGAGE] = true;
-  }
+  // (The room-above goblins are no longer frozen — they pursue from spawn —
+  // so there's no thaw beat for them here any more.)
 
   // Beat: chest-locked dialogue the first time the hero steps onto ANY
   // locked chest tile without a key. The dialogue is a generic "It's locked;
