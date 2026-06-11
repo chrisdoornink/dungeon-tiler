@@ -513,14 +513,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           : [];
         
         const leaderEntry = allSwarmMembers.length > 0 ? allSwarmMembers[0] : null;
-        const isLeader = leaderEntry ? leaderEntry.index === ctx.enemyIndex : true;
         const leader = leaderEntry ? leaderEntry.enemy : null;
 
-        // Find distances to leader and nearest mate
-        const leaderDist = leader && !isLeader
-          ? Math.abs(leader.y - e.y) + Math.abs(leader.x - e.x)
-          : 0;
-        
         let nearestMate: { y: number; x: number } | null = null;
         let nearestMateDist = Infinity;
         for (const m of swarmMates) {
@@ -538,7 +532,20 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           } else {
             e.facing = py > e.y ? "DOWN" : "UP";
           }
-          return e.attack;
+          // Strength in numbers: count living swarm-mates also pressed against
+          // the player (cardinally adjacent). A lone white goblin is a minor
+          // threat; every extra body on the player makes the whole pack bite
+          // harder.
+          const flankers = swarmMates.filter(
+            (m) =>
+              m.health > 0 &&
+              Math.abs(m.y - py) + Math.abs(m.x - px) === 1
+          ).length;
+          // Base 2 (up from 1) so stragglers aren't trivial, +1 per flanking
+          // mate (capped at +2). The engine still applies +/-1 variance, shield,
+          // and the 4-damage/turn cap on top, so a full surround reliably maxes
+          // a turn while a lone goblin stays survivable.
+          return 2 + Math.min(flankers, 2);
         }
 
         // Vision check
@@ -584,109 +591,86 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return false;
         };
 
-        // LEADER BEHAVIOR: Chase player with occasional pauses to let swarm catch up
-        if (isLeader && seesPlayer) {
+        // ENGAGED: surround the player instead of trailing in single file.
+        // The old behavior made followers chase the leader, so the swarm strung
+        // out in a line and only the front goblin ever reached the hero. Now
+        // each member makes for the nearest open tile beside the player; once a
+        // side is taken the others claim the remaining sides, and a member with
+        // nowhere open piles onto a held side so it keeps attacking. Every step
+        // only ever closes the gap, so they tighten the noose instead of milling
+        // around.
+        const leaderSeesPlayer = leader
+          ? withinRange && canSee(grid, [leader.y, leader.x], [py, px])
+          : false;
+        if (seesPlayer || leaderSeesPlayer) {
           faceToward(py, px);
-          
-          // Check if swarm is too spread out (any member >2 tiles away)
-          const maxSwarmDist = swarmMates.reduce((max, m) => {
-            const d = Math.abs(m.y - e.y) + Math.abs(m.x - e.x);
-            return Math.max(max, d);
-          }, 0);
-          
-          // If swarm is spread out (>2 tiles), pause 40% of the time to let them catch up
-          if (maxSwarmDist > 2 && rng() < 0.4) {
-            // Stay in place this turn (let followers catch up)
-            return 0;
-          }
-          
-          // Otherwise pursue player with some variation
-          const tacticRoll = rng();
-          if (tacticRoll < 0.7) {
-            // 70%: Direct pursuit
-            stepToward(py, px);
-          } else {
-            // 30%: Slight variation (adjacent move that doesn't increase distance much)
-            const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
-              [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
+
+          const mateOn = (yy: number, xx: number) =>
+            swarmMates.some((m) => m.y === yy && m.x === xx);
+
+          // Step one tile toward (ty,tx), taking only moves that strictly reduce
+          // the distance to it (so a goblin can never oscillate back and forth).
+          // With allowStack false it refuses to share a mate's tile, which keeps
+          // the pack spreading; with it true it may pile on to reach the player.
+          const stepCloser = (
+            ty: number,
+            tx: number,
+            allowStack: boolean
+          ): boolean => {
+            const curDist = Math.abs(ty - e.y) + Math.abs(tx - e.x);
+            if (curDist === 0) return false;
+            const opts: Array<[number, number]> = [
+              [-1, 0],
+              [1, 0],
+              [0, -1],
+              [0, 1],
             ];
-            for (let i = dirs.length - 1; i > 0; i--) {
-              const j = Math.floor(rng() * (i + 1));
-              [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-            }
-            let moved = false;
-            for (const [dy, dx, face] of dirs) {
+            for (const [dy, dx] of opts) {
               const ny = e.y + dy;
               const nx = e.x + dx;
-              if (ny === py && nx === px) continue;
+              if (ny === py && nx === px) continue; // never the player's tile
+              if (Math.abs(ty - ny) + Math.abs(tx - nx) >= curDist) continue; // must close in
               if (!isFloor(ny, nx)) continue;
-              const newDist = Math.abs(ny - py) + Math.abs(nx - px);
-              if (newDist > manhattan + 1) continue; // don't move away from player
+              if (!allowStack && mateOn(ny, nx)) continue; // don't pile while flanking
+              e.facing =
+                dx !== 0 ? (dx > 0 ? "RIGHT" : "LEFT") : dy > 0 ? "DOWN" : "UP";
               e.y = ny;
               e.x = nx;
-              e.facing = face;
               e.memory.moved = true;
-              moved = true;
+              return true;
+            }
+            return false;
+          };
+
+          // Open floor tiles beside the player, nearest to this goblin first.
+          const slots = (
+            [
+              [py - 1, px],
+              [py + 1, px],
+              [py, px - 1],
+              [py, px + 1],
+            ] as Array<[number, number]>
+          )
+            .filter(([sy, sx]) => isFloor(sy, sx))
+            .sort(
+              (a, b) =>
+                Math.abs(a[0] - e.y) +
+                Math.abs(a[1] - e.x) -
+                (Math.abs(b[0] - e.y) + Math.abs(b[1] - e.x))
+            );
+
+          // Claim the nearest reachable open flank; if every flank is blocked,
+          // pile onto a held side so this goblin still presses the player.
+          let advanced = false;
+          for (const [sy, sx] of slots) {
+            if (mateOn(sy, sx)) continue; // taken side -- let a mate have it
+            if (stepCloser(sy, sx, false)) {
+              advanced = true;
               break;
             }
-            if (!moved) stepToward(py, px);
           }
+          if (!advanced) stepCloser(py, px, true);
           return 0;
-        }
-
-        // NON-LEADER BEHAVIOR: Prioritize following leader over chasing player
-        if (!isLeader && leader) {
-          // If leader can see player, non-leaders focus on staying near leader
-          const leaderSeesPlayer = leader && withinRange && canSee(grid, [leader.y, leader.x], [py, px]);
-          
-          if (leaderSeesPlayer || seesPlayer) {
-            // During combat: >60% chance to move toward leader, <40% toward player
-            const followLeader = rng() < 0.65;
-            
-            if (followLeader && leaderDist > 0) {
-              // Move toward leader to maintain swarm cohesion
-              faceToward(leader.y, leader.x);
-              stepToward(leader.y, leader.x);
-            } else if (leaderDist <= 2) {
-              // Already close to leader, can pursue player with variation
-              faceToward(py, px);
-              const tacticRoll = rng();
-              if (tacticRoll < 0.5) {
-                stepToward(py, px);
-              } else {
-                // Move adjacent to leader's position for flanking
-                const dirs: Array<[number, number, "UP"|"RIGHT"|"DOWN"|"LEFT"]> = [
-                  [-1, 0, "UP"], [1, 0, "DOWN"], [0, -1, "LEFT"], [0, 1, "RIGHT"],
-                ];
-                for (let i = dirs.length - 1; i > 0; i--) {
-                  const j = Math.floor(rng() * (i + 1));
-                  [dirs[i], dirs[j]] = [dirs[j], dirs[i]];
-                }
-                let moved = false;
-                for (const [dy, dx, face] of dirs) {
-                  const ny = e.y + dy;
-                  const nx = e.x + dx;
-                  if (ny === py && nx === px) continue;
-                  if (!isFloor(ny, nx)) continue;
-                  // Prefer staying near leader
-                  const distToLeader = Math.abs(ny - leader.y) + Math.abs(nx - leader.x);
-                  if (distToLeader > 2) continue;
-                  e.y = ny;
-                  e.x = nx;
-                  e.facing = face;
-                  e.memory.moved = true;
-                  moved = true;
-                  break;
-                }
-                if (!moved) stepToward(py, px);
-              }
-            } else {
-              // Too far from leader, regroup
-              faceToward(leader.y, leader.x);
-              stepToward(leader.y, leader.x);
-            }
-            return 0;
-          }
         }
 
         // Not in combat: regroup with swarm

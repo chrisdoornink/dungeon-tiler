@@ -79,7 +79,7 @@ function buildGoblinTestRoom(): GameState {
     hasKey: false,
     hasExitKey: false,
     hasSword: true,
-    hasShield: false,
+    hasShield: true,
     showFullMap: true,
     win: false,
     playerDirection: Direction.DOWN,
@@ -126,7 +126,7 @@ function TestGoblinsInner() {
           </p>
           <div className="text-xs text-gray-400 mt-2 space-y-1">
             <p>⬜ White Goblin: 1 HP, 1 ATK each (4 AP combined per swarm)</p>
-            <p>Hero: 5 HP, 1 ATK + Sword (+2)</p>
+            <p>Hero: 5 HP, 1 ATK + Sword (+2) + Shield (-1 dmg)</p>
           </div>
         </div>
         <TilemapGrid
