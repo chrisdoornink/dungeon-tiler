@@ -1,4 +1,4 @@
-export type EnvironmentId = "cave" | "outdoor" | "house";
+export type EnvironmentId = "cave" | "outdoor" | "house" | "pink_realm";
 
 export const DEFAULT_ENVIRONMENT: EnvironmentId = "cave";
 
@@ -31,6 +31,13 @@ const ENVIRONMENT_CONFIGS: Record<EnvironmentId, EnvironmentConfig> = {
     floorNorthEdge: "/images/floor/in-house-floor-1000.png",
     wallPrefix: "/images/wall/outdoor-wall-",
     daylight: true,
+  },
+  pink_realm: {
+    id: "pink_realm",
+    floorDefault: "/images/floor/pink-realm-floor.png",
+    floorNorthEdge: "/images/floor/pink-realm-floor-1000.png",
+    wallPrefix: "/images/wall/pink-realm-wall-",
+    daylight: false,
   },
 };
 

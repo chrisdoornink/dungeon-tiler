@@ -68,6 +68,7 @@ import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
 import { FloorTransition } from "./FloorTransition";
+import { PinkRealmSparkles } from "./PinkRealmSparkles";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -3082,6 +3083,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     : "none",
                 }}
               >
+                {environment === "pink_realm" && (
+                  <PinkRealmSparkles tiles={gameState.mapData.tiles} />
+                )}
                 {/* Death vignette overlay - darkens everything except spotlight on hero */}
                 {shouldAnimateHeroDeath && heroDeathPhase !== "idle" && heroDeathPhase !== "complete" && heroDeathPositionRef.current && (
                   <div

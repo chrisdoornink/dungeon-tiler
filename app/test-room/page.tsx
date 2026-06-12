@@ -96,7 +96,7 @@ function createRoomOne(): BuiltRoom {
     TileSubtype.ROOM_TRANSITION,
   ];
 
-  const mapData: MapData = { tiles, subtypes } as MapData;
+  const mapData: MapData = { tiles, subtypes, environment: "pink_realm" } as MapData;
   const snapshot = cloneMap(mapData);
 
   subtypes[centerY][centerX] = [TileSubtype.PLAYER];
