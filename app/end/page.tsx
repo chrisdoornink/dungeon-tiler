@@ -205,7 +205,7 @@ export default function EndPage() {
         <h1 className="text-2xl font-semibold mb-2 text-gray-100">{title}</h1>
         <p className="text-gray-200 mb-3">{subtitle} {new Date(last.completedAt).toLocaleString()}</p>
         {levelReached != null && (
-          <p className="text-sm text-gray-400 mb-3">Reached Level {levelReached}</p>
+          <p className="text-sm text-gray-400 mb-3">{last.outcome === 'win' ? 'Completed' : 'Reached'} Level {levelReached}</p>
         )}
 
         {/* Death cause specific subtitle with image */}

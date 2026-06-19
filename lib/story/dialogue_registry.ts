@@ -50,6 +50,10 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
         speaker: "",
         text: "Welcome to TorchBoy. You're a boy with a torch.",
       },
+      {
+        speaker: "",
+        text: "Use the arrow keys (or the on-screen controls) to move around.",
+      },
     ],
   },
   "tutorial-ghost-spotted": {

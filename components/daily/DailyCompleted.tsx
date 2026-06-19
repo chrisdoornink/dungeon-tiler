@@ -421,7 +421,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
             </p>
             {lastGame?.currentFloor != null && (
               <p className="text-sm text-gray-400 text-center mt-2">
-                Reached Level {lastGame.currentFloor}
+                {isWin ? "Completed" : "Reached"} Level {lastGame.currentFloor}
               </p>
             )}
             <p className="text-sm text-gray-300 text-center mt-4">

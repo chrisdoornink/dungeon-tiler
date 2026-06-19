@@ -18,6 +18,12 @@ const BEAT_GHOST_SNUFFED = "ghost-snuffed";
 const BEAT_LIGHT_RELIT = "light-relit";
 const BEAT_ROCK_PICKUP = "rock-pickup";
 const BEAT_GOBLIN_INTRO = "goblin-intro";
+// Internal one-step delay flag: the goblin-intro trigger (HUD sight, distance
+// <= 8) can be met a step before the goblin is actually drawn in the hero's
+// torchlight. We "arm" on the step the trigger is first met and fire the
+// dialogue on the following director call so the line lands when the goblin
+// is visible on screen.
+const BEAT_GOBLIN_INTRO_ARMED = "goblin-intro-armed";
 const BEAT_GOBLIN_DEFEATED = "goblin-defeated";
 const BEAT_CHEST_LOCKED = "chest-locked";
 const BEAT_SWORD_PICKUP = "sword-pickup";
@@ -182,26 +188,32 @@ export function applyTutorialDirector(
     beats[BEAT_LIGHT_RELIT] = true;
   }
 
-  // Beat: goblin-intro dialogue. Fires the moment the fire-goblin is visible
-  // to the hero — exactly the criterion the "Enemies in sight" HUD uses.
-  // The col-11 room entry remains as a fallback in case the goblin has
-  // already been defeated (or otherwise won't be seen). The goblin spawns
-  // frozen (see rooms/opening_room.ts); thaw it here so it starts pursuing
-  // now that it's been introduced and the player has been told to engage.
-  if (
-    !beats[BEAT_GOBLIN_INTRO] &&
-    (fireGoblinIsInSight(state, playerPos) ||
-      playerPos.x >= TUTORIAL_ROOM_ENTER_COL)
-  ) {
-    queueDialogue(state, "tutorial-goblin-intro");
-    for (const enemy of state.enemies ?? []) {
-      if (enemy.kind !== "fire-goblin") continue;
-      const memory = enemy.behaviorMemory as Record<string, unknown> | undefined;
-      if (memory && memory.frozen === true) {
-        memory.frozen = false;
+  // Beat: goblin-intro dialogue. The trigger — the fire-goblin entering the
+  // "Enemies in sight" HUD (canSee + distance <= 8), or the col-11 room entry
+  // fallback in case the goblin won't be seen — can be met one step before the
+  // goblin is actually rendered in the hero's torchlight, making the "A goblin!"
+  // line land while the screen is still empty. So we arm on the step the trigger
+  // is first met and fire on the NEXT director call, lining the dialogue up with
+  // the goblin appearing on screen. The goblin spawns frozen (see
+  // rooms/opening_room.ts) and stays frozen across the armed step; we thaw it
+  // when the intro actually fires.
+  if (!beats[BEAT_GOBLIN_INTRO]) {
+    if (beats[BEAT_GOBLIN_INTRO_ARMED]) {
+      queueDialogue(state, "tutorial-goblin-intro");
+      for (const enemy of state.enemies ?? []) {
+        if (enemy.kind !== "fire-goblin") continue;
+        const memory = enemy.behaviorMemory as Record<string, unknown> | undefined;
+        if (memory && memory.frozen === true) {
+          memory.frozen = false;
+        }
       }
+      beats[BEAT_GOBLIN_INTRO] = true;
+    } else if (
+      fireGoblinIsInSight(state, playerPos) ||
+      playerPos.x >= TUTORIAL_ROOM_ENTER_COL
+    ) {
+      beats[BEAT_GOBLIN_INTRO_ARMED] = true;
     }
-    beats[BEAT_GOBLIN_INTRO] = true;
   }
 
   // Beat: rock-pickup — fires once the player has collected their first rock.

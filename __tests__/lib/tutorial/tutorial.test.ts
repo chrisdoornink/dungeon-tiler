@@ -177,24 +177,33 @@ describe("applyTutorialDirector", () => {
     expect(dialogueIds(s)).toHaveLength(0);
   });
 
-  it("fires goblin-intro and thaws the goblin when it comes into sight", () => {
+  it("arms goblin-intro on first sight, then fires and thaws on the next step", () => {
     const s = baseState();
     s.mapData = floorMap(1, 10);
     const g = fireGoblin(0, 4, true);
     s.enemies = [g];
+    // First step in sight: arm only — no dialogue yet, goblin stays frozen so
+    // the "A goblin!" line waits until he's actually drawn on screen.
+    applyTutorialDirector(s, { y: 0, x: 1 });
+    expect(dialogueIds(s)).not.toContain("tutorial-goblin-intro");
+    expect(s.tutorialBeats?.["goblin-intro"]).not.toBe(true);
+    expect(g.behaviorMemory["frozen"]).toBe(true);
+    // Next director call: fire the intro and thaw the goblin.
     applyTutorialDirector(s, { y: 0, x: 1 });
     expect(dialogueIds(s)).toContain("tutorial-goblin-intro");
     expect(s.tutorialBeats?.["goblin-intro"]).toBe(true);
     expect(g.behaviorMemory["frozen"]).toBe(false);
   });
 
-  it("fires goblin-intro via the room-entry fallback even out of sight", () => {
+  it("arms then fires goblin-intro via the room-entry fallback even out of sight", () => {
     const s = baseState();
     s.mapData = floorMap(1, 26);
     // Goblin parked far away (distance > HUD sight) so the fallback path is
     // what triggers; it stays alive so goblin-defeated can't also fire.
     s.enemies = [fireGoblin(0, 25, true)];
-    applyTutorialDirector(s, { y: 0, x: TUTORIAL_ROOM_ENTER_COL });
+    applyTutorialDirector(s, { y: 0, x: TUTORIAL_ROOM_ENTER_COL }); // arm
+    expect(dialogueIds(s)).not.toContain("tutorial-goblin-intro");
+    applyTutorialDirector(s, { y: 0, x: TUTORIAL_ROOM_ENTER_COL }); // fire
     expect(dialogueIds(s)).toContain("tutorial-goblin-intro");
   });
 
