@@ -96,9 +96,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     
     const stats = game.stats;
     switch (badge.id) {
-      case 'monster-hunter':
       case 'exterminator':
-      case 'dungeon-cleaner':
         return `${stats.enemiesDefeated} enemies defeated`;
       case 'swordmaster':
         return `${stats.enemiesKilledBySword || 0} sword kills`;
@@ -110,22 +108,12 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         return 'No damage taken';
       case 'survivor':
         return `Won with ${game.heroHealth} HP`;
-      case 'healthy':
-        return 'Won at full health';
       case 'rock-finder':
         return `${stats.rocksCollected || 0}/12 rocks found`;
-      case 'pitcher':
-        return `${stats.rocksThrown || 0} rocks thrown`;
-      case 'rock-collector':
-        return `${game.rockCount || 0} rocks saved`;
-      case 'hoarder':
-        return `${stats.itemsCollected || 0} items collected`;
       case 'treasure-hunter':
         return `${stats.chestsOpened || 0}/4 chests opened`;
       case 'speedrunner':
         return `${stats.steps} steps`;
-      case 'marathon':
-        return `${stats.steps} steps taken`;
       case 'poisoned':
         return `${stats.poisonSteps || 0} poison steps`;
       case 'ghost-whisperer':
