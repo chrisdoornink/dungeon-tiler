@@ -36,7 +36,6 @@ export {
  *     j  key (universal — unlocks the next locked chest the hero steps on)
  *     x  locked treasure chest containing a SWORD
  *     y  locked treasure chest containing a SHIELD
- *     l  floor sword (no chest, just a sword on the ground)
  *     o  rock on floor
  *     e  exit door
  *     c  exit key
@@ -50,7 +49,7 @@ export {
  *
  *   - "Room above" (rows 1-5): a wide horizontal hall stretching most of
  *     the way across the level. Holds the two goblins, the locked shield
- *     chest, the key for it, the floor sword, rocks, and food pots.
+ *     chest, the key for it, rocks, and food pots.
  *   - Descent (rows 6-12): geometry varies — currently has two branching
  *     corridors and a ghost guarding one of them. The hero must thread it
  *     to reach the goblin room below.
@@ -68,7 +67,7 @@ const VISUAL_MAP = [
   "# y . . . . . . g . . . # . . . . # c . . . . # # #",
   "# . . . . . . . . . . . # . . . . # # # # u . # # #",
   "# . . j . # # o . . # . . . . . . . o . . . . # # #",
-  "# . . . l . . . . o # # . . . . . # . . p p . # # #",
+  "# . . . . . . . . o # # . . . . . # . . p p . # # #",
   "# . . . . . o . . . . # . . . . . . . . p p . # # #",
   // Rows 6-12 — descent corridors
   "# # . . . . # # # . . . . # # . # # # # # . # # # #",
@@ -170,10 +169,6 @@ export function buildTutorialOpeningRoom(): StoryRoom {
         }
         case "j": {
           subtypes[y][x] = [TileSubtype.KEY];
-          break;
-        }
-        case "l": {
-          subtypes[y][x] = [TileSubtype.SWORD];
           break;
         }
         case "o": {
