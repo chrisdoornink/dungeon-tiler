@@ -251,6 +251,18 @@ describe("applyTutorialDirector", () => {
     expect(dialogueIds(s)).toContain("tutorial-chest-locked");
   });
 
+  it("re-fires chest-locked on every step onto the locked chest, not just once", () => {
+    const s = baseState();
+    s.mapData = floorMap(3, 3);
+    s.enemies = [];
+    s.hasKey = false;
+    s.mapData.subtypes[0][0] = [TileSubtype.CHEST, TileSubtype.LOCK];
+    applyTutorialDirector(s, { y: 0, x: 0 });
+    applyTutorialDirector(s, { y: 0, x: 0 });
+    const hints = dialogueIds(s).filter((id) => id === "tutorial-chest-locked");
+    expect(hints).toHaveLength(2);
+  });
+
   it("picks the low-health dialogue variant based on food held", () => {
     const noFood = baseState();
     noFood.mapData = floorMap(3, 3);
@@ -332,6 +344,18 @@ describe("applyTutorialDirector", () => {
     applyTutorialDirector(s, { y: 0, x: 0 });
     expect(dialogueIds(s)).toContain("tutorial-exit-locked");
     expect(dialogueIds(s)).not.toContain("tutorial-exit-approach");
+  });
+
+  it("re-fires exit-locked on every approach to the locked door, not just once", () => {
+    const s = baseState();
+    s.mapData = floorMap(1, 3);
+    s.enemies = [];
+    s.hasExitKey = false;
+    s.mapData.subtypes[0][1] = [TileSubtype.EXIT];
+    applyTutorialDirector(s, { y: 0, x: 0 });
+    applyTutorialDirector(s, { y: 0, x: 0 });
+    const hints = dialogueIds(s).filter((id) => id === "tutorial-exit-locked");
+    expect(hints).toHaveLength(2);
   });
 
   it("fires exit-approach (not exit-locked) when holding the exit key", () => {

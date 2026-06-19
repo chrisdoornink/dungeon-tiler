@@ -25,11 +25,9 @@ const BEAT_GOBLIN_INTRO = "goblin-intro";
 // is visible on screen.
 const BEAT_GOBLIN_INTRO_ARMED = "goblin-intro-armed";
 const BEAT_GOBLIN_DEFEATED = "goblin-defeated";
-const BEAT_CHEST_LOCKED = "chest-locked";
 const BEAT_SWORD_PICKUP = "sword-pickup";
 const BEAT_SHIELD_PICKUP = "shield-pickup";
 const BEAT_LOW_HEALTH = "low-health";
-const BEAT_EXIT_LOCKED = "exit-locked";
 const BEAT_EXIT_APPROACH = "exit-approach";
 
 /**
@@ -249,21 +247,20 @@ export function applyTutorialDirector(
   // (The room-above goblins are no longer frozen — they pursue from spawn —
   // so there's no thaw beat for them here any more.)
 
-  // Beat: chest-locked dialogue the first time the hero steps onto ANY
-  // locked chest tile without a key. The dialogue is a generic "It's locked;
-  // you might need a key.", so firing on whichever locked chest the player
-  // encounters first is what we want — works for both the goblin-room sword
-  // chest and the room-above shield chest, in whatever order the player
-  // hits them, without anchoring to a hard-coded position.
+  // Reminder (NOT a once-only beat): fires EVERY time the hero steps onto a
+  // locked chest tile without a key — generic "It's locked; you might need a
+  // key." A player who wasn't reading the first time gets reminded on each
+  // attempt. Works for both the goblin-room sword chest and the room-above
+  // shield chest, in whatever order they're hit. Movement is blocked while the
+  // dialogue is up, so re-firing can't pile up duplicates — at most one per
+  // step-onto.
   const chestTile = state.mapData.subtypes[playerPos.y]?.[playerPos.x] ?? [];
   if (
-    !beats[BEAT_CHEST_LOCKED] &&
     !state.hasKey &&
     chestTile.includes(TileSubtype.CHEST) &&
     chestTile.includes(TileSubtype.LOCK)
   ) {
     queueDialogue(state, "tutorial-chest-locked");
-    beats[BEAT_CHEST_LOCKED] = true;
   }
 
   // Beat: sword-pickup — fires the first turn the hero is carrying a sword.
@@ -290,16 +287,16 @@ export function applyTutorialDirector(
     beats[BEAT_LOW_HEALTH] = true;
   }
 
-  // Beat: exit-locked hint — fires when the hero reaches the exit door
-  // WITHOUT the exit key. The door blocks them, so this nudges them to go
-  // find the key rather than getting stuck wondering why it won't open.
+  // Reminder (NOT a once-only beat): fires EVERY time the hero is next to the
+  // locked exit door without the exit key, nudging them to go find the key
+  // rather than getting stuck wondering why it won't open. A blocked bump into
+  // the door skips the director, so this re-fires on each fresh approach
+  // instead of spamming while they stand still reading it.
   if (
-    !beats[BEAT_EXIT_LOCKED] &&
     state.hasExitKey !== true &&
     isAdjacentToExit(state, playerPos)
   ) {
     queueDialogue(state, "tutorial-exit-locked");
-    beats[BEAT_EXIT_LOCKED] = true;
   }
 
   // Beat: exit-approach outro — fires when the hero is standing adjacent to
