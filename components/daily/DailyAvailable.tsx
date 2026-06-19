@@ -78,7 +78,7 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
             Your Progress
           </h2>
           <div className="space-y-3">
-            {data.currentStreak > 0 && (
+            {data.currentStreak > 1 && (
               <div className="flex justify-between items-center">
                 <span className="text-gray-300">Current Streak</span>
                 <span className="font-bold text-lg text-blue-300">
@@ -110,30 +110,6 @@ export default function DailyAvailable({ data, onStart }: DailyAvailableProps) {
             </div>
           </div>
         </div>
-
-        {/* Recent History */}
-        {data.streakHistory.length > 10 && (
-          <div className="mb-8">
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Recent History
-            </h2>
-            <div className="bg-black/50 rounded-lg p-4 border border-gray-600">
-              <div className="flex gap-2 overflow-x-auto">
-                {data.streakHistory.slice(-10).map((entry, index) => (
-                  <div
-                    key={index}
-                    className={`flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center text-white font-semibold ${
-                      entry.result === "won" ? "bg-green-500" : "bg-red-500"
-                    }`}
-                    title={`${entry.date}: ${entry.result} (streak: ${entry.streak})`}
-                  >
-                    {entry.result === "won" ? "✓" : "✗"}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

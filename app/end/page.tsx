@@ -3,7 +3,8 @@
 
 import React, { useEffect, useState } from "react";
 import { go } from "../../lib/navigation";
-import { getEnemyIcon, enemyKinds, createEmptyByKind, EnemyRegistry, EnemyKind } from "../../lib/enemies/registry";
+import { getEnemyIcon, EnemyRegistry, EnemyKind } from "../../lib/enemies/registry";
+import { summarizeMonsters, monsterShareLines, shareEmojiForKind } from "../../lib/enemies/monster_summary";
 import { ScoreCalculator, ScoreBreakdown } from '../../lib/score_calculator';
 
 type LastGame = {
@@ -140,36 +141,25 @@ export default function EndPage() {
     ? (last.deathCause.type === 'faulty_floor'
         ? '🕳️'
         : last.deathCause.type === 'enemy'
-        ? (({
-            ghost: '👻',
-            'fire-goblin': '👹',
-            'water-goblin': '🔵',
-            'water-goblin-spear': '🔵🗡️',
-            'earth-goblin': '🟤',
-            'earth-goblin-knives': '🟤⚔️',
-            'pink-goblin': '🔮',
-            'stone-goblin': '🗿',
-          } as Record<string, string>)[last.deathCause.enemyKind || 'fire-goblin'] || '👹')
+        ? shareEmojiForKind((last.deathCause.enemyKind as EnemyKind) || 'fire-goblin')
         : '')
     : '';
   const stepsPart = typeof last.stats?.steps === 'number' ? `👣 ${last.stats!.steps}` : '';
   const scorePart = scoreBreakdown ? `${ScoreCalculator.getScoreEmoji(scoreBreakdown.grade)} ${scoreBreakdown.grade} (${scoreBreakdown.percentage}%)` : '';
   shareLines.push([outcomeEmoji, deathEmoji, scorePart, stepsPart].filter(Boolean).join(' '));
-  // Streak line
+  // Streak line — only on a win and only once it's a real streak (> 1).
   const streakVal = typeof last.streak === 'number' ? last.streak : 0;
-  shareLines.push(`🔥 streak: ${streakVal}`);
-  // Kills line
-  const enemyChunks: string[] = [];
-  if (last.stats?.byKind) {
-    Object.entries(last.stats.byKind as Record<string, number>).forEach(([enemyType, count]) => {
-      const n = typeof count === 'number' ? count : 0;
-      if (n > 0) {
-        const emoji = ({ ghost: '👻', 'fire-goblin': '👹', 'water-goblin': '🔵', 'water-goblin-spear': '🔵🗡️', 'earth-goblin': '🟤', 'earth-goblin-knives': '🟤⚔️', 'pink-goblin': '🔮', 'stone-goblin': '🗿' } as Record<string, string>)[enemyType] || '👹';
-        enemyChunks.push(`${emoji}x${n}`);
-      }
-    });
+  if (last.outcome === 'win' && streakVal > 1) {
+    shareLines.push(`🔥 streak: ${streakVal}`);
   }
-  shareLines.push(`💀 ${enemyChunks.join(' ')}`);
+  // Monsters defeated: total + grouped breakdown (goblins collapse into one bucket)
+  const endMonsterSummary = summarizeMonsters(
+    last.stats?.byKind as Partial<Record<EnemyKind, number>> | undefined,
+    last.stats?.enemiesDefeated
+  );
+  for (const monsterLine of monsterShareLines(endMonsterSummary)) {
+    shareLines.push(monsterLine);
+  }
   // Inventory line
   const items: string[] = [];
   if (last.hasKey) items.push('🔑');
@@ -266,55 +256,30 @@ export default function EndPage() {
               <div className="flex items-center justify-between">
                 <div className="font-medium">Enemies Defeated</div>
                 {(() => {
-                  const by: Record<EnemyKind, number> = (last.stats?.byKind as Record<EnemyKind, number>) || createEmptyByKind();
-                  const items: Array<{ key: EnemyKind; count: number; src: string; title: string }>= enemyKinds.map((k: EnemyKind) => ({
-                    key: k,
-                    count: by[k] || 0,
-                    src: getEnemyIcon(k, 'front'),
-                    title: k,
-                  }));
-                  const visible = items.filter(i => i.count > 0);
-                  const fallbackTotal = last.stats?.enemiesDefeated || 0;
+                  const summary = summarizeMonsters(
+                    last.stats?.byKind as Partial<Record<EnemyKind, number>> | undefined,
+                    last.stats?.enemiesDefeated
+                  );
+                  if (summary.total <= 0) {
+                    return <span className="text-xs text-gray-400">None</span>;
+                  }
                   return (
-                    <div className="flex items-center gap-2">
-                      {visible.length === 0 ? (
-                        <div className="flex items-center gap-1">
-                          {Array.from({ length: Math.min(12, fallbackTotal) }).map((_, i) => (
-                            <div
-                              key={i}
-                              aria-label="enemy"
-                              title="enemy"
-                              className="w-5 h-5"
-                              style={{
-                                backgroundImage: "url(/images/enemies/fire-goblin/fire-goblin-front.png)",
-                                backgroundSize: "contain",
-                                backgroundRepeat: "no-repeat",
-                                backgroundPosition: "center",
-                              }}
-                            />
-                          ))}
-                          {fallbackTotal > 12 && (
-                            <span className="text-xs text-gray-600">+{fallbackTotal - 12}</span>
-                          )}
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
+                      {summary.groups.map((g) => (
+                        <div key={g.key} className="flex items-center gap-0.5" title={g.label}>
+                          <div
+                            aria-label={g.label}
+                            className="w-5 h-5"
+                            style={{
+                              backgroundImage: `url(${g.spriteSrc})`,
+                              backgroundSize: "contain",
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: "center",
+                            }}
+                          />
+                          <span className="text-xs text-gray-400">x{g.count}</span>
                         </div>
-                      ) : (
-                        visible.map((i) => (
-                          <div key={i.key} className="flex items-center gap-0.5">
-                            <div
-                              aria-label={i.title}
-                              title={i.title}
-                              className="w-5 h-5"
-                              style={{
-                                backgroundImage: `url(${i.src})`,
-                                backgroundSize: "contain",
-                                backgroundRepeat: "no-repeat",
-                                backgroundPosition: "center",
-                              }}
-                            />
-                            <span className="text-xs text-gray-400">x{i.count}</span>
-                          </div>
-                        ))
-                      )}
+                      ))}
                     </div>
                   );
                 })()}
@@ -387,7 +352,7 @@ export default function EndPage() {
         {/* Individual Stats List - Simple list below Game Statistics box */}
         <div data-testid="individual-stats-list" className="max-w-2xl mx-auto">
           <div className="text-left text-sm space-y-3 text-gray-200">
-            {typeof last.streak === 'number' && (
+            {typeof last.streak === 'number' && last.streak > 1 && (
               <div className="flex items-baseline justify-between py-2 border-b border-gray-700">
                 <div className="font-medium">Current Streak</div>
                 <div className="text-lg">{last.streak}</div>

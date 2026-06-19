@@ -10,6 +10,11 @@ import {
   EnemyKind,
   getEnemyIcon,
 } from "../../lib/enemies/registry";
+import {
+  summarizeMonsters,
+  monsterShareLines,
+  shareEmojiForKind,
+} from "../../lib/enemies/monster_summary";
 import DailyPollModal, { PollResponses } from "../DailyPollModal";
 import { calculateBadges, type Badge } from "../../lib/badges";
 import type { DailyStats } from "../../lib/redis";
@@ -28,15 +33,8 @@ const EMOJI_MAP = {
   shield: "🛡️",
   map: "🗺️",
 
-  // Enemies
-  "fire-goblin": "🔴",
-  "water-goblin": "🔵",
-  "water-goblin-spear": "🔵",  // Ignoring spear for clarity
-  "earth-goblin": "🟤",
-  "earth-goblin-knives": "🟤",  // Ignoring knives for clarity
-  "pink-goblin": "🟣",
-  ghost: "👻",
-  "stone-goblin": "⚫",
+  // Enemies — snake kept for the poison-death line; all other kinds are grouped
+  // through lib/enemies/monster_summary (no more per-kind colored dots).
   snake: "🐍",
 
   // Stats
@@ -275,8 +273,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       if (lastGame.deathCause.type === "faulty_floor") {
         deathEmojis.push(EMOJI_MAP.faulty_floor);
       } else if (lastGame.deathCause.type === "enemy") {
-        const e = (lastGame.deathCause.enemyKind as keyof typeof EMOJI_MAP) ?? "fire-goblin";
-        deathEmojis.push(EMOJI_MAP[e] || EMOJI_MAP["fire-goblin"]);
+        const e = (lastGame.deathCause.enemyKind as EnemyKind) ?? "fire-goblin";
+        deathEmojis.push(shareEmojiForKind(e));
       } else if (lastGame.deathCause.type === "poison") {
         deathEmojis.push(EMOJI_MAP.poison);
         // include snake indicator if known or by convention
@@ -294,85 +292,20 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       .join(" ");
     lines.push(statsLine);
 
-    // Streak
-    lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
+    // Streak — only show on a win and only once it's a real streak (> 1).
+    if (isWin && data.currentStreak > 1) {
+      lines.push(`${EMOJI_MAP.streak_fire} streak: ${data.currentStreak}`);
+    }
 
-    // Kills by floor
-    if (lastGame?.stats?.byFloor) {
-      const floors = Object.keys(lastGame.stats.byFloor).sort((a, b) => Number(a) - Number(b));
-      
-      for (const floor of floors) {
-        const floorKills = lastGame.stats.byFloor[Number(floor)];
-        const floorEmojis: string[] = [];
-        
-        Object.entries(floorKills).forEach(([enemyType, count]) => {
-          const numCount = typeof count === "number" ? count : 0;
-          if (numCount > 0) {
-            const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP] || '❓';
-            // Add individual emojis for each kill
-            for (let i = 0; i < numCount; i++) {
-              floorEmojis.push(emoji);
-            }
-          }
-        });
-        
-        if (floorEmojis.length > 0) {
-          // Group goblins together with single goblin face
-          const goblinEmojis = floorEmojis.filter(e => 
-            ['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
-          );
-          const nonGoblinEmojis = floorEmojis.filter(e => 
-            !['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
-          );
-          
-          let floorLine = `L${floor}: `;
-          if (goblinEmojis.length > 0) {
-            floorLine += `👹${goblinEmojis.join("")}`;
-            if (nonGoblinEmojis.length > 0) {
-              floorLine += ` ${nonGoblinEmojis.join(" ")}`;
-            }
-          } else {
-            floorLine += nonGoblinEmojis.join(" ");
-          }
-          lines.push(floorLine);
-        }
-      }
-    } else if (lastGame?.stats?.byKind) {
-      // Fallback to old format if no floor data - group all kills together
-      const allEmojis: string[] = [];
-      Object.entries(lastGame.stats.byKind).forEach(([enemyType, count]) => {
-        const numCount = typeof count === "number" ? count : 0;
-        if (numCount > 0) {
-          const emoji = EMOJI_MAP[enemyType as keyof typeof EMOJI_MAP];
-          if (emoji) {
-            for (let i = 0; i < numCount; i++) {
-              allEmojis.push(emoji);
-            }
-          }
-        }
-      });
-      
-      if (allEmojis.length > 0) {
-        // Group goblins together with single goblin face
-        const goblinEmojis = allEmojis.filter(e => 
-          ['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
-        );
-        const nonGoblinEmojis = allEmojis.filter(e => 
-          !['🔴', '🔵', '🟤', '🟣', '⚫'].includes(e)
-        );
-        
-        let killLine = '☠️ ';
-        if (goblinEmojis.length > 0) {
-          killLine += `👹${goblinEmojis.join("")}`;
-          if (nonGoblinEmojis.length > 0) {
-            killLine += ` ${nonGoblinEmojis.join(" ")}`;
-          }
-        } else {
-          killLine += nonGoblinEmojis.join(" ");
-        }
-        killLine += ` (${allEmojis.length} total)`;
-        lines.push(killLine);
-      }
+    // Monsters defeated: a single total plus a grouped breakdown. Goblin variants
+    // collapse into one bucket; the magician/stone/snake/wisp keep their own icon.
+    // Replaces the old per-floor wall of colored dots.
+    const monsterSummary = summarizeMonsters(
+      lastGame?.stats?.byKind,
+      lastGame?.stats?.enemiesDefeated
+    );
+    for (const monsterLine of monsterShareLines(monsterSummary)) {
+      lines.push(monsterLine);
     }
 
     // Inventory line (no label word)
@@ -583,56 +516,50 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         👣 {lastGame.stats.steps || 0}
                       </div>
                     </div>
-                    {/* Streak */}
-                    <div className="mb-2">streak: {data.currentStreak}</div>
-                    {/* Enemies row (individual icons) */}
-                    {lastGame.stats.byKind && (
-                      <div className="mb-1">
-                        <div className="flex items-center justify-center gap-1 flex-wrap">
-                          <span className="mr-1">⚔️</span>
-                          {Object.entries(lastGame.stats.byKind).flatMap(
-                            ([enemyType, count]) => {
-                              const numCount =
-                                typeof count === "number" ? count : 0;
-                              if (numCount <= 0) return [];
-                              
-                              // Create an array of individual enemy icons
-                              return Array.from({ length: numCount }, (_, idx) => (
+                    {/* Streak — win-only, matching the shared text */}
+                    {isWin && data.currentStreak > 1 && (
+                      <div className="mb-2">streak: {data.currentStreak}</div>
+                    )}
+                    {/* Monsters defeated: one icon per group with a count, plus a total */}
+                    {(() => {
+                      const summary = summarizeMonsters(
+                        lastGame.stats.byKind,
+                        lastGame.stats.enemiesDefeated
+                      );
+                      if (summary.total <= 0) return null;
+                      return (
+                        <div className="mb-1">
+                          <div className="flex items-center justify-center gap-3 flex-wrap">
+                            <span className="mr-1">⚔️</span>
+                            {summary.groups.map((g) => (
+                              <div
+                                key={g.key}
+                                className="flex items-center gap-1"
+                                title={g.label}
+                              >
                                 <div
-                                  key={`${enemyType}-${idx}`}
                                   className="w-6 h-6"
                                   style={{
-                                    backgroundImage: `url(/images/enemies/${
-                                      ({
-                                        "fire-goblin": "fire-goblin/fire-goblin-front",
-                                        "water-goblin": "fire-goblin/blue-goblin-front",
-                                        "water-goblin-spear": "fire-goblin/blue-goblin-front-spear",
-                                        "earth-goblin": "fire-goblin/brown-goblin-front",
-                                        "earth-goblin-knives": "fire-goblin/brown-goblin-front-knives",
-                                        "pink-goblin": "fire-goblin/pink-goblin-front",
-                                        "stone-goblin": "fire-goblin/green-goblin-front",
-                                        "ghost": "lantern-wisp",
-                                        "snake": "snake-coiled-right",
-                                      } as Record<string, string>)[enemyType] || "fire-goblin/fire-goblin-front"
-                                    }.png)`,
+                                    backgroundImage: `url(${g.spriteSrc})`,
                                     backgroundSize: "contain",
                                     backgroundRepeat: "no-repeat",
                                     backgroundPosition: "center",
                                   }}
-                                  title={enemyType}
+                                  aria-label={g.label}
                                 />
-                              ));
-                            }
-                          )}
+                                <span className="text-sm text-gray-300">
+                                  ×{g.count}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                          {/* Total defeated count */}
+                          <div className="text-center text-xs text-gray-400 mt-1">
+                            Total: {summary.total} defeated
+                          </div>
                         </div>
-                        {/* Total deaths count */}
-                        <div className="text-center text-xs text-gray-400 mt-1">
-                          Total: {Object.entries(lastGame.stats.byKind).reduce((total, [, count]) => {
-                            return total + (typeof count === "number" ? count : 0);
-                          }, 0)} defeated
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
                     {/* Inventory row (no label) */}
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <span>🗃️</span>
@@ -837,7 +764,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         <div data-testid="individual-stats-list" className="max-w-lg mx-auto">
           <div className="">
             <div className="space-y-1">
-              {data.currentStreak > 0 && (
+              {isWin && data.currentStreak > 1 && (
                 <div className="flex justify-between items-center py-2 border-b border-gray-700">
                   <span className="text-gray-300 font-medium">
                     Current Streak:
