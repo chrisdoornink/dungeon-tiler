@@ -210,7 +210,54 @@ describe('TilemapGrid component', () => {
     expect(parsed.streak).toBe(0);
   });
 
-    // moved tiles length assertion above
+  it('daily death plays the cinematic before signaling results (abyss death)', () => {
+    jest.useFakeTimers();
+    const onDailyComplete = jest.fn();
+
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size).fill(0).map(() => Array(size).fill(0).map(() => [] as number[]));
+    subtypes[12][12] = [TileSubtype.PLAYER];
+    subtypes[12][13] = [TileSubtype.FAULTY_FLOOR]; // step here -> instant abyss death
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      enemies: [],
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    } as GameState;
+
+    render(
+      <TilemapGrid
+        tileTypes={mockTileTypes}
+        initialGameState={initialGameState}
+        isDailyChallenge
+        onDailyComplete={onDailyComplete}
+      />
+    );
+
+    // Walk onto the faulty floor -> instant death, but the cinematic should play first.
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+    });
+    expect(onDailyComplete).not.toHaveBeenCalled();
+
+    // After the sink + spirit + fade (~1.9s), results are signaled.
+    act(() => {
+      jest.advanceTimersByTime(2200);
+    });
+    expect(onDailyComplete).toHaveBeenCalledWith('lost');
+
+    jest.useRealTimers();
+  });
 
   it('persists lastGame and redirects to /end when win becomes true after opening exit', () => {
     const size = 25;

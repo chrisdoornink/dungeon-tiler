@@ -19,11 +19,19 @@ type NeighborInfo = {
   left: number | null;
 };
 
-export type HeroDeathPhase = "idle" | "spinning" | "fallen" | "spirit" | "complete";
+export type HeroDeathPhase =
+  | "idle"
+  | "spinning"
+  | "fallen"
+  | "sinking" // abyss/faulty-floor death: hero collapses to zero height
+  | "spirit"
+  | "complete";
 
 export interface HeroDeathState {
   phase: HeroDeathPhase;
   orientation: Direction;
+  // "topple" = spin then fall on side (enemy/poison); "abyss" = shrink into the hole
+  variant?: "topple" | "abyss";
 }
 
 interface TileProps {
@@ -872,6 +880,11 @@ export const Tile: React.FC<TileProps> = ({
     if (!heroDeathState || deathPhase === "idle") {
       return playerDirection;
     }
+    // Abyss death: show the hero's back (diving in); the heading is conveyed by
+    // rotating the sprite, not by swapping it.
+    if (heroDeathState.variant === "abyss") {
+      return Direction.UP; // maps to the back-facing sprite
+    }
     if (deathPhase === "fallen" || deathPhase === "spirit" || deathPhase === "complete") {
       return Direction.RIGHT;
     }
@@ -908,11 +921,16 @@ export const Tile: React.FC<TileProps> = ({
     : '';
 
   // Determine if we need to flip the hero image for left-facing direction
+  const heroDeathVariant = heroDeathState?.variant ?? "topple";
+  const heroIsDying = !!heroDeathState && deathPhase !== "idle";
+  const heroIsAbyss = isPlayerTile && heroIsDying && heroDeathVariant === "abyss";
   const heroTransform = (() => {
+    // Abyss uses the standalone `rotate`/`scale` props (below), not `transform`.
+    if (heroIsAbyss) return 'none';
     const transforms: string[] = [];
     if (isPlayerTile) {
-      const directionForTransform = heroDeathState && deathPhase !== "idle"
-        ? heroDeathState.orientation
+      const directionForTransform = heroIsDying
+        ? heroDeathState!.orientation
         : playerDirection;
       if (directionForTransform === Direction.LEFT && (!heroDeathState || deathPhase === "spinning")) {
         transforms.push('scaleX(-1)');
@@ -926,6 +944,25 @@ export const Tile: React.FC<TileProps> = ({
     }
     return transforms.length > 0 ? transforms.join(' ') : 'none';
   })();
+  // Abyss death: rotate the back-facing sprite toward the heading (instant, so it
+  // reads as "turned", not spinning), and shrink it uniformly to nothing. Done via
+  // the standalone `rotate`/`scale` CSS props so only the scale transitions.
+  const heroAbyssRotate = (() => {
+    if (!heroIsAbyss) return undefined;
+    switch (heroDeathState?.orientation) {
+      case Direction.RIGHT:
+        return '90deg'; // clockwise
+      case Direction.DOWN:
+        return '180deg';
+      case Direction.LEFT:
+        return '-90deg';
+      case Direction.UP:
+      default:
+        return '0deg';
+    }
+  })();
+  const heroScale = heroIsAbyss ? '0' : undefined;
+  const heroTransition = heroIsAbyss ? 'scale 450ms ease-in' : undefined;
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
   const npcTransform = (() => {
@@ -1058,6 +1095,9 @@ export const Tile: React.FC<TileProps> = ({
               style={{
                 backgroundImage: `url(${heroImage})`,
                 transform: heroTransform,
+                rotate: heroAbyssRotate,
+                scale: heroScale,
+                transition: heroTransition,
                 backgroundColor: 'transparent'
               }}
             />
@@ -1604,6 +1644,9 @@ export const Tile: React.FC<TileProps> = ({
               style={{
                 backgroundImage: `url(${heroImage})`,
                 transform: heroTransform,
+                rotate: heroAbyssRotate,
+                scale: heroScale,
+                transition: heroTransition,
                 backgroundColor: 'transparent'
               }}
             />

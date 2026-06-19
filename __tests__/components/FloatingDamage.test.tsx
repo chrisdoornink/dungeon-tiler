@@ -39,7 +39,7 @@ function withEnemy(state: GameState, enemyY: number, enemyX: number): GameState 
 }
 
 describe('Floating combat damage numbers', () => {
-  it('shows a red floating number over the enemy when hero lands a hit (and kills with sword)', async () => {
+  it('shows an enemy-colored damage number over the enemy when the hero lands a killing hit', async () => {
     jest.useFakeTimers();
     // Player at (1,1), enemy at (1,2). Give sword so damage is lethal in one hit
     const base = makeBaseState(1, 1);
@@ -61,7 +61,9 @@ describe('Floating combat damage numbers', () => {
     expect(float).toHaveAttribute('data-x', '2');
     // UI shows raw damage dealt (base 1 + sword 2 + variance +1 = 4)
     expect(float).toHaveAttribute('data-amount', '4');
-    expect(float).toHaveAttribute('data-color', 'red');
+    // Enemy numbers are colored by enemy type, and it wasn't a miss
+    expect(float).toHaveAttribute('data-kind', 'fire-goblin');
+    expect(float).toHaveAttribute('data-miss', 'false');
 
     // Effect should disappear after a short time
     act(() => {
@@ -72,7 +74,7 @@ describe('Floating combat damage numbers', () => {
     jest.useRealTimers();
   });
 
-  it('shows a green floating number over the hero when enemies hit the hero on their turn', async () => {
+  it('shows a non-green hero damage number when enemies hit the hero on their turn', async () => {
     jest.useFakeTimers();
     // Player at (5,5), enemy adjacent at (5,6). Do not move into enemy; move up to trigger enemy attack phase.
     const base = makeBaseState(5, 5);
@@ -92,9 +94,40 @@ describe('Floating combat damage numbers', () => {
     expect(float).toHaveAttribute('data-x', '5');
     // enemy base(1) + variance(+2 from 0.9 per enemy.ts) - defense(0) = 3, but capped at 2 per tick
     expect(float).toHaveAttribute('data-amount', '2');
-    expect(float).toHaveAttribute('data-color', 'green');
+    // Hero damage must NOT use the heal-green color — that was the confusing part
+    expect(float.getAttribute('data-color')).not.toBe('#6afc7a');
 
     // Effect should disappear after a short time
+    act(() => {
+      jest.advanceTimersByTime(1200);
+    });
+    expect(screen.queryByTestId('floating-damage')).toBeNull();
+
+    jest.useRealTimers();
+  });
+
+  it('shows "miss" over the enemy when the hero deals 0 damage', async () => {
+    jest.useFakeTimers();
+    // Player at (1,1), enemy at (1,2), no sword. RNG 0.0 -> variance -1 ->
+    // base 1 + 0 - 1 = 0 damage (a miss). The enemy survives at its tile.
+    const base = makeBaseState(1, 1);
+    const state: GameState = { ...withEnemy(base, 1, 2), combatRng: () => 0.0 };
+
+    render(<TilemapGrid tileTypes={{}} initialGameState={state} />);
+
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+    });
+
+    const floats = await screen.findAllByTestId('floating-damage');
+    const enemyFloat = floats.find(
+      (el: Element) => el.getAttribute('data-target') === 'enemy'
+    )!;
+    expect(enemyFloat).toBeInTheDocument();
+    expect(enemyFloat).toHaveAttribute('data-amount', '0');
+    expect(enemyFloat).toHaveAttribute('data-miss', 'true');
+    expect(enemyFloat).toHaveTextContent('miss');
+
     act(() => {
       jest.advanceTimersByTime(1200);
     });

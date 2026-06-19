@@ -214,24 +214,66 @@ body {
   box-sizing: border-box !important;
 }
 
-/* Spirit effect animations */
-@keyframes spiritRiseFade {
-  from {
-    transform: translateY(0);
+/* Floating combat numbers: a quick pop, then a gentle rise and fade.
+   The translate(-50%, ...) keeps the number centered on its tile throughout. */
+@keyframes damageFloat {
+  0% {
+    transform: translate(-50%, calc(-50% + 2px)) scale(0.7);
+    opacity: 0;
+  }
+  18% {
+    transform: translate(-50%, calc(-50% - 4px)) scale(1.18);
     opacity: 1;
   }
-  to {
-    transform: translateY(-100px);
+  34% {
+    transform: translate(-50%, calc(-50% - 9px)) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, calc(-50% - 34px)) scale(1);
     opacity: 0;
   }
 }
 
-@keyframes spiritFlip {
-  0%, 100% {
-    transform: scaleX(1);
+/* Daily death: fade the game to black before the results screen. */
+@keyframes deathFadeIn {
+  from {
+    opacity: 0;
   }
-  50% {
-    transform: scaleX(-1);
+  to {
+    opacity: 1;
+  }
+}
+
+/* Spirit effect: a soul gently rising as it fades out. */
+@keyframes spiritRiseFade {
+  0% {
+    transform: translateY(6px) scale(0.8);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(0) scale(1);
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(-104px) scale(1.08);
+    opacity: 0;
+  }
+}
+
+/* Gentle ethereal drift — a soft sway + tilt, replacing the old hard mirror snap. */
+@keyframes spiritSway {
+  0% {
+    transform: translateX(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-2.5px) rotate(-5deg);
+  }
+  75% {
+    transform: translateX(2.5px) rotate(5deg);
+  }
+  100% {
+    transform: translateX(0) rotate(0deg);
   }
 }
 
@@ -239,9 +281,8 @@ body {
 .spirit-rise-fade {
   animation: spiritRiseFade 1800ms ease-out forwards;
 }
-.spirit-flip {
-  /* Full cycle 1400ms -> flips state every 700ms with 2 steps */
-  animation: spiritFlip 1400ms steps(2, end) infinite;
+.spirit-drift {
+  animation: spiritSway 1700ms ease-in-out infinite;
 }
 
 /* Heart effect animation (for petting dogs) */

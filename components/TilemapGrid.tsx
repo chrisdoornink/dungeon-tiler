@@ -96,6 +96,44 @@ function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
 
 // Grid dimensions will be derived from provided map data
 
+// Floating combat-number colors. Each entity's HP change is shown in that
+// entity's own color so it's instantly clear WHO took the hit: enemy damage
+// uses the enemy's body color, hero damage uses the hero's skin tone, and
+// healing stays green (the one intuitive "good" color).
+const ENEMY_NUMBER_COLOR: Record<string, string> = {
+  "fire-goblin": "#ff6b4a",
+  "water-goblin": "#5aa9ff",
+  "water-goblin-spear": "#5aa9ff",
+  "earth-goblin": "#c5894f",
+  "earth-goblin-knives": "#c5894f",
+  "pink-goblin": "#ff77d6",
+  "stone-goblin": "#aeb6bd",
+  "white-goblin": "#eaeaea",
+  snake: "#74e06f",
+  ghost: "#c3eeff",
+};
+const HERO_DAMAGE_COLOR = "#f1c27d"; // hero skin tone — clearly "the hero lost HP"
+const HERO_HEAL_COLOR = "#6afc7a"; // green = healing
+const MISS_COLOR = "#c9c9c9"; // muted gray for a 0-damage "miss"
+
+type FloatingNumber = {
+  id: string;
+  y: number;
+  x: number;
+  amount: number;
+  target: "enemy" | "hero";
+  sign: "+" | "-";
+  kind?: string; // enemy kind (for enemy-colored numbers)
+  miss?: boolean; // true => render "miss" instead of a value
+  createdAt: number;
+};
+
+function floatingColor(f: Pick<FloatingNumber, "target" | "sign" | "kind" | "miss">): string {
+  if (f.miss) return MISS_COLOR;
+  if (f.target === "hero") return f.sign === "+" ? HERO_HEAL_COLOR : HERO_DAMAGE_COLOR;
+  return (f.kind && ENEMY_NUMBER_COLOR[f.kind]) || ENEMY_NUMBER_COLOR["fire-goblin"];
+}
+
 interface TilemapGridProps {
   tilemap?: number[][];
   tileTypes: Record<number, TileType>;
@@ -135,7 +173,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     ? 'daily-new'
     : 'default';
 
-  const shouldAnimateHeroDeath = resolvedStorageSlot === 'story';
+  // Play the death cinematic (spin/topple or abyss-sink -> spirit) in story AND
+  // daily, so death reads as a transition instead of an instant cut to results.
+  const shouldAnimateHeroDeath =
+    resolvedStorageSlot === 'story' || isDailyChallenge;
 
   // Router removed; daily flow handled via onDailyComplete callback
 
@@ -194,6 +235,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   
   // Track if death screen should be shown
   const [showDeathScreen, setShowDeathScreen] = useState(false);
+  // Daily death: fade to black during the spirit phase, bridging into the results screen.
+  const [deathFade, setDeathFade] = useState(false);
 
   // Transient moving rock effect
   const [rockEffect, setRockEffect] = useState<null | {
@@ -1329,16 +1372,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 impact!.x
               }-${now}-${Math.random().toString(36).slice(2, 7)}`;
               setFloating((prevF) => {
-                const nextF = [
+                const nextF: FloatingNumber[] = [
                   ...prevF,
                   {
                     id,
                     y: impact!.y,
                     x: impact!.x,
                     amount: dmg,
-                    color: "red" as const,
-                    target: "enemy" as const,
-                    sign: "-" as const,
+                    target: "enemy",
+                    sign: "-",
+                    kind: preEnemyAtImpact.kind,
                     createdAt: now,
                   },
                 ];
@@ -1501,18 +1544,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     Array<{ id: string; y: number; x: number; createdAt: number }>
   >([]);
   // Transient floating damage numbers (hero/enemy hits)
-  const [floating, setFloating] = useState<
-    Array<{
-      id: string;
-      y: number;
-      x: number;
-      amount: number;
-      color: "red" | "green";
-      target: "enemy" | "hero";
-      sign: "+" | "-";
-      createdAt: number;
-    }>
-  >([]);
+  const [floating, setFloating] = useState<FloatingNumber[]>([]);
   const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>("idle");
   const [heroDeathOrientation, setHeroDeathOrientation] = useState<Direction>(Direction.RIGHT);
   const heroDeathPositionRef = useRef<[number, number] | null>(null);
@@ -1563,7 +1595,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const lastCheckpoint = gameState.lastCheckpoint;
   const heroDeathStateForTiles: HeroDeathState | undefined =
     shouldAnimateHeroDeath && heroDeathPhase !== "idle"
-      ? { phase: heroDeathPhase, orientation: heroDeathOrientation }
+      ? {
+          phase: heroDeathPhase,
+          orientation: heroDeathOrientation,
+          variant:
+            gameState.deathCause?.type === "faulty_floor" ? "abyss" : "topple",
+        }
       : undefined;
 
   useEffect(() => {
@@ -1577,6 +1614,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       clearHeroDeathTimeouts();
       heroDeathPositionRef.current = null;
       setHeroDeathPhase("idle");
+      setDeathFade(false);
       const facing =
         gameState.playerDirection === Direction.LEFT ? Direction.LEFT : Direction.RIGHT;
       setHeroDeathOrientation(facing);
@@ -1597,6 +1635,26 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       if (!shouldAnimateHeroDeath || !playerPosition || typeof window === "undefined") {
         setHeroDeathPhase("complete");
+      } else if (gameState.deathCause?.type === "faulty_floor") {
+        // Abyss death: skip the spin/topple. The hero turns toward the way he was
+        // headed and shrinks into the revealed hole; a spirit rises ~1s later.
+        // Use the full heading (not just L/R) so Tile can rotate the back sprite.
+        setHeroDeathOrientation(gameState.playerDirection);
+        clearHeroDeathTimeouts();
+        setHeroDeathPhase("sinking");
+        const spiritDelay = 1000;
+        heroDeathTimeouts.current.push(
+          window.setTimeout(() => {
+            setHeroDeathPhase("spirit");
+            spawnHeroSpirit();
+          }, spiritDelay)
+        );
+        const completeDelay = spiritDelay + 900;
+        heroDeathTimeouts.current.push(
+          window.setTimeout(() => {
+            setHeroDeathPhase("complete");
+          }, completeDelay)
+        );
       } else {
         clearHeroDeathTimeouts();
         setHeroDeathPhase("spinning");
@@ -1641,6 +1699,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }, [
     gameState.heroHealth,
     gameState.playerDirection,
+    gameState.deathCause,
     playerPosition,
     heroDeathPhase,
     shouldAnimateHeroDeath,
@@ -1651,9 +1710,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   useEffect(() => {
     if (!shouldAnimateHeroDeath) return;
     if (heroDeathPhase === "spirit") {
-      setShowDeathScreen(true);
+      // Daily bridges to its own results screen with a fade; story shows the
+      // full death overlay (with restart). Don't show that overlay in daily.
+      if (isDailyChallenge) {
+        setDeathFade(true);
+      } else {
+        setShowDeathScreen(true);
+      }
     }
-  }, [heroDeathPhase, shouldAnimateHeroDeath]);
+  }, [heroDeathPhase, shouldAnimateHeroDeath, isDailyChallenge]);
 
   // Determine the currently active checkpoint tile from the lastCheckpoint snapshot
   const activeCheckpoint: [number, number] | null = React.useMemo(() => {
@@ -1810,7 +1875,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (onDailyComplete) {
           onDailyComplete("won");
         } else {
-          router.push("/daily");
+          router.push("/daily-new");
         }
       } else if (onWin) {
         // Custom non-daily win flow (e.g. /new tutorial → daily floor 2
@@ -2148,7 +2213,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (onDailyComplete) {
         onDailyComplete("lost");
       } else {
-        router.push("/daily");
+        router.push("/daily-new");
       }
     } else {
       // Handle regular game death
@@ -2208,7 +2273,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       let targetY = prePlayerY;
       let targetX = prePlayerX;
       let preEnemyAtTarget: Enemy | undefined;
-      let preEnemyHealth = 0;
       if (playerPosition && gameState.enemies && gameState.enemies.length > 0) {
         const [py, px] = playerPosition;
         let ty = py;
@@ -2232,7 +2296,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         const enemy = gameState.enemies.find((e) => e.y === ty && e.x === tx);
         if (enemy) {
           preEnemyAtTarget = enemy;
-          preEnemyHealth = enemy.health;
           // Show BAM at midpoint between player and enemy
           const yMid = (py + enemy.y) / 2;
           const xMid = (px + enemy.x) / 2;
@@ -2248,43 +2311,53 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
       }
 
+      const preDamageDealt = gameState.stats?.damageDealt ?? 0;
       const newGameState = movePlayer(gameState, direction);
       CurrentGameStorage.saveCurrentGame(newGameState, resolvedStorageSlot);
-      // Compute floating damage numbers based on differences
-      // 1) Enemy damage taken when attacking into enemy tile
-      if (
-        preEnemyAtTarget &&
-        typeof targetY === "number" &&
-        typeof targetX === "number"
-      ) {
-        // Check enemy at same position after move
-        const postEnemy = (newGameState.enemies || []).find(
+      // Compute floating damage numbers from what the engine actually did.
+      // 1) Hero attacking an enemy. movePlayer ticks enemies BEFORE resolving the
+      //    player's attack, so guessing from pre-move tile positions is unreliable
+      //    (phantom or missing numbers, wrong amounts when enemies swap tiles).
+      //    Instead use the exact damage the engine recorded — stats.damageDealt
+      //    delta; the hero hits at most one enemy per move — and treat the attack
+      //    as having happened iff the target tile still holds an enemy or one just
+      //    died there. A 0-damage attack renders as "miss".
+      if (typeof targetY === "number" && typeof targetX === "number") {
+        const dealt = Math.max(
+          0,
+          (newGameState.stats?.damageDealt ?? 0) - preDamageDealt
+        );
+        const enemyAtTargetPost = (newGameState.enemies || []).find(
           (e) => e.y === targetY && e.x === targetX
         );
-        let dmg = 0;
-        if (postEnemy) {
-          dmg = Math.max(0, preEnemyHealth - postEnemy.health);
-        } else {
-          // Enemy died -> damage equals its remaining health before the hit
-          dmg = preEnemyHealth;
-        }
-        if (dmg > 0) {
+        const diedAtTarget = (newGameState.recentDeaths || []).some(
+          ([dy, dx]) => dy === targetY && dx === targetX
+        );
+        if (enemyAtTargetPost || diedAtTarget) {
+          const hitKind =
+            enemyAtTargetPost?.kind ||
+            (newGameState.defeatedEnemies || []).find(
+              (d) => d.y === targetY && d.x === targetX
+            )?.kind ||
+            preEnemyAtTarget?.kind ||
+            "fire-goblin";
           const spawn = () => {
             const now = Date.now();
             const id = `fd-enemy-${targetY},${targetX}-${now}-${Math.random()
               .toString(36)
               .slice(2, 7)}`;
             setFloating((prev) => {
-              const next = [
+              const next: FloatingNumber[] = [
                 ...prev,
                 {
                   id,
                   y: targetY as number,
                   x: targetX as number,
-                  amount: dmg,
-                  color: "red" as const,
-                  target: "enemy" as const,
-                  sign: "-" as const,
+                  amount: dealt,
+                  target: "enemy",
+                  sign: "-",
+                  kind: hitKind,
+                  miss: dealt === 0,
                   createdAt: now,
                 },
               ];
@@ -2298,7 +2371,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (process.env.NODE_ENV === "test") {
             spawn();
           } else {
-            setTimeout(spawn, 120); // wait for enemy movement to settle
+            setTimeout(spawn, 120); // let the BAM flash land first
           }
         }
       }
@@ -2325,7 +2398,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 y: prePlayerY as number,
                 x: prePlayerX as number,
                 amount: heroDmg,
-                color: "green" as const,
                 target: "hero" as const,
                 sign: "-" as const,
                 createdAt: now,
@@ -2357,7 +2429,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 y: prePlayerY as number,
                 x: prePlayerX as number,
                 amount: heroHeal,
-                color: "green" as const,
                 target: "hero" as const,
                 sign: "+" as const,
                 createdAt: now,
@@ -2573,6 +2644,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause={gameState.deathCause}
           onRestart={handleRestartFromCheckpoint}
           hasCheckpoint={!!gameState.lastCheckpoint}
+        />
+      )}
+      {/* Daily death: fade to black under the rising spirit, bridging to results */}
+      {deathFade && (
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 z-[9998] pointer-events-none"
+          style={{ backgroundColor: "#000", animation: "deathFadeIn 800ms ease-in forwards" }}
         />
       )}
       {isHeroDiaryOpen && (
@@ -3087,16 +3166,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   <PinkRealmSparkles tiles={gameState.mapData.tiles} />
                 )}
                 {/* Death vignette overlay - darkens everything except spotlight on hero */}
-                {shouldAnimateHeroDeath && heroDeathPhase !== "idle" && heroDeathPhase !== "complete" && heroDeathPositionRef.current && (
-                  <div
-                    aria-hidden="true"
-                    className={styles.deathVignette}
-                    style={{
-                      opacity: heroDeathPhase === "spirit" ? 0 : 1,
-                      transition: heroDeathPhase === "spirit" ? "opacity 900ms ease-out" : "opacity 400ms ease-in",
-                    }}
-                  />
-                )}
                 {rockEffect &&
                   (() => {
                     const tileSize = 40;
@@ -3184,6 +3253,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     return floating.map((f) => {
                       const pxLeft = (f.x + 0.5) * tileSize;
                       const pxTop = (f.y + 0.5) * tileSize;
+                      const cssColor = floatingColor(f);
                       return (
                         <div
                           key={f.id}
@@ -3192,24 +3262,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           data-y={String(f.y)}
                           data-x={String(f.x)}
                           data-amount={String(f.amount)}
-                          data-color={f.color}
+                          data-color={cssColor}
+                          data-kind={f.kind ?? ""}
+                          data-miss={f.miss ? "true" : "false"}
                           aria-hidden="true"
                           className="absolute pointer-events-none"
                           style={{
                             left: `${pxLeft}px`,
                             top: `${pxTop}px`,
-                            transform: "translate(-50%, -50%)",
                             zIndex: 11500,
-                            color: f.color === "red" ? "#ff4242" : "#6afc7a",
+                            color: cssColor,
                             fontWeight: 800,
-                            textShadow: "0 1px 0 rgba(0,0,0,0.6)",
-                            // Match spirit effect speed/distance: rise ~100px over ~1800ms
-                            animation:
-                              "spiritRiseFade 1800ms ease-out forwards",
+                            fontSize: f.miss ? "0.78em" : "1em",
+                            fontStyle: f.miss ? "italic" : "normal",
+                            letterSpacing: f.miss ? "0.02em" : "0",
+                            textShadow:
+                              "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.6)",
+                            // Pop, rise, and fade (centered via the keyframes' translate).
+                            animation: "damageFloat 1100ms ease-out forwards",
                           }}
                         >
-                          {f.sign}
-                          {f.amount}
+                          {f.miss ? "miss" : `${f.sign}${f.amount}`}
                         </div>
                       );
                     });
@@ -3235,7 +3308,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         >
                           <div
-                            className="w-full h-full spirit-flip"
+                            className="w-full h-full spirit-drift"
                             style={{
                               backgroundImage: "url(/images/items/spirit.png)",
                               backgroundSize: "contain",
