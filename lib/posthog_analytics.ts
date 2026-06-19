@@ -36,26 +36,34 @@ export function identifyUser() {
 }
 
 /**
- * Tag this person as a "new player" who entered through the /new tutorial.
+ * Tag this person as a brand-new player (no prior local storage).
  *
  * Sets BOTH:
  *   - a super property (posthog.register) so `player_type=new_player` rides
  *     on every subsequent event this person fires — including their later
  *     daily `game_start` / `game_complete` — letting us slice the entire
- *     reporting tree by who came in through the tutorial.
+ *     reporting tree by who came in fresh.
  *   - a person property so the flag survives in PostHog for cohort / funnel
  *     filtering even across devices once identified.
+ *
+ * `enteredViaTutorial` distinguishes the two first-run paths: the guided run
+ * (`/new`, default true) vs. a new player who chose to skip the guide and jump
+ * straight into the daily (pass `false`). Both are new players, but only the
+ * former saw the walkthrough — keeping them sliceable lets us compare day-1
+ * outcomes between guided and unguided newcomers.
  *
  * `first_tutorial_at` is set-once so re-entries don't overwrite the original
  * acquisition timestamp.
  */
-export function markNewPlayer() {
+export function markNewPlayer(opts?: { enteredViaTutorial?: boolean }) {
   if (typeof window === 'undefined') return;
+
+  const enteredViaTutorial = opts?.enteredViaTutorial ?? true;
 
   try {
     posthog.register({ player_type: 'new_player' });
     posthog.setPersonProperties(
-      { player_type: 'new_player', entered_via_tutorial: true },
+      { player_type: 'new_player', entered_via_tutorial: enteredViaTutorial },
       { first_tutorial_at: new Date().toISOString() }
     );
   } catch (error) {
@@ -219,7 +227,7 @@ function normalizeTutorialBeat(dialogueId: string): string {
 }
 
 export function trackTutorialLanded(params: {
-  outcome: 'started' | 'redirected';
+  outcome: 'started' | 'redirected' | 'skipped';
   reason?: string;
 }) {
   captureEvent('tutorial_landed', {
