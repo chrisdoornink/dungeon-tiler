@@ -1819,23 +1819,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   useEffect(() => {
     if (gameState.win && !gameCompletionProcessed) {
       setGameCompletionProcessed(true);
-      try {
-        const mode = isDailyChallenge ? "daily" : "normal";
-        const mapId = computeMapId(gameState.mapData);
-        trackGameComplete({
-          outcome: "win",
-          mode,
-          mapId,
-          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
-          heroHealth: gameState.heroHealth,
-          steps: gameState.stats.steps,
-          enemiesDefeated: gameState.stats.enemiesDefeated,
-          damageDealt: gameState.stats.damageDealt,
-          damageTaken: gameState.stats.damageTaken,
-          byKind: gameState.stats.byKind,
-          currentFloor: gameState.currentFloor,
-        });
-      } catch {}
+      // The tutorial "win" is just the handoff into the real daily run — it
+      // isn't a completed game, has no floor, and would log as "None::win".
+      // Keep tutorial runs out of game_complete; the tutorial funnel
+      // (tutorial_completed) covers them.
+      if (gameState.mode !== "tutorial") {
+        try {
+          const mode = isDailyChallenge ? "daily" : "normal";
+          const mapId = computeMapId(gameState.mapData);
+          trackGameComplete({
+            outcome: "win",
+            mode,
+            mapId,
+            dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+            heroHealth: gameState.heroHealth,
+            steps: gameState.stats.steps,
+            enemiesDefeated: gameState.stats.enemiesDefeated,
+            damageDealt: gameState.stats.damageDealt,
+            damageTaken: gameState.stats.damageTaken,
+            byKind: gameState.stats.byKind,
+            currentFloor: gameState.currentFloor,
+          });
+        } catch {}
+      }
       if (isDailyChallenge) {
         // Handle daily challenge completion
         try {

@@ -269,6 +269,26 @@ describe("applyTutorialDirector", () => {
     expect(dialogueIds(withFood)).toContain("tutorial-low-health-with-food");
   });
 
+  it("floors heroHealth at 1 so the guided run is non-lethal", () => {
+    const s = baseState();
+    s.mapData = floorMap(3, 3);
+    s.enemies = [];
+    s.heroHealth = 0; // a hit that would otherwise be fatal
+    const out = applyTutorialDirector(s, { y: 0, x: 0 });
+    expect(out.heroHealth).toBe(1);
+  });
+
+  it("still fires the low-health beat when a fatal hit is floored to 1 HP", () => {
+    const s = baseState();
+    s.mapData = floorMap(3, 3);
+    s.enemies = [];
+    s.heroHealth = -3; // overkill hit
+    s.foodCount = 0;
+    applyTutorialDirector(s, { y: 0, x: 0 });
+    expect(s.heroHealth).toBe(1);
+    expect(dialogueIds(s)).toContain("tutorial-low-health-no-food");
+  });
+
   it("fires the ghost spotted / snuffed / relit sequence", () => {
     const spotted = baseState();
     spotted.mapData = floorMap(1, 5);

@@ -149,6 +149,17 @@ export function applyTutorialDirector(
 ): GameState {
   if (state.mode !== "tutorial") return state;
 
+  // The guided run is a teaching space, not a place to game-over. Floor the
+  // hero at 1 HP: a brand-new player can take hits, still trigger the
+  // low-health beat below (which fires at exactly 1 HP), and always reach the
+  // payoff instead of being bounced to the /end screen. movePlayer ticks all
+  // damage (combat, poison, hazards) before calling the director, so clamping
+  // here covers every source. Side effect: no tutorial death ever fires, so
+  // tutorial runs stop polluting the game_complete analytics.
+  if (state.heroHealth < 1) {
+    state.heroHealth = 1;
+  }
+
   const beats = { ...(state.tutorialBeats ?? {}) };
 
   // Beat: "This is a ghost." — fires when a ghost is within two tiles of the
