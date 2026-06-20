@@ -161,6 +161,10 @@ body {
   margin: 0;
   padding: 0;
   border: none;
+  /* The game grid is a fixed-width (600px) scaled box; on sub-600px phones it
+     would otherwise overhang and let the whole page pan sideways. Clip it so
+     the playfield stays put on narrow screens. */
+  overflow-x: hidden;
 }
 
 /* Global theme tokens moved from CSS Modules to avoid purity errors on Vercel */

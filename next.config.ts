@@ -1,6 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  compiler: {
+    // Strip console.log/info/debug from PRODUCTION builds so gameplay debug
+    // logging ([PLAYER DAMAGE], [ENEMY ATTACK], [SNAKE POT], etc.) never
+    // reaches a live player's console. Errors and warnings are kept. Dev
+    // builds keep everything for debugging.
+    removeConsole:
+      process.env.NODE_ENV === "production"
+        ? { exclude: ["error", "warn"] }
+        : false,
+  },
+
   async headers() {
     return [
       {

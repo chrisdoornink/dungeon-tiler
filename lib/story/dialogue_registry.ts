@@ -48,7 +48,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "",
-        text: "Welcome to TorchBoy. You're a boy with a torch.",
+        text: "Welcome to Torch Boy. You're a boy with a torch.",
       },
       {
         speaker: "",
@@ -122,7 +122,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       },
       {
         speaker: "",
-        text: "Press R to throw it. A short-range attack, good for hitting something before it reaches you.",
+        text: "Tap the rock button (or press R) to throw it — a ranged attack, good for hitting something before it reaches you.",
       },
     ],
   },
@@ -162,7 +162,7 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       {
         speaker: "",
-        text: "You're barely hanging on there — you should eat some food.",
+        text: "You're barely hanging on there — careful now, and grab any food you can find (pots often hide it).",
       },
     ],
   },

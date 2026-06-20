@@ -51,11 +51,11 @@ export default function DailyAvailable({
       }}
     >
       <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center mb-8 text-blue-400">
+        <h1 className="text-3xl font-bold text-center mb-6 text-blue-400">
           Torch Boy
         </h1>
         <div
-          className="w-24 h-24 mx-auto"
+          className="w-20 h-20 sm:w-24 sm:h-24 mx-auto"
           style={{
             backgroundImage: "url(/images/hero/hero-front-static.png)",
             backgroundSize: "contain",
@@ -63,19 +63,21 @@ export default function DailyAvailable({
             backgroundPosition: "center",
           }}
         />
-        <h2 className="text-xl font-bold text-center mb-8 text-gray-100">
+        <h2 className="text-xl font-bold text-center mb-6 text-gray-100">
           Daily Dungeon Challenge
         </h2>
         <p className="text-center text-gray-200">{today}</p>
 
         {firstTime ? (
           /* First-run fork: lead with the guided run, offer a skip for
-             players who already know the ropes. */
-          <div className="text-center mt-16">
+             players who already know the ropes. The pb clearance keeps the
+             skip link from colliding with the fixed bottom-left help/feedback
+             buttons on short phone screens. */
+          <div className="text-center mt-6 sm:mt-16 pb-28">
             <p className="text-lg text-gray-200 mb-2">
               First time in the dungeon?
             </p>
-            <p className="text-sm text-gray-400 mb-8 max-w-md mx-auto leading-relaxed">
+            <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto leading-relaxed">
               Your first run is a guided one — we&apos;ll walk you through
               moving, fighting, and grabbing loot, then hand you the rest of
               today&apos;s challenge.
@@ -89,7 +91,7 @@ export default function DailyAvailable({
               Guide Me
             </button>
 
-            <div className="mt-8">
+            <div className="mt-6">
               <button
                 type="button"
                 onClick={handleStartGame}

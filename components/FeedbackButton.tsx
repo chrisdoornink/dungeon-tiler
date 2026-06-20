@@ -137,7 +137,7 @@ export default function FeedbackButton() {
                 </label>
 
                 <div className="flex items-center justify-between text-xs text-slate-400">
-                  <span>Sent securely to our PostHog workspace.</span>
+                  <span>Your feedback goes straight to the developer.</span>
                   <button
                     type="submit"
                     disabled={isSubmitting || !formValues.message.trim()}

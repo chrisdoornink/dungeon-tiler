@@ -18,7 +18,7 @@ import { makeTutorialDialogueEvent } from "./tutorial_dialogue";
  * room file specifies.
  *
  * On load we queue two dialogue events back-to-back:
- *   1. "tutorial-welcome"        — Welcome to TorchBoy
+ *   1. "tutorial-welcome"        — Welcome to Torch Boy
  *   2. "tutorial-ghost-warning"  — ghosts can steal your light
  *
  * They play in sequence before the player has any control. After dismissing
