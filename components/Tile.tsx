@@ -1205,7 +1205,7 @@ export const Tile: React.FC<TileProps> = ({
                     })(),
                     // Darken non-torch-carrying enemies in cave/underground environments
                     filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
-                      ? 'brightness(0.80)'
+                      ? 'brightness(var(--enemy-dim, 0.80))'
                       : undefined,
                   }}
                   data-testid="enemy-sprite"
@@ -1754,7 +1754,7 @@ export const Tile: React.FC<TileProps> = ({
                     })(),
                     // Darken non-torch-carrying enemies in cave/underground environments
                     filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
-                      ? 'brightness(0.80)'
+                      ? 'brightness(var(--enemy-dim, 0.80))'
                       : undefined,
                   }}
                   data-testid="enemy-sprite"

@@ -125,6 +125,22 @@
   box-shadow: inset 0 0 55px 24px rgba(0, 0, 0, 0.5);
 }
 
+/* ---------------------------------------------------------------------------
+   Brightness A/B prototype (opt-in via `?bright=1` -> `.bright-mode` on the
+   game root, see TilemapGrid). Nothing here affects the default experience.
+
+   The main lever is a highlight-safe GAMMA tone-curve on the whole playfield
+   (#torchboy-lift, defined in TilemapGrid). Unlike a flat brightness filter,
+   gamma lifts the dark floor/walls and shadows a lot while leaving near-white
+   highlights (candles, torch flames) almost untouched — so the scene reads
+   lighter without the candles blowing out. Because dark pixels lift more than
+   bright ones, it naturally brightens the dim FOV edges more than the lit
+   center too. Tunable via the exponent (lower = brighter shadows).
+   --------------------------------------------------------------------------- */
+.bright-mode .game-scale { filter: url(#torchboy-lift); }
+/* Lift the extra cave enemy dimming (Tile.tsx reads var(--enemy-dim, 0.80)). */
+.bright-mode { --enemy-dim: 0.85; }
+
 /* Border width utilities used in components */
 .border-b-8 { border-bottom-width: 8px !important; border-bottom-style: solid; }
 .border-b-4 { border-bottom-width: 4px !important; border-bottom-style: solid; }

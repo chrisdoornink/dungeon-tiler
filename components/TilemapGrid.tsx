@@ -283,6 +283,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
+  // Brightness A/B prototype: `?bright=1` opts into the lifted lighting defined
+  // under `.bright-mode` in globals.css. Default (no param) is untouched. Read
+  // on mount to avoid an SSR/client class mismatch.
+  const [brightMode, setBrightMode] = useState<boolean>(false);
+  useEffect(() => {
+    try {
+      setBrightMode(
+        new URLSearchParams(window.location.search).get("bright") === "1"
+      );
+    } catch {}
+  }, []);
   const [activeBookshelfId, setActiveBookshelfId] = useState<string | null>(null);
   const [activeBedInteraction, setActiveBedInteraction] = useState<{
     bedId: string;
@@ -2644,7 +2655,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   ]);
 
   return (
-    <div className="relative">
+    <div className={`relative${brightMode ? " bright-mode" : ""}`}>
+      {/* Brightness A/B prototype: highlight-safe shadow-lift curve referenced
+          by `.bright-mode .game-scale` in globals.css. Gamma < 1 raises dark
+          values toward mid while leaving near-white (candles) almost fixed.
+          Only mounted when the `?bright=1` flag is on. */}
+      {brightMode && (
+        <svg
+          width="0"
+          height="0"
+          aria-hidden="true"
+          style={{ position: "absolute", width: 0, height: 0 }}
+        >
+          <filter id="torchboy-lift" colorInterpolationFilters="sRGB">
+            <feComponentTransfer>
+              <feFuncR type="gamma" amplitude="1" exponent="0.7" offset="0" />
+              <feFuncG type="gamma" amplitude="1" exponent="0.7" offset="0" />
+              <feFuncB type="gamma" amplitude="1" exponent="0.7" offset="0" />
+            </feComponentTransfer>
+          </filter>
+        </svg>
+      )}
       {showDeathScreen && (
         <DeathScreen
           deathCause={gameState.deathCause}
