@@ -64,6 +64,7 @@ interface TileProps {
   suppressDarknessOverlay?: boolean;
   activeCheckpoint?: [number, number] | null; // Active checkpoint position for lit/unlit rendering
   heroDeathState?: HeroDeathState;
+  heroWarping?: boolean; // when true, flicker the hero sprite (teleport dematerialize)
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -96,6 +97,7 @@ export const Tile: React.FC<TileProps> = ({
   suppressDarknessOverlay = false,
   activeCheckpoint = null,
   heroDeathState,
+  heroWarping = false,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Torch animations disabled for performance: render static torch sprite when present.
@@ -1145,7 +1147,8 @@ export const Tile: React.FC<TileProps> = ({
                 rotate: heroAbyssRotate,
                 scale: heroScale,
                 transition: heroTransition,
-                backgroundColor: 'transparent'
+                backgroundColor: 'transparent',
+                animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
               }}
             />
           )}
@@ -1694,7 +1697,8 @@ export const Tile: React.FC<TileProps> = ({
                 rotate: heroAbyssRotate,
                 scale: heroScale,
                 transition: heroTransition,
-                backgroundColor: 'transparent'
+                backgroundColor: 'transparent',
+                animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
               }}
             />
           )}

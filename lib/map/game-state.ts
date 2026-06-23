@@ -48,6 +48,7 @@ import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./p
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
 import { buildOutsideWorld } from "./outside-world";
+import { buildPinkRealm } from "./pink-realm";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
@@ -649,7 +650,9 @@ export function performThrowRune(gameState: GameState): GameState {
       const newEnemies = enemies.slice();
       // Runes instantly kill ALL enemies, rune consumed
       const removed = newEnemies.splice(hitIdx, 1)[0];
-      
+      // A rune is not a bomb — a pink goblin killed this way leaves no teleport ring.
+      cleanupPinkRing(removed, newMapData.subtypes);
+
       // Store defeated enemy info for onEnemyDefeat processing
       const newDefeatedEnemies = (preTickState.defeatedEnemies ? preTickState.defeatedEnemies.slice() : [])
         .concat([{
@@ -672,6 +675,7 @@ export function performThrowRune(gameState: GameState): GameState {
       
       const finalState = {
         ...preTickState,
+        mapData: newMapData, // carries the pink-ring cleanup done above
         enemies: newEnemies,
         stats: newStats,
         recentDeaths: newRecent,
@@ -806,6 +810,8 @@ const BOMB_PRESERVED_SUBTYPES = new Set<TileSubtype>([
   TileSubtype.FLOOR_TORCH,
   TileSubtype.BREACH,
   TileSubtype.SINGED,
+  // A pink goblin killed by the blast drops a teleport ring; keep it through the blast.
+  TileSubtype.PINK_RING,
 ]);
 
 /**
@@ -873,7 +879,8 @@ export function detonateLiveBombs(state: GameState): GameState {
             stats.damageDealt = stats.damageDealt + Math.min(BOMB_ENEMY_DAMAGE, prevHp);
             if (newHp <= 0) {
               const removed = enemies.splice(i, 1)[0];
-              cleanupPinkRing(removed, newMapData.subtypes);
+              // A bomb kill leaves the goblin's teleport ring behind (the pink realm key).
+              dropPinkRingOnDeath(removed, newMapData.subtypes, y, x);
               defeatedEnemies.push({
                 y: removed.y,
                 x: removed.x,
@@ -1162,6 +1169,13 @@ export interface GameState {
   // when the player walks back through the breach.
   inOutsideWorld?: boolean;
   outsideDirection?: Direction;
+  // Pink realm: set while the player has stepped through a pink goblin's leftover
+  // teleport ring. Reuses dungeonReturn for the saved room to come back to.
+  inPinkRealm?: boolean;
+  // Run-level achievement flag: latches true the first time the player warps into
+  // the pink realm and persists for the rest of the run (across returns + floors)
+  // so the endgame results can record that the secret area was found.
+  reachedPinkRealm?: boolean;
   dungeonReturn?: {
     mapData: MapData;
     enemies?: PlainEnemy[];
@@ -1222,26 +1236,42 @@ export function reviveFromLastCheckpoint(
   return restored;
 }
 
-/** Remove the pink ring from the map when a pink goblin dies */
+/**
+ * Remove a pink goblin's teleport ring from the map when it is killed by anything OTHER
+ * than a bomb (rock, melee, hazard). The clean kill lets the goblin's teleport magic
+ * collapse with it — no ring left behind. Restores the ring tile and sweeps any strays.
+ */
 function cleanupPinkRing(enemy: Enemy, subtypes: number[][][]): void {
   if (enemy.kind !== 'pink-goblin') return;
   const mem = enemy.behaviorMemory as { ringY?: number; ringX?: number; ringOrigSubs?: number[] };
-  // Targeted restoration at stored position
+  // Only clear THIS goblin's own ring (at its stored position). No blanket sweep — that
+  // would also wipe other goblins' rings and any bomb-dropped portal we mean to keep.
   if (typeof mem.ringY === 'number' && typeof mem.ringX === 'number') {
     const orig = mem.ringOrigSubs ?? [];
     subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
   }
-  // Full sweep for any stale rings
-  for (let y = 0; y < subtypes.length; y++) {
-    for (let x = 0; x < (subtypes[y]?.length ?? 0); x++) {
-      const s = subtypes[y]?.[x];
-      if (!s) continue;
-      const ri = s.indexOf(TileSubtype.PINK_RING);
-      if (ri !== -1) {
-        s.splice(ri, 1);
-        if (s.length === 0) s.push(TileSubtype.NONE);
-      }
-    }
+}
+
+/**
+ * A BOMB kill of a pink goblin always leaves a teleport ring behind (stepping on it warps
+ * to the pink realm). If the goblin already had a ring out, that one stays; otherwise a
+ * fresh ring drops on the tile where it died. (PINK_RING is bomb-preserved so the blast
+ * that kills the goblin doesn't immediately strip the dropped ring.)
+ */
+function dropPinkRingOnDeath(
+  enemy: Enemy,
+  subtypes: number[][][],
+  deathY: number,
+  deathX: number
+): void {
+  if (enemy.kind !== 'pink-goblin') return;
+  const mem = enemy.behaviorMemory as { ringY?: number; ringX?: number };
+  if (typeof mem.ringY === 'number' && typeof mem.ringX === 'number') {
+    return; // a ring is already out — keep it where the goblin placed it
+  }
+  const s = subtypes[deathY]?.[deathX];
+  if (s && !s.includes(TileSubtype.PINK_RING)) {
+    s.push(TileSubtype.PINK_RING);
   }
 }
 
@@ -1884,6 +1914,70 @@ function enterOutsideWorld(
   };
 }
 
+/** True when a living pink goblin still owns the ring on (y,x) (its active teleport target). */
+function pinkRingClaimedByLiving(
+  state: GameState,
+  y: number,
+  x: number
+): boolean {
+  return (state.enemies ?? []).some((e) => {
+    if (e.kind !== "pink-goblin") return false;
+    const m = e.behaviorMemory as { ringY?: number; ringX?: number };
+    return m?.ringY === y && m?.ringX === x;
+  });
+}
+
+/** Step onto a leftover (unclaimed) pink ring -> warp into the pink realm. */
+function enterPinkRealm(
+  state: GameState,
+  ringPos: [number, number],
+  direction: Direction
+): GameState {
+  const [ry, rx] = ringPos;
+  const dungeonMap = removePlayerFromMapData(state.mapData);
+  // The ring is consumed on entry, so it's gone when the player comes back.
+  if (dungeonMap.subtypes[ry]?.[rx]) {
+    dungeonMap.subtypes[ry][rx] = dungeonMap.subtypes[ry][rx].filter(
+      (t) => t !== TileSubtype.PINK_RING
+    );
+  }
+  const { mapData: realmMap, entry } = buildPinkRealm(state.mapData, ringPos);
+  return {
+    ...state,
+    mapData: placePlayerAt(realmMap, entry),
+    enemies: [],
+    playerDirection: direction,
+    inPinkRealm: true,
+    reachedPinkRealm: true,
+    dungeonReturn: {
+      mapData: dungeonMap,
+      enemies: serializeEnemies(state.enemies),
+      position: ringPos,
+    },
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
+/** Step onto the pink realm's return ring -> restore the saved room. */
+function returnFromPinkRealm(
+  state: GameState,
+  direction: Direction
+): GameState | null {
+  const ret = state.dungeonReturn;
+  if (!ret) return null;
+  return {
+    ...state,
+    mapData: placePlayerAt(ret.mapData, ret.position),
+    enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
+    playerDirection: direction,
+    inPinkRealm: false,
+    dungeonReturn: undefined,
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
 export function movePlayer(
   gameState: GameState,
   direction: Direction
@@ -1945,6 +2039,25 @@ function movePlayerCore(
   // If position didn't change, return state with updated direction only
   if (newY === currentY && newX === currentX) {
     return { ...gameState, playerDirection: direction };
+  }
+
+  // Stepping onto a pink teleport ring warps to / from the pink realm. A ring still owned
+  // by a living pink goblin (its active teleport target) is inert; only a leftover ring
+  // (the goblin died while it was out) warps.
+  {
+    const destTile = gameState.mapData.tiles[newY]?.[newX];
+    const destSubs = gameState.mapData.subtypes[newY]?.[newX] ?? [];
+    if (
+      (destTile === FLOOR || destTile === FLOWERS) &&
+      destSubs.includes(TileSubtype.PINK_RING)
+    ) {
+      if (gameState.inPinkRealm) {
+        const back = returnFromPinkRealm(gameState, direction);
+        if (back) return back;
+      } else if (!pinkRingClaimedByLiving(gameState, newY, newX)) {
+        return enterPinkRealm(gameState, [newY, newX], direction);
+      }
+    }
   }
 
   // Deep clone the map data to avoid modifying the original

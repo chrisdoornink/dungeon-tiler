@@ -37,7 +37,7 @@ import {
 } from "../lib/torch_glow";
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
-import { trackGameComplete, trackUse, trackPickup } from "../lib/analytics";
+import { trackGameComplete, trackUse, trackPickup, trackPinkRealmReached } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { hashStringToSeed } from "../lib/rng";
 import { computeMapId, advanceToNextFloor } from "../lib/map";
@@ -287,6 +287,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     openCenter: { x: number; y: number } | null; // null until floor swap happens
     pendingGameState: GameState | null; // the next-floor state, computed eagerly
   } | null>(null);
+  // When true, the hero sprite flickers (dematerializes) during the active iris transition.
+  // Set only for pink-realm warps, not ordinary floor changes.
+  const [warpFlicker, setWarpFlicker] = useState(false);
 
   const [dialogueSession, setDialogueSession] = useState<DialogueSession | null>(null);
   const [selectedChoiceIndex, setSelectedChoiceIndex] = useState<number>(0);
@@ -1963,6 +1966,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             streak: nextStreak,
             heroHealth: gameState.heroHealth,
             currentFloor: gameState.currentFloor,
+            reachedPinkRealm: !!gameState.reachedPinkRealm,
           };
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2017,6 +2021,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             streak: nextStreak,
             heroHealth: gameState.heroHealth,
             currentFloor: gameState.currentFloor,
+            reachedPinkRealm: !!gameState.reachedPinkRealm,
           };
           if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2320,6 +2325,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause: gameState.deathCause,
           heroHealth: 0, // Always 0 for deaths
           currentFloor: gameState.currentFloor,
+          reachedPinkRealm: !!gameState.reachedPinkRealm,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2351,6 +2357,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause: gameState.deathCause,
           heroHealth: 0, // Always 0 for deaths
           currentFloor: gameState.currentFloor,
+          reachedPinkRealm: !!gameState.reachedPinkRealm,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2432,6 +2439,59 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       const preDamageDealt = gameState.stats?.damageDealt ?? 0;
       const newGameState = movePlayer(gameState, direction);
+
+      // Pink-realm warp: first show the hero step ONTO the ring tile, then flicker
+      // (dematerialize) and run the iris transition into the realm — rather than swapping
+      // the map instantly (which made the hero flicker on the tile beside the ring).
+      if (!!newGameState.inPinkRealm !== !!gameState.inPinkRealm) {
+        // Telemetry: record the first time the player finds the pink realm this run.
+        if (newGameState.inPinkRealm && !gameState.reachedPinkRealm) {
+          try {
+            trackPinkRealmReached({
+              mode: isDailyChallenge ? "daily" : "normal",
+              floor: gameState.currentFloor,
+              dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+            });
+          } catch {}
+        }
+        if (playerPosition) {
+          const [py, px] = playerPosition;
+          let dy = 0,
+            dx = 0;
+          switch (direction) {
+            case Direction.UP: dy = -1; break;
+            case Direction.RIGHT: dx = 1; break;
+            case Direction.DOWN: dy = 1; break;
+            case Direction.LEFT: dx = -1; break;
+          }
+          const destY = py + dy;
+          const destX = px + dx;
+          const interMap = JSON.parse(JSON.stringify(gameState.mapData)) as typeof gameState.mapData;
+          if (interMap.subtypes[py]?.[px]) {
+            interMap.subtypes[py][px] = interMap.subtypes[py][px].filter(
+              (t) => t !== TileSubtype.PLAYER
+            );
+          }
+          if (
+            interMap.subtypes[destY]?.[destX] &&
+            !interMap.subtypes[destY][destX].includes(TileSubtype.PLAYER)
+          ) {
+            interMap.subtypes[destY][destX].push(TileSubtype.PLAYER);
+          }
+          // Show the hero standing on the ring for a beat before it dissolves.
+          setGameState({ ...gameState, mapData: interMap, playerDirection: direction });
+        }
+        setTimeout(() => {
+          setWarpFlicker(true);
+          setFloorTransition({
+            closeCenter: { x: 300, y: 300 },
+            openCenter: { x: 300, y: 300 },
+            pendingGameState: newGameState,
+          });
+        }, 160);
+        return;
+      }
+
       CurrentGameStorage.saveCurrentGame(newGameState, resolvedStorageSlot);
       // Compute floating damage numbers from what the engine actually did.
       // 1) Hero attacking an enemy. movePlayer ticks enemies BEFORE resolving the
@@ -3658,7 +3718,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
                     activeCheckpoint,
-                    heroDeathStateForTiles
+                    heroDeathStateForTiles,
+                    warpFlicker
                   )}
                 </div>
               </div>
@@ -3679,6 +3740,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   }}
                   onComplete={() => {
                     setFloorTransition(null);
+                    setWarpFlicker(false);
                   }}
                 />
               )}
@@ -3898,7 +3960,8 @@ function renderTileGrid(
   hasExitKey?: boolean,
   heroPoisoned: boolean = false,
   activeCheckpoint?: [number, number] | null,
-  heroDeathState?: HeroDeathState
+  heroDeathState?: HeroDeathState,
+  heroWarping: boolean = false
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -4104,6 +4167,7 @@ function renderTileGrid(
             suppressDarknessOverlay={suppressDarknessOverlay}
             activeCheckpoint={activeCheckpoint}
             heroDeathState={isPlayerTile ? heroDeathState : undefined}
+            heroWarping={!!isPlayerTile && heroWarping}
           />
         </div>
       );

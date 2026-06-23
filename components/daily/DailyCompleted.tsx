@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
 // import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
@@ -89,7 +89,12 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     }
   };
 
-  const lastGame = getLastGame();
+  // lastGame is a one-time read from localStorage that never changes while this
+  // screen is mounted. Memoize it so the reference is stable — re-reading on every
+  // render made the badge effect (deps: [lastGame]) re-run forever and trip React's
+  // "Maximum update depth exceeded".
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const lastGame = useMemo(() => getLastGame(), []);
 
   // Generate dynamic badge descriptions based on actual stats
   const getDynamicBadgeDescription = (badge: Badge, game: GameState) => {
@@ -656,6 +661,24 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         </div>
 
         {/* Badges Section - Show earned badges */}
+        {lastGame?.reachedPinkRealm && (
+          <div className="max-w-2xl mx-auto mb-4">
+            <div className="rounded-lg shadow-xl p-5 bg-gradient-to-br from-pink-600/25 to-fuchsia-600/15 border border-pink-400/70">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl" aria-hidden>🔮</div>
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-pink-200">
+                    Secret Found: The Pink Realm
+                  </div>
+                  <div className="text-[11px] text-pink-100/70 leading-snug mt-0.5">
+                    You stepped through a fallen goblin&apos;s ring into the mirror
+                    world. Almost nobody finds this.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {badges.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <div className="rounded-lg shadow-xl p-6 bg-black/50 border border-gray-600">

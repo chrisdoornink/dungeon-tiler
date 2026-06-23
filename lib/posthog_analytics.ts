@@ -140,6 +140,10 @@ export function trackUse(item: "rock" | "rune" | "bomb" | "food" | "potion") {
   captureEvent('item_use', { item });
 }
 
+export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+  captureEvent('pink_realm_reached', { ...params });
+}
+
 export function trackDailyChallenge(action: 'intro_viewed' | 'started' | 'completed', params?: EventParams) {
   captureEvent('daily_challenge', {
     action,

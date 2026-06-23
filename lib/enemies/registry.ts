@@ -235,23 +235,17 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return tiles;
         };
 
-        // Helper: remove any existing ring from the map, restoring original subtypes
+        // Helper: remove THIS goblin's own ring, restoring the tile's original subtypes.
+        // Scoped to mem.ringY/ringX only — no blanket sweep, which would also erase other
+        // pink goblins' rings or a bomb-dropped portal left for the player.
         const removeRing = () => {
-          if (!subtypes) { delete mem.ringY; delete mem.ringX; delete mem.ringOrigSubs; return; }
-          if (typeof mem.ringY === "number" && typeof mem.ringX === "number") {
+          if (
+            subtypes &&
+            typeof mem.ringY === "number" &&
+            typeof mem.ringX === "number"
+          ) {
             const orig = mem.ringOrigSubs ?? [];
             subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
-          }
-          for (let y = 0; y < H; y++) {
-            for (let x = 0; x < W; x++) {
-              const s = subtypes[y]?.[x];
-              if (!s) continue;
-              const ri = s.indexOf(TileSubtype.PINK_RING);
-              if (ri !== -1) {
-                s.splice(ri, 1);
-                if (s.length === 0) s.push(TileSubtype.NONE);
-              }
-            }
           }
           delete mem.ringY;
           delete mem.ringX;

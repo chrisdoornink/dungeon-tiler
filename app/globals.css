@@ -398,6 +398,16 @@ body {
   animation: heartPop 600ms ease-out forwards;
 }
 
+/* Hero teleport dematerialize: rapid opacity flicker while the iris transition plays. */
+@keyframes heroWarpFlicker {
+  0% { opacity: 1; }
+  20% { opacity: 0.25; }
+  40% { opacity: 0.7; }
+  60% { opacity: 0.1; }
+  80% { opacity: 0.5; }
+  100% { opacity: 0.85; }
+}
+
 /* Bomb detonation: each BAM frame scales up and fades. Three are layered with
    staggered delays for a big, cartoonish, multi-pop explosion. --bam-rot varies the
    rotation per layer so the stacked frames don't look identical. */

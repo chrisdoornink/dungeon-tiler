@@ -38,3 +38,7 @@ export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "roc
 export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion") {
   posthogAnalytics.trackUse(name);
 }
+
+export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+  posthogAnalytics.trackPinkRealmReached(params);
+}
