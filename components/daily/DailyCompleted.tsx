@@ -660,25 +660,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           </div>
         </div>
 
-        {/* Badges Section - Show earned badges */}
-        {lastGame?.reachedPinkRealm && (
-          <div className="max-w-2xl mx-auto mb-4">
-            <div className="rounded-lg shadow-xl p-5 bg-gradient-to-br from-pink-600/25 to-fuchsia-600/15 border border-pink-400/70">
-              <div className="flex items-center gap-3">
-                <div className="text-3xl" aria-hidden>🔮</div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-pink-200">
-                    Secret Found: The Pink Realm
-                  </div>
-                  <div className="text-[11px] text-pink-100/70 leading-snug mt-0.5">
-                    You stepped through a fallen goblin&apos;s ring into the mirror
-                    world. Almost nobody finds this.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Badges Section - Show earned badges.
+            Note: reachedPinkRealm is intentionally tracked silently (run-level flag +
+            pink_realm_reached PostHog event + lastGame payload) but NOT shown here yet —
+            a richer realm reveal will land once the realm has real secrets/stats. */}
         {badges.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <div className="rounded-lg shadow-xl p-6 bg-black/50 border border-gray-600">
