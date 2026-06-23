@@ -1,5 +1,6 @@
 import { allocateChestsAndKeys } from '../../lib/map/map-features';
 import { TileSubtype } from '../../lib/map/constants';
+import { mulberry32, withPatchedMathRandom } from '../../lib/rng';
 
 describe('Multi-tier chest/key allocation', () => {
   // Run multiple iterations to cover randomness
@@ -18,12 +19,30 @@ describe('Multi-tier chest/key allocation', () => {
     }
   });
 
-  test('snake medallion chest is placed only on floor 2', () => {
+  // Daily reproducibility contract: the draw uses the externally-seeded Math.random,
+  // so the same seed must always yield the same Floor 2 items, and different seeds
+  // are allowed to differ. This guards the seeding dependency (see allocateChestsAndKeys).
+  test('a fixed seed always produces the same Floor 2 draw', () => {
+    const drawForSeed = (seed: number) =>
+      withPatchedMathRandom(mulberry32(seed), () => allocateChestsAndKeys().get(2)!.chestContents);
+
+    expect(drawForSeed(12345)).toEqual(drawForSeed(12345));
+    expect(drawForSeed(777)).toEqual(drawForSeed(777));
+
+    // Across a spread of seeds, at least two distinct draws appear (the pool actually varies).
+    const draws = new Set(
+      Array.from({ length: 20 }, (_, i) => drawForSeed(1000 + i).join(','))
+    );
+    expect(draws.size).toBeGreaterThan(1);
+  });
+
+  test('Level 2 optional items (bomb / medallion / heart) only ever appear on floor 2', () => {
+    const optional = [TileSubtype.SNAKE_MEDALLION, TileSubtype.EXTRA_HEART, TileSubtype.BOMB];
     for (let i = 0; i < ITERATIONS; i++) {
       const alloc = allocateChestsAndKeys();
       for (const [floor, data] of alloc.entries()) {
         for (const content of data.chestContents) {
-          if (content === TileSubtype.SNAKE_MEDALLION) {
+          if (optional.includes(content)) {
             expect(floor).toBe(2);
           }
         }
@@ -31,28 +50,49 @@ describe('Multi-tier chest/key allocation', () => {
     }
   });
 
-  test('exactly 4 chests total: 2 on floor 1 (sword + shield) and 2 on floor 2 (medallion + heart)', () => {
+  test('Floor 2 draws exactly 2 distinct items from the optional pool each run', () => {
+    const pool = new Set([
+      TileSubtype.SNAKE_MEDALLION,
+      TileSubtype.EXTRA_HEART,
+      TileSubtype.BOMB,
+    ]);
+    for (let i = 0; i < ITERATIONS; i++) {
+      const f2 = allocateChestsAndKeys().get(2)!;
+      expect(f2.chestContents.length).toBe(2);
+      // distinct
+      expect(new Set(f2.chestContents).size).toBe(2);
+      // all drawn from the pool
+      for (const c of f2.chestContents) expect(pool.has(c)).toBe(true);
+    }
+  });
+
+  test('over many runs, every optional item appears on floor 2 at least once', () => {
+    const seen = new Set<number>();
+    for (let i = 0; i < 200; i++) {
+      const f2 = allocateChestsAndKeys().get(2)!;
+      for (const c of f2.chestContents) seen.add(c);
+    }
+    expect(seen.has(TileSubtype.SNAKE_MEDALLION)).toBe(true);
+    expect(seen.has(TileSubtype.EXTRA_HEART)).toBe(true);
+    expect(seen.has(TileSubtype.BOMB)).toBe(true);
+  });
+
+  test('exactly 4 chests total: F1 sword+shield, F2 two optional items', () => {
     for (let i = 0; i < ITERATIONS; i++) {
       const alloc = allocateChestsAndKeys();
       let totalChests = 0;
       let hasSword = false;
       let hasShield = false;
-      let hasMedallion = false;
-      let hasHeart = false;
       for (const [, data] of alloc.entries()) {
         totalChests += data.chests;
         for (const content of data.chestContents) {
           if (content === TileSubtype.SWORD) hasSword = true;
           if (content === TileSubtype.SHIELD) hasShield = true;
-          if (content === TileSubtype.SNAKE_MEDALLION) hasMedallion = true;
-          if (content === TileSubtype.EXTRA_HEART) hasHeart = true;
         }
       }
       expect(totalChests).toBe(4);
       expect(hasSword).toBe(true);
       expect(hasShield).toBe(true);
-      expect(hasMedallion).toBe(true);
-      expect(hasHeart).toBe(true);
     }
   });
 

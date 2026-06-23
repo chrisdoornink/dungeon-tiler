@@ -7,6 +7,7 @@ import {
   TileSubtype,
   performThrowRock,
   performThrowRune,
+  performThrowBomb,
   performUseFood,
   performUsePotion,
   reviveFromLastCheckpoint,
@@ -246,6 +247,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   }>(null);
   // Transient moving rune effect
   const [runeEffect, setRuneEffect] = useState<null | {
+    y: number;
+    x: number;
+    id: string;
+  }>(null);
+  // Transient flying bomb effect (travels to its resting tile before it arms)
+  const [bombThrowEffect, setBombThrowEffect] = useState<null | {
     y: number;
     x: number;
     id: string;
@@ -620,148 +627,77 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     try {
       trackUse("rune");
     } catch {}
-    setGameState((prev) => {
-      const count = prev.runeCount ?? 0;
-      if (count <= 0) return prev;
-      const pos = playerPosition;
-      if (!pos) return prev;
-      const [py, px] = pos;
-      // Determine direction vector
-      let vx = 0,
-        vy = 0;
-      switch (prev.playerDirection) {
-        case Direction.UP:
-          vy = -1;
-          break;
-        case Direction.RIGHT:
-          vx = 1;
-          break;
-        case Direction.DOWN:
-          vy = 1;
-          break;
-        case Direction.LEFT:
-          vx = -1;
-          break;
+    const prev = gameState;
+    const count = prev.runeCount ?? 0;
+    if (count <= 0) return;
+    const pos = playerPosition;
+    if (!pos) return;
+    const [py, px] = pos;
+    // Determine direction vector
+    let vx = 0,
+      vy = 0;
+    switch (prev.playerDirection) {
+      case Direction.UP:
+        vy = -1;
+        break;
+      case Direction.RIGHT:
+        vx = 1;
+        break;
+      case Direction.DOWN:
+        vy = 1;
+        break;
+      case Direction.LEFT:
+        vx = -1;
+        break;
+    }
+
+    // Compute animation path (up to 4 steps)
+    const path: Array<[number, number]> = [];
+    let ty = py,
+      tx = px;
+    let impact: { y: number; x: number } | null = null;
+    for (let step = 1; step <= 4; step++) {
+      ty += vy;
+      tx += vx;
+      // Out of bounds: stop before leaving grid
+      if (
+        ty < 0 ||
+        ty >= prev.mapData.tiles.length ||
+        tx < 0 ||
+        tx >= prev.mapData.tiles[0].length
+      ) {
+        const last = path[path.length - 1];
+        if (last) impact = { y: last[0], x: last[1] };
+        break;
       }
-
-      // Compute animation path (up to 4 steps)
-      const path: Array<[number, number]> = [];
-      let ty = py,
-        tx = px;
-      let impact: { y: number; x: number } | null = null;
-      for (let step = 1; step <= 4; step++) {
-        ty += vy;
-        tx += vx;
-        // Out of bounds: stop before leaving grid
-        if (
-          ty < 0 ||
-          ty >= prev.mapData.tiles.length ||
-          tx < 0 ||
-          tx >= prev.mapData.tiles[0].length
-        ) {
-          const last = path[path.length - 1];
-          if (last) impact = { y: last[0], x: last[1] };
-          break;
-        }
-        // If wall, stop before entering wall (rune will drop on the last traversed floor tile)
-        if (prev.mapData.tiles[ty][tx] !== 0) {
-          const last = path[path.length - 1];
-          if (last) impact = { y: last[0], x: last[1] };
-          break;
-        }
-        // Add floor step
-        path.push([ty, tx]);
-        // If enemy at tile, include and stop
-        const enemies = prev.enemies ?? [];
-        const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
-        if (enemyAt) {
-          impact = { y: ty, x: tx };
-          break;
-        }
-        // If pot at tile, include and stop
-        const subs = prev.mapData.subtypes[ty][tx] || [];
-        if (subs.includes(TileSubtype.POT)) {
-          impact = { y: ty, x: tx };
-          break;
-        }
+      // If wall, stop before entering wall (rune will drop on the last traversed floor tile)
+      if (prev.mapData.tiles[ty][tx] !== 0) {
+        const last = path[path.length - 1];
+        if (last) impact = { y: last[0], x: last[1] };
+        break;
       }
-
-      // Run the animation
-      if (path.length > 0) {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        let idx = 0;
-        setRuneEffect({ y: path[0][0], x: path[0][1], id });
-        const stepMs = 50;
-        const interval = setInterval(() => {
-          idx += 1;
-          if (idx >= path.length || !path[idx]) {
-            clearInterval(interval);
-            setRuneEffect((cur) => (cur && cur.id === id ? null : cur));
-            return;
-          }
-          const [ny, nx] = path[idx];
-          setRuneEffect((cur) =>
-            cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
-          );
-        }, stepMs);
-        // Safety: clear after 1s
-        setTimeout(() => {
-          setRuneEffect((cur) => (cur && cur.id === id ? null : cur));
-        }, 1000);
-
-        // Schedule BAM effect at impact position timed with animation arrival
-        if (impact) {
-          const bamDelay = Math.max(0, path.length) * stepMs + 10;
-          setTimeout(() => {
-            const bamIdx = 1 + Math.floor(Math.random() * 3);
-            setBamEffect({
-              y: impact.y,
-              x: impact.x,
-              src: `/images/items/bam${bamIdx}.png`,
-            });
-            setTimeout(() => setBamEffect(null), 300);
-            triggerScreenShake();
-          }, bamDelay);
-        }
-
-        // If clear path (no impact and path reached 4), delay applying game logic until animation completes
-        if (!impact && path.length === 4) {
-          setTimeout(() => {
-            setGameState((p2) => {
-              const next = performThrowRune(p2);
-              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
-              try {
-                const died = next.recentDeaths || [];
-                if (died.length > 0) {
-                  const now = Date.now();
-                  setSpirits((prevS) => {
-                    const out = [...prevS];
-                    for (const [y, x] of died) {
-                      const key = `${y},${x}`;
-                      const sid = `${key}-${now}-${Math.random()
-                        .toString(36)
-                        .slice(2, 7)}`;
-                      out.push({ id: sid, y, x, createdAt: now });
-                      setTimeout(() => {
-                        setSpirits((curr) => curr.filter((s) => s.id !== sid));
-                      }, 2000);
-                    }
-                    return out;
-                  });
-                }
-              } catch (err) {
-                console.error("Rune kill spirit spawn error:", err);
-              }
-              return next;
-            });
-          }, path.length * stepMs + 10);
-          return prev;
-        }
+      // Add floor step
+      path.push([ty, tx]);
+      // If enemy at tile, include and stop
+      const enemies = prev.enemies ?? [];
+      const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
+      if (enemyAt) {
+        impact = { y: ty, x: tx };
+        break;
       }
+      // If pot at tile, include and stop
+      const subs = prev.mapData.subtypes[ty][tx] || [];
+      if (subs.includes(TileSubtype.POT)) {
+        impact = { y: ty, x: tx };
+        break;
+      }
+    }
 
-      // Apply game logic immediately for collisions or early stops
+    // Apply the throw outcome as a VALUE (StrictMode-safe), plus spirit VFX for kills.
+    const applyNext = () => {
       const next = performThrowRune(prev);
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      setGameState(next);
       try {
         const died = next.recentDeaths || [];
         if (died.length > 0) {
@@ -784,9 +720,57 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       } catch (err) {
         console.error("Rune kill spirit spawn error:", err);
       }
-      return next;
-    });
-  }, [playerPosition, resolvedStorageSlot]);
+    };
+
+    // Run the animation
+    if (path.length > 0) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      let idx = 0;
+      setRuneEffect({ y: path[0][0], x: path[0][1], id });
+      const stepMs = 50;
+      const interval = setInterval(() => {
+        idx += 1;
+        if (idx >= path.length || !path[idx]) {
+          clearInterval(interval);
+          setRuneEffect((cur) => (cur && cur.id === id ? null : cur));
+          return;
+        }
+        const [ny, nx] = path[idx];
+        setRuneEffect((cur) =>
+          cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+        );
+      }, stepMs);
+      // Safety: clear after 1s
+      setTimeout(() => {
+        setRuneEffect((cur) => (cur && cur.id === id ? null : cur));
+      }, 1000);
+
+      // Schedule BAM effect at impact position timed with animation arrival
+      if (impact) {
+        const imp = impact;
+        const bamDelay = Math.max(0, path.length) * stepMs + 10;
+        setTimeout(() => {
+          const bamIdx = 1 + Math.floor(Math.random() * 3);
+          setBamEffect({
+            y: imp.y,
+            x: imp.x,
+            src: `/images/items/bam${bamIdx}.png`,
+          });
+          setTimeout(() => setBamEffect(null), 300);
+          triggerScreenShake();
+        }, bamDelay);
+      }
+
+      // If clear path (no impact and path reached 4), delay applying game logic until animation completes
+      if (!impact && path.length === 4) {
+        setTimeout(applyNext, path.length * stepMs + 10);
+        return;
+      }
+    }
+
+    // Apply game logic immediately for collisions or early stops
+    applyNext();
+  }, [gameState, playerPosition, resolvedStorageSlot]);
 
   const applyDialogueCompletionEffects = useCallback(
     (session: DialogueSession) => {
@@ -1216,153 +1200,192 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState, resolvedStorageSlot]);
 
-  // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via performThrowRock
+  // Handle throwing a bomb. Unlike a rock it does not detonate on impact: it comes to
+  // rest on the floor tile before the wall and arms a 1-turn fuse (see performThrowBomb).
+  // The detonation + explosion VFX fire on the player's next turn.
+  //
+  // NOTE: all side effects (flight animation + arming) run in the handler body and arm
+  // the bomb by setting a VALUE (not a function updater). React StrictMode double-invokes
+  // state *updater functions* in dev; doing the work here instead keeps it to a single
+  // throw (an earlier version set up the flight inside an updater, so StrictMode ran it
+  // twice — detonating the first bomb on impact and arming a second).
+  const handleThrowBomb = useCallback(() => {
+    try {
+      trackUse("bomb");
+    } catch {}
+    if ((gameState.bombCount ?? 0) <= 0) return;
+    const pos = playerPosition;
+    if (!pos) return;
+    const [py, px] = pos;
+
+    // Direction vector
+    let vx = 0,
+      vy = 0;
+    switch (gameState.playerDirection) {
+      case Direction.UP:
+        vy = -1;
+        break;
+      case Direction.RIGHT:
+        vx = 1;
+        break;
+      case Direction.DOWN:
+        vy = 1;
+        break;
+      case Direction.LEFT:
+        vx = -1;
+        break;
+    }
+
+    // Mirror performThrowBomb's resting logic: travel over floor up to 4 tiles, stopping
+    // before the first wall/obstacle/edge OR enemy. The path is the floor tiles the flying
+    // bomb visibly crosses before it comes to rest.
+    const bombEnemies = gameState.enemies ?? [];
+    const path: Array<[number, number]> = [];
+    for (let step = 1; step <= 4; step++) {
+      const ny = py + vy * step;
+      const nx = px + vx * step;
+      if (
+        ny < 0 ||
+        ny >= gameState.mapData.tiles.length ||
+        nx < 0 ||
+        nx >= gameState.mapData.tiles[0].length
+      )
+        break;
+      const tile = gameState.mapData.tiles[ny][nx];
+      if (tile !== 0 && tile !== 5) break; // not FLOOR/FLOWERS
+      if (bombEnemies.some((e) => e.y === ny && e.x === nx)) break; // stop in front of enemy
+      path.push([ny, nx]);
+    }
+
+    // Arm the bomb (this is the throw "turn"). Computing a value and setting it — rather
+    // than passing an updater function — is the StrictMode-safe pattern used by movePlayer,
+    // so performThrowBomb's enemy tick runs exactly once.
+    const arm = () => {
+      const next = performThrowBomb(gameState);
+      CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      setGameState(next);
+    };
+
+    // No travel (a wall is right in front) — the bomb rests at the player's feet, arm now.
+    if (path.length === 0) {
+      arm();
+      return;
+    }
+
+    // Animate the bomb flying to its resting tile, then arm it.
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    let idx = 0;
+    setBombThrowEffect({ y: path[0][0], x: path[0][1], id });
+    const stepMs = 45;
+    const interval = setInterval(() => {
+      idx += 1;
+      if (idx >= path.length || !path[idx]) {
+        clearInterval(interval);
+        setBombThrowEffect((cur) => (cur && cur.id === id ? null : cur));
+        arm();
+        return;
+      }
+      const [ny, nx] = path[idx];
+      setBombThrowEffect((cur) =>
+        cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+      );
+    }, stepMs);
+    // Safety: clear the effect after 1s in case the interval is interrupted.
+    setTimeout(() => {
+      setBombThrowEffect((cur) => (cur && cur.id === id ? null : cur));
+    }, 1000);
+  }, [gameState, playerPosition, resolvedStorageSlot]);
+
+  // Handle throwing a rock: animate a rock moving up to 4 tiles, then update game state via
+  // performThrowRock. All side effects run in the handler body and state is applied as a
+  // VALUE (not a function updater), so React StrictMode's dev double-invoke can't double-throw.
   const handleThrowRock = useCallback(() => {
     try {
       trackUse("rock");
     } catch {}
-    setGameState((prev) => {
-      const count = prev.rockCount ?? 0;
-      if (count <= 0) return prev;
-      const pos = playerPosition;
-      if (!pos) return prev;
-      const [py, px] = pos;
-      // Determine direction vector
-      let vx = 0,
-        vy = 0;
-      switch (prev.playerDirection) {
-        case Direction.UP:
-          vy = -1;
-          break;
-        case Direction.RIGHT:
-          vx = 1;
-          break;
-        case Direction.DOWN:
-          vy = 1;
-          break;
-        case Direction.LEFT:
-          vx = -1;
-          break;
+    const prev = gameState;
+    const count = prev.rockCount ?? 0;
+    if (count <= 0) return;
+    const pos = playerPosition;
+    if (!pos) return;
+    const [py, px] = pos;
+    // Determine direction vector
+    let vx = 0,
+      vy = 0;
+    switch (prev.playerDirection) {
+      case Direction.UP:
+        vy = -1;
+        break;
+      case Direction.RIGHT:
+        vx = 1;
+        break;
+      case Direction.DOWN:
+        vy = 1;
+        break;
+      case Direction.LEFT:
+        vx = -1;
+        break;
+    }
+
+    // Compute animation path (up to 4 steps)
+    const path: Array<[number, number]> = [];
+    let ty = py,
+      tx = px;
+    let impact: { y: number; x: number } | null = null;
+    // Track pre-hit enemy (if any) at the impact tile to compute floating damage later
+    let preEnemyAtImpact: Enemy | undefined;
+    let preEnemyHealth = 0;
+    for (let step = 1; step <= 4; step++) {
+      ty += vy;
+      tx += vx;
+      // Out of bounds: stop before leaving grid
+      if (
+        ty < 0 ||
+        ty >= prev.mapData.tiles.length ||
+        tx < 0 ||
+        tx >= prev.mapData.tiles[0].length
+      ) {
+        // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
+        const last = path[path.length - 1];
+        if (last) impact = { y: last[0], x: last[1] };
+        break;
       }
-
-      // Compute animation path (up to 4 steps)
-      const path: Array<[number, number]> = [];
-      let ty = py,
-        tx = px;
-      let impact: { y: number; x: number } | null = null;
-      // Track pre-hit enemy (if any) at the impact tile to compute floating damage later
-      let preEnemyAtImpact: Enemy | undefined;
-      let preEnemyHealth = 0;
-      for (let step = 1; step <= 4; step++) {
-        ty += vy;
-        tx += vx;
-        // Out of bounds: stop before leaving grid
-        if (
-          ty < 0 ||
-          ty >= prev.mapData.tiles.length ||
-          tx < 0 ||
-          tx >= prev.mapData.tiles[0].length
-        ) {
-          // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
-          const last = path[path.length - 1];
-          if (last) impact = { y: last[0], x: last[1] };
-          break;
-        }
-        // If wall, stop before entering wall
-        if (prev.mapData.tiles[ty][tx] !== 0) {
-          // Impact on the wall tile
-          impact = { y: ty, x: tx };
-          break;
-        }
-        path.push([ty, tx]);
-        // If enemy at tile, include and stop
-        const enemies = prev.enemies ?? [];
-        const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
-        const hitEnemy = !!enemyAt;
-        if (hitEnemy) {
-          impact = { y: ty, x: tx };
-          preEnemyAtImpact = enemyAt;
-          preEnemyHealth = enemyAt!.health;
-          break;
-        }
-        // If pot at tile, include and stop (already included above)
-        const subs = prev.mapData.subtypes[ty][tx] || [];
-        if (subs.includes(TileSubtype.POT)) {
-          impact = { y: ty, x: tx };
-          break;
-        }
+      // If wall, stop before entering wall
+      if (prev.mapData.tiles[ty][tx] !== 0) {
+        // Impact on the wall tile
+        impact = { y: ty, x: tx };
+        break;
       }
-
-      // Run the animation
-      if (path.length > 0) {
-        const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        let idx = 0;
-        setRockEffect({ y: path[0][0], x: path[0][1], id });
-        const stepMs = 50; // faster animation per tile
-        const interval = setInterval(() => {
-          idx += 1;
-          if (idx >= path.length || !path[idx]) {
-            clearInterval(interval);
-            setRockEffect((cur) => (cur && cur.id === id ? null : cur));
-            return;
-          }
-          const [ny, nx] = path[idx];
-          setRockEffect((cur) =>
-            cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
-          );
-        }, stepMs);
-        // Safety: clear after 1s
-        setTimeout(() => {
-          setRockEffect((cur) => (cur && cur.id === id ? null : cur));
-        }, 1000);
-
-        // Schedule BAM effect at impact position timed with animation arrival
-        if (impact) {
-          const bamDelay = Math.max(0, path.length) * stepMs + 10;
-          setTimeout(() => {
-            const bamIdx = 1 + Math.floor(Math.random() * 3);
-            setBamEffect({
-              y: impact.y,
-              x: impact.x,
-              src: `/images/items/bam${bamIdx}.png`,
-            });
-            setTimeout(() => setBamEffect(null), 300);
-            triggerScreenShake();
-          }, bamDelay);
-        }
-
-        // If clear path (no impact and path reached 4), delay applying game logic until animation completes
-        if (!impact && path.length === 4) {
-          setTimeout(() => {
-            setGameState((p2) => {
-              const next = performThrowRock(p2);
-              CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
-              return next;
-            });
-          }, path.length * stepMs + 10);
-          // Return previous state for now so the rock doesn't appear early
-          return prev;
-        }
+      path.push([ty, tx]);
+      // If enemy at tile, include and stop
+      const enemies = prev.enemies ?? [];
+      const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
+      const hitEnemy = !!enemyAt;
+      if (hitEnemy) {
+        impact = { y: ty, x: tx };
+        preEnemyAtImpact = enemyAt;
+        preEnemyHealth = enemyAt!.health;
+        break;
       }
-      // If there was an immediate impact with no path advanced (e.g., wall adjacent), still show BAM
-      else if (impact) {
-        const bamIdx = 1 + Math.floor(Math.random() * 3);
-        setBamEffect({
-          y: impact.y,
-          x: impact.x,
-          src: `/images/items/bam${bamIdx}.png`,
-        });
-        setTimeout(() => setBamEffect(null), 300);
+      // If pot at tile, include and stop (already included above)
+      const subs = prev.mapData.subtypes[ty][tx] || [];
+      if (subs.includes(TileSubtype.POT)) {
+        impact = { y: ty, x: tx };
+        break;
       }
+    }
 
-      // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
+    // Apply the throw outcome as a VALUE, plus the post-throw VFX (floating damage, spirits).
+    const applyNext = () => {
       const next = performThrowRock(prev);
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+      setGameState(next);
       try {
         // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
         if (preEnemyAtImpact && impact) {
+          const imp = impact;
           const postEnemy = (next.enemies || []).find(
-            (e) => e.y === impact.y && e.x === impact.x
+            (e) => e.y === imp.y && e.x === imp.x
           );
           const preHP =
             typeof preEnemyHealth === "number" && !Number.isNaN(preEnemyHealth)
@@ -1379,16 +1402,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           if (dmg > 0 && Number.isFinite(dmg)) {
             const spawn = () => {
               const now = Date.now();
-              const id = `fd-enemy-${impact!.y},${
-                impact!.x
-              }-${now}-${Math.random().toString(36).slice(2, 7)}`;
+              const id = `fd-enemy-${imp.y},${imp.x}-${now}-${Math.random()
+                .toString(36)
+                .slice(2, 7)}`;
               setFloating((prevF) => {
                 const nextF: FloatingNumber[] = [
                   ...prevF,
                   {
                     id,
-                    y: impact!.y,
-                    x: impact!.x,
+                    y: imp.y,
+                    x: imp.x,
                     amount: dmg,
                     target: "enemy",
                     sign: "-",
@@ -1437,9 +1460,67 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       } catch (err) {
         console.error("Rock kill spirit spawn error:", err);
       }
-      return next;
-    });
-  }, [playerPosition, resolvedStorageSlot]);
+    };
+
+    // Run the animation
+    if (path.length > 0) {
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      let idx = 0;
+      setRockEffect({ y: path[0][0], x: path[0][1], id });
+      const stepMs = 50; // faster animation per tile
+      const interval = setInterval(() => {
+        idx += 1;
+        if (idx >= path.length || !path[idx]) {
+          clearInterval(interval);
+          setRockEffect((cur) => (cur && cur.id === id ? null : cur));
+          return;
+        }
+        const [ny, nx] = path[idx];
+        setRockEffect((cur) =>
+          cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+        );
+      }, stepMs);
+      // Safety: clear after 1s
+      setTimeout(() => {
+        setRockEffect((cur) => (cur && cur.id === id ? null : cur));
+      }, 1000);
+
+      // Schedule BAM effect at impact position timed with animation arrival
+      if (impact) {
+        const imp = impact;
+        const bamDelay = Math.max(0, path.length) * stepMs + 10;
+        setTimeout(() => {
+          const bamIdx = 1 + Math.floor(Math.random() * 3);
+          setBamEffect({
+            y: imp.y,
+            x: imp.x,
+            src: `/images/items/bam${bamIdx}.png`,
+          });
+          setTimeout(() => setBamEffect(null), 300);
+          triggerScreenShake();
+        }, bamDelay);
+      }
+
+      // If clear path (no impact and path reached 4), delay applying game logic until animation completes
+      if (!impact && path.length === 4) {
+        setTimeout(applyNext, path.length * stepMs + 10);
+        return;
+      }
+    }
+    // If there was an immediate impact with no path advanced (e.g., wall adjacent), still show BAM
+    else if (impact) {
+      const bamIdx = 1 + Math.floor(Math.random() * 3);
+      setBamEffect({
+        y: impact.y,
+        x: impact.x,
+        src: `/images/items/bam${bamIdx}.png`,
+      });
+      setTimeout(() => setBamEffect(null), 300);
+    }
+
+    // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
+    applyNext();
+  }, [gameState, playerPosition, resolvedStorageSlot]);
 
   // Handle bookshelf interactions
   useEffect(() => {
@@ -2004,6 +2085,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     shield: false,
     rocks: 0,
     runes: 0,
+    bombs: 0,
     food: 0,
     chestKeys: 0,
   });
@@ -2027,6 +2109,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), duration);
   };
+
+  // Shake the screen once whenever a bomb detonates this turn.
+  const lastBombBlastKeyRef = useRef<string>("");
+  useEffect(() => {
+    const blasts = gameState?.recentBombBlasts ?? [];
+    if (blasts.length === 0) {
+      lastBombBlastKeyRef.current = "";
+      return;
+    }
+    const key = blasts.map(([y, x]) => `${y},${x}`).join("|");
+    if (key === lastBombBlastKeyRef.current) return;
+    lastBombBlastKeyRef.current = key;
+    triggerScreenShake(360);
+  }, [gameState?.recentBombBlasts]);
 
   useEffect(() => {
     try {
@@ -2062,6 +2158,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         trackPickup("rune");
         triggerItemPickupAnimation("rune");
       }
+      if ((gameState.bombCount ?? 0) > prevInv.bombs) {
+        trackPickup("bomb");
+        triggerItemPickupAnimation("bomb");
+      }
       if ((gameState.foodCount ?? 0) > prevInv.food) {
         trackPickup("food");
         triggerItemPickupAnimation("food");
@@ -2074,6 +2174,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       shield: !!gameState.hasShield,
       rocks: gameState.rockCount ?? 0,
       runes: gameState.runeCount ?? 0,
+      bombs: gameState.bombCount ?? 0,
       food: gameState.foodCount ?? 0,
       chestKeys: gameState.chestKeyCount ?? 0,
     };
@@ -2084,6 +2185,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       nextInv.shield !== prevInv.shield ||
       nextInv.rocks !== prevInv.rocks ||
       nextInv.runes !== prevInv.runes ||
+      nextInv.bombs !== prevInv.bombs ||
       nextInv.food !== prevInv.food ||
       nextInv.chestKeys !== prevInv.chestKeys;
     if (changed) {
@@ -2607,6 +2709,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Use a rune
           handleThrowRune();
           return;
+        case "b":
+        case "B":
+          // Throw a bomb
+          handleThrowBomb();
+          return;
         case "f":
         case "F":
           // Use food
@@ -2645,6 +2752,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleMoveInput,
     handleThrowRock,
     handleThrowRune,
+    handleThrowBomb,
     handleUseFood,
     handleUsePotion,
     handleSnakeMedallionClick,
@@ -3087,6 +3195,48 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         )}
                       </button>
                     )}
+                    {(gameState.bombCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleThrowBomb}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Throw bomb (${gameState.bombCount}) — tap or press B`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/bomb-black.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              B
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.bombCount}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Bomb x{gameState.bombCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or B)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
                     {(gameState.foodCount ?? 0) > 0 && (
                       <button
                         type="button"
@@ -3229,6 +3379,32 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       />
                     );
                   })()}
+                {bombThrowEffect &&
+                  (() => {
+                    const tileSize = 40;
+                    const pxLeft = (bombThrowEffect.x + 0.5) * tileSize;
+                    const pxTop = (bombThrowEffect.y + 0.5) * tileSize;
+                    const size = 26;
+                    return (
+                      <div
+                        aria-hidden="true"
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${pxLeft - size / 2}px`,
+                          top: `${pxTop - size / 2}px`,
+                          width: `${size}px`,
+                          height: `${size}px`,
+                          zIndex: 11900,
+                          backgroundImage: "url(/images/items/bomb-black.png)",
+                          backgroundSize: "contain",
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "center",
+                          filter: "drop-shadow(0 1px 1px rgba(0,0,0,0.5))",
+                          transition: `left 45ms linear, top 45ms linear`,
+                        }}
+                      />
+                    );
+                  })()}
                 {runeEffect &&
                   (() => {
                     const tileSize = 40;
@@ -3283,6 +3459,51 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         }}
                       />
                     );
+                  })()}
+                {/* Bomb detonation: the three BAM frames layered and scaled up over the
+                    3x3 blast, triggered in a staggered sequence for a big cartoon boom. */}
+                {(gameState.recentBombBlasts ?? []).length > 0 &&
+                  (() => {
+                    const tileSize = 40; // px
+                    const size = Math.round(tileSize * 3.6); // ~144px, covers 3x3 + spill
+                    const bamSrcs = [
+                      "/images/items/bam1.png",
+                      "/images/items/bam2.png",
+                      "/images/items/bam3.png",
+                    ];
+                    const rots = [-12, 10, 0];
+                    const out: React.ReactNode[] = [];
+                    (gameState.recentBombBlasts ?? []).forEach(([by, bx], i) => {
+                      const pxLeft = (bx + 0.5) * tileSize;
+                      const pxTop = (by + 0.5) * tileSize;
+                      bamSrcs.forEach((src, k) => {
+                        out.push(
+                          <div
+                            key={`bomb-bam-${by}-${bx}-${i}-${k}`}
+                            data-testid="bomb-blast-effect"
+                            aria-hidden="true"
+                            className="absolute pointer-events-none"
+                            style={
+                              {
+                                left: `${pxLeft - size / 2}px`,
+                                top: `${pxTop - size / 2}px`,
+                                width: `${size}px`,
+                                height: `${size}px`,
+                                backgroundImage: `url(${src})`,
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                                zIndex: 12500 + k,
+                                opacity: 0,
+                                "--bam-rot": `${rots[k]}deg`,
+                                animation: `bombBam 480ms ease-out ${k * 90}ms forwards`,
+                              } as React.CSSProperties
+                            }
+                          />
+                        );
+                      });
+                    });
+                    return out;
                   })()}
                 {floating.length > 0 &&
                   (() => {
@@ -3576,6 +3797,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         rockCount={gameState.rockCount ?? 0}
         onUseRune={handleThrowRune}
         runeCount={gameState.runeCount ?? 0}
+        onThrowBomb={handleThrowBomb}
+        bombCount={gameState.bombCount ?? 0}
       />
     </div>
   );

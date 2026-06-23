@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 interface DeathScreenProps {
   deathCause?: {
-    type: 'enemy' | 'faulty_floor' | 'poison';
+    type: 'enemy' | 'faulty_floor' | 'poison' | 'bomb';
     enemyKind?: string;
   };
   onRestart: () => void;
@@ -27,6 +27,8 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
         return 'You fell into the abyss';
       case 'poison':
         return 'The poison consumed you';
+      case 'bomb':
+        return 'Caught in your own bomb blast';
       case 'enemy':
         const enemyName = deathCause.enemyKind || 'enemy';
         const formattedName = enemyName

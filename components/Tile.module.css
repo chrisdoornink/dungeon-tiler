@@ -416,6 +416,85 @@
   }
 }
 
+/* Bomb (revealed in an opened chest) uses the black bomb sprite. */
+.bombIcon {
+  background-image: url("/images/items/bomb-black.png");
+}
+
+/* Live thrown bomb resting on the floor with a lit fuse: black sprite with the red
+   sprite flashing on top for a sparking, about-to-detonate look. */
+.bombLive {
+  position: relative;
+  width: 30px;
+  height: 30px;
+  z-index: 1040;
+  filter: drop-shadow(0 0 5px rgba(255, 140, 40, 0.55));
+  animation: bombGlow 0.5s ease-in-out infinite;
+}
+
+.bombLiveSprite {
+  position: absolute;
+  inset: 0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.bombLiveBlack {
+  background-image: url("/images/items/bomb-black.png");
+}
+
+.bombLiveRed {
+  background-image: url("/images/items/bomb-red.png");
+  animation: bombFlash 0.5s infinite;
+}
+
+/* Fast opacity flips read as a hard flash between the black and red sprites. */
+@keyframes bombFlash {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  50%,
+  95% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes bombGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px rgba(255, 140, 40, 0.4));
+  }
+  50% {
+    filter: drop-shadow(0 0 8px rgba(255, 90, 30, 0.8));
+  }
+}
+
+/* Scorch decal left on tiles caught in a bomb blast. Swap the background for
+   /images/items/singe-*.png art later. */
+.singedOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1015; /* above floor/road (1010), below items (1030) */
+  background: radial-gradient(
+      70% 70% at 50% 50%,
+      rgba(10, 8, 6, 0.66),
+      rgba(20, 14, 10, 0.32) 62%,
+      rgba(0, 0, 0, 0) 80%
+    ),
+    radial-gradient(
+      30% 30% at 38% 60%,
+      rgba(0, 0, 0, 0.5),
+      rgba(0, 0, 0, 0) 70%
+    );
+  mix-blend-mode: multiply;
+}
+
 /* Sword and Shield assets */
 .swordIcon {
   background-image: url("/images/items/sword.png");

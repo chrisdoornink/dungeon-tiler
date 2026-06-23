@@ -92,6 +92,14 @@ export enum TileSubtype {
   PINK_RING = 49,
   EXTRA_HEART = 50,
   OPEN_ABYSS = 51,
+  // Bomb item: BOMB is the carryable/chest pickup (grants a 3-pack), BOMB_LIVE is a
+  // thrown bomb resting on the floor with its 1-turn fuse armed, SINGED is the scorch
+  // overlay left on tiles caught in a blast, BREACH marks an outer-wall floor tile blown
+  // open by a bomb (the doorway to the outside world).
+  BOMB = 52,
+  BOMB_LIVE = 53,
+  SINGED = 54,
+  BREACH = 55,
 }
 
 /**

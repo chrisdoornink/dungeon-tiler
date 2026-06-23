@@ -52,6 +52,7 @@ const EMOJI_MAP = {
 
   // Death causes
   faulty_floor: "🕳️",
+  bomb: "💣",
 
   // Streak indicators
   streak_fire: "🔥",
@@ -225,12 +226,18 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           image: "/images/enemies/snake-coiled-right.png",
           alt: "Poisoned by snake",
         };
+      case "bomb":
+        return {
+          message: "You were caught in your own bomb blast",
+          image: "/images/items/bomb-red.png",
+          alt: "Killed by a bomb",
+        };
       case "enemy":
         const enemyKind = (lastGame.deathCause.enemyKind ||
           "fire-goblin") as EnemyKind;
         const enemyConfig = EnemyRegistry[enemyKind];
         const enemyImage = getEnemyIcon(enemyKind);
-        const enemyName = `a ${enemyConfig.displayName}`;
+        const enemyName = enemyConfig ? `a ${enemyConfig.displayName}` : "an enemy";
 
         return {
           message: `You were slain by ${enemyName}`,
@@ -260,6 +267,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     if (!isWin && lastGame?.deathCause) {
       if (lastGame.deathCause.type === "faulty_floor") {
         deathEmojis.push(EMOJI_MAP.faulty_floor);
+      } else if (lastGame.deathCause.type === "bomb") {
+        deathEmojis.push(EMOJI_MAP.bomb);
       } else if (lastGame.deathCause.type === "enemy") {
         const e = (lastGame.deathCause.enemyKind as EnemyKind) ?? "fire-goblin";
         deathEmojis.push(shareEmojiForKind(e));

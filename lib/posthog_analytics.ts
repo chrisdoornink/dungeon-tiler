@@ -132,11 +132,11 @@ export function trackGameComplete(params: {
   });
 }
 
-export function trackPickup(item: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "food" | "potion") {
+export function trackPickup(item: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "bomb" | "food" | "potion") {
   captureEvent('item_pickup', { item });
 }
 
-export function trackUse(item: "rock" | "rune" | "food" | "potion") {
+export function trackUse(item: "rock" | "rune" | "bomb" | "food" | "potion") {
   captureEvent('item_use', { item });
 }
 

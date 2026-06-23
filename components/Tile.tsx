@@ -393,6 +393,16 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.EXTRA_HEART) || false;
   };
 
+  const hasBombItem = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.BOMB) || false;
+  };
+  const hasLiveBomb = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.BOMB_LIVE) || false;
+  };
+  const hasSinged = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SINGED) || false;
+  };
+
   // Bed helpers
   const hasBed = (subtypes: number[] | undefined): boolean => {
     if (!subtypes) return false;
@@ -554,7 +564,12 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BED_FULL_2 &&
         subtype !== TileSubtype.BED_FULL_3 &&
         subtype !== TileSubtype.BED_FULL_4 &&
-        subtype !== TileSubtype.EXTRA_HEART
+        subtype !== TileSubtype.EXTRA_HEART &&
+        // Bomb item + scorch/breach overlays have custom rendering
+        subtype !== TileSubtype.BOMB &&
+        subtype !== TileSubtype.BOMB_LIVE &&
+        subtype !== TileSubtype.SINGED &&
+        subtype !== TileSubtype.BREACH
     );
   };
 
@@ -566,6 +581,17 @@ export const Tile: React.FC<TileProps> = ({
 
     return (
       <div className={styles.subtypeContainer}>
+        {/* Scorch overlay left by a bomb blast (floor decal under items). Swap the
+            CSS background for /images/items/singe-*.png art when available. */}
+        {hasSinged(subtypes) && (
+          <div
+            key="singed"
+            aria-hidden="true"
+            data-testid={`subtype-icon-${TileSubtype.SINGED}`}
+            className={styles.singedOverlay}
+          />
+        )}
+
         {/* Render chest with asset if present */}
         {hasChest(subtypes) && (
           <div
@@ -614,6 +640,13 @@ export const Tile: React.FC<TileProps> = ({
             key="extra-heart-revealed"
             data-testid={`subtype-icon-${TileSubtype.EXTRA_HEART}`}
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.heartIcon}`}
+          />
+        )}
+        {hasOpenChest(subtypes) && hasBombItem(subtypes) && (
+          <div
+            key="bomb-revealed"
+            data-testid={`subtype-icon-${TileSubtype.BOMB}`}
+            className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.bombIcon}`}
           />
         )}
 
@@ -737,6 +770,20 @@ export const Tile: React.FC<TileProps> = ({
               ])})`,
             }}
           />
+        )}
+
+        {/* Live thrown bomb sitting on the floor with its fuse lit: flashes between the
+            black and red bomb sprites for a sparking, about-to-blow look. */}
+        {hasLiveBomb(subtypes) && (
+          <div
+            key="bomb-live"
+            data-testid={`subtype-icon-${TileSubtype.BOMB_LIVE}`}
+            className={styles.bombLive}
+            aria-hidden="true"
+          >
+            <div className={`${styles.bombLiveSprite} ${styles.bombLiveBlack}`} />
+            <div className={`${styles.bombLiveSprite} ${styles.bombLiveRed}`} />
+          </div>
         )}
         {hasFood(subtypes) && !hasPot(subtypes) && (
           <div

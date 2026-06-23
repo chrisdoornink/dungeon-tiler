@@ -47,6 +47,7 @@ import {
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
+import { buildOutsideWorld } from "./outside-world";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
@@ -119,6 +120,8 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
 }
 
 export function performUseFood(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.foodCount || 0;
   if (count <= 0) return gameState;
 
@@ -185,6 +188,8 @@ export function performUseFood(gameState: GameState): GameState {
  * Use potion from inventory to heal 2 HP (costs a move like throwing rocks/runes)
  */
 export function performUsePotion(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.potionCount || 0;
   if (count <= 0) return gameState;
 
@@ -257,6 +262,8 @@ export function performUsePotion(gameState: GameState): GameState {
  * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
  */
 export function performThrowRock(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
   if (!pos) return gameState;
   const [py, px] = pos;
@@ -542,6 +549,8 @@ export function performThrowRock(gameState: GameState): GameState {
  *   - others: deal 2 damage; if enemy dies, rune is consumed; otherwise, rune lands on the last traversed floor tile.
  */
 export function performThrowRune(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
   if (!pos) return gameState;
   const [py, px] = pos;
@@ -754,6 +763,286 @@ export function performThrowRune(gameState: GameState): GameState {
   return preTickState;
 }
 
+// --- Bombs -----------------------------------------------------------------
+
+/** How far a thrown bomb travels before resting. */
+const BOMB_THROW_RANGE = 4;
+/** Damage dealt to the hero if caught in a bomb blast (fixed, not range-scaled). */
+const BOMB_PLAYER_DAMAGE = 6;
+/** Reduced hero damage when carrying a shield. */
+const BOMB_PLAYER_DAMAGE_SHIELD = 4;
+/** Damage dealt to each enemy in the blast. ~kills most; a stone goblin (8 HP) survives one. */
+const BOMB_ENEMY_DAMAGE = 6;
+/** Each chest bomb pickup grants this many bombs. */
+export const BOMB_PACK_SIZE = 3;
+
+/**
+ * Subtypes a bomb blast must NOT destroy. The exit door (EXIT) and exit key
+ * (EXITKEY) are intentionally indestructible so a bomb can never strand a run.
+ */
+const BOMB_PROTECTED_SUBTYPES = new Set<TileSubtype>([
+  TileSubtype.EXIT,
+  TileSubtype.EXITKEY,
+]);
+
+/**
+ * Subtypes that survive a blast on a tile that is otherwise scorched. Everything
+ * not listed here (pots, rocks, runes, food, chests, keys, locks, etc.) is destroyed.
+ */
+const BOMB_PRESERVED_SUBTYPES = new Set<TileSubtype>([
+  TileSubtype.EXIT,
+  TileSubtype.EXITKEY,
+  TileSubtype.PLAYER,
+  TileSubtype.ROAD,
+  TileSubtype.ROAD_STRAIGHT,
+  TileSubtype.ROAD_CORNER,
+  TileSubtype.ROAD_T,
+  TileSubtype.ROAD_END,
+  TileSubtype.ROAD_ROTATE_90,
+  TileSubtype.ROAD_ROTATE_180,
+  TileSubtype.ROAD_ROTATE_270,
+  TileSubtype.ROOM_TRANSITION,
+  TileSubtype.WALL_TORCH,
+  TileSubtype.FLOOR_TORCH,
+  TileSubtype.BREACH,
+  TileSubtype.SINGED,
+]);
+
+/**
+ * Resolve any armed bombs sitting on the current map. A bomb is placed (BOMB_LIVE)
+ * on the turn it is thrown and detonates at the start of the player's next turn, so
+ * this is called first thing in every turn entry point. Each live bomb produces a 3x3
+ * blast that turns walls to floor, removes destructible items, kills enemies, scorches
+ * tiles, and marks BREACH on any perimeter wall it opens. Always clears the transient
+ * recentBombBlasts list so the UI only animates this turn's explosions.
+ */
+export function detonateLiveBombs(state: GameState): GameState {
+  const subtypes = state.mapData.subtypes;
+  const liveCenters: Array<[number, number]> = [];
+  for (let y = 0; y < subtypes.length; y++) {
+    const row = subtypes[y];
+    for (let x = 0; x < row.length; x++) {
+      if ((row[x] || []).includes(TileSubtype.BOMB_LIVE)) liveCenters.push([y, x]);
+    }
+  }
+  if (liveCenters.length === 0) {
+    // Clear any stale blast markers from a previous turn so VFX don't replay.
+    if (state.recentBombBlasts && state.recentBombBlasts.length > 0) {
+      return { ...state, recentBombBlasts: [] };
+    }
+    return state;
+  }
+
+  const newMapData = JSON.parse(JSON.stringify(state.mapData)) as MapData;
+  const height = newMapData.tiles.length;
+  const width = newMapData.tiles[0]?.length ?? 0;
+
+  const enemies = state.enemies ? state.enemies.slice() : [];
+  const defeatedEnemies = state.defeatedEnemies ? state.defeatedEnemies.slice() : [];
+  const blastCenters: Array<[number, number]> = [];
+  const stats = { ...state.stats, byKind: state.stats.byKind, byFloor: state.stats.byFloor };
+  let wallsDestroyed = 0;
+  let enemiesDefeated = 0;
+  let playerHit = false;
+
+  for (const [cy, cx] of liveCenters) {
+    blastCenters.push([cy, cx]);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const y = cy + dy;
+        const x = cx + dx;
+        if (y < 0 || y >= height || x < 0 || x >= width) continue;
+        const subs = newMapData.subtypes[y][x] || [];
+        const isProtected = subs.some((s) => BOMB_PROTECTED_SUBTYPES.has(s));
+
+        // Walls become floor (unless this is the protected exit door).
+        const wasWall = newMapData.tiles[y][x] === WALL;
+        const openedWall = wasWall && !isProtected;
+        if (openedWall) {
+          newMapData.tiles[y][x] = FLOOR;
+          wallsDestroyed += 1;
+        }
+
+        // Damage enemies caught in the blast. Most die; tough enemies (stone goblin,
+        // 8 HP) can survive a single bomb.
+        for (let i = enemies.length - 1; i >= 0; i--) {
+          if (enemies[i].y === y && enemies[i].x === x) {
+            const target = enemies[i];
+            const prevHp = target.health ?? 1;
+            const newHp = prevHp - BOMB_ENEMY_DAMAGE;
+            stats.damageDealt = stats.damageDealt + Math.min(BOMB_ENEMY_DAMAGE, prevHp);
+            if (newHp <= 0) {
+              const removed = enemies.splice(i, 1)[0];
+              cleanupPinkRing(removed, newMapData.subtypes);
+              defeatedEnemies.push({
+                y: removed.y,
+                x: removed.x,
+                kind: removed.kind,
+                behaviorMemory: removed.behaviorMemory,
+              });
+              trackEnemyKill(stats, removed.kind as EnemyKind, state.currentFloor ?? 1);
+              enemiesDefeated += 1;
+            } else {
+              // Survives — record the damage.
+              target.health = newHp;
+            }
+          }
+        }
+
+        // Hero caught in the blast takes damage once.
+        if (subs.includes(TileSubtype.PLAYER)) playerHit = true;
+
+        // Strip everything destructible; keep preserved/cosmetic markers; scorch the tile.
+        const kept = subs.filter((s) => BOMB_PRESERVED_SUBTYPES.has(s));
+        if (!kept.includes(TileSubtype.SINGED)) kept.push(TileSubtype.SINGED);
+        if (openedWall) {
+          const onPerimeter =
+            y === 0 || y === height - 1 || x === 0 || x === width - 1;
+          if (onPerimeter && !kept.includes(TileSubtype.BREACH)) {
+            kept.push(TileSubtype.BREACH);
+          }
+        }
+        newMapData.subtypes[y][x] = kept;
+      }
+    }
+  }
+
+  stats.enemiesDefeated = stats.enemiesDefeated + enemiesDefeated;
+  stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
+
+  let heroHealth = state.heroHealth;
+  let deathCause = state.deathCause;
+  if (playerHit) {
+    const applied = state.hasShield
+      ? BOMB_PLAYER_DAMAGE_SHIELD
+      : BOMB_PLAYER_DAMAGE;
+    heroHealth = Math.max(0, heroHealth - applied);
+    stats.damageTaken = stats.damageTaken + applied;
+    if (state.mode === "tutorial" && heroHealth < 1) heroHealth = 1;
+    if (heroHealth === 0) deathCause = { type: "bomb" };
+  }
+
+  let nextState: GameState = {
+    ...state,
+    mapData: newMapData,
+    enemies,
+    defeatedEnemies,
+    stats,
+    heroHealth,
+    deathCause,
+    recentBombBlasts: blastCenters,
+  };
+
+  // Process story events for ONLY the enemies this blast defeated (no-op outside story
+  // mode). Guard against slice(-0), which would return the whole accumulated array.
+  const freshlyDefeated =
+    enemiesDefeated > 0 ? defeatedEnemies.slice(-enemiesDefeated) : [];
+  for (const info of freshlyDefeated) {
+    const updated = processEnemyDefeat(nextState, info);
+    nextState = { ...nextState, ...updated };
+  }
+
+  return nextState;
+}
+
+/**
+ * Throw a bomb up to BOMB_THROW_RANGE tiles in the player's facing direction.
+ * Unlike a rock it does not break on impact: it comes to rest on the last floor tile
+ * before any wall/obstacle/edge (or at max range on open floor) and arms a 1-turn fuse.
+ * It detonates on the player's next turn (see detonateLiveBombs).
+ */
+export function performThrowBomb(gameState: GameState): GameState {
+  // Resolve any bomb armed on a previous turn before this throw.
+  const state = detonateLiveBombs(gameState);
+  if (state.heroHealth <= 0) return state;
+
+  const pos = findPlayerPosition(state.mapData);
+  if (!pos) return state;
+  const [py, px] = pos;
+  const count = state.bombCount ?? 0;
+  if (count <= 0) return state;
+
+  // Throwing is a player turn: enemies move first (mirrors rocks/runes).
+  const preTickState: GameState = { ...state };
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const result = updateEnemies(
+      preTickState.mapData.tiles,
+      preTickState.mapData.subtypes,
+      preTickState.enemies,
+      { y: py, x: px },
+      {
+        rng: preTickState.combatRng ?? Math.random,
+        defense: preTickState.hasShield ? 1 : 0,
+        playerTorchLit: preTickState.heroTorchLit ?? true,
+        setPlayerTorchLit: (lit: boolean) => {
+          preTickState.heroTorchLit = lit;
+        },
+      }
+    );
+    if (result.damage > 0) {
+      const applied = Math.min(4, result.damage);
+      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      preTickState.stats = {
+        ...preTickState.stats,
+        damageTaken: preTickState.stats.damageTaken + applied,
+      };
+    }
+  }
+
+  // Direction vector
+  let vx = 0,
+    vy = 0;
+  switch (preTickState.playerDirection) {
+    case Direction.UP:
+      vy = -1;
+      break;
+    case Direction.RIGHT:
+      vx = 1;
+      break;
+    case Direction.DOWN:
+      vy = 1;
+      break;
+    case Direction.LEFT:
+      vx = -1;
+      break;
+  }
+
+  const newMapData = JSON.parse(JSON.stringify(preTickState.mapData)) as MapData;
+
+  // Walk outward; rest on the last walkable floor tile before a wall/obstacle/edge OR
+  // before an enemy — a bomb thrown at an enemy stops on the tile in front of it (it does
+  // not pass through), so the enemy is caught in the blast. If a wall/enemy is immediately
+  // ahead, the bomb rests at the player's own feet.
+  const bombEnemies = preTickState.enemies ?? [];
+  let restY = py;
+  let restX = px;
+  for (let step = 1; step <= BOMB_THROW_RANGE; step++) {
+    const ny = py + vy * step;
+    const nx = px + vx * step;
+    if (!isWithinBounds(preTickState.mapData, ny, nx)) break;
+    const tile = newMapData.tiles[ny][nx];
+    if (tile !== FLOOR && tile !== FLOWERS) break; // wall/obstacle: stop before it
+    if (bombEnemies.some((e) => e.y === ny && e.x === nx)) break; // enemy: stop in front
+    restY = ny;
+    restX = nx;
+  }
+
+  const restBase = (newMapData.subtypes[restY][restX] || []).filter(
+    (t) => t !== TileSubtype.BOMB_LIVE
+  );
+  newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
+
+  return {
+    ...preTickState,
+    mapData: newMapData,
+    bombCount: count - 1,
+    stats: {
+      ...preTickState.stats,
+      bombsThrown: (preTickState.stats.bombsThrown ?? 0) + 1,
+    },
+  };
+}
+
 /**
  * Enum representing possible movement directions
  */
@@ -789,6 +1078,7 @@ export interface GameState {
   // Inventory
   rockCount?: number; // Count of collected rocks
   runeCount?: number; // Count of collected runes
+  bombCount?: number; // Count of carried bombs (chest pickups grant a 3-pack)
   foodCount?: number; // Count of collected food items
   potionCount?: number; // Count of collected +2 potions
   hasSnakeMedallion?: boolean; // Snake medallion for portal travel
@@ -802,6 +1092,8 @@ export interface GameState {
     // Extended stats for badge system
     rocksThrown?: number;
     rocksCollected?: number;
+    bombsThrown?: number;
+    wallsDestroyed?: number;
     runesUsed?: number;
     foodUsed?: number;
     potionsUsed?: number;
@@ -816,6 +1108,8 @@ export interface GameState {
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
+  // Transient: blast centers where a bomb detonated this tick (UI explosion VFX)
+  recentBombBlasts?: Array<[number, number]>;
   // Transient: defeated enemies with their memory for onEnemyDefeat processing
   defeatedEnemies?: Array<{
     y: number;
@@ -837,7 +1131,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -863,6 +1157,16 @@ export interface GameState {
   };
   // Multi-tier daily mode: signals that the player entered the exit and needs to advance to the next floor
   needsFloorTransition?: boolean;
+  // Outside world: set while the player has stepped through a wall breach into the
+  // open grassland beyond the dungeon. dungeonReturn holds the snapshot to restore
+  // when the player walks back through the breach.
+  inOutsideWorld?: boolean;
+  outsideDirection?: Direction;
+  dungeonReturn?: {
+    mapData: MapData;
+    enemies?: PlainEnemy[];
+    position: [number, number];
+  };
 }
 
 export type CheckpointSnapshot =
@@ -1312,6 +1616,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
     recentDeaths: [],
+    recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
     npcInteractionQueue: [],
     bookshelfInteractionQueue: [],
@@ -1488,7 +1793,116 @@ function applyRoomTransition(
   return finalState;
 }
 
+/**
+ * True when the player stands on a BREACH tile on the matching map edge and is moving
+ * off that edge — the trigger for crossing between the dungeon and the outside world.
+ */
+function isSteppingThroughBreach(
+  state: GameState,
+  position: [number, number],
+  direction: Direction,
+  height: number,
+  width: number
+): boolean {
+  const [cy, cx] = position;
+  const subs = state.mapData.subtypes?.[cy]?.[cx] ?? [];
+  if (!subs.includes(TileSubtype.BREACH)) return false;
+  switch (direction) {
+    case Direction.UP:
+      return cy === 0;
+    case Direction.DOWN:
+      return cy === height - 1;
+    case Direction.LEFT:
+      return cx === 0;
+    case Direction.RIGHT:
+      return cx === width - 1;
+    default:
+      return false;
+  }
+}
+
+function placePlayerAt(mapData: MapData, position: [number, number]): MapData {
+  const next = JSON.parse(JSON.stringify(mapData)) as MapData;
+  const [y, x] = position;
+  const cell = (next.subtypes[y][x] || []).filter((t) => t !== TileSubtype.PLAYER);
+  cell.push(TileSubtype.PLAYER);
+  next.subtypes[y][x] = cell;
+  return next;
+}
+
+/**
+ * Handle a step through a wall breach. From the dungeon this loads a fresh outside-world
+ * area for the breached direction and stashes the dungeon to restore later; from the
+ * outside world it restores the saved dungeon. Returns null if no crossing applies.
+ */
+function enterOutsideWorld(
+  state: GameState,
+  position: [number, number],
+  direction: Direction
+): GameState | null {
+  // Already outside: walking back through the inner breach returns to the dungeon.
+  if (state.inOutsideWorld) {
+    const ret = state.dungeonReturn;
+    if (!ret) return null;
+    const restored = placePlayerAt(ret.mapData, ret.position);
+    return {
+      ...state,
+      mapData: restored,
+      enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
+      playerDirection: direction,
+      inOutsideWorld: false,
+      outsideDirection: undefined,
+      dungeonReturn: undefined,
+      recentDeaths: [],
+      recentBombBlasts: [],
+    };
+  }
+
+  // From the dungeon: stash the current floor and load the outside grassland.
+  const height = getMapHeight(state.mapData);
+  const width = getMapWidth(state.mapData);
+  const { mapData: outsideMap, enemies: outsideEnemies, entry } = buildOutsideWorld(
+    direction,
+    width,
+    height
+  );
+  const dungeonReturn = {
+    mapData: removePlayerFromMapData(state.mapData),
+    enemies: serializeEnemies(state.enemies),
+    position,
+  };
+  return {
+    ...state,
+    mapData: placePlayerAt(outsideMap, entry),
+    enemies: rehydrateEnemies(outsideEnemies),
+    playerDirection: direction,
+    inOutsideWorld: true,
+    outsideDirection: direction,
+    dungeonReturn,
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
 export function movePlayer(
+  gameState: GameState,
+  direction: Direction
+): GameState {
+  // Resolve the move first, then detonate any armed bomb against the player's FINAL
+  // position so stepping out of the 3x3 blast keeps the hero safe. (movePlayer never
+  // places a bomb, so every BOMB_LIVE present was armed on a previous turn.) Skip
+  // detonation on a floor transition — that floor is being replaced.
+  const result = movePlayerCore(gameState, direction);
+  if (result.needsFloorTransition) return result;
+  return detonateLiveBombs(result);
+}
+
+/**
+ * Move the player and resolve the turn. Any bomb armed on a previous turn is detonated
+ * AFTER the move (see the movePlayer wrapper), so its blast is measured against the
+ * player's final position — moving out of the 3x3 keeps you safe.
+ */
+function movePlayerCore(
   gameState: GameState,
   direction: Direction
 ): GameState {
@@ -1501,6 +1915,12 @@ export function movePlayer(
 
   const height = getMapHeight(gameState.mapData);
   const width = getMapWidth(gameState.mapData);
+
+  // Stepping off the map edge from a breach tile leads to the outside world.
+  if (isSteppingThroughBreach(gameState, [currentY, currentX], direction, height, width)) {
+    const outside = enterOutsideWorld(gameState, [currentY, currentX], direction);
+    if (outside) return outside;
+  }
 
   if (height === 0 || width === 0) {
     return { ...gameState, playerDirection: direction };
@@ -2089,9 +2509,14 @@ export function movePlayer(
       (subtype.includes(TileSubtype.SWORD) ||
         subtype.includes(TileSubtype.SHIELD) ||
         subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
-        subtype.includes(TileSubtype.EXTRA_HEART)) &&
+        subtype.includes(TileSubtype.EXTRA_HEART) ||
+        subtype.includes(TileSubtype.BOMB)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
+      if (subtype.includes(TileSubtype.BOMB)) {
+        newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
       if (subtype.includes(TileSubtype.SWORD)) {
         newGameState.hasSword = true;
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
@@ -2105,8 +2530,9 @@ export function movePlayer(
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       if (subtype.includes(TileSubtype.EXTRA_HEART)) {
+        // Adds a heart to the max AND fully refills health (e.g. 1/5 -> 6/6).
         newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
-        newGameState.heroHealth = Math.min(newGameState.heroHealth + 1, newGameState.heroMaxHealth);
+        newGameState.heroHealth = newGameState.heroMaxHealth;
         newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
@@ -2286,6 +2712,9 @@ export function movePlayer(
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_180) ||
       destSubtypes.includes(TileSubtype.ROAD_ROTATE_270) ||
       destSubtypes.includes(TileSubtype.EXIT) ||
+      // Bomb scorch + outer-wall breaches are floor overlays the player stands on.
+      destSubtypes.includes(TileSubtype.SINGED) ||
+      destSubtypes.includes(TileSubtype.BREACH) ||
       destSubtypes.includes(TileSubtype.OPEN_ABYSS)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
@@ -2304,7 +2733,7 @@ export function movePlayer(
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
       if (
-        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART) &&
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART || t === TileSubtype.BOMB) &&
         !hasClosedChest
       )
         return false;

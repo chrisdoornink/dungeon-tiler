@@ -10,8 +10,9 @@ const CURRENT_GAME_KEY = "currentGame";
 const DAILY_NEW_GAME_KEY = "currentDailyNewGame";
 const STORY_GAME_KEY = "currentStoryGame";
 const TUTORIAL_GAME_KEY = "currentTutorialGame";
+const TEST_GAME_KEY = "currentTestGame";
 
-export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial";
+export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial" | "test";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
@@ -21,6 +22,8 @@ function keyForSlot(slot: GameStorageSlot): string {
       return STORY_GAME_KEY;
     case "tutorial":
       return TUTORIAL_GAME_KEY;
+    case "test":
+      return TEST_GAME_KEY;
     default:
       return CURRENT_GAME_KEY;
   }
@@ -44,6 +47,10 @@ export class CurrentGameStorage {
     try {
       const storedState: StoredGameState = {
         ...gameState,
+        // Transient per-turn VFX markers must not persist, or reloading right after a
+        // bomb blast / death replays the one-shot explosion, shake, and death puffs.
+        recentBombBlasts: [],
+        recentDeaths: [],
         lastSaved: Date.now(),
         isDailyChallenge: slot === "daily-new",
       };

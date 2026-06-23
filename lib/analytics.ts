@@ -31,10 +31,10 @@ export function trackGameComplete(params: {
   posthogAnalytics.trackGameComplete(params);
 }
 
-export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "food" | "potion") {
+export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "bomb" | "food" | "potion") {
   posthogAnalytics.trackPickup(name);
 }
 
-export function trackUse(name: "rock" | "rune" | "food" | "potion") {
+export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion") {
   posthogAnalytics.trackUse(name);
 }

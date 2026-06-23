@@ -43,6 +43,8 @@ const ItemPickupAnimation: React.FC<ItemPickupAnimationProps> = ({
         return "/images/items/rock-1.png";
       case 'rune':
         return '/images/items/rune1.png';
+      case 'bomb':
+        return '/images/items/bomb-black.png';
       case 'food':
         return '/images/items/food-1.png';
       default:

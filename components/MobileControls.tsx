@@ -6,6 +6,8 @@ interface MobileControlsProps {
   rockCount?: number;
   onUseRune?: () => void;
   runeCount?: number;
+  onThrowBomb?: () => void;
+  bombCount?: number;
 }
 
 const MobileControls: React.FC<MobileControlsProps> = ({
@@ -14,6 +16,8 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   rockCount,
   onUseRune,
   runeCount,
+  onThrowBomb,
+  bombCount,
 }) => {
   const [isMobile, setIsMobile] = useState(false);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
@@ -151,6 +155,33 @@ const MobileControls: React.FC<MobileControlsProps> = ({
                 width: isMobile ? 22 : 18,
                 height: isMobile ? 22 : 18,
                 backgroundImage: "url(/images/items/rune1.png)",
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                verticalAlign: 'middle'
+              }}
+            />
+          </button>
+        )}
+        {(bombCount ?? 0) > 0 && (
+          <button
+            data-testid="mobile-action-bomb"
+            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
+              isMobile
+                ? 'bg-[#333333] hover:bg-[#444444] text-white'
+                : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]'
+            }`}
+            onClick={() => (bombCount ?? 0) > 0 && onThrowBomb && onThrowBomb()}
+            aria-label="Throw Bomb"
+            title={`Throw bomb (${bombCount})`}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                display: 'inline-block',
+                width: isMobile ? 22 : 18,
+                height: isMobile ? 22 : 18,
+                backgroundImage: "url(/images/items/bomb-black.png)",
                 backgroundSize: 'contain',
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: 'center',

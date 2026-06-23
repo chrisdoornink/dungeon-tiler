@@ -513,6 +513,14 @@ const EARLY_CHEST_CONTENTS = [
   TileSubtype.SHIELD,
 ];
 
+// Level 2 optional-item pool. Each run draws 2 distinct items from this pool into the
+// two L2 chests. Add more options here later.
+const L2_OPTIONAL_POOL = [
+  TileSubtype.SNAKE_MEDALLION,
+  TileSubtype.EXTRA_HEART,
+  TileSubtype.BOMB,
+];
+
 /**
  * Deterministically allocate chests and keys across floors.
  * - Sword & Shield: 2 chests + 2 keys randomly placed across floors 1–3
@@ -543,14 +551,20 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
   }
   floor1.chestContents = earlyContents;
 
-  // Floor 2: Snake Medallion and Extra Heart (2 chests, 2 keys)
+  // Floor 2: two optional-item chests (2 keys). Each run the daily seed draws 2
+  // distinct items from the L2 optional pool. Extend L2_OPTIONAL_POOL to add more
+  // possibilities later.
   const floor2 = result.get(2)!;
   floor2.chests = 2;
   floor2.keys = 2;
-  floor2.chestContents = [TileSubtype.SNAKE_MEDALLION, TileSubtype.EXTRA_HEART];
+  const pool = [...L2_OPTIONAL_POOL];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  floor2.chestContents = pool.slice(0, 2);
 
-  // Floor 3: No chests or keys
-  // (already initialized to 0)
+  // Floor 3: no chests or keys (already initialized to 0).
 
   return result;
 }

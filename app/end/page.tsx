@@ -22,7 +22,7 @@ type LastGame = {
   };
   outcome?: "win" | "dead";
   deathCause?: {
-    type: 'enemy' | 'faulty_floor';
+    type: 'enemy' | 'faulty_floor' | 'poison' | 'bomb';
     enemyKind?: string;
   };
   stats?: {
@@ -107,12 +107,18 @@ export default function EndPage() {
           image: "/images/floor/crack3.png",
           alt: "Floor crack"
         };
+      case 'bomb':
+        return {
+          message: "You were caught in your own bomb blast",
+          image: "/images/items/bomb-red.png",
+          alt: "Killed by a bomb"
+        };
       case 'enemy':
         const enemyKind = (last.deathCause.enemyKind || 'fire-goblin') as EnemyKind;
         const enemyConfig = EnemyRegistry[enemyKind];
         const enemyImage = getEnemyIcon(enemyKind);
-        const enemyName = `a ${enemyConfig.displayName}`;
-        
+        const enemyName = enemyConfig ? `a ${enemyConfig.displayName}` : "an enemy";
+
         return {
           message: `You were slain by ${enemyName}`,
           image: enemyImage,
@@ -140,6 +146,8 @@ export default function EndPage() {
   const deathEmoji = last.outcome === 'dead' && last.deathCause
     ? (last.deathCause.type === 'faulty_floor'
         ? '🕳️'
+        : last.deathCause.type === 'bomb'
+        ? '💣'
         : last.deathCause.type === 'enemy'
         ? shareEmojiForKind((last.deathCause.enemyKind as EnemyKind) || 'fire-goblin')
         : '')

@@ -398,6 +398,28 @@ body {
   animation: heartPop 600ms ease-out forwards;
 }
 
+/* Bomb detonation: each BAM frame scales up and fades. Three are layered with
+   staggered delays for a big, cartoonish, multi-pop explosion. --bam-rot varies the
+   rotation per layer so the stacked frames don't look identical. */
+@keyframes bombBam {
+  0% {
+    transform: scale(0.35) rotate(var(--bam-rot, 0deg));
+    opacity: 0;
+  }
+  25% {
+    transform: scale(0.95) rotate(var(--bam-rot, 0deg));
+    opacity: 1;
+  }
+  60% {
+    transform: scale(1.08) rotate(var(--bam-rot, 0deg));
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.3) rotate(var(--bam-rot, 0deg));
+    opacity: 0;
+  }
+}
+
 /* Item pickup animation - center screen scale up and fade */
 @keyframes itemPickupCenter {
   0% {
