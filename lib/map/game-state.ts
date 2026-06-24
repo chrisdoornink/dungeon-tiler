@@ -49,6 +49,7 @@ import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapFo
 import { addSnakesPerRules } from "./enemy-features";
 import { buildOutsideWorld } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
+import { seedMist, advanceMist, mistContains } from "./pink-mist";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
@@ -145,6 +146,8 @@ export function performUseFood(gameState: GameState): GameState {
           setPlayerTorchLit: (lit: boolean) => {
             preTickState.heroTorchLit = lit;
           },
+          // Blind enemies standing in the pink mist (consistent with movement turns).
+          skipEnemy: mistBlindSkip(preTickState),
         }
       );
 
@@ -213,6 +216,8 @@ export function performUsePotion(gameState: GameState): GameState {
           setPlayerTorchLit: (lit: boolean) => {
             preTickState.heroTorchLit = lit;
           },
+          // Blind enemies standing in the pink mist (consistent with movement turns).
+          skipEnemy: mistBlindSkip(preTickState),
         }
       );
 
@@ -331,9 +336,11 @@ export function performThrowRock(gameState: GameState): GameState {
         suppress: (e: Enemy) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
         // Fully skip any enemy the rock will kill this turn (no move, no attack,
-        // no proximity hook). Prevents ghost-snuff-before-rock-hits race.
+        // no proximity hook). Prevents ghost-snuff-before-rock-hits race. Also blind
+        // enemies standing in the pink mist (consistent with movement turns).
         skipEnemy: (e: Enemy) =>
-          rockKillTargetIdx !== null && enemiesRef[rockKillTargetIdx] === e,
+          (rockKillTargetIdx !== null && enemiesRef[rockKillTargetIdx] === e) ||
+          mistBlindSkip(preTickState)(e),
       }
     );
     if (result.damage > 0) {
@@ -591,6 +598,8 @@ export function performThrowRune(gameState: GameState): GameState {
         },
         suppress: (e: Enemy) =>
           Math.abs(e.y - py) + Math.abs(e.x - px) === 1 && e.kind === "ghost",
+        // Blind enemies standing in the pink mist (consistent with movement turns).
+        skipEnemy: mistBlindSkip(preTickState),
       }
     );
     if (result.damage > 0) {
@@ -984,6 +993,8 @@ export function performThrowBomb(gameState: GameState): GameState {
         setPlayerTorchLit: (lit: boolean) => {
           preTickState.heroTorchLit = lit;
         },
+        // Blind enemies standing in the pink mist (consistent with movement turns).
+        skipEnemy: mistBlindSkip(preTickState),
       }
     );
     if (result.damage > 0) {
@@ -1176,6 +1187,10 @@ export interface GameState {
   // the pink realm and persists for the rest of the run (across returns + floors)
   // so the endgame results can record that the secret area was found.
   reachedPinkRealm?: boolean;
+  // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
+  // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
+  // in it are blinded. Undefined / absent outside the realm.
+  mist?: Array<[number, number]>;
   dungeonReturn?: {
     mapData: MapData;
     enemies?: PlainEnemy[];
@@ -1927,6 +1942,57 @@ function pinkRingClaimedByLiving(
   });
 }
 
+/**
+ * Pink-mist blinding predicate for updateEnemies' skipEnemy: an enemy standing in the
+ * mist (only while in the realm) is skipped entirely — it can't move or attack this turn.
+ * Shared so every enemy-tick (movement AND throws) blinds consistently.
+ */
+function mistBlindSkip(state: GameState): (e: Enemy) => boolean {
+  return (e: Enemy) =>
+    !!state.inPinkRealm && mistContains(state.mist, e.y, e.x);
+}
+
+/** Flip a pressed direction — used when the hero stands in the pink mist. */
+function reverseDirection(direction: Direction): Direction {
+  switch (direction) {
+    case Direction.UP:
+      return Direction.DOWN;
+    case Direction.DOWN:
+      return Direction.UP;
+    case Direction.LEFT:
+      return Direction.RIGHT;
+    case Direction.RIGHT:
+      return Direction.LEFT;
+    default:
+      return direction;
+  }
+}
+
+/**
+ * Minimal first-pass population for the pink realm: a single white-goblin swarm placed
+ * away from the entry so the mist's enemy-blinding has something to act on. Pink goblins
+ * are intentionally left out for now — their teleport ring would tangle with the realm's
+ * own return ring.
+ */
+function buildPinkRealmEnemies(realmMap: MapData, entry: [number, number]): Enemy[] {
+  const enemies: Enemy[] = [];
+  const swarmLocations = placeEnemies({
+    grid: realmMap.tiles,
+    player: { y: entry[0], x: entry[1] },
+    count: 1,
+    minDistanceFromPlayer: 6,
+  });
+  for (const loc of swarmLocations) {
+    for (let i = 0; i < 4; i++) {
+      const goblin = new Enemy({ y: loc.y, x: loc.x });
+      goblin.kind = "white-goblin";
+      enemies.push(goblin);
+    }
+  }
+  assignWhiteGoblinSwarmIds(enemies);
+  return enemies;
+}
+
 /** Step onto a leftover (unclaimed) pink ring -> warp into the pink realm. */
 function enterPinkRealm(
   state: GameState,
@@ -1945,10 +2011,13 @@ function enterPinkRealm(
   return {
     ...state,
     mapData: placePlayerAt(realmMap, entry),
-    enemies: [],
+    enemies: buildPinkRealmEnemies(realmMap, entry),
     playerDirection: direction,
     inPinkRealm: true,
     reachedPinkRealm: true,
+    // Keep the entry/return-ring tile clear so the hero's first move isn't reversed
+    // before any mist has visibly drifted onto them.
+    mist: seedMist(realmMap, Math.random, [entry]),
     dungeonReturn: {
       mapData: dungeonMap,
       enemies: serializeEnemies(state.enemies),
@@ -1972,6 +2041,7 @@ function returnFromPinkRealm(
     enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
     playerDirection: direction,
     inPinkRealm: false,
+    mist: undefined, // the mist belongs to the realm; clear it on the way out
     dungeonReturn: undefined,
     recentDeaths: [],
     recentBombBlasts: [],
@@ -1988,7 +2058,15 @@ export function movePlayer(
   // detonation on a floor transition — that floor is being replaced.
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
-  return detonateLiveBombs(result);
+  const detonated = detonateLiveBombs(result);
+  // Drift the pink mist one turn as the hero MOVES through the realm — only while already
+  // in the realm (not the entry/exit turn) so the freshly-seeded cloud holds for a beat.
+  // Standing actions (throwing, using items) blind mist-covered enemies but deliberately
+  // don't shift the cloud; the hero stirs it by walking through it.
+  if (gameState.inPinkRealm && detonated.inPinkRealm) {
+    return { ...detonated, mist: advanceMist(detonated.mist ?? [], detonated.mapData) };
+  }
+  return detonated;
 }
 
 /**
@@ -2006,6 +2084,13 @@ function movePlayerCore(
   const [currentY, currentX] = position;
   let newY = currentY;
   let newX = currentX;
+
+  // Pink-realm mist scrambles the senses: while the hero stands in it, every pressed
+  // direction is reversed (up<->down, left<->right). Computed from the pre-move tile,
+  // then used for the rest of the turn (movement, the ring/breach checks, facing).
+  if (gameState.inPinkRealm && mistContains(gameState.mist, currentY, currentX)) {
+    direction = reverseDirection(direction);
+  }
 
   const height = getMapHeight(gameState.mapData);
   const width = getMapWidth(gameState.mapData);
@@ -2091,6 +2176,8 @@ function movePlayerCore(
         setPlayerTorchLit: (lit: boolean) => {
           newGameState.heroTorchLit = lit;
         },
+        // Pink mist blinds: an enemy standing in the mist can't move or attack this turn.
+        skipEnemy: mistBlindSkip(gameState),
         // Suppress only when the player moves directly away from an adjacent enemy along the same axis
         suppress: (e: Enemy) => {
           const dy = newY - currentY;

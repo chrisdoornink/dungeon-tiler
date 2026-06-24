@@ -3719,7 +3719,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     Boolean(gameState.conditions?.poisoned?.active),
                     activeCheckpoint,
                     heroDeathStateForTiles,
-                    warpFlicker
+                    warpFlicker,
+                    new Set((gameState.mist ?? []).map(([my, mx]) => `${my},${mx}`))
                   )}
                 </div>
               </div>
@@ -3961,7 +3962,8 @@ function renderTileGrid(
   heroPoisoned: boolean = false,
   activeCheckpoint?: [number, number] | null,
   heroDeathState?: HeroDeathState,
-  heroWarping: boolean = false
+  heroWarping: boolean = false,
+  mistKeys: Set<string> = new Set()
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -4169,6 +4171,11 @@ function renderTileGrid(
             heroDeathState={isPlayerTile ? heroDeathState : undefined}
             heroWarping={!!isPlayerTile && heroWarping}
           />
+          {/* Pink-realm mist: a soft drifting haze over the tile (above the floor + actors,
+              semi-transparent), shown only where the tile is currently visible. */}
+          {isVisible && mistKeys.has(`${rowIndex},${colIndex}`) && (
+            <div className={styles.mistOverlay} aria-hidden="true" />
+          )}
         </div>
       );
     })
