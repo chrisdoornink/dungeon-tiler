@@ -19,6 +19,7 @@ type LastGame = {
   heroHealth?: number;
   berryCount?: number;
   pinkHeartCount?: number;
+  bonusHearts?: number;
   mapData: {
     tiles: number[][];
     subtypes: number[][][];
@@ -177,6 +178,8 @@ export default function EndPage() {
   if (last.hasExitKey) items.push('🗝️');
   if (last.hasSword) items.push('🗡️');
   if (last.hasShield) items.push('🛡️');
+  // Pink flaming heart shown here only if still HELD (kept unused).
+  if ((last.pinkHeartCount ?? 0) > 0) items.push('💗');
   shareLines.push(`🗃️ inventory: ${items.join('')}`);
   // Health line (default to empty if unknown)
   const health = typeof last.heroHealth === 'number' ? last.heroHealth : 0;
@@ -184,6 +187,9 @@ export default function EndPage() {
   for (let i = 1; i <= 5; i++) {
     healthTiles.push(i <= health ? '🟩' : '⬜');
   }
+  // Temporary pink overheal hearts still active at the end (heart was used).
+  const bonusHearts = typeof last.bonusHearts === 'number' ? last.bonusHearts : 0;
+  for (let i = 0; i < bonusHearts; i++) healthTiles.push('💗');
   shareLines.push(healthTiles.join(''));
   const shareText = shareLines.join('\n');
 

@@ -316,6 +316,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     if (lastGame?.hasExitKey) items.push(EMOJI_MAP.exitKey);
     if (lastGame?.hasSword) items.push(EMOJI_MAP.sword);
     if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
+    // Pink flaming heart prize: shown here only if still HELD (kept unused) — a secret-find flex.
+    if ((lastGame?.pinkHeartCount ?? 0) > 0) items.push("💗");
     lines.push(`🗃️ ${items.join("")}`);
 
     // Health visualization (5 hearts showing final health). Default to empty if unknown.
@@ -329,6 +331,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         healthTiles.push("🤍"); // Empty heart for lost health
       }
     }
+    // Temporary pink overheal hearts still active at the end (i.e. the heart was USED and the
+    // buffer survived) ride along after the normal row.
+    const bonusHearts =
+      typeof lastGame?.bonusHearts === "number" ? lastGame.bonusHearts : 0;
+    for (let i = 0; i < bonusHearts; i++) healthTiles.push("💗");
     lines.push(healthTiles.join(""));
 
     // Grade (moved below hearts), intentionally commented out for now until accuracy is improved
@@ -650,6 +657,28 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                                 backgroundPosition: "center",
                               }}
                               aria-label={filled ? "Heart" : "Empty Heart"}
+                            />
+                          );
+                        }
+                        // Temporary pink overheal hearts still active at the end (the heart
+                        // was used and the buffer survived) render after the normal row.
+                        const bonusHearts =
+                          typeof lastGame?.bonusHearts === "number"
+                            ? lastGame.bonusHearts
+                            : 0;
+                        for (let i = 0; i < bonusHearts; i++) {
+                          tiles.push(
+                            <div
+                              key={`bonus-${i}`}
+                              className="w-5 h-5"
+                              style={{
+                                backgroundImage:
+                                  "url(/images/presentational/heart-pink.png)",
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                              }}
+                              aria-label="Pink Heart"
                             />
                           );
                         }

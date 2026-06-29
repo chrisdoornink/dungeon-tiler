@@ -140,7 +140,11 @@ describe("Pink ring warp", () => {
       }
     realmMap.subtypes[ry][rx - 1] = [TileSubtype.PLAYER];
     realmMap.tiles[ry][rx - 1] = FLOOR;
-    const back = movePlayer({ ...inRealm, mapData: realmMap }, Direction.RIGHT);
+    // Clear the drifting mist for this step: it's seeded with Math.random and, if it
+    // happens to cover the player's tile, reverses controls (RIGHT->LEFT) so the hero
+    // would miss the ring. This test verifies the warp-back, not the mist, so empty it
+    // to keep the step deterministic.
+    const back = movePlayer({ ...inRealm, mapData: realmMap, mist: [] }, Direction.RIGHT);
     expect(back.inPinkRealm).toBeFalsy();
     expect(back.mapData.environment).not.toBe("pink_realm");
   });
@@ -171,7 +175,11 @@ describe("Pink ring warp", () => {
       }
     realmMap.subtypes[ry][rx - 1] = [TileSubtype.PLAYER];
     realmMap.tiles[ry][rx - 1] = FLOOR;
-    const back = movePlayer({ ...inRealm, mapData: realmMap }, Direction.RIGHT);
+    // Clear the drifting mist for this step: it's seeded with Math.random and, if it
+    // happens to cover the player's tile, reverses controls (RIGHT->LEFT) so the hero
+    // would miss the ring. This test verifies the warp-back, not the mist, so empty it
+    // to keep the step deterministic.
+    const back = movePlayer({ ...inRealm, mapData: realmMap, mist: [] }, Direction.RIGHT);
     expect(back.inPinkRealm).toBeFalsy();
     expect(back.reachedPinkRealm).toBe(true); // achievement persists after returning
   });

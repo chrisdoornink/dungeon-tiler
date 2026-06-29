@@ -1995,6 +1995,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             reachedPinkRealm: !!gameState.reachedPinkRealm,
             pinkHeartCount: gameState.pinkHeartCount ?? 0,
             berryCount: gameState.berryCount ?? 0,
+            bonusHearts: gameState.bonusHearts ?? 0,
           };
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2052,6 +2053,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             reachedPinkRealm: !!gameState.reachedPinkRealm,
             pinkHeartCount: gameState.pinkHeartCount ?? 0,
             berryCount: gameState.berryCount ?? 0,
+            bonusHearts: gameState.bonusHearts ?? 0,
           };
           if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2372,6 +2374,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           reachedPinkRealm: !!gameState.reachedPinkRealm,
           pinkHeartCount: gameState.pinkHeartCount ?? 0,
           berryCount: gameState.berryCount ?? 0,
+          bonusHearts: gameState.bonusHearts ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2406,6 +2409,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           reachedPinkRealm: !!gameState.reachedPinkRealm,
           pinkHeartCount: gameState.pinkHeartCount ?? 0,
           berryCount: gameState.berryCount ?? 0,
+          bonusHearts: gameState.bonusHearts ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
