@@ -373,6 +373,58 @@
   background-image: url("/images/items/rune1.png");
 }
 
+/* Pink realm prizes */
+.pinkHeartIcon {
+  background-image: url("/images/items/pink-heart.png");
+}
+
+.berryIcon {
+  background-image: url("/images/items/berry.png");
+}
+
+/* Pink glow behind the pink flaming heart (matches the pink_realm aesthetic). */
+.pinkGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 0; /* under assetIcon */
+  background: radial-gradient(
+      60% 60% at 50% 50%,
+      rgba(255, 158, 224, 0.5),
+      rgba(255, 158, 224, 0) 70%
+    ),
+    radial-gradient(
+      80% 80% at 50% 50%,
+      rgba(236, 72, 153, 0.28),
+      rgba(0, 0, 0, 0) 75%
+    );
+  filter: blur(2px) saturate(120%);
+  mix-blend-mode: screen;
+  animation: pinkPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pinkPulse {
+  0% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.5;
+    filter: blur(2.2px) saturate(115%);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.1);
+    opacity: 0.95;
+    filter: blur(2px) saturate(130%);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(0.95);
+    opacity: 0.5;
+    filter: blur(2.2px) saturate(115%);
+  }
+}
+
 /* Small pulsing green glow for rune (behind asset) */
 .runeGlow {
   position: absolute;

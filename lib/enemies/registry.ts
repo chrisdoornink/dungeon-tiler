@@ -337,6 +337,90 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const hasLOS = canSee(grid, [e.y, e.x], [py, px]);
         const hasRing = typeof mem.ringY === "number" && typeof mem.ringX === "number";
 
+        // --- Pink-realm "ninja" variant (tagged at spawn via behaviorMemory.ninja) ---
+        // A fast hit-and-run skirmisher: slides several tiles to close the gap, strikes
+        // hard, then blinks far away (no ring needed in the realm). Branches out before the
+        // dungeon-only ring/teleport logic below, so ordinary pink goblins are unchanged.
+        if ((mem as Record<string, unknown>).ninja === true) {
+          const NINJA_MELEE = 4; // -> ~3-5 after the engine's +/-1 variance, then capped
+          const SLIDE_MIN = 3;
+          const FLEE_MIN = 6, FLEE_MAX = 12; // where it reappears after a strike
+          const AMBUSH_MIN = 1, AMBUSH_MAX = 2; // occasional blink-in near the hero
+
+          // Valid landing spot: in-bounds floor, not the player, not another enemy's
+          // start-of-tick tile (the engine reverts moves onto an occupied tile), and free
+          // of important overlays (chest/key/ring/berry, etc).
+          const tileFree = (y: number, x: number): boolean => {
+            if (!isFloor(y, x)) return false;
+            if (y === py && x === px) return false;
+            for (let k = 0; k < ctx.enemies.length; k++) {
+              if (k === ctx.enemyIndex) continue;
+              if (ctx.enemies[k].y === y && ctx.enemies[k].x === x) return false;
+            }
+            const subs = subtypes?.[y]?.[x] ?? [];
+            const hasImportant =
+              subs.length > 0 &&
+              !subs.every((s) => s === TileSubtype.NONE || s === TileSubtype.FAULTY_FLOOR);
+            return !hasImportant;
+          };
+
+          // Teleport to a random free tile within [minD,maxD] of the hero. Returns success.
+          const blinkTo = (minD: number, maxD: number): boolean => {
+            const elig = findEligibleTiles(py, px, minD, maxD).filter(([y, x]) => tileFree(y, x));
+            if (elig.length === 0) return false;
+            const [ty, tx] = elig[Math.floor(rng() * elig.length)];
+            e.y = ty;
+            e.x = tx;
+            e.memory.moved = true;
+            facePlayer();
+            return true;
+          };
+
+          // Slide up to maxTiles steps toward the hero, stopping at a wall, the hero, or a
+          // blocked tile. Picks the dominant axis each step with a one-axis sidestep fallback.
+          const slide = (maxTiles: number): void => {
+            facePlayer();
+            for (let step = 0; step < maxTiles; step++) {
+              const dy = py - e.y;
+              const dx = px - e.x;
+              if (Math.abs(dy) + Math.abs(dx) <= 1) break; // adjacent — stop, strike next turn
+              let sy = 0, sx = 0;
+              if (Math.abs(dx) >= Math.abs(dy)) sx = dx > 0 ? 1 : -1;
+              else sy = dy > 0 ? 1 : -1;
+              let ny = e.y + sy, nx = e.x + sx;
+              if (!(ny === py && nx === px) && tileFree(ny, nx)) {
+                e.y = ny; e.x = nx; e.memory.moved = true;
+                e.facing = sx !== 0 ? (sx > 0 ? "RIGHT" : "LEFT") : sy > 0 ? "DOWN" : "UP";
+                continue;
+              }
+              // Dominant axis blocked — try the other axis once.
+              let ay = 0, ax = 0;
+              if (sx !== 0 && dy !== 0) ay = dy > 0 ? 1 : -1;
+              else if (sy !== 0 && dx !== 0) ax = dx > 0 ? 1 : -1;
+              ny = e.y + ay; nx = e.x + ax;
+              if ((ay !== 0 || ax !== 0) && !(ny === py && nx === px) && tileFree(ny, nx)) {
+                e.y = ny; e.x = nx; e.memory.moved = true;
+                e.facing = ax !== 0 ? (ax > 0 ? "RIGHT" : "LEFT") : ay > 0 ? "DOWN" : "UP";
+                continue;
+              }
+              break; // fully blocked
+            }
+          };
+
+          facePlayer();
+          if (manhattan === 1) {
+            // Hit and run: strike, then vanish far across the realm.
+            blinkTo(FLEE_MIN, FLEE_MAX);
+            return NINJA_MELEE;
+          }
+          // Occasionally blink in close for an ambush; otherwise slide in fast.
+          if (rng() < 0.25 && blinkTo(AMBUSH_MIN, AMBUSH_MAX)) {
+            return 0;
+          }
+          slide(SLIDE_MIN + (rng() < 0.5 ? 0 : 1)); // slide 3-4 tiles
+          return 0;
+        }
+
         if (hasLOS) {
           // --- LOS mode: ranged attack + positioning, no teleportation ---
           // Clean up any existing ring since we have direct sight
@@ -537,9 +621,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           ).length;
           // Base 2 (up from 1) so stragglers aren't trivial, +1 per flanking
           // mate (capped at +2). The engine still applies +/-1 variance, shield,
-          // and the 4-damage/turn cap on top, so a full surround reliably maxes
+          // and the per-turn damage cap on top, so a full surround reliably maxes
           // a turn while a lone goblin stays survivable.
-          return 2 + Math.min(flankers, 2);
+          // Pink-realm swarms hit harder (base 3) — tagged via behaviorMemory at spawn.
+          const realmBuffed = (e.memory as Record<string, unknown>).realmBuffed === true;
+          const baseBite = realmBuffed ? 3 : 2;
+          return baseBite + Math.min(flankers, 2);
         }
 
         // Vision check

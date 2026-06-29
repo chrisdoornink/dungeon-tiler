@@ -5,13 +5,15 @@ import HeartPopAnimation from './HeartPopAnimation';
 interface HealthDisplayProps {
   health: number;
   maxHealth?: number;
+  bonusHearts?: number; // temporary pink overheal hearts drawn after the normal row
   className?: string;
   isPoisoned?: boolean; // when true, tint filled hearts to indicate poison
 }
 
-const HealthDisplay: React.FC<HealthDisplayProps> = ({ 
-  health, 
-  maxHealth = 5, 
+const HealthDisplay: React.FC<HealthDisplayProps> = ({
+  health,
+  maxHealth = 5,
+  bonusHearts = 0,
   className = '',
   isPoisoned = false,
 }) => {
@@ -61,6 +63,27 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
         />
       );
     }
+  }
+
+  // Temporary pink overheal hearts (from the pink flaming heart prize) are drawn after the
+  // normal row. They are always "filled" — they only exist while held — and use the pink
+  // HUD heart asset so they read as a distinct bonus buffer.
+  const safeBonus = Math.max(0, Math.floor(bonusHearts));
+  for (let b = 0; b < safeBonus; b++) {
+    hearts.push(
+      <Image
+        key={`bonus-${b}`}
+        src="/images/presentational/heart-pink.png"
+        alt="💗"
+        width={16}
+        height={16}
+        className="w-4 h-4"
+        sizes="16px"
+        // Tiny pixel-art icon: skip the Next optimizer so the raw sprite is served
+        // (crisper, and avoids a stale cached /_next/image entry when the art changes).
+        unoptimized
+      />
+    );
   }
 
   return (

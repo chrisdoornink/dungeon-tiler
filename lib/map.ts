@@ -66,6 +66,9 @@ export {
 export {
   performUseFood,
   performUsePotion,
+  performUsePinkHeart,
+  performUseBerry,
+  PINK_HEART_BONUS_HEARTS,
   performThrowRock,
   performThrowRune,
   performThrowBomb,

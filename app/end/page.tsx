@@ -17,6 +17,8 @@ type LastGame = {
   showFullMap?: boolean;
   streak?: number;
   heroHealth?: number;
+  berryCount?: number;
+  pinkHeartCount?: number;
   mapData: {
     tiles: number[][];
     subtypes: number[][][];
@@ -330,6 +332,8 @@ export default function EndPage() {
             if (last.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
             if (last.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
             if (last.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
+            if ((last.berryCount ?? 0) > 0) inv.push({ emoji: '🍓', label: `Belted Berry x${last.berryCount}` });
+            if ((last.pinkHeartCount ?? 0) > 0) inv.push({ emoji: '💗', label: 'Pink Flaming Heart' });
             if (last.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });
             if (inv.length === 0) {
               return <div className="text-gray-400">None</div>;

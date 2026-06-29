@@ -89,6 +89,8 @@ export const ASSET_URLS: string[] = [
   "/images/items/rune1.png",
   "/images/items/snake-medalion.png",
   "/images/items/heart.png",
+  "/images/items/pink-heart.png",
+  "/images/items/berry.png",
   "/images/items/bomb-black.png",
   "/images/items/bomb-red.png",
   "/images/items/bam1.png",

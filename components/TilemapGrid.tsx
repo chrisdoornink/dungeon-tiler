@@ -10,6 +10,8 @@ import {
   performThrowBomb,
   performUseFood,
   performUsePotion,
+  performUsePinkHeart,
+  performUseBerry,
   reviveFromLastCheckpoint,
   serializeEnemies,
   serializeNPCs,
@@ -516,6 +518,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
     setGameState((prev) => {
       const newState = performUsePotion(prev);
+      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
+      return newState;
+    });
+  }, [resolvedStorageSlot]);
+
+  // Handle using the pink flaming heart prize (full heal + 3 temporary pink hearts)
+  const handleUsePinkHeart = useCallback(() => {
+    try {
+      trackUse("pink_heart");
+    } catch {}
+    setGameState((prev) => {
+      const newState = performUsePinkHeart(prev);
+      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
+      return newState;
+    });
+  }, [resolvedStorageSlot]);
+
+  // Handle using a belted berry (heal 2-3)
+  const handleUseBerry = useCallback(() => {
+    try {
+      trackUse("berry");
+    } catch {}
+    setGameState((prev) => {
+      const newState = performUseBerry(prev);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
@@ -1967,6 +1993,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
             currentFloor: gameState.currentFloor,
             reachedPinkRealm: !!gameState.reachedPinkRealm,
+            pinkHeartCount: gameState.pinkHeartCount ?? 0,
+            berryCount: gameState.berryCount ?? 0,
           };
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2022,6 +2050,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             heroHealth: gameState.heroHealth,
             currentFloor: gameState.currentFloor,
             reachedPinkRealm: !!gameState.reachedPinkRealm,
+            pinkHeartCount: gameState.pinkHeartCount ?? 0,
+            berryCount: gameState.berryCount ?? 0,
           };
           if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2092,6 +2122,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     runes: 0,
     bombs: 0,
     food: 0,
+    pinkHearts: 0,
+    berry: 0,
     chestKeys: 0,
   });
 
@@ -2171,6 +2203,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         trackPickup("food");
         triggerItemPickupAnimation("food");
       }
+      if ((gameState.pinkHeartCount ?? 0) > prevInv.pinkHearts) {
+        trackPickup("pink_heart");
+        triggerItemPickupAnimation("pinkHeart");
+      }
+      if ((gameState.berryCount ?? 0) > prevInv.berry) {
+        trackPickup("berry");
+        triggerItemPickupAnimation("berry");
+      }
     } catch {}
     const nextInv = {
       key: gameState.hasKey,
@@ -2181,6 +2221,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       runes: gameState.runeCount ?? 0,
       bombs: gameState.bombCount ?? 0,
       food: gameState.foodCount ?? 0,
+      pinkHearts: gameState.pinkHeartCount ?? 0,
+      berry: gameState.berryCount ?? 0,
       chestKeys: gameState.chestKeyCount ?? 0,
     };
     const changed =
@@ -2192,6 +2234,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       nextInv.runes !== prevInv.runes ||
       nextInv.bombs !== prevInv.bombs ||
       nextInv.food !== prevInv.food ||
+      nextInv.pinkHearts !== prevInv.pinkHearts ||
+      nextInv.berry !== prevInv.berry ||
       nextInv.chestKeys !== prevInv.chestKeys;
     if (changed) {
       setPrevInv(nextInv);
@@ -2326,6 +2370,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           heroHealth: 0, // Always 0 for deaths
           currentFloor: gameState.currentFloor,
           reachedPinkRealm: !!gameState.reachedPinkRealm,
+          pinkHeartCount: gameState.pinkHeartCount ?? 0,
+          berryCount: gameState.berryCount ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2358,6 +2404,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           heroHealth: 0, // Always 0 for deaths
           currentFloor: gameState.currentFloor,
           reachedPinkRealm: !!gameState.reachedPinkRealm,
+          pinkHeartCount: gameState.pinkHeartCount ?? 0,
+          berryCount: gameState.berryCount ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2784,6 +2832,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           // Use potion
           handleUsePotion();
           return;
+        case "h":
+        case "H":
+          // Use the pink flaming heart prize
+          handleUsePinkHeart();
+          return;
+        case "g":
+        case "G":
+          // Use a belted berry
+          handleUseBerry();
+          return;
         case "m":
         case "M":
           // Use snake medallion (place/travel portal)
@@ -2815,6 +2873,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleThrowBomb,
     handleUseFood,
     handleUsePotion,
+    handleUsePinkHeart,
+    handleUseBerry,
     handleSnakeMedallionClick,
     handleInteract,
     handleDialogueChoiceNavigate,
@@ -2910,6 +2970,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               <HealthDisplay
                 health={gameState.heroHealth}
                 maxHealth={gameState.heroMaxHealth ?? 5}
+                bonusHearts={gameState.bonusHearts ?? 0}
                 className="mb-2"
                 isPoisoned={Boolean(gameState.conditions?.poisoned?.active)}
               />
@@ -2986,7 +3047,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   ((gameState.rockCount ?? 0) > 0 ? 1 : 0) +
                   ((gameState.runeCount ?? 0) > 0 ? 1 : 0) +
                   ((gameState.foodCount ?? 0) > 0 ? 1 : 0) +
-                  ((gameState.potionCount ?? 0) > 0 ? 1 : 0);
+                  ((gameState.potionCount ?? 0) > 0 ? 1 : 0) +
+                  ((gameState.pinkHeartCount ?? 0) > 0 ? 1 : 0) +
+                  ((gameState.berryCount ?? 0) > 0 ? 1 : 0);
 
                 const isCompact = inventoryCount > 2;
 
@@ -3376,6 +3439,90 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             <span>Potion x{gameState.potionCount}</span>
                             <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
                               (tap or P)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.berryCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleUseBerry}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Use berry (${gameState.berryCount}) — heals 2-3 — tap or press G`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/berry.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              G
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.berryCount}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Berry x{gameState.berryCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or G)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.pinkHeartCount ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleUsePinkHeart}
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444]"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1"
+                        }
+                        title={`Use pink heart (${gameState.pinkHeartCount}) — full heal + 3 hearts — tap or press H`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: "url(/images/items/pink-heart.png)",
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              H
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.pinkHeartCount}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span>Pink Heart x{gameState.pinkHeartCount}</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or H)
                             </span>
                           </>
                         )}

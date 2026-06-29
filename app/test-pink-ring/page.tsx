@@ -11,6 +11,7 @@ import {
 import { FLOOR } from "../../lib/map/constants";
 import { findPlayerPosition } from "../../lib/map/player";
 import { buildPinkRealm } from "../../lib/map/pink-realm";
+import { buildPinkRealmEnemies } from "../../lib/map/game-state";
 import { seedMist } from "../../lib/map/pink-mist";
 import { rehydrateEnemies } from "../../lib/enemy";
 import { TilemapGrid } from "../../components/TilemapGrid";
@@ -109,12 +110,17 @@ function buildRealmState(): GameState {
     TileSubtype.PLAYER,
   ];
   const mist = seedMist(mapData, Math.random, [entry]);
-  const enemyTiles = shuffle(emptyFloorTiles(mapData, entry, 4, 9)).slice(0, 3);
-  const enemies = rehydrateEnemies(
-    enemyTiles.map(([y, x]) => ({ y, x, kind: "white-goblin" as const }))
-  );
+  // Use the real realm population (4 buffed white-goblin swarms + 4 ninja pink goblins) so
+  // this harness faithfully exercises the shipped pink-realm combat.
+  const enemies = buildPinkRealmEnemies(mapData, entry);
   return {
     ...BASE,
+    // Realistic mid-run loadout for accurate playtesting of the realm.
+    hasSword: true,
+    hasShield: true,
+    bombCount: 1,
+    rockCount: 2,
+    foodCount: 3,
     showFullMap: true,
     mapData,
     enemies,

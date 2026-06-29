@@ -100,6 +100,11 @@ export enum TileSubtype {
   BOMB_LIVE = 53,
   SINGED = 54,
   BREACH = 55,
+  // Pink realm prizes (scattered on the realm floor, picked up like a rock):
+  // PINK_HEART is the rare pink flaming heart (full heal + 3 temporary pink hearts on
+  // use, or kept as an end-screen prize); BERRY is the belted berry (heals 2-3 on use).
+  PINK_HEART = 56,
+  BERRY = 57,
 }
 
 /**

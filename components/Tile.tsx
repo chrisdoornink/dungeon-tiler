@@ -404,6 +404,12 @@ export const Tile: React.FC<TileProps> = ({
   const hasSinged = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SINGED) || false;
   };
+  const hasPinkHeart = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PINK_HEART) || false;
+  };
+  const hasBerry = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.BERRY) || false;
+  };
 
   // Bed helpers
   const hasBed = (subtypes: number[] | undefined): boolean => {
@@ -571,7 +577,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BOMB &&
         subtype !== TileSubtype.BOMB_LIVE &&
         subtype !== TileSubtype.SINGED &&
-        subtype !== TileSubtype.BREACH
+        subtype !== TileSubtype.BREACH &&
+        // Pink realm prizes have custom rendering (heart gets a glow overlay)
+        subtype !== TileSubtype.PINK_HEART &&
+        subtype !== TileSubtype.BERRY
     );
   };
 
@@ -837,6 +846,28 @@ export const Tile: React.FC<TileProps> = ({
             style={{
               backgroundImage: `url('/images/enemies/fire-goblin/pink-ring.png')`,
             }}
+          />
+        )}
+
+        {/* Render the pink flaming heart prize (with a pink glow) only once its chest is
+            open — while the chest is closed/locked it stays hidden inside. */}
+        {hasOpenChest(subtypes) && hasPinkHeart(subtypes) && (
+          <>
+            <div className={styles.pinkGlow} aria-hidden="true" />
+            <div
+              key="pink-heart"
+              data-testid={`subtype-icon-${TileSubtype.PINK_HEART}`}
+              className={`${styles.assetIcon} ${styles.pinkHeartIcon}`}
+            />
+          </>
+        )}
+
+        {/* Render the belted berry prize */}
+        {hasBerry(subtypes) && (
+          <div
+            key="berry"
+            data-testid={`subtype-icon-${TileSubtype.BERRY}`}
+            className={`${styles.assetIcon} ${styles.berryIcon}`}
           />
         )}
 

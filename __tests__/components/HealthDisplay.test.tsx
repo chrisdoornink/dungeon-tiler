@@ -50,8 +50,32 @@ describe('HealthDisplay', () => {
 
   it('should render inline by default', () => {
     const { container } = render(<HealthDisplay health={3} />);
-    
+
     const healthDisplay = container.firstChild;
     expect(healthDisplay).toHaveClass('flex');
+  });
+
+  it('should render temporary pink bonus hearts after the normal row', () => {
+    render(<HealthDisplay health={5} maxHealth={5} bonusHearts={3} />);
+
+    const redHearts = screen.getAllByAltText('❤️');
+    const pinkHearts = screen.getAllByAltText('💗');
+
+    expect(redHearts).toHaveLength(5);
+    expect(pinkHearts).toHaveLength(3);
+  });
+
+  it('should not render pink hearts when bonusHearts is 0', () => {
+    render(<HealthDisplay health={4} maxHealth={5} bonusHearts={0} />);
+
+    expect(screen.queryAllByAltText('💗')).toHaveLength(0);
+  });
+
+  it('should render pink bonus hearts alongside empty normal hearts', () => {
+    render(<HealthDisplay health={2} maxHealth={5} bonusHearts={3} />);
+
+    expect(screen.getAllByAltText('❤️')).toHaveLength(2); // filled normal
+    expect(screen.getAllByAltText('🤍')).toHaveLength(3); // empty normal
+    expect(screen.getAllByAltText('💗')).toHaveLength(3); // pink bonus
   });
 });

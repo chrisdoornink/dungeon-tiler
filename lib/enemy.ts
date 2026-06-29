@@ -76,11 +76,8 @@ export class Enemy {
       if (this.health > 2) this.health = 2;
       this.attack = 1;
     } else if (k === 'white-goblin') {
-      // White goblin swarm member: very fragile, light attack
-      this.health = 1;
-      this.attack = 1;
-    } else if (k === 'white-goblin') {
-      // White goblin swarm member: very fragile, light attack
+      // White goblin swarm member: very fragile, light attack. Pink-realm swarms are
+      // buffed at spawn by overriding .health directly (see buildPinkRealmEnemies).
       this.health = 1;
       this.attack = 1;
     }

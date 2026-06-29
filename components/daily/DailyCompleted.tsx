@@ -596,6 +596,18 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                             asset: "/images/items/shield.png",
                             alt: "Shield",
                           });
+                        if ((lastGame?.berryCount ?? 0) > 0)
+                          inv.push({
+                            asset: "/images/items/berry.png",
+                            alt: `Belted Berry x${lastGame.berryCount}`,
+                          });
+                        // Pink flaming heart prize: shown only if still held at the end
+                        // (using it consumes it). A trophy for finding the secret realm.
+                        if ((lastGame?.pinkHeartCount ?? 0) > 0)
+                          inv.push({
+                            asset: "/images/items/pink-heart.png",
+                            alt: "Pink Flaming Heart — secret prize",
+                          });
                         if (inv.length === 0) return null;
                         return inv.map((i, idx) => (
                           <div

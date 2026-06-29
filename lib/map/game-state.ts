@@ -121,6 +121,42 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
   }
 }
 
+/**
+ * Drain temporary pink bonus hearts (the overheal buffer granted by the pink flaming
+ * heart) before real health. Returns the new bonus-heart count and the residual damage
+ * that should still be subtracted from heroHealth (0 if the buffer fully absorbed it).
+ * Pure — callers apply the returned values themselves.
+ */
+function absorbBonusHearts(
+  bonusHearts: number | undefined,
+  amount: number
+): { bonusHearts: number; toHealth: number } {
+  const bonus = Math.max(0, bonusHearts ?? 0);
+  if (amount <= 0) return { bonusHearts: bonus, toHealth: 0 };
+  const absorbed = Math.min(bonus, amount);
+  return { bonusHearts: bonus - absorbed, toHealth: amount - absorbed };
+}
+
+/**
+ * Apply `amount` of incoming damage to the hero, draining pink bonus hearts before real
+ * health. Mutates state.bonusHearts and state.heroHealth in place (heroHealth floored at
+ * 0). Damage-stat bookkeeping (stats.damageTaken) stays at each call site unchanged.
+ */
+function applyHeroDamage(state: GameState, amount: number): void {
+  const r = absorbBonusHearts(state.bonusHearts, amount);
+  state.bonusHearts = r.bonusHearts;
+  state.heroHealth = Math.max(0, state.heroHealth - r.toHealth);
+}
+
+// Total enemy damage the hero can take in a single turn. The standard dungeon caps this
+// at 4 so a pile-on can't instantly delete the hero. The pink realm is a deliberately
+// harder gauntlet guarding the heart, so its buffed swarms + hit-and-run ninjas are
+// allowed to stack more per turn. Tunable knob for realm difficulty.
+const PINK_REALM_DAMAGE_CAP = 6;
+function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
+  return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
+}
+
 export function performUseFood(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
@@ -153,7 +189,7 @@ export function performUseFood(gameState: GameState): GameState {
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
-        preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+        applyHeroDamage(preTickState, applied);
         preTickState.stats.damageTaken += applied;
 
         // If player dies from enemy damage, track which enemy killed them
@@ -223,7 +259,7 @@ export function performUsePotion(gameState: GameState): GameState {
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
-        preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+        applyHeroDamage(preTickState, applied);
         preTickState.stats.damageTaken += applied;
 
         if (preTickState.heroHealth === 0) {
@@ -258,7 +294,153 @@ export function performUsePotion(gameState: GameState): GameState {
   }
 
   // debug: used potion
-  
+
+  return newGameState;
+}
+
+// Temporary pink hearts granted when the pink flaming heart prize is consumed.
+export const PINK_HEART_BONUS_HEARTS = 3;
+
+/**
+ * Use the pink flaming heart prize (keyboard 'h'): refill to full health AND grant 3
+ * temporary pink bonus hearts that sit on top of max health and are spent before real
+ * health when damaged. Consumes one heart and costs a turn (enemies act first, like a
+ * potion). Does nothing if none are held.
+ */
+export function performUsePinkHeart(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
+  const count = gameState.pinkHeartCount ?? 0;
+  if (count <= 0) return gameState;
+
+  // Enemies act first relative to current player position
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const pos = findPlayerPosition(preTickState.mapData);
+    if (pos) {
+      const [py, px] = pos;
+      const result = updateEnemies(
+        preTickState.mapData.tiles,
+        preTickState.mapData.subtypes,
+        preTickState.enemies,
+        { y: py, x: px },
+        {
+          rng: preTickState.combatRng ?? Math.random,
+          defense: preTickState.hasShield ? 1 : 0,
+          playerTorchLit: preTickState.heroTorchLit ?? true,
+          setPlayerTorchLit: (lit: boolean) => {
+            preTickState.heroTorchLit = lit;
+          },
+          skipEnemy: mistBlindSkip(preTickState),
+        }
+      );
+
+      if (result.damage > 0) {
+        const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
+        applyHeroDamage(preTickState, applied);
+        preTickState.stats.damageTaken += applied;
+
+        if (preTickState.heroHealth === 0) {
+          const killerEnemy = preTickState.enemies.find(
+            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
+          );
+          if (killerEnemy) {
+            preTickState.deathCause = {
+              type: "enemy",
+              enemyKind: killerEnemy.kind,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Consume the heart: full heal + 3 temporary pink bonus hearts.
+  const newGameState = { ...preTickState };
+  newGameState.heroHealth = newGameState.heroMaxHealth ?? 5;
+  newGameState.bonusHearts = (newGameState.bonusHearts ?? 0) + PINK_HEART_BONUS_HEARTS;
+  newGameState.pinkHeartCount = count - 1;
+  newGameState.stats = {
+    ...newGameState.stats,
+    pinkHeartsUsed: (newGameState.stats.pinkHeartsUsed ?? 0) + 1,
+    maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
+  };
+  incrementStepsAndTime(newGameState);
+
+  return newGameState;
+}
+
+/**
+ * Use a belted berry (keyboard 'g'): heal a variable 2-3 hearts (clamped to max health).
+ * Consumes one berry and costs a turn (enemies act first, like a potion). Does nothing if
+ * none are held.
+ */
+export function performUseBerry(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
+  const count = gameState.berryCount ?? 0;
+  if (count <= 0) return gameState;
+
+  // Enemies act first relative to current player position
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const pos = findPlayerPosition(preTickState.mapData);
+    if (pos) {
+      const [py, px] = pos;
+      const result = updateEnemies(
+        preTickState.mapData.tiles,
+        preTickState.mapData.subtypes,
+        preTickState.enemies,
+        { y: py, x: px },
+        {
+          rng: preTickState.combatRng ?? Math.random,
+          defense: preTickState.hasShield ? 1 : 0,
+          playerTorchLit: preTickState.heroTorchLit ?? true,
+          setPlayerTorchLit: (lit: boolean) => {
+            preTickState.heroTorchLit = lit;
+          },
+          skipEnemy: mistBlindSkip(preTickState),
+        }
+      );
+
+      if (result.damage > 0) {
+        const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
+        applyHeroDamage(preTickState, applied);
+        preTickState.stats.damageTaken += applied;
+
+        if (preTickState.heroHealth === 0) {
+          const killerEnemy = preTickState.enemies.find(
+            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
+          );
+          if (killerEnemy) {
+            preTickState.deathCause = {
+              type: "enemy",
+              enemyKind: killerEnemy.kind,
+            };
+          }
+        }
+      }
+    }
+  }
+
+  // Consume the berry: heal a variable 2-3 hearts (capped at heroMaxHealth).
+  const healRng = preTickState.combatRng ?? Math.random;
+  const heal = healRng() < 0.5 ? 2 : 3;
+  const newGameState = { ...preTickState };
+  newGameState.heroHealth = Math.min(
+    newGameState.heroMaxHealth ?? 5,
+    newGameState.heroHealth + heal
+  );
+  newGameState.berryCount = count - 1;
+  newGameState.stats = {
+    ...newGameState.stats,
+    berriesUsed: (newGameState.stats.berriesUsed ?? 0) + 1,
+    maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
+  };
+  incrementStepsAndTime(newGameState);
+
   return newGameState;
 }
 
@@ -344,8 +526,8 @@ export function performThrowRock(gameState: GameState): GameState {
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(4, result.damage);
-      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
+      applyHeroDamage(preTickState, applied);
       preTickState.stats = {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
@@ -603,8 +785,8 @@ export function performThrowRune(gameState: GameState): GameState {
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(4, result.damage);
-      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
+      applyHeroDamage(preTickState, applied);
       preTickState.stats = {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
@@ -927,12 +1109,16 @@ export function detonateLiveBombs(state: GameState): GameState {
   stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
 
   let heroHealth = state.heroHealth;
+  let bonusHearts = state.bonusHearts;
   let deathCause = state.deathCause;
   if (playerHit) {
     const applied = state.hasShield
       ? BOMB_PLAYER_DAMAGE_SHIELD
       : BOMB_PLAYER_DAMAGE;
-    heroHealth = Math.max(0, heroHealth - applied);
+    // Pink bonus hearts soak the blast before real health.
+    const absorbed = absorbBonusHearts(bonusHearts, applied);
+    bonusHearts = absorbed.bonusHearts;
+    heroHealth = Math.max(0, heroHealth - absorbed.toHealth);
     stats.damageTaken = stats.damageTaken + applied;
     if (state.mode === "tutorial" && heroHealth < 1) heroHealth = 1;
     if (heroHealth === 0) deathCause = { type: "bomb" };
@@ -945,6 +1131,7 @@ export function detonateLiveBombs(state: GameState): GameState {
     defeatedEnemies,
     stats,
     heroHealth,
+    bonusHearts,
     deathCause,
     recentBombBlasts: blastCenters,
   };
@@ -998,8 +1185,8 @@ export function performThrowBomb(gameState: GameState): GameState {
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(4, result.damage);
-      preTickState.heroHealth = Math.max(0, preTickState.heroHealth - applied);
+      const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
+      applyHeroDamage(preTickState, applied);
       preTickState.stats = {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
@@ -1090,6 +1277,10 @@ export interface GameState {
   npcs?: NPC[]; // Friendly or neutral NPCs present in the map
   heroHealth: number; // Player health points for current run
   heroMaxHealth?: number; // Maximum health points (increases when extra heart is collected); defaults to 5
+  // Temporary "overheal" pink hearts granted by the pink flaming heart prize. They sit on
+  // top of heroHealth/heroMaxHealth, render pink in the HUD, are drained BEFORE real health
+  // when the hero takes damage, and are NOT refilled by food/potions. Absent/0 normally.
+  bonusHearts?: number;
   heroAttack: number; // Player base attack for current run
   // Optional RNG for combat variance injection in tests; falls back to Math.random
   combatRng?: () => number;
@@ -1099,6 +1290,8 @@ export interface GameState {
   bombCount?: number; // Count of carried bombs (chest pickups grant a 3-pack)
   foodCount?: number; // Count of collected food items
   potionCount?: number; // Count of collected +2 potions
+  pinkHeartCount?: number; // Pink flaming heart prizes held (pink realm); use with 'h' or keep as a trophy
+  berryCount?: number; // Belted berries held (pink realm); use with 'g' to heal 2-3
   hasSnakeMedallion?: boolean; // Snake medallion for portal travel
   stats: {
     damageDealt: number;
@@ -1115,6 +1308,8 @@ export interface GameState {
     runesUsed?: number;
     foodUsed?: number;
     potionsUsed?: number;
+    pinkHeartsUsed?: number;
+    berriesUsed?: number;
     enemiesKilledBySword?: number;
     enemiesKilledByRock?: number;
     enemiesKilledByRune?: number;
@@ -1666,7 +1861,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     npcInteractionQueue: [],
     bookshelfInteractionQueue: [],
     bedInteractionQueue: [],
-    // Preserve: heroHealth, heroAttack, hasSword, hasShield, hasSnakeMedallion, rockCount, runeCount, foodCount, potionCount, stats, etc.
+    // Preserve: heroHealth, heroMaxHealth, bonusHearts, heroAttack, hasSword, hasShield, hasSnakeMedallion, rockCount, runeCount, foodCount, potionCount, pinkHeartCount, berryCount, stats, etc.
   };
 }
 
@@ -1968,28 +2163,53 @@ function reverseDirection(direction: Direction): Direction {
   }
 }
 
+// Pink-realm population tuning. The realm is a hard gauntlet guarding the heart chest.
+const REALM_WHITE_SWARMS = 4; // four sets of white goblins (4 goblins each)
+const REALM_WHITE_GOBLIN_HP = 3; // buffed from 1 so a single hero swing can't clear them
+const REALM_PINK_NINJAS = 4; // four hit-and-run ninja pink goblins
+
 /**
- * Minimal first-pass population for the pink realm: a single white-goblin swarm placed
- * away from the entry so the mist's enemy-blinding has something to act on. Pink goblins
- * are intentionally left out for now — their teleport ring would tangle with the realm's
- * own return ring.
+ * Populate the pink realm: four white-goblin swarms (buffed — tougher and harder-hitting
+ * than their dungeon kin) plus four "ninja" pink goblins that slide in, strike, and blink
+ * away without ever dropping a teleport ring (the ninja flag flips their registry behavior,
+ * so their ring logic can't tangle with the realm's own return ring).
  */
-function buildPinkRealmEnemies(realmMap: MapData, entry: [number, number]): Enemy[] {
+export function buildPinkRealmEnemies(realmMap: MapData, entry: [number, number]): Enemy[] {
   const enemies: Enemy[] = [];
+
+  // White-goblin swarms, buffed for the realm.
   const swarmLocations = placeEnemies({
     grid: realmMap.tiles,
     player: { y: entry[0], x: entry[1] },
-    count: 1,
+    count: REALM_WHITE_SWARMS,
     minDistanceFromPlayer: 6,
   });
   for (const loc of swarmLocations) {
     for (let i = 0; i < 4; i++) {
       const goblin = new Enemy({ y: loc.y, x: loc.x });
       goblin.kind = "white-goblin";
+      goblin.health = REALM_WHITE_GOBLIN_HP; // override the kind setter's baseline of 1
+      (goblin.behaviorMemory as Record<string, unknown>).realmBuffed = true; // stronger bite
       enemies.push(goblin);
     }
   }
+  // Group the whites into 4-member swarms (must run while the array holds only whites).
   assignWhiteGoblinSwarmIds(enemies);
+
+  // Ninja pink goblins, tagged so the registry runs the realm hit-and-run behavior.
+  const ninjaLocations = placeEnemies({
+    grid: realmMap.tiles,
+    player: { y: entry[0], x: entry[1] },
+    count: REALM_PINK_NINJAS,
+    minDistanceFromPlayer: 5,
+  });
+  for (const loc of ninjaLocations) {
+    const ninja = new Enemy({ y: loc.y, x: loc.x });
+    ninja.kind = "pink-goblin";
+    (ninja.behaviorMemory as Record<string, unknown>).ninja = true;
+    enemies.push(ninja);
+  }
+
   return enemies;
 }
 
@@ -2193,11 +2413,11 @@ function movePlayerCore(
       }
     );
     if (result.damage > 0) {
-      const applied = Math.min(4, result.damage);
+      const applied = Math.min(perTurnDamageCap(newGameState), result.damage);
       const playerPos = findPlayerPosition(newGameState.mapData);
       console.log(`[PLAYER DAMAGE] Taking ${applied} damage (${result.damage} before cap) during movePlayer. Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - applied)}. Player at: ${playerPos ? `(${playerPos[0]},${playerPos[1]})` : 'unknown'}`);
       console.log(`[PLAYER DAMAGE] Attacking enemies:`, result.attackingEnemies.map(e => `${e.kind} dealt ${e.damage}`).join(', '));
-      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
+      applyHeroDamage(newGameState, applied);
       newGameState.stats.damageTaken += applied;
 
       // Tutorial guardrail: never let the hero die during the tutorial. They
@@ -2575,7 +2795,7 @@ function movePlayerCore(
         if (dmgNow > 0) {
           const applied = Math.min(2, dmgNow);
           console.log(`[SNAKE POT] Snake pot ambush at (${newY},${newX})! Dealing ${applied} damage (${dmgNow} before cap). Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - applied)}. Player at (${currentY},${currentX})`);
-          newGameState.heroHealth = Math.max(0, newGameState.heroHealth - applied);
+          applyHeroDamage(newGameState, applied);
           newGameState.stats.damageTaken += applied;
         }
         // If the ambush was lethal, mark death cause as enemy snake
@@ -2710,6 +2930,7 @@ function movePlayerCore(
         subtype.includes(TileSubtype.SHIELD) ||
         subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
         subtype.includes(TileSubtype.EXTRA_HEART) ||
+        subtype.includes(TileSubtype.PINK_HEART) ||
         subtype.includes(TileSubtype.BOMB)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
@@ -2736,6 +2957,11 @@ function movePlayerCore(
         newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
+      if (subtype.includes(TileSubtype.PINK_HEART)) {
+        // The pink flaming heart prize, revealed from its locked realm chest.
+        newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
       // Clearing of item happens below when we set dest tile subtypes
     }
 
@@ -2747,6 +2973,15 @@ function movePlayerCore(
       // Remove only the ROCK tag; preserve other overlays like ROAD
       newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.ROCK);
       // debug: rock picked up
+    }
+
+    // Belted berries are scattered loose on the realm floor: pick up on entry and clear the
+    // tag (a ground pickup, like a rock). The pink heart is NOT here — it lives inside a
+    // locked chest and is granted by the chest-reveal block above once the chest is opened.
+    if (subtype.includes(TileSubtype.BERRY)) {
+      newGameState.berryCount = (newGameState.berryCount || 0) + 1;
+      newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter((t) => t !== TileSubtype.BERRY);
     }
 
     // Combat: if an enemy occupies the destination, resolve attack
@@ -2933,7 +3168,7 @@ function movePlayerCore(
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
       if (
-        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART || t === TileSubtype.BOMB) &&
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART || t === TileSubtype.BOMB || t === TileSubtype.PINK_HEART) &&
         !hasClosedChest
       )
         return false;
@@ -3002,7 +3237,7 @@ function movePlayerCore(
       // Apply poison damage
       const poisonDamage = poison.damagePerInterval;
       console.log(`[POISON DAMAGE] Taking ${poisonDamage} poison damage. Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - poisonDamage)}. Steps since last: ${poison.stepsSinceLastDamage}`);
-      newGameState.heroHealth = Math.max(0, newGameState.heroHealth - poisonDamage);
+      applyHeroDamage(newGameState, poisonDamage);
       newGameState.stats.damageTaken += poisonDamage;
       poison.stepsSinceLastDamage = 0;
       
