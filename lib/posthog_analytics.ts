@@ -144,6 +144,31 @@ export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floo
   captureEvent('pink_realm_reached', { ...params });
 }
 
+/**
+ * Fire when the player taps the Share Results button on an end / completion
+ * screen. `surface` distinguishes the two share buttons (the generic /end
+ * screen vs. the daily completion screen). Pair this with `game_complete`
+ * (or `daily_challenge` completed) per day to build a share-rate chart:
+ *   share_clicked unique users / completions unique users.
+ */
+export function trackShare(params: {
+  surface: "end_screen" | "daily_completed";
+  mode?: "daily" | "normal";
+  outcome?: "win" | "dead";
+  levelReached?: number;
+  dateSeed?: string;
+  method?: "native_share" | "clipboard";
+}) {
+  captureEvent('share_clicked', {
+    surface: params.surface,
+    game_mode: params.mode,
+    outcome: params.outcome,
+    level_reached: params.levelReached != null ? String(params.levelReached) : undefined,
+    date_seed: params.dateSeed,
+    method: params.method,
+  });
+}
+
 export function trackDailyChallenge(action: 'intro_viewed' | 'started' | 'completed', params?: EventParams) {
   captureEvent('daily_challenge', {
     action,

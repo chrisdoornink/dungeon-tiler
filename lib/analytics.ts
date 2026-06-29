@@ -42,3 +42,14 @@ export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion") {
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
   posthogAnalytics.trackPinkRealmReached(params);
 }
+
+export function trackShare(params: {
+  surface: "end_screen" | "daily_completed";
+  mode?: "daily" | "normal";
+  outcome?: "win" | "dead";
+  levelReached?: number;
+  dateSeed?: string;
+  method?: "native_share" | "clipboard";
+}) {
+  posthogAnalytics.trackShare(params);
+}

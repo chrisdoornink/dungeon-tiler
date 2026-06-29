@@ -6,6 +6,7 @@ import { go } from "../../lib/navigation";
 import { getEnemyIcon, EnemyRegistry, EnemyKind } from "../../lib/enemies/registry";
 import { summarizeMonsters, monsterShareLines, shareEmojiForKind } from "../../lib/enemies/monster_summary";
 import { ScoreCalculator, ScoreBreakdown } from '../../lib/score_calculator';
+import * as Analytics from "../../lib/analytics";
 
 type LastGame = {
   completedAt: string;
@@ -185,6 +186,14 @@ export default function EndPage() {
   const shareText = shareLines.join('\n');
 
   const onShare = async () => {
+    try {
+      Analytics.trackShare?.({
+        surface: "end_screen",
+        outcome: last.outcome === "win" ? "win" : "dead",
+        levelReached: levelReached ?? undefined,
+        method: typeof navigator.share === "function" ? "native_share" : "clipboard",
+      });
+    } catch {}
     try {
       if (navigator.share) {
         await navigator.share({ text: shareText });

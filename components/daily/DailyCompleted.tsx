@@ -345,6 +345,15 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   const onShare = async () => {
     const shareText = generateShareText();
     try {
+      Analytics.trackShare?.({
+        surface: "daily_completed",
+        mode: "daily",
+        outcome: isWin ? "win" : "dead",
+        levelReached: lastGame?.currentFloor,
+        method: "clipboard",
+      });
+    } catch {}
+    try {
       if (navigator.clipboard) {
         await navigator.clipboard.writeText(shareText);
         setCopied(true);
