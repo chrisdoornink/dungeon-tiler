@@ -2148,9 +2148,16 @@ function pinkRingClaimedByLiving(
  * mist (only while in the realm) is skipped entirely — it can't move or attack this turn.
  * Shared so every enemy-tick (movement AND throws) blinds consistently.
  */
-function mistBlindSkip(state: GameState): (e: Enemy) => boolean {
+function mistBlindSkip(
+  state: GameState,
+  exceptPinkGoblins = false
+): (e: Enemy) => boolean {
   return (e: Enemy) =>
-    !!state.inPinkRealm && mistContains(state.mist, e.y, e.x);
+    !!state.inPinkRealm &&
+    mistContains(state.mist, e.y, e.x) &&
+    // Pink goblins are NOT fully blinded on movement ticks — they self-handle the mist
+    // (shuffle one tile toward the nearest clear tile, no attack) in their own behavior.
+    !(exceptPinkGoblins && e.kind === "pink-goblin");
 }
 
 /** Flip a pressed direction — used when the hero stands in the pink mist. */
@@ -2402,8 +2409,12 @@ function movePlayerCore(
         setPlayerTorchLit: (lit: boolean) => {
           newGameState.heroTorchLit = lit;
         },
-        // Pink mist blinds: an enemy standing in the mist can't move or attack this turn.
-        skipEnemy: mistBlindSkip(gameState),
+        // Pink mist blinds enemies standing in it (no move/attack) — EXCEPT pink goblins,
+        // which instead shuffle one tile toward the nearest clear tile (handled in their
+        // behavior via the `mist` context below). The realm haze tiles are passed so that
+        // behavior can see where the mist is.
+        skipEnemy: mistBlindSkip(gameState, true),
+        mist: gameState.mist,
         // Suppress only when the player moves directly away from an adjacent enemy along the same axis
         suppress: (e: Enemy) => {
           const dy = newY - currentY;

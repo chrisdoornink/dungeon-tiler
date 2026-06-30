@@ -15,6 +15,9 @@ export interface BehaviorContext {
   enemyIndex: number; // index into enemies array for this enemy
   player: { y: number; x: number; torchLit: boolean };
   ghosts?: Array<{ y: number; x: number }>;
+  // Pink-mist tiles for the current tick (pink realm only). Lets mist-aware behaviors
+  // (e.g. pink goblins fleeing the haze) see where the mist is. Absent outside the realm.
+  mist?: Array<[number, number]>;
   // utilities
   rng?: () => number;
   // actions
@@ -183,6 +186,58 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           ringOrigSubs?: number[];
           ringAge?: number;
         };
+
+        // --- Pink mist (realm only): if standing in the haze the goblin is disoriented.
+        // It can only shuffle ONE tile toward the nearest clear tile and cannot attack;
+        // getting out is its only goal while inside. This is a purely positional check each
+        // tick — it has no memory of the mist once clear, and the pursuit/leap logic below
+        // never avoids the mist, so it can blunder back in on its own.
+        if (
+          (mem as Record<string, unknown>).ninja === true &&
+          Array.isArray(ctx.mist) &&
+          ctx.mist.length > 0
+        ) {
+          const mk = (y: number, x: number) => y * 10000 + x;
+          const mistSet = new Set(ctx.mist.map(([my, mx]) => mk(my, mx)));
+          if (mistSet.has(mk(e.y, e.x))) {
+            const occupied = new Set<number>();
+            for (let k = 0; k < ctx.enemies.length; k++) {
+              if (k === ctx.enemyIndex) continue;
+              occupied.add(mk(ctx.enemies[k].y, ctx.enemies[k].x));
+            }
+            const startY = e.y, startX = e.x;
+            const dirs: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+            const walkableFirst = (y: number, x: number) =>
+              isFloor(y, x) && !(y === py && x === px) && !occupied.has(mk(y, x));
+            // BFS outward through mist-covered floor to the nearest clear tile; take the
+            // first step toward it (one tile this turn).
+            const visited = new Set<number>([mk(startY, startX)]);
+            const queue: Array<[number, number, number, number]> = [];
+            for (const [dy, dx] of dirs) {
+              const ny = startY + dy, nx = startX + dx;
+              if (!walkableFirst(ny, nx)) continue;
+              visited.add(mk(ny, nx));
+              queue.push([ny, nx, ny, nx]);
+            }
+            while (queue.length > 0) {
+              const [cy, cx, fy, fx] = queue.shift()!;
+              if (!mistSet.has(mk(cy, cx))) {
+                e.y = fy; e.x = fx; e.memory.moved = true;
+                const sdy = fy - startY, sdx = fx - startX;
+                e.facing = sdx !== 0 ? (sdx > 0 ? "RIGHT" : "LEFT") : (sdy > 0 ? "DOWN" : "UP");
+                break;
+              }
+              for (const [dy, dx] of dirs) {
+                const ny = cy + dy, nx = cx + dx;
+                const kk = mk(ny, nx);
+                if (visited.has(kk) || !isFloor(ny, nx)) continue;
+                visited.add(kk);
+                queue.push([ny, nx, fy, fx]);
+              }
+            }
+            return 0; // disoriented: no attack while in the mist, even if it couldn't move
+          }
+        }
 
         // Becomes aware when player is within range 8 (regardless of LOS — it can sense nearby presence)
         // LOS is only required for ranged attacks, not for awareness/teleport logic

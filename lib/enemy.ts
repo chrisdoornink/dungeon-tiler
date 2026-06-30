@@ -446,6 +446,7 @@ export function updateEnemies(
     skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
+    mist?: Array<[number, number]>;
   }
 ): number;
 export function updateEnemies(
@@ -460,6 +461,7 @@ export function updateEnemies(
     skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
+    mist?: Array<[number, number]>;
   }
 ): { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> };
 export function updateEnemies(
@@ -473,6 +475,7 @@ export function updateEnemies(
     skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
+    mist?: Array<[number, number]>;
   },
   opts?: {
     rng?: () => number;
@@ -481,6 +484,7 @@ export function updateEnemies(
     skipEnemy?: (e: Enemy) => boolean;
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
+    mist?: Array<[number, number]>;
   }
 ): number | { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> } {
   // Handle backward compatibility: old signature was (grid, enemies, player, opts)
@@ -549,6 +553,7 @@ export function updateEnemies(
         ghosts: ghostPositions,
         rng,
         setPlayerTorchLit: opts?.setPlayerTorchLit,
+        mist: finalOpts?.mist,
         enemy: enemyCtx,
       });
       // Write back any mutations from customUpdate
