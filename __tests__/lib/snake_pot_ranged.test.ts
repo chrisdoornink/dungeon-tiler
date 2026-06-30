@@ -11,14 +11,16 @@ import type { MapData } from "../../lib/map/types";
 import { Enemy } from "../../lib/enemy";
 
 /**
- * Destroying a snake pot from range (rock, rune, or bomb) should kill the coiled
- * snake before it can ambush AND give the player clear credit: the POT+SNAKE tags
- * are cleared, the kill counts in stats (toward the snake/rock badges), and for
- * rock/rune the tile is added to recentDeaths so a spirit rises from the broken
- * pot. No live snake enemy should spawn and the hero should take no damage/poison.
+ * Ranged interactions with a pot (POT, optionally + SNAKE / + RUNE / food).
  *
- * Regression guard for the prior bug where a thrown rock silently stripped the POT
- * tag, leaving an invisible orphaned SNAKE tag and giving zero feedback.
+ * A thrown ROCK or RUNE BREAKS the pot but does NOT destroy what's inside — the
+ * contents are released onto the tile: a snake slithers out as a live enemy (no
+ * free ambush bite, since you broke it from a distance), and runes/food are left
+ * on the floor to pick up. A BOMB blast, being an explosion, obliterates the pot
+ * and kills the snake outright.
+ *
+ * Regression guard for the earlier behavior where a thrown rock silently deleted
+ * the snake and the pot's food.
  */
 
 function makeCorridor(py: number, px: number, size = 12): MapData {
@@ -59,40 +61,58 @@ function baseState(mapData: MapData, overrides: Partial<GameState> = {}): GameSt
   };
 }
 
-describe("Rock destroys a snake pot", () => {
-  it("clears both tags, credits a snake kill, records the death, and leaves no live snake", () => {
+describe("Rock breaks a snake pot", () => {
+  it("releases the snake as a live enemy without an ambush, and does not count as a kill", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
     map.subtypes[py][px + 3] = [TileSubtype.POT, TileSubtype.SNAKE];
 
-    const after = performThrowRock(
-      baseState(map, { rockCount: 2, currentFloor: 2 })
-    );
+    const after = performThrowRock(baseState(map, { rockCount: 2 }));
 
     const tile = after.mapData.subtypes[py][px + 3];
-    // Both the pot and the (invisible) snake marker are gone — no orphan tag.
+    // Pot shattered, snake no longer hidden inside.
     expect(tile).not.toContain(TileSubtype.POT);
     expect(tile).not.toContain(TileSubtype.SNAKE);
-    // Rock consumed, none placed on the pot tile.
+    expect(tile).not.toContain(TileSubtype.ROCK);
     expect(after.rockCount).toBe(1);
     expect(after.stats.rocksThrown).toBe(1);
-    expect(tile).not.toContain(TileSubtype.ROCK);
-    // Kill credited like any snake rock kill.
-    expect(after.stats.enemiesDefeated).toBe(1);
-    expect(after.stats.enemiesKilledByRock).toBe(1);
-    expect(after.stats.damageDealt).toBe(2);
-    expect(after.stats.byKind?.snake).toBe(1);
-    expect(after.stats.byFloor?.[2]?.snake).toBe(1);
-    // Spirit VFX feedback: the tile is registered as a death this tick.
-    expect(after.recentDeaths).toContainEqual([py, px + 3]);
-    // The latent snake never becomes a live enemy and the hero is unharmed.
-    expect(after.enemies?.length ?? 0).toBe(0);
+    // The snake slithered out as a live enemy at the pot tile.
+    expect(after.enemies).toHaveLength(1);
+    expect(after.enemies?.[0]?.kind).toBe("snake");
+    expect(after.enemies?.[0]?.y).toBe(py);
+    expect(after.enemies?.[0]?.x).toBe(px + 3);
+    // Breaking it from range is NOT a kill: no credit, no spirit.
+    expect(after.stats.enemiesDefeated).toBe(0);
+    expect(after.stats.byKind?.snake ?? 0).toBe(0);
+    expect(after.recentDeaths ?? []).toHaveLength(0);
+    // No free ambush bite or poison — the player is at a distance.
     expect(after.heroHealth).toBe(5);
     expect(after.conditions?.poisoned?.active ?? false).toBe(false);
   });
+});
 
-  it("does not award a snake kill for an ordinary (non-snake) pot", () => {
+describe("Rock breaks an ordinary pot", () => {
+  it("reveals the pot's item on the floor instead of destroying it (deterministic override)", () => {
+    const py = 5,
+      px = 5;
+    const map = makeCorridor(py, px);
+    map.subtypes[py][px + 3] = [TileSubtype.POT];
+    const key = `${py},${px + 3}`;
+
+    const after = performThrowRock(
+      baseState(map, { rockCount: 1, potOverrides: { [key]: TileSubtype.FOOD } })
+    );
+
+    const tile = after.mapData.subtypes[py][px + 3];
+    expect(tile).not.toContain(TileSubtype.POT);
+    expect(tile).toContain(TileSubtype.FOOD);
+    expect(after.rockCount).toBe(0);
+    // The reveal override is consumed.
+    expect(after.potOverrides?.[key]).toBeUndefined();
+  });
+
+  it("reveals a food or potion even without an override (contents are never destroyed)", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
@@ -100,70 +120,72 @@ describe("Rock destroys a snake pot", () => {
 
     const after = performThrowRock(baseState(map, { rockCount: 1 }));
 
-    expect(after.mapData.subtypes[py][px + 3]).not.toContain(TileSubtype.POT);
-    expect(after.stats.enemiesDefeated).toBe(0);
-    expect(after.stats.byKind?.snake ?? 0).toBe(0);
-    expect(after.recentDeaths ?? []).toHaveLength(0);
+    const tile = after.mapData.subtypes[py][px + 3];
+    expect(tile).not.toContain(TileSubtype.POT);
+    expect(
+      tile.includes(TileSubtype.FOOD) || tile.includes(TileSubtype.MED)
+    ).toBe(true);
+  });
+
+  it("reveals the rune from a rune pot", () => {
+    const py = 5,
+      px = 5;
+    const map = makeCorridor(py, px);
+    map.subtypes[py][px + 3] = [TileSubtype.POT, TileSubtype.RUNE];
+
+    const after = performThrowRock(baseState(map, { rockCount: 1 }));
+
+    const tile = after.mapData.subtypes[py][px + 3];
+    expect(tile).not.toContain(TileSubtype.POT);
+    expect(tile).toContain(TileSubtype.RUNE);
   });
 });
 
-describe("Rune destroys a snake pot", () => {
-  it("clears both tags, credits a snake kill, drops the rune in front, and records the death", () => {
+describe("Rune breaks a snake pot", () => {
+  it("releases the snake and drops the thrown rune in front (no kill)", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
     map.subtypes[py][px + 3] = [TileSubtype.POT, TileSubtype.SNAKE];
 
-    const after = performThrowRune(
-      baseState(map, { runeCount: 1, currentFloor: 3 })
-    );
+    const after = performThrowRune(baseState(map, { runeCount: 1, currentFloor: 3 }));
 
     const tile = after.mapData.subtypes[py][px + 3];
     expect(tile).not.toContain(TileSubtype.POT);
     expect(tile).not.toContain(TileSubtype.SNAKE);
-    // Rune lands on the floor tile just before the pot, so it can be retrieved.
+    expect(after.enemies).toHaveLength(1);
+    expect(after.enemies?.[0]?.kind).toBe("snake");
+    // Thrown rune lands on the floor tile just before the pot.
     expect(after.runeCount).toBe(0);
     expect(after.mapData.subtypes[py][px + 2]).toContain(TileSubtype.RUNE);
-    expect(after.stats.enemiesDefeated).toBe(1);
-    expect(after.stats.damageDealt).toBe(2);
-    expect(after.stats.byKind?.snake).toBe(1);
-    // The rune-master badge is stone-goblin-specific; a snake rune kill must NOT
-    // advance enemiesKilledByRune (matches normal rune kills of non-stone enemies).
-    expect(after.stats.enemiesKilledByRune ?? 0).toBe(0);
-    expect(after.recentDeaths).toContainEqual([py, px + 3]);
-    expect(after.enemies?.length ?? 0).toBe(0);
-    expect(after.heroHealth).toBe(5);
+    // Not a kill.
+    expect(after.stats.enemiesDefeated).toBe(0);
+    expect(after.recentDeaths ?? []).toHaveLength(0);
   });
 
-  it("keeps the rune in inventory when a snake pot is directly adjacent (nowhere to land), still credits the kill", () => {
+  it("keeps the rune in inventory when the snake pot is directly adjacent (nowhere to land)", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
-    // Pot directly ahead of the player: there is no floor tile in front of it to
-    // drop the bounced rune onto, so the rune must not be consumed.
     map.subtypes[py][px + 1] = [TileSubtype.POT, TileSubtype.SNAKE];
 
-    const after = performThrowRune(baseState(map, { runeCount: 1, currentFloor: 2 }));
+    const after = performThrowRune(baseState(map, { runeCount: 1 }));
 
     const tile = after.mapData.subtypes[py][px + 1];
     expect(tile).not.toContain(TileSubtype.POT);
     expect(tile).not.toContain(TileSubtype.SNAKE);
-    // Rune preserved (scarce resource not silently destroyed on a smart play).
+    expect(after.enemies).toHaveLength(1);
+    expect(after.enemies?.[0]?.kind).toBe("snake");
+    // Rune preserved (scarce resource not silently destroyed).
     expect(after.runeCount).toBe(1);
-    // Snake still killed and credited.
-    expect(after.stats.enemiesDefeated).toBe(1);
-    expect(after.stats.byKind?.snake).toBe(1);
-    expect(after.recentDeaths).toContainEqual([py, px + 1]);
-    expect(after.enemies?.length ?? 0).toBe(0);
   });
 });
 
 describe("Bomb blast destroys a snake pot", () => {
-  it("clears both tags and credits a snake kill (blast VFX is its own feedback)", () => {
+  it("obliterates the pot and kills the snake (counts as a kill, blast VFX is its own feedback)", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
-    // A live bomb sits next to a snake pot, both on the carved floor row.
     map.subtypes[py][px + 1] = [TileSubtype.BOMB_LIVE];
     map.subtypes[py][px + 2] = [TileSubtype.POT, TileSubtype.SNAKE];
 
@@ -175,11 +197,11 @@ describe("Bomb blast destroys a snake pot", () => {
     expect(after.stats.enemiesDefeated).toBe(1);
     expect(after.stats.damageDealt).toBe(2);
     expect(after.stats.byKind?.snake).toBe(1);
+    // No snake survives the blast (it is killed, not released).
     expect(after.enemies?.length ?? 0).toBe(0);
-    // The ranged kill avoids the walk-in ambush, so no poison is applied.
     expect(after.conditions?.poisoned?.active ?? false).toBe(false);
-    // A snake pot pushes nothing onto defeatedEnemies (it never became a real
-    // enemy), so the story-event slice window stays exact.
+    // A snake pot pushes nothing onto defeatedEnemies, keeping the story-event
+    // slice window exact.
     expect(after.defeatedEnemies ?? []).toHaveLength(0);
   });
 
@@ -187,7 +209,6 @@ describe("Bomb blast destroys a snake pot", () => {
     const py = 5,
       px = 5;
     const map = makeCorridor(py, px);
-    // Bomb at px+2; its 3x3 blast spans px+1..px+3 on the player's row.
     map.subtypes[py][px + 2] = [TileSubtype.BOMB_LIVE];
     map.subtypes[py][px + 3] = [TileSubtype.POT, TileSubtype.SNAKE];
     const goblin = new Enemy({ y: py, x: px + 1 });
@@ -198,14 +219,11 @@ describe("Bomb blast destroys a snake pot", () => {
       baseState(map, { currentFloor: 2, enemies: [goblin] })
     );
 
-    // Both the snake pot and the real enemy are counted as kills.
     expect(after.stats.enemiesDefeated).toBe(2);
     expect(after.stats.byKind?.snake).toBe(1);
     expect(after.stats.byKind?.["fire-goblin"]).toBe(1);
     expect(after.enemies?.length ?? 0).toBe(0);
-    // Only the real enemy is recorded in defeatedEnemies — the snake pot must not
-    // inflate it, or the slice(-enemiesDefeated) story window would re-process a
-    // stale enemy.
+    // Only the real enemy is recorded in defeatedEnemies.
     expect(after.defeatedEnemies ?? []).toHaveLength(1);
     expect(after.defeatedEnemies?.[0]?.kind).toBe("fire-goblin");
   });

@@ -68,31 +68,66 @@ function trackEnemyKill(stats: GameState["stats"], enemyKind: EnemyKind, floor: 
   stats.byFloor[floor][enemyKind] = (stats.byFloor[floor][enemyKind] ?? 0) + 1;
 }
 
-// A coiled snake hidden in a pot (POT + SNAKE) springs an ambush when the player
-// opens it by walking in. Smashing the pot from range instead — a thrown rock or
-// rune — kills the snake before it can strike, and the player deserves clear
-// credit for the smart play. This records that as a real snake kill so it counts
-// in the run stats (toward the snake/rock badges) exactly like any other snake
-// kill. Mutates `stats` in place. Callers also push the tile to recentDeaths so a
-// spirit rises from the broken pot as unmistakable "you got it" feedback. The
-// bomb-blast path tracks its kills via a local counter, so it does NOT use this.
-const SNAKE_POT_KILL_DAMAGE = 2; // snakes have 2 HP; mirrors a normal rock/rune kill
+// A snake hidden in a pot (POT + SNAKE) only springs its ambush bite + poison when
+// the player WALKS into it. A bomb blast, being an explosion, kills the coiled
+// snake outright; SNAKE_POT_KILL_DAMAGE is the per-snake damage credited for that
+// (see detonateLiveBombs). Thrown rocks/runes do NOT destroy the snake — they just
+// break the pot and let it slither out (see breakPotReleasingContents).
+const SNAKE_POT_KILL_DAMAGE = 2; // snakes have 2 HP
 
-function recordSnakePotKill(
-  stats: GameState["stats"],
-  floor: number,
-  killedBy: "rock" | "rune"
-): void {
-  stats.enemiesDefeated = (stats.enemiesDefeated ?? 0) + 1;
-  stats.damageDealt = (stats.damageDealt ?? 0) + SNAKE_POT_KILL_DAMAGE;
-  // Rocks feed the generic "defeat N enemies with rocks" badge, so a rock snake
-  // kill legitimately counts. Runes do NOT: enemiesKilledByRune backs the
-  // stone-goblin-specific rune-master badge, and — like a normal rune kill of any
-  // non-stone enemy — a snake-pot rune kill should not advance it.
-  if (killedBy === "rock") {
-    stats.enemiesKilledByRock = (stats.enemiesKilledByRock ?? 0) + 1;
+// Break a pot from range (a thrown rock or rune) WITHOUT the player stepping onto
+// it. Unlike a bomb blast — which obliterates the tile — breaking a pot just
+// releases what is inside, so the contents survive:
+//   - snake pot -> the snake slithers out as a live enemy. It gets NO free ambush
+//                  bite (you broke it from a distance) and acts on later turns.
+//   - rune pot  -> the rune is revealed on the tile.
+//   - food pot  -> its food/potion is revealed on the tile (the same deterministic
+//                  contents a walk-in open would show; a pending override is used
+//                  up just as opening would).
+// Mutates mapData.subtypes[y][x] in place. Returns any spawned snake (else null)
+// and the next potOverrides map (an override is consumed when used).
+function breakPotReleasingContents(
+  mapData: MapData,
+  y: number,
+  x: number,
+  potOverrides: GameState["potOverrides"]
+): { spawnedSnake: Enemy | null; potOverrides: GameState["potOverrides"] } {
+  const subs = mapData.subtypes[y][x] || [];
+  if (subs.includes(TileSubtype.SNAKE)) {
+    mapData.subtypes[y][x] = subs.filter(
+      (s) => s !== TileSubtype.POT && s !== TileSubtype.SNAKE
+    );
+    const snake = new Enemy({ y, x });
+    snake.kind = "snake";
+    return { spawnedSnake: snake, potOverrides };
   }
-  trackEnemyKill(stats, "snake", floor);
+  if (subs.includes(TileSubtype.RUNE)) {
+    const kept = subs.filter(
+      (s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE
+    );
+    mapData.subtypes[y][x] = kept.concat([TileSubtype.RUNE]);
+    return { spawnedSnake: null, potOverrides };
+  }
+  // Food / potion pot: reveal the same contents a walk-in open would (reveal is
+  // computed while the POT tag is still on the tile, matching the walk-in path).
+  const key = `${y},${x}`;
+  const overrideReveal = potOverrides?.[key];
+  if (overrideReveal) {
+    mapData.subtypes[y][x] = subs
+      .filter((s) => s !== TileSubtype.POT)
+      .concat([overrideReveal]);
+    const next = { ...potOverrides };
+    delete next[key];
+    return {
+      spawnedSnake: null,
+      potOverrides: Object.keys(next).length ? next : undefined,
+    };
+  }
+  const reveal = pickPotRevealDeterministic(mapData, y, x);
+  mapData.subtypes[y][x] = subs
+    .filter((s) => s !== TileSubtype.POT)
+    .concat([reveal]);
+  return { spawnedSnake: null, potOverrides };
 }
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
@@ -720,41 +755,23 @@ export function performThrowRock(gameState: GameState): GameState {
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
-      // Snake pot: the rock shatters it and kills the coiled snake before it can
-      // ambush. Clear both tags, credit the kill, and record the death so a spirit
-      // rises from the broken pot (clear "you did the right thing" feedback).
-      if (subs.includes(TileSubtype.SNAKE)) {
-        newMapData.subtypes[ty][tx] = subs.filter(
-          (s) => s !== TileSubtype.POT && s !== TileSubtype.SNAKE
-        );
-        const stats = {
-          ...preTickState.stats,
-          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
-        };
-        recordSnakePotKill(stats, preTickState.currentFloor ?? 1, "rock");
-        return {
-          ...preTickState,
-          mapData: newMapData,
-          rockCount: count - 1,
-          stats,
-          recentDeaths: [
-            ...(preTickState.recentDeaths ?? []),
-            [ty, tx] as [number, number],
-          ],
-        };
-      }
-      // If this pot contains a rune, reveal it; otherwise remove pot
-      if (subs.includes(TileSubtype.RUNE)) {
-        // Preserve non-pot tags (e.g., ROAD overlays) and add RUNE
-        const kept = subs.filter((s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE);
-        newMapData.subtypes[ty][tx] = kept.concat([TileSubtype.RUNE]);
-      } else {
-        // Remove only the pot marker; keep other tags (e.g., ROAD)
-        newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
-      }
+      // A thrown rock shatters the pot but does NOT destroy what is inside: a snake
+      // slithers out as a live enemy (to be fought — no free ambush bite, since you
+      // broke it from range), and a rune/food is left on the floor to pick up. (A
+      // bomb blast, by contrast, obliterates the contents — see detonateLiveBombs.)
+      const released = breakPotReleasingContents(
+        newMapData,
+        ty,
+        tx,
+        preTickState.potOverrides
+      );
       return {
         ...preTickState,
         mapData: newMapData,
+        enemies: released.spawnedSnake
+          ? [...(preTickState.enemies ?? []), released.spawnedSnake]
+          : preTickState.enemies,
+        potOverrides: released.potOverrides,
         rockCount: count - 1,
         stats: {
           ...preTickState.stats,
@@ -961,54 +978,34 @@ export function performThrowRune(gameState: GameState): GameState {
     // Pot on floor tile
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
-      // Snake pot: the rune shatters it and kills the coiled snake before it can
-      // ambush. Credit the kill and record the death for the spirit VFX, then drop
-      // the thrown rune in front of the pot so it can be retrieved. If there is no
-      // floor tile to drop onto (pot directly ahead of the player), keep the rune
-      // in inventory rather than destroying it — mirrors how an ordinary adjacent
-      // pot leaves the thrown rune untouched.
-      if (subs.includes(TileSubtype.SNAKE)) {
-        newMapData.subtypes[ty][tx] = subs.filter(
-          (s) => s !== TileSubtype.POT && s !== TileSubtype.SNAKE
-        );
-        const stats = { ...preTickState.stats };
-        recordSnakePotKill(stats, preTickState.currentFloor ?? 1, "rune");
-        let runeLanded = false;
-        if (
-          !(lastFloorY === py && lastFloorX === px) &&
-          newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
-        ) {
-          newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-          runeLanded = true;
-        }
-        return {
-          ...preTickState,
-          mapData: newMapData,
-          runeCount: runeLanded ? count - 1 : count,
-          stats,
-          recentDeaths: [
-            ...(preTickState.recentDeaths ?? []),
-            [ty, tx] as [number, number],
-          ],
-        };
-      }
-      if (subs.includes(TileSubtype.RUNE)) {
-        // Preserve other tags and reveal RUNE
-        const kept = subs.filter((s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE);
-        newMapData.subtypes[ty][tx] = kept.concat([TileSubtype.RUNE]);
-      } else {
-        // Remove only pot; keep others
-        newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
-      }
-      // Drop rune before the pot
+      // A thrown rune shatters the pot like a rock: the contents are released, not
+      // destroyed (a snake slithers out as a live enemy, food/runes are left on the
+      // floor). The thrown rune then drops in front of the pot so it can be
+      // retrieved; if there is no floor tile to land on (pot directly ahead of the
+      // player) the rune is kept in inventory rather than lost.
+      const released = breakPotReleasingContents(
+        newMapData,
+        ty,
+        tx,
+        preTickState.potOverrides
+      );
+      let runeLanded = false;
       if (
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
         newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
-        return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
+        runeLanded = true;
       }
-      return preTickState;
+      return {
+        ...preTickState,
+        mapData: newMapData,
+        enemies: released.spawnedSnake
+          ? [...(preTickState.enemies ?? []), released.spawnedSnake]
+          : preTickState.enemies,
+        potOverrides: released.potOverrides,
+        runeCount: runeLanded ? count - 1 : count,
+      };
     }
 
     // Continue traversal over floor
