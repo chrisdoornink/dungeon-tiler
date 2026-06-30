@@ -61,11 +61,38 @@ function trackEnemyKill(stats: GameState["stats"], enemyKind: EnemyKind, floor: 
   // Track by kind
   if (!stats.byKind) stats.byKind = createEmptyByKind();
   stats.byKind[enemyKind] = (stats.byKind[enemyKind] ?? 0) + 1;
-  
+
   // Track by floor
   if (!stats.byFloor) stats.byFloor = {};
   if (!stats.byFloor[floor]) stats.byFloor[floor] = createEmptyByKind();
   stats.byFloor[floor][enemyKind] = (stats.byFloor[floor][enemyKind] ?? 0) + 1;
+}
+
+// A coiled snake hidden in a pot (POT + SNAKE) springs an ambush when the player
+// opens it by walking in. Smashing the pot from range instead — a thrown rock or
+// rune — kills the snake before it can strike, and the player deserves clear
+// credit for the smart play. This records that as a real snake kill so it counts
+// in the run stats (toward the snake/rock badges) exactly like any other snake
+// kill. Mutates `stats` in place. Callers also push the tile to recentDeaths so a
+// spirit rises from the broken pot as unmistakable "you got it" feedback. The
+// bomb-blast path tracks its kills via a local counter, so it does NOT use this.
+const SNAKE_POT_KILL_DAMAGE = 2; // snakes have 2 HP; mirrors a normal rock/rune kill
+
+function recordSnakePotKill(
+  stats: GameState["stats"],
+  floor: number,
+  killedBy: "rock" | "rune"
+): void {
+  stats.enemiesDefeated = (stats.enemiesDefeated ?? 0) + 1;
+  stats.damageDealt = (stats.damageDealt ?? 0) + SNAKE_POT_KILL_DAMAGE;
+  // Rocks feed the generic "defeat N enemies with rocks" badge, so a rock snake
+  // kill legitimately counts. Runes do NOT: enemiesKilledByRune backs the
+  // stone-goblin-specific rune-master badge, and — like a normal rune kill of any
+  // non-stone enemy — a snake-pot rune kill should not advance it.
+  if (killedBy === "rock") {
+    stats.enemiesKilledByRock = (stats.enemiesKilledByRock ?? 0) + 1;
+  }
+  trackEnemyKill(stats, "snake", floor);
 }
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
@@ -693,6 +720,29 @@ export function performThrowRock(gameState: GameState): GameState {
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
+      // Snake pot: the rock shatters it and kills the coiled snake before it can
+      // ambush. Clear both tags, credit the kill, and record the death so a spirit
+      // rises from the broken pot (clear "you did the right thing" feedback).
+      if (subs.includes(TileSubtype.SNAKE)) {
+        newMapData.subtypes[ty][tx] = subs.filter(
+          (s) => s !== TileSubtype.POT && s !== TileSubtype.SNAKE
+        );
+        const stats = {
+          ...preTickState.stats,
+          rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+        };
+        recordSnakePotKill(stats, preTickState.currentFloor ?? 1, "rock");
+        return {
+          ...preTickState,
+          mapData: newMapData,
+          rockCount: count - 1,
+          stats,
+          recentDeaths: [
+            ...(preTickState.recentDeaths ?? []),
+            [ty, tx] as [number, number],
+          ],
+        };
+      }
       // If this pot contains a rune, reveal it; otherwise remove pot
       if (subs.includes(TileSubtype.RUNE)) {
         // Preserve non-pot tags (e.g., ROAD overlays) and add RUNE
@@ -702,9 +752,9 @@ export function performThrowRock(gameState: GameState): GameState {
         // Remove only the pot marker; keep other tags (e.g., ROAD)
         newMapData.subtypes[ty][tx] = subs.filter((s) => s !== TileSubtype.POT);
       }
-      return { 
-        ...preTickState, 
-        mapData: newMapData, 
+      return {
+        ...preTickState,
+        mapData: newMapData,
         rockCount: count - 1,
         stats: {
           ...preTickState.stats,
@@ -911,6 +961,37 @@ export function performThrowRune(gameState: GameState): GameState {
     // Pot on floor tile
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
+      // Snake pot: the rune shatters it and kills the coiled snake before it can
+      // ambush. Credit the kill and record the death for the spirit VFX, then drop
+      // the thrown rune in front of the pot so it can be retrieved. If there is no
+      // floor tile to drop onto (pot directly ahead of the player), keep the rune
+      // in inventory rather than destroying it — mirrors how an ordinary adjacent
+      // pot leaves the thrown rune untouched.
+      if (subs.includes(TileSubtype.SNAKE)) {
+        newMapData.subtypes[ty][tx] = subs.filter(
+          (s) => s !== TileSubtype.POT && s !== TileSubtype.SNAKE
+        );
+        const stats = { ...preTickState.stats };
+        recordSnakePotKill(stats, preTickState.currentFloor ?? 1, "rune");
+        let runeLanded = false;
+        if (
+          !(lastFloorY === py && lastFloorX === px) &&
+          newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
+        ) {
+          newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+          runeLanded = true;
+        }
+        return {
+          ...preTickState,
+          mapData: newMapData,
+          runeCount: runeLanded ? count - 1 : count,
+          stats,
+          recentDeaths: [
+            ...(preTickState.recentDeaths ?? []),
+            [ty, tx] as [number, number],
+          ],
+        };
+      }
       if (subs.includes(TileSubtype.RUNE)) {
         // Preserve other tags and reveal RUNE
         const kept = subs.filter((s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE);
@@ -1040,6 +1121,11 @@ export function detonateLiveBombs(state: GameState): GameState {
   const stats = { ...state.stats, byKind: state.stats.byKind, byFloor: state.stats.byFloor };
   let wallsDestroyed = 0;
   let enemiesDefeated = 0;
+  // Snake pots destroyed by the blast are counted separately: they add to the kill
+  // tally but push nothing onto defeatedEnemies, so they must stay OUT of the
+  // `slice(-enemiesDefeated)` story-event window below (which is keyed to real
+  // enemy kills) to avoid re-processing a stale, previously-defeated enemy.
+  let snakePotKills = 0;
   let playerHit = false;
 
   for (const [cy, cx] of liveCenters) {
@@ -1090,6 +1176,16 @@ export function detonateLiveBombs(state: GameState): GameState {
         // Hero caught in the blast takes damage once.
         if (subs.includes(TileSubtype.PLAYER)) playerHit = true;
 
+        // A snake pot caught in the blast: the coiled snake dies with the shattered
+        // pot. The blast VFX already plays here, so credit the kill in stats (toward
+        // the snake-hater badge / run totals) without a separate spirit. POT and
+        // SNAKE aren't in BOMB_PRESERVED_SUBTYPES, so both tags are stripped below.
+        if (subs.includes(TileSubtype.POT) && subs.includes(TileSubtype.SNAKE)) {
+          trackEnemyKill(stats, "snake", state.currentFloor ?? 1);
+          stats.damageDealt = stats.damageDealt + SNAKE_POT_KILL_DAMAGE;
+          snakePotKills += 1;
+        }
+
         // Strip everything destructible; keep preserved/cosmetic markers; scorch the tile.
         const kept = subs.filter((s) => BOMB_PRESERVED_SUBTYPES.has(s));
         if (!kept.includes(TileSubtype.SINGED)) kept.push(TileSubtype.SINGED);
@@ -1105,7 +1201,7 @@ export function detonateLiveBombs(state: GameState): GameState {
     }
   }
 
-  stats.enemiesDefeated = stats.enemiesDefeated + enemiesDefeated;
+  stats.enemiesDefeated = stats.enemiesDefeated + enemiesDefeated + snakePotKills;
   stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
 
   let heroHealth = state.heroHealth;

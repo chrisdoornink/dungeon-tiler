@@ -746,11 +746,12 @@ export const Tile: React.FC<TileProps> = ({
         {/* Render POT/ROCK/FOOD/MED with assets if present */}
         {hasPot(subtypes) && (() => {
           const isSnakePot = subtypes?.includes(TileSubtype.SNAKE) ?? false;
-          // Deterministic per-tile delay so multiple snake-pots don't twitch
-          // in sync. Range 0-4.9s within the 5s animation window.
+          // Deterministic per-tile delay so multiple snake-pots don't rattle in
+          // sync. Range 0.0-2.9s, kept under the 3s cycle so every value lands on a
+          // distinct phase (delays past one cycle would alias back into sync).
           const y = typeof row === 'number' ? row : 0;
           const x = typeof col === 'number' ? col : 0;
-          const delayMs = (((y * 73 + x * 131) % 49) / 10).toFixed(1);
+          const delayMs = (((y * 73 + x * 131) % 30) / 10).toFixed(1);
           return (
             <div
               key="pot"

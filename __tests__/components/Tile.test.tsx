@@ -431,4 +431,42 @@ describe('Tile component', () => {
       expect(enemySprite).toBeInTheDocument();
     });
   });
+
+  describe('snake pot rendering', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+
+    it('applies the rattle animation class and a per-tile delay to a snake pot', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.POT, TileSubtype.SNAKE]}
+          row={5}
+          col={5}
+        />
+      );
+
+      const potIcon = screen.getByTestId(`subtype-icon-${TileSubtype.POT}`);
+      // Wiggle/rattle animation class is present so the pot visibly shakes.
+      expect(potIcon.className).toContain('potIconSnake');
+      // A non-empty per-tile delay desyncs pots from each other.
+      expect(potIcon.style.getPropertyValue('--snake-pot-delay')).toMatch(/\ds$/);
+    });
+
+    it('does not apply the rattle class to an ordinary pot', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.POT]}
+          row={5}
+          col={5}
+        />
+      );
+
+      const potIcon = screen.getByTestId(`subtype-icon-${TileSubtype.POT}`);
+      expect(potIcon.className).not.toContain('potIconSnake');
+      expect(potIcon.style.getPropertyValue('--snake-pot-delay')).toBe('');
+    });
+  });
 });
