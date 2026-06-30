@@ -46,7 +46,7 @@ import {
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
-import { addSnakesPerRules } from "./enemy-features";
+import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
@@ -1836,6 +1836,12 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           });
           
           assignWhiteGoblinSwarmIds(placed);
+        }
+        // Floor 3 (escape floor): station one static guard next to the exit key so
+        // collecting it always requires a fight. Inside this seeded block so the
+        // guard position is deterministic per daily seed, like the rest of floor 3.
+        if (nextFloor === 3) {
+          return addStaticGuardNearKey(newMapData, placed);
         }
         return placed;
       })

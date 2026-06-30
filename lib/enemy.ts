@@ -108,6 +108,11 @@ export class Enemy {
     if (seesNow) {
       this.pursuitTtl = ENEMY_PURSUIT_TTL; // refresh memory window
       this.lastKnownPlayer = { y: player.y, x: player.x };
+      // Once a static guard (e.g. the floor-3 exit-key guard) spots the player it
+      // stops holding its post and behaves like a normal goblin thereafter.
+      if (this.behaviorMemory["isGuard"] === true) {
+        this.behaviorMemory["guardWoke"] = true;
+      }
     } else if (this.pursuitTtl > 0 && this.lastKnownPlayer) {
       this.pursuitTtl -= 1;
     }
@@ -238,9 +243,13 @@ export class Enemy {
         this.state = EnemyState.IDLE;
       }
     } else {
-      // Idle goblins have a 50% chance to wander randomly each turn
+      // Idle goblins have a 50% chance to wander randomly each turn.
+      // Static guards (e.g. the floor-3 exit-key guard) hold their post and do NOT
+      // wander until they have seen the player at least once (guardWoke).
       const isGoblin = this.kind !== 'ghost' && this.kind !== 'snake' && this.kind !== 'white-goblin';
-      if (isGoblin && Math.random() < 0.5) {
+      const isStaticGuard =
+        this.behaviorMemory["isGuard"] === true && this.behaviorMemory["guardWoke"] !== true;
+      if (isGoblin && !isStaticGuard && Math.random() < 0.5) {
         const dirs: Array<[number, number, 'UP'|'RIGHT'|'DOWN'|'LEFT']> = [
           [-1, 0, 'UP'], [1, 0, 'DOWN'], [0, -1, 'LEFT'], [0, 1, 'RIGHT'],
         ];

@@ -8,7 +8,7 @@ import {
 } from "./constants";
 import type { MapData } from "./types";
 import { generateMap, gridSizeForFloor, areAllFloorsConnected } from "./map-generation";
-import { addPlayerToMap } from "./player";
+import { addPlayerToMap, addPlayerToMapAwayFromObjectives } from "./player";
 
 export function generateMapWithSubtypes(gridW?: number, gridH?: number): MapData {
   const tiles = generateMap(gridW, gridH);
@@ -645,6 +645,16 @@ export function generateCompleteMapForFloor(
   const withRocks = addRocksToMap(withPots, floor);
   const withFaultyFloors = addFaultyFloorsToMap(withRocks);
   const withTorches = addWallTorchesToMap(withFaultyFloors);
+  // Floor 3 is the escape floor (key + exit only): spawn the hero far from both
+  // objectives so the run requires traversal rather than a lucky short hop. Other
+  // floors keep the original fully-random spawn.
+  // NOTE: the matching exit-key guard is added in advanceToNextFloor (the only path
+  // that reaches floor 3 in the daily run, where it stays inside the seeded RNG block).
+  // If a future caller builds floor 3 directly (e.g. initializeGameStateForMultiTier(3)),
+  // it would get this hero spread but NOT the guard — add the guard there too if so.
+  if (floor === 3) {
+    return addPlayerToMapAwayFromObjectives(withTorches, { minDistance: 8 });
+  }
   return addPlayerToMap(withTorches);
 }
 

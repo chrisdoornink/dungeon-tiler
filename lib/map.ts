@@ -46,9 +46,9 @@ export {
   findStrategicDoorWall,
 } from "./map/map-features";
 
-export { addPlayerToMap, findPlayerPosition } from "./map/player";
+export { addPlayerToMap, addPlayerToMapAwayFromObjectives, findPlayerPosition } from "./map/player";
 
-export { addSnakesPerRules, addSnakePots } from "./map/enemy-features";
+export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/enemy-features";
 
 export {
   cloneMapData,
