@@ -1940,7 +1940,6 @@ function applyRoomTransition(
       undefined
     );
     targetNPCsPlain = npcs;
-    console.log(`[Room Transition] Dynamically loaded NPCs for ${toId}:`, npcs.map((n) => n.id).join(', ') || 'none');
   } else {
     targetNPCsPlain = clonePlainNPCs(targetRoom.npcs) ?? [];
   }
@@ -2431,9 +2430,6 @@ function movePlayerCore(
     );
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(newGameState), result.damage);
-      const playerPos = findPlayerPosition(newGameState.mapData);
-      console.log(`[PLAYER DAMAGE] Taking ${applied} damage (${result.damage} before cap) during movePlayer. Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - applied)}. Player at: ${playerPos ? `(${playerPos[0]},${playerPos[1]})` : 'unknown'}`);
-      console.log(`[PLAYER DAMAGE] Attacking enemies:`, result.attackingEnemies.map(e => `${e.kind} dealt ${e.damage}`).join(', '));
       applyHeroDamage(newGameState, applied);
       newGameState.stats.damageTaken += applied;
 
@@ -2468,13 +2464,10 @@ function movePlayerCore(
         // so searching by adjacency after updateEnemies() would miss the killer.
         const killerEnemy = result.attackingEnemies[0];
         if (killerEnemy) {
-          console.log(`[PLAYER DEATH] Killed by ${killerEnemy.kind}. Player was at (${currentY},${currentX})`);
           newGameState.deathCause = {
             type: "enemy",
             enemyKind: killerEnemy.kind,
           };
-        } else {
-          console.log(`[PLAYER DEATH] Health reached 0 but no attacking enemy recorded. Player at (${currentY},${currentX})`);
         }
       }
     }
@@ -2779,7 +2772,6 @@ function movePlayerCore(
     if (subtype.includes(TileSubtype.POT)) {
       // Special case: snake pot spawns a snake and triggers immediate attack/poison
       if (subtype.includes(TileSubtype.SNAKE)) {
-        console.log(`[SNAKE POT] Snake pot opened at (${newY},${newX}). Player at (${currentY},${currentX})`);
         // Remove the pot and snake tag from the tile
         newMapData.subtypes[newY][newX] = subtype.filter(
           (t) => t !== TileSubtype.POT && t !== TileSubtype.SNAKE
@@ -2789,7 +2781,6 @@ function movePlayerCore(
         const snake = new Enemy({ y: newY, x: newX });
         snake.kind = 'snake';
         newGameState.enemies.push(snake);
-        console.log(`[SNAKE POT] Spawned snake at (${newY},${newX}). Calling updateEnemies AGAIN (potential double-attack bug!)`);
 
         // Immediate enemy resolution relative to current player position
         const posNow = [currentY, currentX] as [number, number];
@@ -2811,13 +2802,11 @@ function movePlayerCore(
         const dmgNow = Math.max(1, result.damage);
         if (dmgNow > 0) {
           const applied = Math.min(2, dmgNow);
-          console.log(`[SNAKE POT] Snake pot ambush at (${newY},${newX})! Dealing ${applied} damage (${dmgNow} before cap). Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - applied)}. Player at (${currentY},${currentX})`);
           applyHeroDamage(newGameState, applied);
           newGameState.stats.damageTaken += applied;
         }
         // If the ambush was lethal, mark death cause as enemy snake
         if (newGameState.heroHealth === 0) {
-          console.log(`[PLAYER DEATH] Killed by snake pot ambush at (${newY},${newX})`);
           newGameState.deathCause = { type: "enemy", enemyKind: "snake" };
           return newGameState;
         }
@@ -3253,14 +3242,12 @@ function movePlayerCore(
     if (poison.stepsSinceLastDamage >= poison.stepInterval) {
       // Apply poison damage
       const poisonDamage = poison.damagePerInterval;
-      console.log(`[POISON DAMAGE] Taking ${poisonDamage} poison damage. Health: ${newGameState.heroHealth} -> ${Math.max(0, newGameState.heroHealth - poisonDamage)}. Steps since last: ${poison.stepsSinceLastDamage}`);
       applyHeroDamage(newGameState, poisonDamage);
       newGameState.stats.damageTaken += poisonDamage;
       poison.stepsSinceLastDamage = 0;
       
       // Set death cause if poison kills the player
       if (newGameState.heroHealth === 0) {
-        console.log(`[PLAYER DEATH] Killed by poison damage`);
         newGameState.deathCause = {
           type: "poison",
           enemyKind: "snake",
