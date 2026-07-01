@@ -29,6 +29,7 @@ import {
   FLOOR,
   FLOWERS,
   TileSubtype,
+  TREE,
   WALL,
   type RoomId,
 } from "./constants";
@@ -47,7 +48,7 @@ import {
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
-import { buildOutsideWorld } from "./outside-world";
+import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
@@ -1052,8 +1053,11 @@ export function detonateLiveBombs(state: GameState): GameState {
         const subs = newMapData.subtypes[y][x] || [];
         const isProtected = subs.some((s) => BOMB_PROTECTED_SUBTYPES.has(s));
 
-        // Walls become floor (unless this is the protected exit door).
-        const wasWall = newMapData.tiles[y][x] === WALL;
+        // Walls AND trees become floor (unless protected, e.g. the exit door). Trees are
+        // destructible so the outside-world / nightmare boundaries can be blasted — they're
+        // just made several layers thick so two bombs can't tunnel all the way through.
+        const wasWall =
+          newMapData.tiles[y][x] === WALL || newMapData.tiles[y][x] === TREE;
         const openedWall = wasWall && !isProtected;
         if (openedWall) {
           newMapData.tiles[y][x] = FLOOR;
@@ -1344,7 +1348,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison" | "bomb";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -1390,6 +1394,17 @@ export interface GameState {
     mapData: MapData;
     enemies?: PlainEnemy[];
     position: [number, number];
+  };
+  // Nightmare room: set while the player has bombed through the pink realm's outer wall
+  // and stepped into the pitch-black nightmare beyond. realmReturn holds the realm snapshot
+  // to restore on the way back (kept separate from dungeonReturn, which still holds the
+  // dungeon for the realm's own exit ring — the two stashes nest).
+  inNightmare?: boolean;
+  realmReturn?: {
+    mapData: MapData;
+    enemies?: PlainEnemy[];
+    position: [number, number];
+    mist?: Array<[number, number]>;
   };
 }
 
@@ -1789,10 +1804,6 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
       // Floors 5+: no chests or keys, just a standard map without chests/keys
       mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor);
     }
-    // Daily-only: 1-in-6 chance to use the outdoor environment
-    if (Math.random() < 1 / 6) {
-      mapData.environment = "outdoor";
-    }
     return mapData;
   });
 
@@ -2085,6 +2096,59 @@ function enterOutsideWorld(
   position: [number, number],
   direction: Direction
 ): GameState | null {
+  // In the nightmare: walking back through the inner breach returns to the pink realm
+  // (torch relit). Restores from the separate realmReturn stash.
+  if (state.inNightmare) {
+    const ret = state.realmReturn;
+    if (!ret) return null;
+    return {
+      ...state,
+      mapData: placePlayerAt(ret.mapData, ret.position),
+      enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
+      playerDirection: direction,
+      inNightmare: false,
+      inPinkRealm: true,
+      mist: ret.mist,
+      heroTorchLit: true,
+      realmReturn: undefined,
+      recentDeaths: [],
+      recentBombBlasts: [],
+    };
+  }
+
+  // From the pink realm: breaching the outer wall drops into the nightmare room, not the
+  // grassland. The torch is snuffed (pitch black) and the realm is stashed for return.
+  if (state.inPinkRealm) {
+    const realmHeight = getMapHeight(state.mapData);
+    const realmWidth = getMapWidth(state.mapData);
+    const { mapData: nightmareMap, entry: nightmareEntry } = buildNightmareRoom(
+      direction,
+      realmWidth,
+      realmHeight
+    );
+    return {
+      ...state,
+      mapData: placePlayerAt(nightmareMap, nightmareEntry),
+      enemies: [],
+      playerDirection: direction,
+      inNightmare: true,
+      inPinkRealm: false,
+      mist: undefined,
+      outsideDirection: direction,
+      // Keep the torch lit so the flame still shows — the nightmare's darkness is forced
+      // by the renderer (inNightmare), which limits the light to the 4 adjacent tiles.
+      heroTorchLit: true,
+      realmReturn: {
+        mapData: removePlayerFromMapData(state.mapData),
+        enemies: serializeEnemies(state.enemies),
+        position,
+        mist: state.mist,
+      },
+      recentDeaths: [],
+      recentBombBlasts: [],
+    };
+  }
+
   // Already outside: walking back through the inner breach returns to the dungeon.
   if (state.inOutsideWorld) {
     const ret = state.dungeonReturn;
@@ -2127,6 +2191,40 @@ function enterOutsideWorld(
     recentDeaths: [],
     recentBombBlasts: [],
   };
+}
+
+/**
+ * How deep into the nightmare room the hero stands: the perpendicular distance from the
+ * inner (realm-facing) breach edge. The entry tile sits at depth 1; each step deeper in
+ * raises the toll. Used to drain the hero — the darkness gets more lethal the further in.
+ */
+function nightmareDepth(state: GameState): number {
+  const pos = findPlayerPosition(state.mapData);
+  if (!pos) return 0;
+  const [py, px] = pos;
+  const H = getMapHeight(state.mapData);
+  const W = getMapWidth(state.mapData);
+  switch (innerEdgeForDirection(state.outsideDirection ?? Direction.DOWN)) {
+    case "top":
+      return py;
+    case "bottom":
+      return H - 1 - py;
+    case "left":
+      return px;
+    case "right":
+      return W - 1 - px;
+    default:
+      return py;
+  }
+}
+
+/**
+ * Health drained per step at a given nightmare depth. Depth 1 (the breach edge) is safe so
+ * the hero can peek in and step back out; it then escalates fast, so wandering more than a
+ * few tiles in is near-certain death.
+ */
+function nightmareHazardDamage(depth: number): number {
+  return Math.max(0, depth - 1);
 }
 
 /** True when a living pink goblin still owns the ring on (y,x) (its active teleport target). */
@@ -2290,6 +2388,28 @@ export function movePlayer(
   // detonation on a floor transition — that floor is being replaced.
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
+  // Nightmare darkness drains the hero the deeper they wander. Apply only when the hero
+  // actually MOVED while staying in the nightmare (not the entry step, the step back out,
+  // or bumping a wall).
+  if (gameState.inNightmare && result.inNightmare) {
+    const before = findPlayerPosition(gameState.mapData);
+    const after = findPlayerPosition(result.mapData);
+    const moved =
+      !!before && !!after && (before[0] !== after[0] || before[1] !== after[1]);
+    if (moved) {
+      const dmg = nightmareHazardDamage(nightmareDepth(result));
+      if (dmg > 0) {
+        applyHeroDamage(result, dmg);
+        result.stats = {
+          ...result.stats,
+          damageTaken: (result.stats.damageTaken ?? 0) + dmg,
+        };
+        if (result.heroHealth <= 0 && !result.deathCause) {
+          result.deathCause = { type: "darkness" };
+        }
+      }
+    }
+  }
   const detonated = detonateLiveBombs(result);
   // Drift the pink mist one turn as the hero MOVES through the realm — only while already
   // in the realm (not the entry/exit turn) so the freshly-seeded cloud holds for a beat.

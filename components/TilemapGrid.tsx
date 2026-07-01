@@ -1710,8 +1710,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environmentDaylight = environmentConfig.daylight;
   const autoPhaseVisibility = environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
+  // The nightmare room is always pitch black: never suppress its darkness regardless of
+  // environment, forceDaylight, or torch state, so it renders dark from the first frame.
+  const inNightmare = !!gameState.inNightmare;
   const suppressDarknessOverlay =
-    autoPhaseVisibility || (forceDaylight && heroTorchLitState);
+    !inNightmare && (autoPhaseVisibility || (forceDaylight && heroTorchLitState));
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
   const lastCheckpoint = gameState.lastCheckpoint;
   const heroDeathStateForTiles: HeroDeathState | undefined =
@@ -3561,7 +3564,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 }}
               >
                 {environment === "pink_realm" && (
-                  <PinkRealmSparkles tiles={gameState.mapData.tiles} />
+                  <PinkRealmSparkles
+                    tiles={gameState.mapData.tiles}
+                    dark={inNightmare}
+                  />
                 )}
                 {/* Death vignette overlay - darkens everything except spotlight on hero */}
                 {rockEffect &&
@@ -3830,7 +3836,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // When the hero's torch is OFF, force a pure black background behind tiles
                     // to avoid any hue from module CSS (e.g., --forest-dark) bleeding through
                     // the transparent center of the vignette.
-                    backgroundColor: heroTorchLitForVisibility ? undefined : "#000",
+                    backgroundColor:
+                      heroTorchLitForVisibility && !inNightmare ? undefined : "#000",
                   }}
                   tabIndex={0} // Make div focusable for keyboard events
                   onMouseMove={(e) => {
@@ -3858,7 +3865,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     tileTypes,
                     gameState.mapData.subtypes,
                     environment,
-                    gameState.showFullMap || suppressDarknessOverlay,
+                    // The nightmare is always dark — never let showFullMap (or a brief
+                    // map-reveal on entry) light it up, which caused a delayed darken.
+                    (gameState.showFullMap || suppressDarknessOverlay) && !inNightmare,
                     gameState.playerDirection,
                     gameState.enemies,
                     gameState.npcs,
@@ -3871,7 +3880,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     activeCheckpoint,
                     heroDeathStateForTiles,
                     warpFlicker,
-                    new Set((gameState.mist ?? []).map(([my, mx]) => `${my},${mx}`))
+                    new Set((gameState.mist ?? []).map(([my, mx]) => `${my},${mx}`)),
+                    inNightmare
                   )}
                 </div>
               </div>
@@ -4023,7 +4033,8 @@ function calculateVisibility(
   grid: number[][],
   playerPosition: [number, number] | null,
   showFullMap: boolean = false,
-  heroTorchLit: boolean = true
+  heroTorchLit: boolean = true,
+  nightmare: boolean = false
 ): number[][] {
   const gridHeight = grid.length;
   const gridWidth = grid[0].length;
@@ -4041,6 +4052,25 @@ function calculateVisibility(
     .map(() => Array(gridWidth).fill(0));
 
   const [playerY, playerX] = playerPosition;
+
+  // Nightmare room: the dark smothers the torch — only the hero's own tile and the four
+  // orthogonally-adjacent tiles are lit, regardless of torch state.
+  if (nightmare) {
+    visibility[playerY][playerX] = 3;
+    const orth: Array<[number, number]> = [
+      [playerY - 1, playerX],
+      [playerY + 1, playerX],
+      [playerY, playerX - 1],
+      [playerY, playerX + 1],
+    ];
+    for (const [y, x] of orth) {
+      if (y >= 0 && y < gridHeight && x >= 0 && x < gridWidth) {
+        visibility[y][x] = 1;
+      }
+    }
+    return visibility;
+  }
+
   // If hero torch is out, only reveal the hero's own tile; rely on wall torches for the rest
   if (!heroTorchLit) {
     // Center tile fully visible
@@ -4114,7 +4144,8 @@ function renderTileGrid(
   activeCheckpoint?: [number, number] | null,
   heroDeathState?: HeroDeathState,
   heroWarping: boolean = false,
-  mistKeys: Set<string> = new Set()
+  mistKeys: Set<string> = new Set(),
+  inNightmare: boolean = false
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -4139,7 +4170,8 @@ function renderTileGrid(
     grid,
     playerPosition,
     showFullMap,
-    heroTorchLitForVisibility
+    heroTorchLitForVisibility,
+    inNightmare
   );
 
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
@@ -4318,6 +4350,7 @@ function renderTileGrid(
             playerHasExitKey={hasExitKey}
             environment={resolvedEnvironment}
             suppressDarknessOverlay={suppressDarknessOverlay}
+            inNightmare={inNightmare}
             activeCheckpoint={activeCheckpoint}
             heroDeathState={isPlayerTile ? heroDeathState : undefined}
             heroWarping={!!isPlayerTile && heroWarping}
@@ -4383,7 +4416,7 @@ function renderTileGrid(
 
     // Push the warm torch glow first (lower z) ONLY if the hero's torch is lit,
     // then the dark vignette (higher z) ONLY when torch is lit as well.
-    if (!suppressDarknessOverlay && heroTorchLitForVisibility) {
+    if (!suppressDarknessOverlay && heroTorchLitForVisibility && !inNightmare) {
       tiles.push(
         <div
           key="torch-glow"
@@ -4392,7 +4425,7 @@ function renderTileGrid(
         />
       );
     }
-    if (!suppressDarknessOverlay && heroTorchLitForVisibility) {
+    if (!suppressDarknessOverlay && heroTorchLitForVisibility && !inNightmare) {
       tiles.push(
         <div
           key="fov-radial-overlay"

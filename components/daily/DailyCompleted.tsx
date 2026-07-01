@@ -53,6 +53,7 @@ const EMOJI_MAP = {
   // Death causes
   faulty_floor: "🕳️",
   bomb: "💣",
+  darkness: "🌑",
 
   // Streak indicators
   streak_fire: "🔥",
@@ -237,6 +238,14 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           image: "/images/items/bomb-red.png",
           alt: "Killed by a bomb",
         };
+      case "darkness":
+        return {
+          message: "You were swallowed by the dark",
+          // A black square — no asset needed for the nightmare's darkness.
+          image:
+            "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          alt: "Swallowed by the dark",
+        };
       case "enemy":
         const enemyKind = (lastGame.deathCause.enemyKind ||
           "fire-goblin") as EnemyKind;
@@ -281,6 +290,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         deathEmojis.push(EMOJI_MAP.poison);
         // include snake indicator if known or by convention
         deathEmojis.push(EMOJI_MAP.snake);
+      } else if (lastGame.deathCause.type === "darkness") {
+        deathEmojis.push(EMOJI_MAP.darkness);
       }
     }
     const statsLine = [

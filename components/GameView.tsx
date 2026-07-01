@@ -106,10 +106,6 @@ function GameViewInner({
             return initializeGameStateForMultiTier(1);
           }
           const gs = initializeGameState();
-          // Daily-only: 1-in-6 chance to use the outdoor environment
-          if (gs && gs.mapData && Math.random() < 1 / 6) {
-            gs.mapData.environment = "outdoor";
-          }
           return gs;
         });
         if (state) {

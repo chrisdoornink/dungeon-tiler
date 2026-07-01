@@ -62,6 +62,7 @@ interface TileProps {
   playerHasExitKey?: boolean; // Player holds the exit key for conditional exit rendering
   environment?: EnvironmentId;
   suppressDarknessOverlay?: boolean;
+  inNightmare?: boolean; // Nightmare room: darken the floor + invert its sparkles
   activeCheckpoint?: [number, number] | null; // Active checkpoint position for lit/unlit rendering
   heroDeathState?: HeroDeathState;
   heroWarping?: boolean; // when true, flicker the hero sprite (teleport dematerialize)
@@ -95,6 +96,7 @@ export const Tile: React.FC<TileProps> = ({
   playerHasExitKey,
   environment = DEFAULT_ENVIRONMENT,
   suppressDarknessOverlay = false,
+  inNightmare = false,
   activeCheckpoint = null,
   heroDeathState,
   heroWarping = false,
@@ -1089,7 +1091,7 @@ export const Tile: React.FC<TileProps> = ({
       // Check if this floor tile has darkness (collapsed faulty floor) or open abyss
       const isDarkness = hasDarkness(subtype);
       const isOpenAbyss = hasOpenAbyss(subtype);
-      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : isOpenAbyss ? styles.openAbyss : styles.floor} ${tierClass}`;
+      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : isOpenAbyss ? styles.openAbyss : styles.floor} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
 
       // Map floor variant to NESW asset filename based on neighbors
       const floorAsset =
@@ -1640,7 +1642,7 @@ export const Tile: React.FC<TileProps> = ({
   // If this is a flowers tile
   if (tileId === 5) {
     if (isVisible) {
-      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
       const floorAsset =
         process.env.NODE_ENV === 'test'
           ? environmentConfig.floorDefault
@@ -1863,7 +1865,7 @@ export const Tile: React.FC<TileProps> = ({
   // If this is a tree tile
   if (tileId === 6) {
     if (isVisible) {
-      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}`;
+      const floorClasses = `${styles.tileContainer} ${styles.floor} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
       const floorAsset =
         process.env.NODE_ENV === 'test'
           ? environmentConfig.floorDefault
