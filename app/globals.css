@@ -125,6 +125,18 @@
   box-shadow: inset 0 0 55px 24px rgba(0, 0, 0, 0.5);
 }
 
+/* Nightmare room floor: darken the pink-realm floor (keeping its hue) so it reads as a
+   deep, dim version of the realm. The ::before overlay paints above the floor's background
+   image but behind the hero/items (later DOM children), so the floor goes dark while the
+   hero + flame stay bright. */
+.nightmare-floor::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.62);
+}
+
 /* ---------------------------------------------------------------------------
    Brightness A/B prototype (opt-in via `?bright=1` -> `.bright-mode` on the
    game root, see TilemapGrid). Nothing here affects the default experience.

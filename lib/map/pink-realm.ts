@@ -49,7 +49,14 @@ export function buildPinkRealm(
     const srow: number[][] = [];
     for (let x = 0; x < W; x++) {
       trow.push(source.tiles[y][W - 1 - x]); // horizontal mirror
-      srow.push([]); // emptied of all items/markers
+      // Drop the source room's items/enemies, but KEEP structural breach markers: a wall
+      // blown open in the dungeon stays a charred breach in the realm, and stepping through
+      // it leads into the nightmare room (handled in enterOutsideWorld when inPinkRealm).
+      const srcSubs = source.subtypes[y]?.[W - 1 - x] ?? [];
+      const carried = srcSubs.filter(
+        (s) => s === TileSubtype.BREACH || s === TileSubtype.SINGED
+      );
+      srow.push(carried);
     }
     tiles.push(trow);
     subtypes.push(srow);

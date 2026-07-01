@@ -906,6 +906,5 @@ export function updateConditionalNpcs(state: GameState): void {
   
   // Update the active NPCs immediately
   state.npcs = rehydrateNPCs(npcs);
-  console.log(`[updateConditionalNpcs] Reloaded ${state.currentRoomId} NPCs: ${state.npcs.map(n => n.id).join(', ')}`);
 }
 

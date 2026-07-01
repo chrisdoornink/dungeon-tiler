@@ -39,7 +39,13 @@ function spawnSparkle(tiles: number[][], withDelay: boolean): Sparkle {
   };
 }
 
-export function PinkRealmSparkles({ tiles }: { tiles: number[][] }) {
+export function PinkRealmSparkles({
+  tiles,
+  dark = false,
+}: {
+  tiles: number[][];
+  dark?: boolean;
+}) {
   const [sparkles, setSparkles] = useState<Sparkle[]>(() =>
     Array.from({ length: COUNT }, () => spawnSparkle(tiles, true))
   );
@@ -76,9 +82,12 @@ export function PinkRealmSparkles({ tiles }: { tiles: number[][] }) {
               height: s.size,
               borderRadius: "50%",
               opacity: 0,
-              background:
-                "radial-gradient(circle, #ffd6f0 0%, #ff9ee0 60%, transparent 100%)",
-              boxShadow: `0 0 ${s.size * 2}px ${s.size}px rgba(255, 180, 230, 0.7)`,
+              background: dark
+                ? "radial-gradient(circle, #1a0c22 0%, #07030c 60%, transparent 100%)"
+                : "radial-gradient(circle, #ffd6f0 0%, #ff9ee0 60%, transparent 100%)",
+              boxShadow: dark
+                ? `0 0 ${s.size * 2}px ${s.size}px rgba(0, 0, 0, 0.65)`
+                : `0 0 ${s.size * 2}px ${s.size}px rgba(255, 180, 230, 0.7)`,
               ["--peak-opacity" as string]: s.peakOpacity,
               animation: `pink-sparkle-once ${s.duration}s ease-in-out ${s.delay}s 1 both`,
             }}
