@@ -63,6 +63,74 @@ const EMOJI_MAP = {
   loss_square: "🟥",
 } as const;
 
+// Minimal shape of the `lastGame` snapshot that this screen reads for inventory
+// + health. The snapshot is written by TilemapGrid on run completion and stored
+// in localStorage; older snapshots may be missing the newer count fields, so all
+// are optional and default to 0/absent.
+export interface EndGameSnapshot {
+  hasKey?: boolean;
+  hasExitKey?: boolean;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  hasSnakeMedallion?: boolean;
+  rockCount?: number;
+  runeCount?: number;
+  bombCount?: number;
+  foodCount?: number;
+  potionCount?: number;
+  berryCount?: number;
+  pinkHeartCount?: number;
+  heroHealth?: number;
+  heroMaxHealth?: number;
+  bonusHearts?: number;
+}
+
+export interface InventoryEntry {
+  key: string;
+  asset: string; // in-game HUD asset, for the on-screen row
+  emoji: string; // for the copy-to-clipboard share text
+  alt: string;
+  count?: number; // present only for stackable items; drives the "×N" label
+}
+
+// Build the ordered inventory list shown at the end of a run. Unique gear (key,
+// sword, shield, medallion) has no count; stackables (rocks, runes, bombs, food,
+// potions, berries, pink hearts) carry their count so both the visual row and the
+// share text can render "×N". Assets match components/TilemapGrid.tsx's HUD.
+export function buildInventoryEntries(
+  game: EndGameSnapshot | null | undefined
+): InventoryEntry[] {
+  const inv: InventoryEntry[] = [];
+  if (!game) return inv;
+  if (game.hasKey)
+    inv.push({ key: "key", asset: "/images/items/key.png", emoji: "🗝️", alt: "Key" });
+  if (game.hasExitKey)
+    inv.push({ key: "exitKey", asset: "/images/items/exit-key.png", emoji: "🔑", alt: "Exit Key" });
+  if (game.hasSword)
+    inv.push({ key: "sword", asset: "/images/items/sword.png", emoji: "🗡️", alt: "Sword" });
+  if (game.hasShield)
+    inv.push({ key: "shield", asset: "/images/items/shield.png", emoji: "🛡️", alt: "Shield" });
+  if (game.hasSnakeMedallion)
+    inv.push({ key: "medallion", asset: "/images/items/snake-medalion.png", emoji: "🎖️", alt: "Travel Medallion" });
+  if ((game.rockCount ?? 0) > 0)
+    inv.push({ key: "rock", asset: "/images/items/rock-1.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
+  if ((game.runeCount ?? 0) > 0)
+    inv.push({ key: "rune", asset: "/images/items/rune1.png", emoji: "🪄", alt: "Rune", count: game.runeCount });
+  if ((game.bombCount ?? 0) > 0)
+    inv.push({ key: "bomb", asset: "/images/items/bomb-black.png", emoji: "💣", alt: "Bomb", count: game.bombCount });
+  if ((game.foodCount ?? 0) > 0)
+    inv.push({ key: "food", asset: "/images/items/food-1.png", emoji: "🍖", alt: "Food", count: game.foodCount });
+  if ((game.potionCount ?? 0) > 0)
+    inv.push({ key: "potion", asset: "/images/items/meds-1.png", emoji: "🧪", alt: "Potion", count: game.potionCount });
+  if ((game.berryCount ?? 0) > 0)
+    inv.push({ key: "berry", asset: "/images/items/berry.png", emoji: "🍓", alt: "Belted Berry", count: game.berryCount });
+  // Pink flaming heart prize: shown only if still HELD at the end (using it
+  // consumes it). A trophy for finding the secret realm.
+  if ((game.pinkHeartCount ?? 0) > 0)
+    inv.push({ key: "pinkHeart", asset: "/images/items/pink-heart.png", emoji: "💗", alt: "Pink Flaming Heart — secret prize", count: game.pinkHeartCount });
+  return inv;
+}
+
 interface DailyCompletedProps {
   data: DailyChallengeData;
 }
@@ -321,21 +389,25 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       lines.push(monsterLine);
     }
 
-    // Inventory line (no label word)
-    const items: string[] = [];
-    if (lastGame?.hasKey) items.push(EMOJI_MAP.key);
-    if (lastGame?.hasExitKey) items.push(EMOJI_MAP.exitKey);
-    if (lastGame?.hasSword) items.push(EMOJI_MAP.sword);
-    if (lastGame?.hasShield) items.push(EMOJI_MAP.shield);
-    // Pink flaming heart prize: shown here only if still HELD (kept unused) — a secret-find flex.
-    if ((lastGame?.pinkHeartCount ?? 0) > 0) items.push("💗");
-    lines.push(`🗃️ ${items.join("")}`);
+    // Inventory line (no label word). Stackables carry a "×N" count; unique gear
+    // (key/sword/shield/medallion) shows just its emoji.
+    const items = buildInventoryEntries(lastGame).map((i) =>
+      typeof i.count === "number" ? `${i.emoji}×${i.count}` : i.emoji
+    );
+    lines.push(`🗃️ ${items.join(" ")}`);
 
-    // Health visualization (5 hearts showing final health). Default to empty if unknown.
+    // Health visualization: one heart per max HP (5 by default, 6+ if an Extra
+    // Heart was collected), filled up to final health. Default to empty if unknown.
     const health =
       typeof lastGame?.heroHealth === "number" ? lastGame!.heroHealth : 0;
+    // Never render fewer hearts than current HP: older snapshots (pre-heroMaxHealth)
+    // can carry heroHealth 6 from an Extra Heart with no max stored, so floor at health.
+    const maxHealth = Math.max(
+      typeof lastGame?.heroMaxHealth === "number" ? lastGame!.heroMaxHealth : 5,
+      health
+    );
     const healthTiles: string[] = [];
-    for (let i = 1; i <= 5; i++) {
+    for (let i = 1; i <= maxHealth; i++) {
       if (i <= health) {
         healthTiles.push("❤️"); // Filled heart for remaining health
       } else {
@@ -589,59 +661,38 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         </div>
                       );
                     })()}
-                    {/* Inventory row (no label) */}
-                    <div className="flex items-center justify-center gap-2 mb-2">
+                    {/* Inventory row (no label). Stackables show a "×N" count. */}
+                    <div className="flex items-center justify-center gap-3 mb-2 flex-wrap">
                       <span>🗃️</span>
-                      {(() => {
-                        const inv: Array<{ asset: string; alt: string }> = [];
-                        if (lastGame?.hasKey)
-                          inv.push({
-                            asset: "/images/items/key.png",
-                            alt: "Key",
-                          });
-                        if (lastGame?.hasExitKey)
-                          inv.push({
-                            asset: "/images/items/exit-key.png",
-                            alt: "Exit Key",
-                          });
-                        if (lastGame?.hasSword)
-                          inv.push({
-                            asset: "/images/items/sword.png",
-                            alt: "Sword",
-                          });
-                        if (lastGame?.hasShield)
-                          inv.push({
-                            asset: "/images/items/shield.png",
-                            alt: "Shield",
-                          });
-                        if ((lastGame?.berryCount ?? 0) > 0)
-                          inv.push({
-                            asset: "/images/items/berry.png",
-                            alt: `Belted Berry x${lastGame.berryCount}`,
-                          });
-                        // Pink flaming heart prize: shown only if still held at the end
-                        // (using it consumes it). A trophy for finding the secret realm.
-                        if ((lastGame?.pinkHeartCount ?? 0) > 0)
-                          inv.push({
-                            asset: "/images/items/pink-heart.png",
-                            alt: "Pink Flaming Heart — secret prize",
-                          });
-                        if (inv.length === 0) return null;
-                        return inv.map((i, idx) => (
+                      {buildInventoryEntries(lastGame).map((i) => {
+                        const label =
+                          typeof i.count === "number"
+                            ? `${i.alt} x${i.count}`
+                            : i.alt;
+                        return (
                           <div
-                            key={idx}
-                            className="w-6 h-6"
-                            style={{
-                              backgroundImage: `url(${i.asset})`,
-                              backgroundSize: "contain",
-                              backgroundRepeat: "no-repeat",
-                              backgroundPosition: "center",
-                            }}
-                            title={i.alt}
-                            aria-label={i.alt}
-                          />
-                        ));
-                      })()}
+                            key={i.key}
+                            className="flex items-center gap-1"
+                            title={label}
+                          >
+                            <div
+                              className="w-6 h-6"
+                              style={{
+                                backgroundImage: `url(${i.asset})`,
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "center",
+                              }}
+                              aria-label={label}
+                            />
+                            {typeof i.count === "number" && (
+                              <span className="text-sm text-gray-300">
+                                ×{i.count}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                     {/* Hearts */}
                     <div className="flex items-center justify-center gap-1">
@@ -650,8 +701,18 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                           typeof lastGame?.heroHealth === "number"
                             ? lastGame!.heroHealth
                             : 0;
+                        // One heart per max HP: 5 normally, 6+ when an Extra
+                        // Heart was collected. Older snapshots lack heroMaxHealth
+                        // and fall back to 5 — but never fewer than current HP, so
+                        // a pre-migration 6/6 run doesn't lose its 6th heart.
+                        const maxHealth = Math.max(
+                          typeof lastGame?.heroMaxHealth === "number"
+                            ? lastGame!.heroMaxHealth
+                            : 5,
+                          health
+                        );
                         const tiles: React.ReactElement[] = [];
-                        for (let i = 1; i <= 5; i++) {
+                        for (let i = 1; i <= maxHealth; i++) {
                           const filled = i <= health;
                           tiles.push(
                             <div

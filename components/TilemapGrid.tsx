@@ -1999,6 +1999,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             pinkHeartCount: gameState.pinkHeartCount ?? 0,
             berryCount: gameState.berryCount ?? 0,
             bonusHearts: gameState.bonusHearts ?? 0,
+            heroMaxHealth: gameState.heroMaxHealth ?? 5,
+            hasSnakeMedallion: !!gameState.hasSnakeMedallion,
+            rockCount: gameState.rockCount ?? 0,
+            runeCount: gameState.runeCount ?? 0,
+            bombCount: gameState.bombCount ?? 0,
+            foodCount: gameState.foodCount ?? 0,
+            potionCount: gameState.potionCount ?? 0,
           };
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2057,6 +2064,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             pinkHeartCount: gameState.pinkHeartCount ?? 0,
             berryCount: gameState.berryCount ?? 0,
             bonusHearts: gameState.bonusHearts ?? 0,
+            heroMaxHealth: gameState.heroMaxHealth ?? 5,
+            hasSnakeMedallion: !!gameState.hasSnakeMedallion,
+            rockCount: gameState.rockCount ?? 0,
+            runeCount: gameState.runeCount ?? 0,
+            bombCount: gameState.bombCount ?? 0,
+            foodCount: gameState.foodCount ?? 0,
+            potionCount: gameState.potionCount ?? 0,
           };
           if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2378,6 +2392,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           pinkHeartCount: gameState.pinkHeartCount ?? 0,
           berryCount: gameState.berryCount ?? 0,
           bonusHearts: gameState.bonusHearts ?? 0,
+          heroMaxHealth: gameState.heroMaxHealth ?? 5,
+          hasSnakeMedallion: !!gameState.hasSnakeMedallion,
+          rockCount: gameState.rockCount ?? 0,
+          runeCount: gameState.runeCount ?? 0,
+          bombCount: gameState.bombCount ?? 0,
+          foodCount: gameState.foodCount ?? 0,
+          potionCount: gameState.potionCount ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
@@ -2413,6 +2434,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           pinkHeartCount: gameState.pinkHeartCount ?? 0,
           berryCount: gameState.berryCount ?? 0,
           bonusHearts: gameState.bonusHearts ?? 0,
+          heroMaxHealth: gameState.heroMaxHealth ?? 5,
+          hasSnakeMedallion: !!gameState.hasSnakeMedallion,
+          rockCount: gameState.rockCount ?? 0,
+          runeCount: gameState.runeCount ?? 0,
+          bombCount: gameState.bombCount ?? 0,
+          foodCount: gameState.foodCount ?? 0,
+          potionCount: gameState.potionCount ?? 0,
         } as const;
         if (typeof window !== "undefined") {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));

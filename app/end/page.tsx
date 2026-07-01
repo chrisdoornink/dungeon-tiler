@@ -17,9 +17,16 @@ type LastGame = {
   showFullMap?: boolean;
   streak?: number;
   heroHealth?: number;
+  heroMaxHealth?: number;
   berryCount?: number;
   pinkHeartCount?: number;
   bonusHearts?: number;
+  rockCount?: number;
+  runeCount?: number;
+  bombCount?: number;
+  foodCount?: number;
+  potionCount?: number;
+  hasSnakeMedallion?: boolean;
   mapData: {
     tiles: number[][];
     subtypes: number[][][];
@@ -172,19 +179,33 @@ export default function EndPage() {
   for (const monsterLine of monsterShareLines(endMonsterSummary)) {
     shareLines.push(monsterLine);
   }
-  // Inventory line
+  // Inventory line. Unique gear shows just its emoji; stackables carry a "×N"
+  // count. Item emojis match the daily completion screen (buildInventoryEntries),
+  // except key/exit-key which keep this screen's long-standing convention.
   const items: string[] = [];
   if (last.hasKey) items.push('🔑');
   if (last.hasExitKey) items.push('🗝️');
   if (last.hasSword) items.push('🗡️');
   if (last.hasShield) items.push('🛡️');
+  if (last.hasSnakeMedallion) items.push('🎖️');
+  if ((last.rockCount ?? 0) > 0) items.push(`🪨×${last.rockCount}`);
+  if ((last.runeCount ?? 0) > 0) items.push(`🪄×${last.runeCount}`);
+  if ((last.bombCount ?? 0) > 0) items.push(`💣×${last.bombCount}`);
+  if ((last.foodCount ?? 0) > 0) items.push(`🍖×${last.foodCount}`);
+  if ((last.potionCount ?? 0) > 0) items.push(`🧪×${last.potionCount}`);
+  if ((last.berryCount ?? 0) > 0) items.push(`🍓×${last.berryCount}`);
   // Pink flaming heart shown here only if still HELD (kept unused).
-  if ((last.pinkHeartCount ?? 0) > 0) items.push('💗');
-  shareLines.push(`🗃️ inventory: ${items.join('')}`);
-  // Health line (default to empty if unknown)
+  if ((last.pinkHeartCount ?? 0) > 0) items.push(`💗×${last.pinkHeartCount}`);
+  shareLines.push(`🗃️ ${items.join(' ')}`);
+  // Health line: one tile per max HP (5 normally, 6+ after an Extra Heart), never
+  // fewer than current HP so a pre-migration 6/6 run keeps all its hearts.
   const health = typeof last.heroHealth === 'number' ? last.heroHealth : 0;
+  const maxHealth = Math.max(
+    typeof last.heroMaxHealth === 'number' ? last.heroMaxHealth : 5,
+    health
+  );
   const healthTiles: string[] = [];
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= maxHealth; i++) {
     healthTiles.push(i <= health ? '🟩' : '⬜');
   }
   // Temporary pink overheal hearts still active at the end (heart was used).
@@ -338,6 +359,12 @@ export default function EndPage() {
             if (last.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
             if (last.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
             if (last.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
+            if (last.hasSnakeMedallion) inv.push({ emoji: '🎖️', label: 'Travel Medallion' });
+            if ((last.rockCount ?? 0) > 0) inv.push({ emoji: '🪨', label: `Rock x${last.rockCount}` });
+            if ((last.runeCount ?? 0) > 0) inv.push({ emoji: '🪄', label: `Rune x${last.runeCount}` });
+            if ((last.bombCount ?? 0) > 0) inv.push({ emoji: '💣', label: `Bomb x${last.bombCount}` });
+            if ((last.foodCount ?? 0) > 0) inv.push({ emoji: '🍖', label: `Food x${last.foodCount}` });
+            if ((last.potionCount ?? 0) > 0) inv.push({ emoji: '🧪', label: `Potion x${last.potionCount}` });
             if ((last.berryCount ?? 0) > 0) inv.push({ emoji: '🍓', label: `Belted Berry x${last.berryCount}` });
             if ((last.pinkHeartCount ?? 0) > 0) inv.push({ emoji: '💗', label: 'Pink Flaming Heart' });
             if (last.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });

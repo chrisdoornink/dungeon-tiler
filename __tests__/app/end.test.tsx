@@ -91,6 +91,38 @@ describe('End Page', () => {
     (nav.go as jest.Mock).mockReset();
   });
 
+  it('lists all carried items with counts (medallion, rocks, bombs, food, potions)', () => {
+    const payload = {
+      completedAt: new Date().toISOString(),
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: true,
+      hasShield: false,
+      hasSnakeMedallion: true,
+      rockCount: 3,
+      bombCount: 2,
+      foodCount: 1,
+      potionCount: 4,
+      outcome: 'win' as const,
+      streak: 1,
+      heroHealth: 5,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      mapData: {
+        tiles: Array(3).fill(0).map(() => Array(3).fill(0)),
+        subtypes: Array(3).fill(0).map(() => Array(3).fill(0).map(() => [] as number[])),
+      },
+    };
+    window.localStorage.setItem('lastGame', JSON.stringify(payload));
+
+    render(<EndPage />);
+
+    expect(screen.getByText('Travel Medallion')).toBeInTheDocument();
+    expect(screen.getByText('Rock x3')).toBeInTheDocument();
+    expect(screen.getByText('Bomb x2')).toBeInTheDocument();
+    expect(screen.getByText('Food x1')).toBeInTheDocument();
+    expect(screen.getByText('Potion x4')).toBeInTheDocument();
+  });
+
   describe('Layout and Box Adjustments', () => {
     const mockGameData = {
       completedAt: new Date().toISOString(),
