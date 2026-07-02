@@ -4,6 +4,7 @@ import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
+import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -1146,6 +1147,28 @@ export const Tile: React.FC<TileProps> = ({
     } as React.CSSProperties;
   };
 
+  // Regular-goblin variant: same slide, plus a bob + alternating tilt baked
+  // into a midpoint keyframe (see smoothStepSlideBob in globals.css). The
+  // midpoint is the geometric center of the slide with a vertical lift
+  // subtracted (screen-up is negative Y) and a rotate layered on top; 0%/100%
+  // stay flat-footed so the arc reads as a step, not a wobble at rest.
+  const smoothStepBobStyle = (
+    step: SmoothEntityStep | undefined,
+    base: string
+  ): React.CSSProperties | null => {
+    if (!step) return null;
+    const baseSuffix = !base || base === 'none' ? '' : ` ${base}`;
+    const midX = (step.dx * 40) / 2;
+    const midY = (step.dy * 40) / 2 - ENEMY_GAIT.bobPx;
+    const tilt = (step.seq % 2 ? 1 : -1) * ENEMY_GAIT.tiltDeg;
+    return {
+      ['--smooth-step-from' as string]: `translate(${step.dx * 40}px, ${step.dy * 40}px)${baseSuffix}`,
+      ['--smooth-step-mid' as string]: `translate(${midX}px, ${midY}px) rotate(${tilt}deg)${baseSuffix}`,
+      ['--smooth-step-to' as string]: !base || base === 'none' ? 'none' : base,
+      animation: `smoothStepSlideBob ${step.dur}ms ${step.ease} both`,
+    } as React.CSSProperties;
+  };
+
   // The pink goblin carries its teleport ring with it: unless the ring is
   // cast somewhere else (a PINK_RING subtype tile), it renders directly under
   // the goblin with the same rising sparkles the standing ring has.
@@ -1408,13 +1431,21 @@ export const Tile: React.FC<TileProps> = ({
                 : undefined,
               // Only while actually sliding: once the tween lands the animation
               // style is dropped so the static transform/pose takes over (this
-              // is what lets the snake snap back to its coiled sprite).
+              // is what lets the snake snap back to its coiled sprite). Regular
+              // goblins (fire/water/earth family) get the bob+tilt variant so
+              // their walk reads as a step rather than a flat glide.
               ...(enemySliding
-                ? smoothStepStyle(enemyStep, enemyBaseTransform)
+                ? REGULAR_GOBLIN_KINDS.has(enemyKind ?? '')
+                  ? smoothStepBobStyle(enemyStep, enemyBaseTransform)
+                  : smoothStepStyle(enemyStep, enemyBaseTransform)
                 : null),
             }}
             onAnimationEnd={(e) => {
-              if (e.animationName === 'smoothStepSlide' && enemyStep) {
+              if (
+                (e.animationName === 'smoothStepSlide' ||
+                  e.animationName === 'smoothStepSlideBob') &&
+                enemyStep
+              ) {
                 setSmoothSlideDoneSeq(enemyStep.seq);
               }
             }}
