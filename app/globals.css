@@ -502,6 +502,27 @@ body {
   background: rgba(0, 0, 0, 0.75); /* ~ brightness(0.25) */
 }
 
+/* An enemy dropping face-first into a freshly opened abyss (mirrors the
+   hero's dive). --fall-from lets smooth mode slide the sprite in from the
+   tile it fell from before it shrinks into the hole; legacy leaves it unset
+   and the sprite just shrinks in place. */
+@keyframes enemyAbyssFall {
+  0% {
+    transform: var(--fall-from, none);
+    opacity: 1;
+    animation-timing-function: ease-in-out;
+  }
+  45% {
+    transform: translate(0px, 0px) scale(1);
+    opacity: 1;
+    animation-timing-function: ease-in;
+  }
+  100% {
+    transform: scale(0);
+    opacity: 0.9;
+  }
+}
+
 /* Smooth movement: perpetual ambient drift for ghosts — a slow, slightly
    irregular hover (up/down with a little sideways sway). Runs on the INNER
    ghost sprite so it composes with the tile-to-tile slide on the wrapper. */
