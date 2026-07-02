@@ -1425,6 +1425,9 @@ export interface GameState {
     y: number;
     x: number;
     kind: string;
+    // Stable render-layer id (lets the UI animate a specific enemy's death,
+    // e.g. sliding into the abyss from its previous tile).
+    id?: string;
     behaviorMemory?: Record<string, unknown>;
   }>;
   npcInteractionQueue?: NPCInteractionEvent[];

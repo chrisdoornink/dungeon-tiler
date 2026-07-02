@@ -163,6 +163,7 @@ describe("Enemy Defeat Story Events", () => {
         y: 5,
         x: 5,
         kind: "fire-goblin",
+        id: expect.any(String), // auto-generated stable render id
         behaviorMemory: { isKalenThreat: true, moved: false }
       });
     });
@@ -176,6 +177,7 @@ describe("Enemy Defeat Story Events", () => {
         y: 5,
         x: 5,
         kind: "fire-goblin",
+        id: expect.any(String), // auto-generated stable render id
         behaviorMemory: {}
       });
     });

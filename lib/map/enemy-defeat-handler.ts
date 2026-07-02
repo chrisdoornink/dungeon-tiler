@@ -65,12 +65,16 @@ export function createDefeatedEnemyInfo(enemy: Enemy): {
   y: number;
   x: number;
   kind: string;
+  id?: string;
   behaviorMemory?: Record<string, unknown>;
 } {
   return {
     y: enemy.y,
     x: enemy.x,
     kind: enemy.kind,
+    // Render-layer identity: lets the UI animate this specific enemy's death
+    // (e.g. sliding into the abyss from the tile it fell from).
+    id: enemy.id,
     behaviorMemory: enemy.behaviorMemory
   };
 }

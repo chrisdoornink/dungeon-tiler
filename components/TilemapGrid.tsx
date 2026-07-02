@@ -1776,6 +1776,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [spirits, setSpirits] = useState<
     Array<{ id: string; y: number; x: number; createdAt: number }>
   >([]);
+  // Transient "enemy fell into the abyss" dives (spawn when a defeated
+  // enemy's tile just became an open abyss). fallFrom is the smooth-mode
+  // slide-in offset from the tile it fell from, when known.
+  const [enemyAbyssFalls, setEnemyAbyssFalls] = useState<
+    Array<{ id: string; y: number; x: number; kind: string; fallFrom?: string }>
+  >([]);
   // Transient floating damage numbers (hero/enemy hits)
   const [floating, setFloating] = useState<FloatingNumber[]>([]);
   const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>("idle");
@@ -2820,6 +2826,46 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Spawn spirits only for actual deaths reported by the engine this tick
       const died = newGameState.recentDeaths || [];
       if (died.length > 0) {
+        // Enemies whose tile just became an open abyss fell into the pit —
+        // show them dropping face-first into the hole (mirrors the hero's
+        // dive). Enemies can never die ON an abyss tile any other way, so
+        // this cleanly separates falls from combat deaths. Read BEFORE
+        // defeatedEnemies is cleared below.
+        const fell = (newGameState.defeatedEnemies ?? []).filter((d) =>
+          newGameState.mapData.subtypes[d.y]?.[d.x]?.includes(
+            TileSubtype.OPEN_ABYSS
+          )
+        );
+        if (fell.length > 0) {
+          const nowTs = Date.now();
+          const entries = fell.map((f) => {
+            // Smooth mode: slide in from the tile it fell from. The entity
+            // diff hasn't rebuilt yet, so the prev map still holds pre-move
+            // positions for this turn.
+            let fallFrom: string | undefined;
+            if (smoothEnabled && f.id) {
+              const p = smoothEntityPrevRef.current.get(`e:${f.id}`);
+              if (p && Math.abs(p[0] - f.y) + Math.abs(p[1] - f.x) === 1) {
+                fallFrom = `translate(${(p[1] - f.x) * 40}px, ${(p[0] - f.y) * 40}px) scale(1)`;
+              }
+            }
+            return {
+              id: `fall-${f.y},${f.x}-${nowTs}-${Math.random()
+                .toString(36)
+                .slice(2, 7)}`,
+              y: f.y,
+              x: f.x,
+              kind: f.kind,
+              fallFrom,
+            };
+          });
+          setEnemyAbyssFalls((prev) => [...prev, ...entries]);
+          for (const e of entries) {
+            setTimeout(() => {
+              setEnemyAbyssFalls((curr) => curr.filter((c) => c.id !== e.id));
+            }, 800);
+          }
+        }
         // onEnemyDefeat processing is now handled directly in game-state.ts
         // Clear defeated enemies after processing
         if (newGameState.defeatedEnemies) {
@@ -4095,6 +4141,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         >
                           {f.miss ? "miss" : `${f.sign}${f.amount}`}
                         </div>
+                      );
+                    });
+                  })()}
+                {/* Enemies dropping face-first into a freshly opened abyss */}
+                {enemyAbyssFalls.length > 0 &&
+                  (() => {
+                    const tileSize = 40; // px
+                    return enemyAbyssFalls.map((f) => {
+                      const pxLeft = (f.x + 0.5) * tileSize;
+                      const pxTop = (f.y + 0.5) * tileSize;
+                      return (
+                        <div
+                          key={f.id}
+                          aria-hidden="true"
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: `${pxLeft - tileSize / 2}px`,
+                            top: `${pxTop - tileSize / 2}px`,
+                            width: `${tileSize}px`,
+                            height: `${tileSize}px`,
+                            backgroundImage: `url(${getEnemyIcon(
+                              f.kind as EnemyKind,
+                              "front"
+                            )})`,
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                            zIndex: 10500, // same layer as live enemies
+                            animation: "enemyAbyssFall 620ms forwards",
+                            ...(f.fallFrom
+                              ? ({ ["--fall-from" as string]: f.fallFrom } as React.CSSProperties)
+                              : null),
+                          }}
+                        />
                       );
                     });
                   })()}
