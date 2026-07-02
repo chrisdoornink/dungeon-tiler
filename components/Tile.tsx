@@ -118,6 +118,12 @@ export const Tile: React.FC<TileProps> = ({
   smoothMode = false,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
+  // Smooth movement: tracks the enemy slide animation finishing (via
+  // onAnimationEnd) so sprites that change pose with motion — the snake's
+  // coiled <-> slither swap — revert the moment the tween lands instead of
+  // waiting for the next turn's re-render. Re-keyed steps (new seq) reset it.
+  const [smoothSlideDoneSeq, setSmoothSlideDoneSeq] = React.useState<number | null>(null);
+  const enemySliding = !!enemyStep && smoothSlideDoneSeq !== enemyStep.seq;
   // Torch animations disabled for performance: render static torch sprite when present.
   // Fast bitmask-based wall variant resolver for perspective.
   // We IGNORE the North (behind) bit and only key off E, S, W.
@@ -1223,6 +1229,10 @@ export const Tile: React.FC<TileProps> = ({
       );
     }
     // Facing flip / scale for the sprite (composed into the slide keyframes too).
+    // Snake pose: in smooth mode the slither sprite shows ONLY while the tile
+    // slide is actually animating (coiled the moment it lands); legacy keeps
+    // the per-turn `moved` flag since there is no tween to sync with.
+    const snakeMoving = smoothMode ? enemySliding : !!enemyMoved;
     const enemyBaseTransform = (() => {
       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
       if (enemyKind !== 'snake') {
@@ -1234,8 +1244,7 @@ export const Tile: React.FC<TileProps> = ({
       }
       // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
       const baseScale = 'scale(0.5)';
-      const moved = !!enemyMoved;
-      if (moved && enemyFacing === 'RIGHT') {
+      if (snakeMoving && enemyFacing === 'RIGHT') {
         return 'scaleX(-1) ' + baseScale;
       }
       return baseScale;
@@ -1278,12 +1287,12 @@ export const Tile: React.FC<TileProps> = ({
                   }
                 };
                 const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
-                // For snakes: use moving sprite when enemyMoved, else coiled
+                // For snakes: slither sprite while moving, coiled otherwise
+                // (smooth mode syncs "moving" to the live slide animation)
                 if (kind === 'snake') {
                   const f = enemyFacing;
                   // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
-                  const useMoving = !!enemyMoved;
-                  if (useMoving) {
+                  if (snakeMoving) {
                     return getEnemyIcon('snake', 'left');
                   }
                   // coiled sprite follows facing (front/back/right are coiled)
@@ -1310,7 +1319,17 @@ export const Tile: React.FC<TileProps> = ({
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
                 : undefined,
-              ...smoothStepStyle(enemyStep, enemyBaseTransform),
+              // Only while actually sliding: once the tween lands the animation
+              // style is dropped so the static transform/pose takes over (this
+              // is what lets the snake snap back to its coiled sprite).
+              ...(enemySliding
+                ? smoothStepStyle(enemyStep, enemyBaseTransform)
+                : null),
+            }}
+            onAnimationEnd={(e) => {
+              if (e.animationName === 'smoothStepSlide' && enemyStep) {
+                setSmoothSlideDoneSeq(enemyStep.seq);
+              }
             }}
             data-testid="enemy-sprite"
           />
