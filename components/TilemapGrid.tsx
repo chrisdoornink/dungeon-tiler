@@ -698,11 +698,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         break;
     }
 
-    // Compute animation path (up to 4 steps)
+    // Resolve the throw FIRST so we know exactly which enemies died, then keep
+    // the current (pre-move) board on screen until the rune lands. The target
+    // may move during its own turn, but the projectile should still connect
+    // with the goblin the player SEES — and its ghost should rise there, at the
+    // same instant the bang appears. So we line the projectile, the bang, and
+    // the ghost all up on the pre-move tile rather than popping the goblin early
+    // and dropping its ghost on the tile it had walked to.
+    const next = performThrowRune(prev);
+    const nextIds = new Set((next.enemies ?? []).map((e) => e.id));
+    // Ghosts rise at each killed enemy's LAST VISIBLE (pre-move) tile.
+    const killedGhosts: Array<[number, number]> = (prev.enemies ?? [])
+      .filter((e) => !nextIds.has(e.id))
+      .map((e) => [e.y, e.x] as [number, number]);
+
+    // Compute the projectile path against PRE-move positions (what is on screen
+    // during the flight). Stop at the first enemy / pot / wall.
     const path: Array<[number, number]> = [];
     let ty = py,
       tx = px;
     let impact: { y: number; x: number } | null = null;
+    const preEnemies = prev.enemies ?? [];
     for (let step = 1; step <= 4; step++) {
       ty += vy;
       tx += vx;
@@ -717,22 +733,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         if (last) impact = { y: last[0], x: last[1] };
         break;
       }
-      // If wall, stop before entering wall (rune will drop on the last traversed floor tile)
+      // If wall, stop before entering wall (rune drops on the last floor tile)
       if (prev.mapData.tiles[ty][tx] !== 0) {
         const last = path[path.length - 1];
         if (last) impact = { y: last[0], x: last[1] };
         break;
       }
-      // Add floor step
       path.push([ty, tx]);
-      // If enemy at tile, include and stop
-      const enemies = prev.enemies ?? [];
-      const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
-      if (enemyAt) {
+      if (preEnemies.some((e) => e.y === ty && e.x === tx)) {
         impact = { y: ty, x: tx };
         break;
       }
-      // If pot at tile, include and stop
       const subs = prev.mapData.subtypes[ty][tx] || [];
       if (subs.includes(TileSubtype.POT)) {
         impact = { y: ty, x: tx };
@@ -740,41 +751,46 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
     }
 
-    // Apply the throw outcome as a VALUE (StrictMode-safe), plus spirit VFX for kills.
-    const applyNext = () => {
-      const next = performThrowRune(prev);
+    // Commit the resolved outcome AND fire the impact VFX together, so the rune
+    // landing, the bang, the goblin vanishing, and its ghost all happen at the
+    // same instant on the same tile.
+    const commitAndImpact = () => {
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       setGameState(next);
-      try {
-        const died = next.recentDeaths || [];
-        if (died.length > 0) {
-          const now = Date.now();
-          setSpirits((prevS) => {
-            const out = [...prevS];
-            for (const [y, x] of died) {
-              const key = `${y},${x}`;
-              const id = `${key}-${now}-${Math.random()
-                .toString(36)
-                .slice(2, 7)}`;
-              out.push({ id, y, x, createdAt: now });
-              setTimeout(() => {
-                setSpirits((curr) => curr.filter((s) => s.id !== id));
-              }, 2000);
-            }
-            return out;
-          });
-        }
-      } catch (err) {
-        console.error("Rune kill spirit spawn error:", err);
+      if (impact) {
+        const bamIdx = 1 + Math.floor(Math.random() * 3);
+        setBamEffect({
+          y: impact.y,
+          x: impact.x,
+          src: `/images/items/bam${bamIdx}.png`,
+        });
+        setTimeout(() => setBamEffect(null), 300);
+        triggerScreenShake();
+      }
+      if (killedGhosts.length > 0) {
+        const now = Date.now();
+        setSpirits((prevS) => {
+          const out = [...prevS];
+          for (const [gy, gx] of killedGhosts) {
+            const id = `${gy},${gx}-${now}-${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
+            out.push({ id, y: gy, x: gx, createdAt: now });
+            setTimeout(() => {
+              setSpirits((curr) => curr.filter((s) => s.id !== id));
+            }, 2000);
+          }
+          return out;
+        });
       }
     };
 
-    // Run the animation
+    // Animate the rune, then land everything as it reaches the impact tile.
+    const stepMs = 50;
     if (path.length > 0) {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       let idx = 0;
       setRuneEffect({ y: path[0][0], x: path[0][1], id });
-      const stepMs = 50;
       const interval = setInterval(() => {
         idx += 1;
         if (idx >= path.length || !path[idx]) {
@@ -791,32 +807,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setTimeout(() => {
         setRuneEffect((cur) => (cur && cur.id === id ? null : cur));
       }, 1000);
-
-      // Schedule BAM effect at impact position timed with animation arrival
-      if (impact) {
-        const imp = impact;
-        const bamDelay = Math.max(0, path.length) * stepMs + 10;
-        setTimeout(() => {
-          const bamIdx = 1 + Math.floor(Math.random() * 3);
-          setBamEffect({
-            y: imp.y,
-            x: imp.x,
-            src: `/images/items/bam${bamIdx}.png`,
-          });
-          setTimeout(() => setBamEffect(null), 300);
-          triggerScreenShake();
-        }, bamDelay);
-      }
-
-      // If clear path (no impact and path reached 4), delay applying game logic until animation completes
-      if (!impact && path.length === 4) {
-        setTimeout(applyNext, path.length * stepMs + 10);
-        return;
-      }
+      // Land the outcome + VFX exactly as the rune reaches the impact tile.
+      setTimeout(commitAndImpact, path.length * stepMs + 10);
+    } else {
+      // No travel (blocked immediately) — resolve now.
+      commitAndImpact();
     }
-
-    // Apply game logic immediately for collisions or early stops
-    applyNext();
   }, [gameState, playerPosition, resolvedStorageSlot]);
 
   const applyDialogueCompletionEffects = useCallback(
@@ -1385,29 +1381,35 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       preKindById.set(e.id, e.kind);
     }
 
-    // Resolve the throw FIRST: enemies take their turn before the rock flies,
-    // so the animation path must follow POST-move positions — otherwise the
-    // rock visually sails through an enemy that stepped forward and lands on
-    // the tile it used to be on.
+    // Resolve the throw FIRST so we know exactly what the rock hit and which
+    // enemies died — but keep the current (pre-move) board on screen until the
+    // rock actually lands. The enemy the engine moved + killed this turn should
+    // stay visible under the incoming rock, then vanish as the bang hits, so the
+    // ghost lines up with the impact instead of dying on the tile it walked to.
     const next = performThrowRock(prev);
+    const nextIds = new Set((next.enemies ?? []).map((e) => e.id));
+    // Ghosts rise at each killed enemy's LAST VISIBLE (pre-move) tile.
+    const killedGhosts: Array<[number, number]> = (prev.enemies ?? [])
+      .filter((e) => !nextIds.has(e.id))
+      .map((e) => [e.y, e.x] as [number, number]);
 
-    // Build the animation path against the resolved state (mirrors the
-    // engine's own path scan).
+    // Build the projectile path against PRE-move positions (what is on screen
+    // during the flight). Stop at the first enemy / pot / wall along the ray.
     const path: Array<[number, number]> = [];
     let ty = py,
       tx = px;
     let impact: { y: number; x: number } | null = null;
     let impactEnemyId: string | null = null;
-    let impactEnemyDied = false;
+    const preEnemies = prev.enemies ?? [];
     for (let step = 1; step <= 4; step++) {
       ty += vy;
       tx += vx;
       // Out of bounds: stop before leaving grid
       if (
         ty < 0 ||
-        ty >= next.mapData.tiles.length ||
+        ty >= prev.mapData.tiles.length ||
         tx < 0 ||
-        tx >= next.mapData.tiles[0].length
+        tx >= prev.mapData.tiles[0].length
       ) {
         // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
         const last = path[path.length - 1];
@@ -1415,122 +1417,107 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         break;
       }
       // If wall, stop before entering wall
-      if (next.mapData.tiles[ty][tx] !== 0) {
+      if (prev.mapData.tiles[ty][tx] !== 0) {
         // Impact on the wall tile
         impact = { y: ty, x: tx };
         break;
       }
       path.push([ty, tx]);
-      // Enemy at its post-move tile — or one that died there this tick
-      const enemyAt = (next.enemies ?? []).find((e) => e.y === ty && e.x === tx);
-      const deadAt = (next.defeatedEnemies ?? []).find(
-        (d) => d.y === ty && d.x === tx
-      );
-      if (enemyAt || deadAt) {
+      // First enemy on the ray at its VISIBLE (pre-move) tile.
+      const enemyPre = preEnemies.find((e) => e.y === ty && e.x === tx);
+      if (enemyPre) {
         impact = { y: ty, x: tx };
-        impactEnemyId = enemyAt?.id ?? deadAt?.id ?? null;
-        impactEnemyDied = !enemyAt && !!deadAt;
+        impactEnemyId = enemyPre.id;
         break;
       }
-      // Pot check against the PRE-throw map: the engine breaks the pot the
-      // rock stops at, so it's already gone from `next`.
-      const prevSubs = prev.mapData.subtypes[ty]?.[tx] || [];
-      if (prevSubs.includes(TileSubtype.POT)) {
+      const preSubs = prev.mapData.subtypes[ty]?.[tx] || [];
+      if (preSubs.includes(TileSubtype.POT)) {
         impact = { y: ty, x: tx };
         break;
       }
     }
 
-    // Commit the (already-resolved) throw outcome, plus the post-throw VFX
-    // (floating damage, spirits).
-    const applyNext = () => {
+    // Commit the resolved outcome AND fire the impact VFX together, so the rock
+    // landing, the bang, the floating damage, and any ghost all happen at the
+    // same instant on the same tile.
+    const commitAndImpact = () => {
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       setGameState(next);
+      if (impact) {
+        const bamIdx = 1 + Math.floor(Math.random() * 3);
+        setBamEffect({
+          y: impact.y,
+          x: impact.x,
+          src: `/images/items/bam${bamIdx}.png`,
+        });
+        setTimeout(() => setBamEffect(null), 300);
+        triggerScreenShake();
+      }
       try {
-        // Floating damage for the enemy the rock hit — matched by id since
-        // positions can't be trusted across the enemy turn.
+        // Floating damage for the enemy the rock hit — matched by id, shown on
+        // the tile where the rock visibly connected (its pre-move tile).
         if (impactEnemyId && impact) {
           const imp = impact;
           const hitId = impactEnemyId;
           const postEnemy = (next.enemies || []).find((e) => e.id === hitId);
           const preHP = preHealthById.get(hitId) ?? 0;
-          let dmg = 0;
-          if (!impactEnemyDied && postEnemy) {
-            const postHP = Math.max(0, postEnemy.health ?? 0);
-            dmg = Math.max(0, preHP - postHP);
-          } else {
-            // Enemy died; damage equals its remaining health before the hit
-            dmg = Math.max(0, preHP);
-          }
+          const dmg = postEnemy
+            ? Math.max(0, preHP - Math.max(0, postEnemy.health ?? 0))
+            : Math.max(0, preHP); // no post-move enemy => it died this throw
           if (dmg > 0 && Number.isFinite(dmg)) {
-            const spawn = () => {
-              const now = Date.now();
-              const id = `fd-enemy-${imp.y},${imp.x}-${now}-${Math.random()
-                .toString(36)
-                .slice(2, 7)}`;
-              setFloating((prevF) => {
-                const nextF: FloatingNumber[] = [
-                  ...prevF,
-                  {
-                    id,
-                    y: imp.y,
-                    x: imp.x,
-                    amount: dmg,
-                    target: "enemy",
-                    sign: "-",
-                    kind: preKindById.get(hitId),
-                    createdAt: now,
-                  },
-                ];
-                setTimeout(() => {
-                  setFloating((curr) => curr.filter((f) => f.id !== id));
-                }, 1200);
-                return nextF;
-              });
-            };
-            if (process.env.NODE_ENV === "test") {
-              spawn();
-            } else {
-              // Align roughly with BAM flash timing
-              setTimeout(spawn, 100);
-            }
+            const now = Date.now();
+            const id = `fd-enemy-${imp.y},${imp.x}-${now}-${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
+            setFloating((prevF) => {
+              const nextF: FloatingNumber[] = [
+                ...prevF,
+                {
+                  id,
+                  y: imp.y,
+                  x: imp.x,
+                  amount: dmg,
+                  target: "enemy",
+                  sign: "-",
+                  kind: preKindById.get(hitId),
+                  createdAt: now,
+                },
+              ];
+              setTimeout(() => {
+                setFloating((curr) => curr.filter((f) => f.id !== id));
+              }, 1200);
+              return nextF;
+            });
           }
         }
       } catch (err) {
         // Prevent any exception here from freezing input handling
         console.error("Rock hit damage popup error:", err);
       }
-      try {
-        // Spawn spirits directly if rock kills occurred (no movement tick in this flow)
-        const died = next.recentDeaths || [];
-        if (died.length > 0) {
-          const now = Date.now();
-          setSpirits((prevS) => {
-            const out = [...prevS];
-            for (const [y, x] of died) {
-              const key = `${y},${x}`;
-              const id = `${key}-${now}-${Math.random()
-                .toString(36)
-                .slice(2, 7)}`;
-              out.push({ id, y, x, createdAt: now });
-              setTimeout(() => {
-                setSpirits((curr) => curr.filter((s) => s.id !== id));
-              }, 2000);
-            }
-            return out;
-          });
-        }
-      } catch (err) {
-        console.error("Rock kill spirit spawn error:", err);
+      if (killedGhosts.length > 0) {
+        const now = Date.now();
+        setSpirits((prevS) => {
+          const out = [...prevS];
+          for (const [gy, gx] of killedGhosts) {
+            const id = `${gy},${gx}-${now}-${Math.random()
+              .toString(36)
+              .slice(2, 7)}`;
+            out.push({ id, y: gy, x: gx, createdAt: now });
+            setTimeout(() => {
+              setSpirits((curr) => curr.filter((s) => s.id !== id));
+            }, 2000);
+          }
+          return out;
+        });
       }
     };
 
-    // Run the animation
+    // Animate the rock, then land everything as it reaches the impact tile.
+    const stepMs = 50; // faster animation per tile
     if (path.length > 0) {
       const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       let idx = 0;
       setRockEffect({ y: path[0][0], x: path[0][1], id });
-      const stepMs = 50; // faster animation per tile
       const interval = setInterval(() => {
         idx += 1;
         if (idx >= path.length || !path[idx]) {
@@ -1547,42 +1534,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setTimeout(() => {
         setRockEffect((cur) => (cur && cur.id === id ? null : cur));
       }, 1000);
-
-      // Schedule BAM effect at impact position timed with animation arrival
-      if (impact) {
-        const imp = impact;
-        const bamDelay = Math.max(0, path.length) * stepMs + 10;
-        setTimeout(() => {
-          const bamIdx = 1 + Math.floor(Math.random() * 3);
-          setBamEffect({
-            y: imp.y,
-            x: imp.x,
-            src: `/images/items/bam${bamIdx}.png`,
-          });
-          setTimeout(() => setBamEffect(null), 300);
-          triggerScreenShake();
-        }, bamDelay);
-      }
-
-      // If clear path (no impact and path reached 4), delay applying game logic until animation completes
-      if (!impact && path.length === 4) {
-        setTimeout(applyNext, path.length * stepMs + 10);
-        return;
-      }
+      // Land the outcome + VFX exactly as the rock reaches the impact tile.
+      setTimeout(commitAndImpact, path.length * stepMs + 10);
+    } else {
+      // No travel (e.g., wall adjacent) — resolve now.
+      commitAndImpact();
     }
-    // If there was an immediate impact with no path advanced (e.g., wall adjacent), still show BAM
-    else if (impact) {
-      const bamIdx = 1 + Math.floor(Math.random() * 3);
-      setBamEffect({
-        y: impact.y,
-        x: impact.x,
-        src: `/images/items/bam${bamIdx}.png`,
-      });
-      setTimeout(() => setBamEffect(null), 300);
-    }
-
-    // Apply game logic (inventory, enemy/pot resolution, placement) immediately for collisions
-    applyNext();
   }, [gameState, playerPosition, resolvedStorageSlot]);
 
   // Handle bookshelf interactions
