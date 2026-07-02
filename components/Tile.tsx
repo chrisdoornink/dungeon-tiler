@@ -1155,12 +1155,19 @@ export const Tile: React.FC<TileProps> = ({
         key="pink-ring-under"
         aria-hidden="true"
         style={{
+          // Mirror the deployed ring's .assetIcon sizing (24x24, centered in
+          // the tile) so the ring looks identical whether it's under the
+          // goblin or parked on its own tile.
           position: 'absolute',
-          inset: 0,
+          left: '50%',
+          top: '50%',
+          width: 24,
+          height: 24,
+          transform: 'translate(-50%, -50%)',
           backgroundImage: `url('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')`,
           backgroundSize: 'contain',
           backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center bottom',
+          backgroundPosition: 'center',
           pointerEvents: 'none',
         }}
       />
