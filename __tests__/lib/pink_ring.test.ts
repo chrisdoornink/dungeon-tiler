@@ -6,7 +6,7 @@ import {
   detonateLiveBombs,
   performThrowRune,
 } from "../../lib/map";
-import { FLOOR } from "../../lib/map/constants";
+import { FLOOR, WALL } from "../../lib/map/constants";
 import type { MapData } from "../../lib/map/types";
 import { Enemy } from "../../lib/enemy";
 
@@ -93,7 +93,12 @@ describe("Pink goblin ring on death", () => {
 
   it("a melee kill leaves no ring behind", () => {
     const map = arena(12, 5, 5); // player at (5,5)
-    const goblin = new Enemy({ y: 5, x: 6 }); // adjacent
+    // Pink goblins now dodge melee if they can retreat, so wall the goblin into
+    // a pocket (walls right / above / below) — cornered, it takes the hit.
+    map.tiles[5][7] = WALL;
+    map.tiles[4][6] = WALL;
+    map.tiles[6][6] = WALL;
+    const goblin = new Enemy({ y: 5, x: 6 }); // adjacent, boxed in
     goblin.kind = "pink-goblin";
     goblin.health = 1; // one strong hit kills it
 

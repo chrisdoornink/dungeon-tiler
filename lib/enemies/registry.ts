@@ -180,33 +180,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
-        // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns
-        // since ring placed), lastHealth/stunned (hit-reaction defensive mode)
+        // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
         const mem = e.memory as {
           aware?: boolean;
           ringY?: number;
           ringX?: number;
           ringOrigSubs?: number[];
           ringAge?: number;
-          lastHealth?: number;
-          stunned?: boolean;
         };
-
-        // Taking a hit breaks the goblin's concentration: compare health against last
-        // tick's snapshot — a drop means the hero connected (rock or melee). From then
-        // on it is "stunned": it can never teleport again, and it either swipes at an
-        // adjacent hero or keeps backing away (branch below, dungeon variant only).
-        // ctx.enemy omits health, so read it off the enemies array by index.
-        const selfHealth = ctx.enemies[ctx.enemyIndex]?.health;
-        if (
-          typeof selfHealth === "number" &&
-          typeof mem.lastHealth === "number" &&
-          selfHealth < mem.lastHealth
-        ) {
-          mem.stunned = true;
-          mem.aware = true;
-        }
-        if (typeof selfHealth === "number") mem.lastHealth = selfHealth;
 
         // --- Pink mist (realm only): if standing in the haze the goblin is disoriented.
         // It can only shuffle ONE tile toward the nearest clear tile and cannot attack;
@@ -402,6 +383,35 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           }
         };
 
+        // Helper: take one step that INCREASES distance from the player. Tries
+        // the direct away-move on each axis first, then perpendicular sidesteps
+        // (which still open up distance from point-blank range). Returns whether
+        // it actually moved — the caller uses that to decide flee-vs-attack.
+        const stepAwayFromPlayer = (): boolean => {
+          const dy = py - e.y;
+          const dx = px - e.x;
+          const candidates: Array<[number, number]> = [];
+          if (dx !== 0) candidates.push([0, dx > 0 ? -1 : 1]); // straight away on x
+          if (dy !== 0) candidates.push([dy > 0 ? -1 : 1, 0]); // straight away on y
+          // Perpendicular sidesteps as a fallback when the direct lane is blocked.
+          if (dx !== 0) candidates.push([-1, 0], [1, 0]);
+          if (dy !== 0) candidates.push([0, -1], [0, 1]);
+          for (const [my, mx] of candidates) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (ny === py && nx === px) continue;
+            if (Math.abs(py - ny) + Math.abs(px - nx) <= manhattan) continue; // must gain distance
+            if (isFloor(ny, nx)) {
+              e.facing = mx !== 0 ? (mx > 0 ? "RIGHT" : "LEFT") : my > 0 ? "DOWN" : "UP";
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              return true;
+            }
+          }
+          return false;
+        };
+
         // Ranged attack damage by manhattan distance
         const rangedDamage = (dist: number): number => {
           if (dist <= 1) return 1;
@@ -497,40 +507,6 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return 0;
         }
 
-        // --- Stunned (has taken a hit): teleporting is permanently disabled. ---
-        // Melee if adjacent, otherwise keep backing away one tile per turn. Ninjas
-        // never reach here (their branch above always returns).
-        if (mem.stunned === true) {
-          if (hasRing) {
-            removeRing();
-            delete mem.ringAge;
-          }
-          facePlayer();
-          if (manhattan === 1) {
-            // Cornered swipe — same base damage as the un-stunned adjacent case.
-            return 1;
-          }
-          // Back away along the larger-gap axis, falling back to the other axis.
-          const dy = py - e.y;
-          const dx = px - e.x;
-          const awayY: [number, number] = [dy > 0 ? -1 : 1, 0];
-          const awayX: [number, number] = [0, dx > 0 ? -1 : 1];
-          const tryMoves = Math.abs(dy) >= Math.abs(dx) ? [awayY, awayX] : [awayX, awayY];
-          for (const [my, mx] of tryMoves) {
-            const ny = e.y + my;
-            const nx = e.x + mx;
-            if (ny === py && nx === px) continue;
-            if (isFloor(ny, nx)) {
-              e.y = ny;
-              e.x = nx;
-              e.memory.moved = true;
-              break;
-            }
-          }
-          facePlayer(); // keep eyes on the hero even while retreating
-          return 0;
-        }
-
         if (hasLOS) {
           // --- LOS mode: ranged attack + positioning, no teleportation ---
           // Clean up any existing ring since we have direct sight
@@ -544,11 +520,17 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             return 0;
           }
 
-          // Adjacent (manhattan === 1): always melee, no back-away. Pink goblins should
-          // be at least as threatening as a basic goblin when the hero stands right in
-          // front of them — base 1 damage matching fire/water/earth goblins.
+          // Adjacent (manhattan === 1): pink goblins are ranged skirmishers, so
+          // point-blank they'd rather open up distance than trade blows. Try to
+          // back off a tile; only if boxed in with nowhere to retreat do they
+          // lash out with a close-range zap (same damage as the laser at
+          // distance 1). Being hit never locks this out — they keep their full
+          // teleport/laser kit and simply react.
           if (manhattan === 1) {
-            return 1;
+            if (stepAwayFromPlayer()) {
+              return 0; // fled — no attack this turn
+            }
+            return rangedDamage(1); // cornered — zap
           }
 
           // Within attack range (4-5): always attack at ideal distance
