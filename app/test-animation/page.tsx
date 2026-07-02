@@ -68,8 +68,8 @@ const ROCKS = ["/images/items/rock-1.png", "/images/items/rock-2.png"];
 
 // Pink goblin: ring effect stays on the ground, ringless goblin floats above.
 const PINK_TILE: [number, number] = [START + 4, START + 4];
-const PINK_GOBLIN = "/images/enemies/fire-goblin/pink-goblin-noring.png"; // placeholder cut; swap when a real asset lands
-const PINK_RING = "/images/enemies/fire-goblin/pink-ring.png";
+const PINK_GOBLIN = "/images/enemies/fire-goblin/pink-goblin-ringless-front.png";
+const PINK_RING = "/images/enemies/fire-goblin/pink-ring-no-sparkle.png";
 
 // White-goblin pack: offsets (px from tile center) for 4 overlaid singles.
 const CLUSTER_OFFSETS: Array<[number, number]> = [
