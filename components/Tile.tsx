@@ -1244,7 +1244,14 @@ export const Tile: React.FC<TileProps> = ({
       <>
         {enemyAura && (
           <div
+            // Slide with the goblin: the aura renders in the destination tile,
+            // so without this it snaps a tile ahead while the sprite glides.
+            // The class's own centering translate composes into the keyframes.
+            key={enemyStep ? `enemy-aura-step-${enemyStep.seq}` : 'enemy-aura-static'}
             className={styles.exitGlow}
+            style={{
+              ...smoothStepStyle(enemyStep, 'translate(-50%, -50%)'),
+            }}
             aria-hidden="true"
           />
         )}

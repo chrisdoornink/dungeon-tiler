@@ -873,6 +873,11 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const py = ctx.player.y;
         const px = ctx.player.x;
 
+        // Reset the per-turn UI flag: `moved` was only ever set to true, so the
+        // snake stuck on its slither sprite after its first move instead of
+        // alternating coiled <-> moving each turn.
+        e.memory.moved = false;
+
         // If adjacent, attack
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
         if (manhattan === 1) {

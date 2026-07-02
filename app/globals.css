@@ -475,6 +475,33 @@ body {
   }
 }
 
+/* Smooth movement: the snuffed-torch FOV classes dim each tile via `filter`
+   and set `z-index: 0` — BOTH create a per-tile stacking context, which
+   confines the wall-top overlays (z 12000) inside their tile and lets the
+   map-space hero (z 11000) paint over them. Scope-limited fix: drop the
+   context creators and dim with an ::after overlay instead. The overlay sits
+   at z 13000 so it darkens the wall tops AND the hero passing through, which
+   is exactly what the legacy whole-tile filter did. Legacy mode untouched. */
+.smooth-movement .fov-tier-snuff-core,
+.smooth-movement .fov-tier-snuff-ring {
+  filter: none;
+  z-index: auto;
+}
+.smooth-movement .fov-tier-snuff-core::after,
+.smooth-movement .fov-tier-snuff-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 13000;
+}
+.smooth-movement .fov-tier-snuff-core::after {
+  background: rgba(0, 0, 0, 0.48); /* ~ brightness(0.52) */
+}
+.smooth-movement .fov-tier-snuff-ring::after {
+  background: rgba(0, 0, 0, 0.75); /* ~ brightness(0.25) */
+}
+
 /* Smooth movement: perpetual ambient drift for ghosts — a slow, slightly
    irregular hover (up/down with a little sideways sway). Runs on the INNER
    ghost sprite so it composes with the tile-to-tile slide on the wrapper. */

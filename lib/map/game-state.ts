@@ -1045,8 +1045,8 @@ const BOMB_THROW_RANGE = 4;
 const BOMB_PLAYER_DAMAGE = 6;
 /** Reduced hero damage when carrying a shield. */
 const BOMB_PLAYER_DAMAGE_SHIELD = 4;
-/** Damage dealt to each enemy in the blast. ~kills most; a stone goblin (8 HP) survives one. */
-const BOMB_ENEMY_DAMAGE = 6;
+/** Damage dealt to each enemy in the blast. Kills everything, incl. a stone goblin (8 HP). */
+const BOMB_ENEMY_DAMAGE = 8;
 /** Each chest bomb pickup grants this many bombs. */
 export const BOMB_PACK_SIZE = 3;
 
