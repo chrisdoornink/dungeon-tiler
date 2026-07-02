@@ -75,6 +75,9 @@ interface TileProps {
   // tile (set only on the turn the entity moved exactly one tile).
   enemyStep?: SmoothEntityStep;
   npcStep?: SmoothEntityStep;
+  // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
+  // goblins instead of the baked 1-4 pack images (smooth mode only).
+  smoothMode?: boolean;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -112,6 +115,7 @@ export const Tile: React.FC<TileProps> = ({
   suppressHeroSprite = false,
   enemyStep,
   npcStep,
+  smoothMode = false,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Torch animations disabled for performance: render static torch sprite when present.
@@ -1117,6 +1121,69 @@ export const Tile: React.FC<TileProps> = ({
   // branches so the smooth slide-in logic lives in one place.
   const renderEnemySprite = () => {
     if (!hasEnemy) return null;
+    // Phase 3 (smooth mode only): white-goblin swarms render as N overlaid
+    // SINGLE goblins instead of the baked 1-4 pack images. Singles have real
+    // right-facing art, so sideways packs mirror properly instead of the
+    // legacy front/back-by-parity fallback. Members are depth-sorted by their
+    // vertical offset so higher-up goblins sit behind lower ones.
+    if (smoothMode && enemyKind === 'white-goblin') {
+      const count = Math.max(1, Math.min(4, enemySwarmCount ?? 1));
+      const dir =
+        enemyFacing === 'UP'
+          ? 'back'
+          : enemyFacing === 'LEFT' || enemyFacing === 'RIGHT'
+          ? 'right'
+          : 'front';
+      const src = `/images/enemies/fire-goblin/white-goblins-${dir}-1.png`;
+      // Flip the whole cluster for LEFT so member offsets mirror consistently.
+      const clusterBase = enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
+      const offsets: Array<[number, number]> = [
+        [-8, 2],
+        [7, 3],
+        [-2, -3],
+        [9, -1],
+      ];
+      return (
+        <>
+          {enemyAura && (
+            <div className={styles.exitGlow} aria-hidden="true" />
+          )}
+          {((enemyVisible ?? isVisible) === true) && (
+            <div
+              key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                zIndex: 10500, // above fog (10000), below wall tops (12000)
+                transform: clusterBase,
+                // Same cave dimming as the single-sprite path
+                filter: !environmentConfig.daylight
+                  ? 'brightness(var(--enemy-dim, 0.80))'
+                  : undefined,
+                ...smoothStepStyle(enemyStep, clusterBase),
+              }}
+              data-testid="enemy-sprite"
+            >
+              {offsets.slice(0, count).map(([ox, oy], k) => (
+                <div
+                  key={k}
+                  style={{
+                    position: 'absolute',
+                    inset: 0,
+                    transform: `translate(${ox}px, ${oy}px) scale(0.68)`,
+                    transformOrigin: '50% 100%',
+                    zIndex: 10 + oy, // painter's order by vertical offset
+                    backgroundImage: `url(${src})`,
+                    backgroundSize: 'contain',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'center',
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      );
+    }
     // Facing flip / scale for the sprite (composed into the slide keyframes too).
     const enemyBaseTransform = (() => {
       // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
