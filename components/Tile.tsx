@@ -78,6 +78,9 @@ interface TileProps {
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
+  // Pink goblin whose teleport ring is NOT cast elsewhere: render the ring
+  // (with sparkles) directly under the goblin.
+  enemyRingUnder?: boolean;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -116,6 +119,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyStep,
   npcStep,
   smoothMode = false,
+  enemyRingUnder = false,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Smooth movement: tracks the enemy slide animation finishing (via
@@ -1142,6 +1146,41 @@ export const Tile: React.FC<TileProps> = ({
     } as React.CSSProperties;
   };
 
+  // The pink goblin carries its teleport ring with it: unless the ring is
+  // cast somewhere else (a PINK_RING subtype tile), it renders directly under
+  // the goblin with the same rising sparkles the standing ring has.
+  const renderPinkRingUnder = () => (
+    <>
+      <div
+        key="pink-ring-under"
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          backgroundImage: `url('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')`,
+          backgroundSize: 'contain',
+          backgroundRepeat: 'no-repeat',
+          backgroundPosition: 'center bottom',
+          pointerEvents: 'none',
+        }}
+      />
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span
+          key={`pink-ring-under-sparkle-${i}`}
+          className="pink-ring-sparkle"
+          aria-hidden="true"
+          style={
+            {
+              left: `${28 + i * 11}%`,
+              ['--dx' as string]: `${(i % 2 ? 1 : -1) * (3 + i * 2)}px`,
+              animationDelay: `${i * 0.35}s`,
+            } as React.CSSProperties
+          }
+        />
+      ))}
+    </>
+  );
+
   // Enemy aura + sprite, shared by the floor (tileId 0) and flowers (tileId 5)
   // branches so the smooth slide-in logic lives in one place.
   const renderEnemySprite = () => {
@@ -1181,6 +1220,9 @@ export const Tile: React.FC<TileProps> = ({
           }}
           data-testid="enemy-sprite"
         >
+          {/* Undeployed teleport ring travels with the goblin (inside the
+              sliding wrapper so it glides along) */}
+          {!isGhost && enemyRingUnder && renderPinkRingUnder()}
           <div
             className={isGhost ? 'ghostFlicker' : undefined}
             style={{
@@ -1301,6 +1343,11 @@ export const Tile: React.FC<TileProps> = ({
             aria-hidden="true"
           />
         )}
+        {/* Legacy path: undeployed teleport ring renders under the goblin */}
+        {enemyKind === 'pink-goblin' &&
+          enemyRingUnder &&
+          ((enemyVisible ?? isVisible) === true) &&
+          renderPinkRingUnder()}
         {((enemyVisible ?? isVisible) === true) && (
           <div
             // A fresh step re-keys the node so the CSS animation restarts even
