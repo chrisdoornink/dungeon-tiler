@@ -1127,39 +1127,57 @@ export const Tile: React.FC<TileProps> = ({
   // branches so the smooth slide-in logic lives in one place.
   const renderEnemySprite = () => {
     if (!hasEnemy) return null;
-    // Smooth mode: ghosts glide their whole phase move (through walls — that
-    // reads exactly right for a ghost) AND hover with a perpetual ambient
-    // drift. Two transform animations can't share one element, so the slide
-    // runs on the outer wrapper and the float + opacity flicker on the inner
-    // sprite. (The inline animation list must re-include ghost-flicker: the
-    // inline property overrides the .ghostFlicker class's animation.)
-    if (smoothMode && enemyKind === 'ghost') {
+    // Smooth mode: ghosts AND pink goblins hover with a perpetual ambient
+    // drift (ghosts also glide their whole wall-phase move). Two transform
+    // animations can't share one element, so the slide (+ facing flip) runs on
+    // the outer wrapper and the float — plus the ghost's opacity flicker — on
+    // the inner sprite. (The ghost's inline animation list must re-include
+    // ghost-flicker: the inline property overrides the .ghostFlicker class.)
+    if (smoothMode && (enemyKind === 'ghost' || enemyKind === 'pink-goblin')) {
       if ((enemyVisible ?? isVisible) !== true) return null;
+      const isGhost = enemyKind === 'ghost';
+      const hoverIcon = isGhost
+        ? getEnemyIcon('ghost', 'front')
+        : getEnemyIcon(
+            'pink-goblin',
+            enemyFacing === 'UP'
+              ? 'back'
+              : enemyFacing === 'RIGHT'
+              ? 'right'
+              : enemyFacing === 'LEFT'
+              ? 'left'
+              : 'front'
+          );
+      // Pink goblin's side art faces LEFT, so it flips when facing RIGHT.
+      const hoverBase =
+        !isGhost && enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
       return (
         <div
           key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
           className="absolute inset-0 pointer-events-none"
           style={{
             zIndex: 10500, // above fog (10000), below wall tops (12000)
-            ...smoothStepStyle(enemyStep, 'none'),
+            transform: hoverBase,
+            ...smoothStepStyle(enemyStep, hoverBase),
           }}
           data-testid="enemy-sprite"
         >
           <div
-            className="ghostFlicker"
+            className={isGhost ? 'ghostFlicker' : undefined}
             style={{
               position: 'absolute',
               inset: 0,
-              backgroundImage: `url(${getEnemyIcon('ghost', 'front')})`,
+              backgroundImage: `url(${hoverIcon})`,
               backgroundSize: 'contain',
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center',
-              // Same cave dimming as the legacy ghost sprite
+              // Same cave dimming as the legacy sprite path
               filter: !environmentConfig.daylight
                 ? 'brightness(var(--enemy-dim, 0.80))'
                 : undefined,
-              animation:
-                'ghost-flicker 2000ms ease-in-out infinite, ghostFloat 3600ms ease-in-out infinite',
+              animation: isGhost
+                ? 'ghost-flicker 2000ms ease-in-out infinite, ghostFloat 3600ms ease-in-out infinite'
+                : 'ghostFloat 3200ms ease-in-out infinite',
             }}
           />
         </div>
@@ -1424,9 +1442,13 @@ export const Tile: React.FC<TileProps> = ({
           })()}
           {/* Render dirt road overlay if this floor tile is marked as part of a road */}
           {hasRoad(subtype) && renderRoadOverlay(subtype)}
-          {/* Render hero image on top of floor if this is a player tile
-              (unless smooth-movement mode renders it as an overlay instead) */}
-          {isPlayerTile && !suppressHeroSprite && (
+          {/* Render hero image on top of floor if this is a player tile.
+              Smooth mode shows the hero as a viewport overlay instead, but the
+              tile hero stays MOUNTED (hidden) so death animations that rely on
+              CSS transitions — the abyss scale-to-0 dive — start from a live
+              element; a freshly-mounted node would jump straight to the end
+              state and the dive would never be visible. */}
+          {isPlayerTile && (
             <div
               className={styles.heroImage}
               style={{
@@ -1437,6 +1459,7 @@ export const Tile: React.FC<TileProps> = ({
                 transition: heroTransition,
                 backgroundColor: 'transparent',
                 animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
+                visibility: suppressHeroSprite ? 'hidden' : undefined,
               }}
             />
           )}
