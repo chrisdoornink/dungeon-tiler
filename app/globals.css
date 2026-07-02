@@ -525,7 +525,14 @@ body {
   height: 4px;
   border-radius: 50%;
   background: radial-gradient(circle, #ffd9f0 0%, #ff86cf 60%, rgba(255, 134, 207, 0) 100%);
-  animation: pinkRingSparkleRise 1.9s ease-out infinite;
+  /* Each sparkle is staggered via animation-delay, and the sprite remounts on
+     every move (enemies are keyed by grid position, not identity) — so all 5
+     delays restart together. Without `backwards`, a delayed animation shows
+     the element's un-animated (fully opaque, untransformed) state while
+     waiting, which reads as a solid row of dots that vanish left-to-right as
+     each one's delay elapses. `backwards` applies the 0% keyframe (opacity 0)
+     during the delay instead, so each sparkle stays invisible until its turn. */
+  animation: pinkRingSparkleRise 1.9s ease-out infinite backwards;
   pointer-events: none;
   z-index: 10400; /* above the ring icon, below enemies (10500) */
 }
