@@ -1687,6 +1687,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Direction keys currently held (most recent last).
   const smoothHeldRef = useRef<Direction[]>([]);
   const smoothMapNodeRef = useRef<HTMLDivElement | null>(null);
+  // Map-space anchor for the hero (inside mapContainer so walls/trees occlude
+  // him via the map's z-order); the rAF loop moves it with the camera.
+  const smoothHeroAnchorRef = useRef<HTMLDivElement | null>(null);
   const smoothHeroSpriteRef = useRef<HTMLDivElement | null>(null);
   // Latest handleMoveInput for the rAF loop (assigned after its definition).
   const latestMoveInputRef = useRef<(d: Direction) => void>(() => {});
@@ -2954,6 +2957,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           [v[0], v[1]]
         )})`;
       }
+      // Hero anchor rides the same visual position, so camera + hero cancel
+      // out and he stays pinned at the viewport center.
+      if (v && smoothHeroAnchorRef.current) {
+        smoothHeroAnchorRef.current.style.transform = `translate3d(${v[1] * 40}px, ${v[0] * 40}px, 0)`;
+      }
 
       // Hero gait: bob + weight-shift tilt + squash while stepping.
       const spriteEl = smoothHeroSpriteRef.current;
@@ -4180,14 +4188,73 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothEntitySteps
                   )}
                 </div>
+                {/* Smooth-movement hero: lives INSIDE the map container at the
+                    camera's fractional map position (so it stays visually
+                    pinned at viewport center) and shares the map's stacking
+                    context at the legacy hero z — above enemies (10500), BELOW
+                    wall-top overlays (12000) and trees (11500), so walls and
+                    canopies occlude him exactly like the in-tile hero did.
+                    Death and warp animations still render in-tile. */}
+                {smoothEnabled &&
+                  playerPosition &&
+                  heroDeathPhase === "idle" &&
+                  !warpFlicker && (
+                    <div
+                      ref={smoothHeroAnchorRef}
+                      data-testid="smooth-hero-overlay"
+                      aria-hidden="true"
+                      style={{
+                        position: "absolute",
+                        left: 0,
+                        top: 0,
+                        width: 40,
+                        height: 40,
+                        zIndex: 11000, // matches legacy .heroImage
+                        pointerEvents: "none",
+                        willChange: "transform",
+                        transform: (() => {
+                          const v = smoothVisualRef.current ?? playerPosition;
+                          return `translate3d(${v[1] * 40}px, ${v[0] * 40}px, 0)`;
+                        })(),
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          transform:
+                            gameState.playerDirection === Direction.LEFT
+                              ? "scaleX(-1)"
+                              : undefined,
+                        }}
+                      >
+                        <div
+                          ref={smoothHeroSpriteRef}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundImage: `url(${heroSpritePath(
+                              gameState.playerDirection,
+                              Boolean(gameState.hasSword),
+                              Boolean(gameState.hasShield),
+                              heroTorchLitState
+                            )})`,
+                            backgroundSize: "contain",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat",
+                            transformOrigin: "50% 100%",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
               </div>
-              {/* Smooth-movement overlays. The hero is pinned at the viewport
-                  center while the map glides beneath, so the torch glow +
-                  vignette can be fixed at center too (they normally live in
-                  map space; renderTileGrid skips them in smooth mode).
-                  isolation keeps these z-indexes from competing with
-                  page-level modals; FloorTransition is a later sibling, so the
-                  iris wipe still paints above everything here. */}
+              {/* Smooth-movement light overlays. The hero is always at the
+                  viewport center, so the torch glow + vignette can be fixed
+                  there (they normally live in map space; renderTileGrid skips
+                  them in smooth mode). isolation keeps these z-indexes from
+                  competing with page-level modals; FloorTransition is a later
+                  sibling, so the iris wipe still paints above everything. */}
               {smoothEnabled && playerPosition && (
                 <div
                   style={{
@@ -4223,52 +4290,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         </>
                       );
                     })()}
-                  {/* Death and warp animations still render in-tile (legacy
-                      path); the overlay only handles the alive, walking hero. */}
-                  {heroDeathPhase === "idle" && !warpFlicker && (
-                    <div
-                      data-testid="smooth-hero-overlay"
-                      style={{
-                        position: "absolute",
-                        left: "50%",
-                        top: "50%",
-                        width: 40,
-                        height: 40,
-                        marginLeft: -20,
-                        marginTop: -20,
-                        zIndex: 11000,
-                      }}
-                    >
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          transform:
-                            gameState.playerDirection === Direction.LEFT
-                              ? "scaleX(-1)"
-                              : undefined,
-                        }}
-                      >
-                        <div
-                          ref={smoothHeroSpriteRef}
-                          style={{
-                            position: "absolute",
-                            inset: 0,
-                            backgroundImage: `url(${heroSpritePath(
-                              gameState.playerDirection,
-                              Boolean(gameState.hasSword),
-                              Boolean(gameState.hasShield),
-                              heroTorchLitState
-                            )})`,
-                            backgroundSize: "contain",
-                            backgroundPosition: "center",
-                            backgroundRepeat: "no-repeat",
-                            transformOrigin: "50% 100%",
-                          }}
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
               {/* Floor transition iris wipe overlay */}
