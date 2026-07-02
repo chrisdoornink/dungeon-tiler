@@ -1157,10 +1157,11 @@ export const Tile: React.FC<TileProps> = ({
         style={{
           // Mirror the deployed ring's .assetIcon sizing (24x24, centered in
           // the tile) so the ring looks identical whether it's under the
-          // goblin or parked on its own tile.
+          // goblin or parked on its own tile. Nudged down a few px so the
+          // ring ellipse sits under the goblin's feet rather than behind him.
           position: 'absolute',
           left: '50%',
-          top: '50%',
+          top: 'calc(50% + 5px)',
           width: 24,
           height: 24,
           transform: 'translate(-50%, -50%)',
@@ -1192,13 +1193,14 @@ export const Tile: React.FC<TileProps> = ({
   // branches so the smooth slide-in logic lives in one place.
   const renderEnemySprite = () => {
     if (!hasEnemy) return null;
-    // Smooth mode: ghosts AND pink goblins hover with a perpetual ambient
-    // drift (ghosts also glide their whole wall-phase move). Two transform
+    // Hovering enemies: ghosts (smooth mode) and pink goblins (ALL modes —
+    // since the ringless art landed, the floating-goblin-over-ring composition
+    // IS the pink goblin's look, not a smooth-mode extra). Two transform
     // animations can't share one element, so the slide (+ facing flip) runs on
     // the outer wrapper and the float — plus the ghost's opacity flicker — on
     // the inner sprite. (The ghost's inline animation list must re-include
     // ghost-flicker: the inline property overrides the .ghostFlicker class.)
-    if (smoothMode && (enemyKind === 'ghost' || enemyKind === 'pink-goblin')) {
+    if ((smoothMode && enemyKind === 'ghost') || enemyKind === 'pink-goblin') {
       if ((enemyVisible ?? isVisible) !== true) return null;
       const isGhost = enemyKind === 'ghost';
       const hoverIcon = isGhost
@@ -1324,8 +1326,7 @@ export const Tile: React.FC<TileProps> = ({
       if (enemyKind !== 'snake') {
         if (enemyKind === 'ghost') return 'none';
         if (enemyKind === 'white-goblin') return 'none';
-        // Pink goblin's side sprite is left-facing, so invert the flip
-        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
+        // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       }
       // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
@@ -1350,11 +1351,6 @@ export const Tile: React.FC<TileProps> = ({
             aria-hidden="true"
           />
         )}
-        {/* Legacy path: undeployed teleport ring renders under the goblin */}
-        {enemyKind === 'pink-goblin' &&
-          enemyRingUnder &&
-          ((enemyVisible ?? isVisible) === true) &&
-          renderPinkRingUnder()}
         {((enemyVisible ?? isVisible) === true) && (
           <div
             // A fresh step re-keys the node so the CSS animation restarts even
