@@ -97,6 +97,7 @@ function enemyToPlain(enemy: Enemy): PlainEnemy {
   const behavior = enemy.behaviorMemory;
   const memoryClone = behavior ? { ...behavior } : undefined;
   return {
+    id: enemy.id,
     y: enemy.y,
     x: enemy.x,
     kind: enemy.kind,

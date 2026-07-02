@@ -37,6 +37,24 @@ import {
   ADJACENT_GLOW,
   DIAGONAL_GLOW,
 } from "../lib/torch_glow";
+import {
+  SMOOTH_TUNING,
+  isSmoothMovementEnabled,
+  heroSpritePath,
+  smoothEaseInOut,
+  type SmoothEntityStep,
+} from "../lib/smooth_movement";
+
+// One tile-step camera tween (smooth movement).
+type SmoothStepTween = {
+  fromR: number;
+  fromC: number;
+  toR: number;
+  toC: number;
+  start: number;
+  dur: number;
+  running: boolean;
+};
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
 import { trackGameComplete, trackUse, trackPickup, trackPinkRealmReached } from "../lib/analytics";
@@ -1648,6 +1666,91 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
   const [prevGameState, setPrevGameState] = useState<GameState | null>(null);
+
+  // --- Smooth movement (Phase 1 port of /test-animation; see lib/smooth_movement.ts) ---
+  // false during SSR/first paint, then resolved from the flag after mount so
+  // server and client markup agree (the flag reads URL/localStorage).
+  const [smoothEnabled, setSmoothEnabled] = useState(false);
+  useEffect(() => {
+    setSmoothEnabled(isSmoothMovementEnabled());
+  }, []);
+  // In-flight camera step tween (one tile per turn).
+  const smoothStepRef = useRef<SmoothStepTween | null>(null);
+  // Fractional [row, col] the camera is currently showing.
+  const smoothVisualRef = useRef<[number, number] | null>(null);
+  // Run momentum: consecutive chained steps + when the last one ended.
+  const smoothChainRef = useRef({ count: 0, lastStepEnd: 0 });
+  // Step parity drives the alternating weight-shift tilt.
+  const smoothParityRef = useRef(0);
+  // Input buffered while a step tween is in flight (last input wins).
+  const smoothQueuedRef = useRef<Direction | null>(null);
+  // Direction keys currently held (most recent last).
+  const smoothHeldRef = useRef<Direction[]>([]);
+  const smoothMapNodeRef = useRef<HTMLDivElement | null>(null);
+  const smoothHeroSpriteRef = useRef<HTMLDivElement | null>(null);
+  // Latest handleMoveInput for the rAF loop (assigned after its definition).
+  const latestMoveInputRef = useRef<(d: Direction) => void>(() => {});
+  const playerPositionRef = useRef<[number, number] | null>(null);
+  playerPositionRef.current = playerPosition;
+
+  // --- Phase 2: enemies/NPCs slide one tile per turn ---
+  // id -> [y, x] as of the previously diffed gameState.
+  const smoothEntityPrevRef = useRef<Map<string, [number, number]>>(new Map());
+  // Cache keyed by gameState identity so StrictMode double-renders (and any
+  // unrelated re-render) reuse the same diff instead of eating it.
+  const smoothEntityCacheRef = useRef<{
+    state: GameState | null;
+    steps: Map<string, SmoothEntityStep>;
+  }>({ state: null, steps: new Map() });
+  const smoothEntitySeqRef = useRef(0);
+
+  // Diff entity positions against the previous gameState; entries keyed by
+  // destination tile ("e:y,x" / "n:y,x") describe the one-tile slide-in.
+  const smoothEntitySteps: Map<string, SmoothEntityStep> | undefined = (() => {
+    if (!smoothEnabled) return undefined;
+    const cache = smoothEntityCacheRef.current;
+    if (cache.state === gameState) return cache.steps;
+    const prev = smoothEntityPrevRef.current;
+    const nextPos = new Map<string, [number, number]>();
+    const steps = new Map<string, SmoothEntityStep>();
+    // Match the hero's step tween when one is in flight (rock/rune/item turns
+    // advance enemies without a hero step — walk pace reads right for those).
+    const dur = smoothStepRef.current?.dur ?? SMOOTH_TUNING.walkStepMs;
+    const ease: SmoothEntityStep["ease"] = smoothStepRef.current?.running
+      ? "linear"
+      : "ease-in-out";
+    smoothEntitySeqRef.current += 1;
+    const seq = smoothEntitySeqRef.current;
+    const visit = (
+      id: string,
+      y: number,
+      x: number,
+      keyPrefix: "e" | "n",
+      kind?: string
+    ) => {
+      nextPos.set(id, [y, x]);
+      const p = prev.get(id);
+      if (!p) return;
+      const dy = p[0] - y;
+      const dx = p[1] - x;
+      // Only animate single-tile steps. 0 = stood still; >1 = ghost wall-phase,
+      // pink-ninja slide/blink, room warp — those should snap, not glide.
+      if (Math.abs(dy) + Math.abs(dx) !== 1) return;
+      // Ghosts flicker-phase (and carry their own CSS animation) — never slide.
+      if (kind === "ghost") return;
+      steps.set(`${keyPrefix}:${y},${x}`, { dy, dx, dur, ease, seq });
+    };
+    for (const e of gameState.enemies ?? []) {
+      if (typeof e.id === "string" && e.id) visit(`e:${e.id}`, e.y, e.x, "e", e.kind);
+    }
+    for (const n of gameState.npcs ?? []) {
+      if (n?.id) visit(`n:${n.id}`, n.y, n.x, "n");
+    }
+    smoothEntityPrevRef.current = nextPos;
+    cache.state = gameState;
+    cache.steps = steps;
+    return steps;
+  })();
   // Transient BAM effect state
   const [bamEffect, setBamEffect] = useState<null | {
     y: number;
@@ -1870,7 +1973,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         // Set moving flag to true
         setIsMoving(true);
 
-        // Delay updating the player position to match the grid transition
+        // Delay updating the player position to match the grid transition.
+        // Smooth mode drives the camera itself (rAF tween), so the position
+        // state must update immediately — the 150ms lag is legacy-only.
         setTimeout(() => {
           // Find new player position
           for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
@@ -1887,7 +1992,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           }
           setPlayerPosition(null);
           setIsMoving(false);
-        }, 150); // Half of the CSS transition time for a smooth effect
+        }, smoothEnabled ? 0 : 150); // Half of the CSS transition time for a smooth effect
       } else if (!prevGameState) {
         // Initial load - set position immediately
         for (let y = 0; y < gameState.mapData.subtypes.length; y++) {
@@ -1904,7 +2009,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // Update previous game state
       setPrevGameState(gameState);
     }
-  }, [gameState, prevGameState, isMoving]);
+  }, [gameState, prevGameState, isMoving, smoothEnabled]);
 
   // Inventory is derived from gameState flags (hasKey, hasExitKey)
 
@@ -2734,6 +2839,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         });
       }
       setGameState(newGameState);
+      // Smooth mode reads the post-move player position off the returned state
+      // to start the camera tween synchronously.
+      return newGameState;
     },
     [gameState, playerPosition, resolvedStorageSlot]
   );
@@ -2748,6 +2856,52 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         handleDialogueAdvance();
         return;
       }
+      if (smoothEnabled) {
+        // A step tween is in flight: buffer the input (last one wins); the rAF
+        // loop dispatches it the moment the current step lands.
+        if (smoothStepRef.current) {
+          smoothQueuedRef.current = direction;
+          return;
+        }
+        // Run momentum: chained steps (gap <= decayMs) past the threshold run.
+        const now = performance.now();
+        const chain = smoothChainRef.current;
+        if (chain.count > 0 && now - chain.lastStepEnd <= SMOOTH_TUNING.decayMs) {
+          chain.count += 1;
+        } else {
+          chain.count = 1;
+        }
+        const running = chain.count > SMOOTH_TUNING.runThreshold;
+        const from = smoothVisualRef.current ?? playerPositionRef.current;
+        // The move itself is the game's normal synchronous turn (enemies and
+        // all); only the camera glide below is new.
+        const newState = handlePlayerMove(direction);
+        const after = newState ? findPlayerInState(newState) : null;
+        if (!after || !from) return;
+        const dr = Math.abs(after[0] - Math.round(from[0]));
+        const dc = Math.abs(after[1] - Math.round(from[1]));
+        if (dr + dc === 0) {
+          // Blocked: a facing-only turn. No tween, no run momentum.
+          chain.count = 0;
+          return;
+        }
+        if (dr + dc > 1) {
+          // Teleport (portal/warp): snap the camera, don't glide across the map.
+          smoothVisualRef.current = [after[0], after[1]];
+          return;
+        }
+        smoothParityRef.current ^= 1;
+        smoothStepRef.current = {
+          fromR: from[0],
+          fromC: from[1],
+          toR: after[0],
+          toC: after[1],
+          start: now,
+          dur: running ? SMOOTH_TUNING.runStepMs : SMOOTH_TUNING.walkStepMs,
+          running,
+        };
+        return;
+      }
       handlePlayerMove(direction);
     },
     [
@@ -2757,8 +2911,100 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       gameState.heroHealth,
       heroDeathPhase,
       floorTransition,
+      smoothEnabled,
     ]
   );
+  // Keep the rAF loop pointed at the latest gated input handler.
+  latestMoveInputRef.current = handleMoveInput;
+
+  // Smooth-movement rAF loop: tweens the camera one tile per turn, applies the
+  // hero's procedural walk/run gait, and chains held/queued inputs into the
+  // next turn the moment a step lands.
+  useEffect(() => {
+    if (!smoothEnabled) return;
+    let raf = 0;
+    const frame = (now: number) => {
+      const step = smoothStepRef.current;
+      let moving = false;
+      let progress = 0;
+      let running = false;
+      if (step) {
+        const raw = Math.min(1, Math.max(0, (now - step.start) / step.dur));
+        // Linear while running so back-to-back steps chain without a hitch.
+        const e = step.running ? raw : smoothEaseInOut(raw);
+        smoothVisualRef.current = [
+          step.fromR + (step.toR - step.fromR) * e,
+          step.fromC + (step.toC - step.fromC) * e,
+        ];
+        moving = true;
+        progress = raw;
+        running = step.running;
+        if (raw >= 1) {
+          smoothStepRef.current = null;
+          smoothChainRef.current.lastStepEnd = now;
+          moving = false;
+          // Chain the next turn immediately while input is held or queued.
+          const held = smoothHeldRef.current;
+          const dir =
+            smoothQueuedRef.current ??
+            (held.length ? held[held.length - 1] : null);
+          smoothQueuedRef.current = null;
+          if (dir !== null) latestMoveInputRef.current(dir);
+          // The dispatch above may have started the next step already; TS's
+          // control-flow narrowing can't see the ref mutation through the
+          // call, so launder the re-read with a cast.
+          const next = smoothStepRef.current as SmoothStepTween | null;
+          if (next) {
+            moving = true;
+            progress = 0;
+            running = next.running;
+          }
+        }
+      } else {
+        if (now - smoothChainRef.current.lastStepEnd > SMOOTH_TUNING.decayMs) {
+          smoothChainRef.current.count = 0;
+        }
+        // Track non-move position changes (floor swaps, warps, revives) by
+        // snapping the camera to the logical position.
+        const lp = playerPositionRef.current;
+        const v = smoothVisualRef.current;
+        if (
+          lp &&
+          (!v || Math.abs(v[0] - lp[0]) + Math.abs(v[1] - lp[1]) > 0.001)
+        ) {
+          smoothVisualRef.current = [lp[0], lp[1]];
+        }
+      }
+
+      const v = smoothVisualRef.current;
+      if (v && smoothMapNodeRef.current) {
+        smoothMapNodeRef.current.style.transform = `translate(${calculateMapTransform(
+          [v[0], v[1]]
+        )})`;
+      }
+
+      // Hero gait: bob + weight-shift tilt + squash while stepping.
+      const spriteEl = smoothHeroSpriteRef.current;
+      if (spriteEl) {
+        if (moving) {
+          const arc = Math.sin(Math.PI * progress);
+          const lift =
+            (running ? SMOOTH_TUNING.bobRun : SMOOTH_TUNING.bobWalk) * arc;
+          const tilt =
+            SMOOTH_TUNING.tiltDeg * (smoothParityRef.current ? 1 : -1) * arc;
+          const sy = 1 + SMOOTH_TUNING.squash * arc;
+          const sx = 1 - SMOOTH_TUNING.squash * 0.5 * arc;
+          spriteEl.style.transform = `translateY(${-lift}px) rotate(${tilt}deg) scale(${sx}, ${sy})`;
+        } else {
+          spriteEl.style.transform = "";
+        }
+      }
+
+      raf = requestAnimationFrame(frame);
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [smoothEnabled]);
 
   // Handle mobile control button clicks
   const handleMobileMove = useCallback(
@@ -2889,13 +3135,47 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       if (direction !== null) {
+        if (smoothEnabled) {
+          // Smooth mode paces held keys itself (the rAF loop chains steps), so
+          // ignore OS key-repeat and track which direction keys are down.
+          if (event.repeat) return;
+          smoothHeldRef.current = smoothHeldRef.current.filter(
+            (d) => d !== direction
+          );
+          smoothHeldRef.current.push(direction);
+        }
         handleMoveInput(direction);
       }
     };
 
+    const handleKeyUp = (event: KeyboardEvent) => {
+      let released: Direction | null = null;
+      switch (event.key) {
+        case "ArrowUp":
+          released = Direction.UP;
+          break;
+        case "ArrowRight":
+          released = Direction.RIGHT;
+          break;
+        case "ArrowDown":
+          released = Direction.DOWN;
+          break;
+        case "ArrowLeft":
+          released = Direction.LEFT;
+          break;
+      }
+      if (released !== null) {
+        smoothHeldRef.current = smoothHeldRef.current.filter(
+          (d) => d !== released
+        );
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
     };
   }, [
     gameState,
@@ -2915,6 +3195,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleDialogueChoiceNavigate,
     handleDialogueChoiceConfirm,
     heroDeathPhase,
+    smoothEnabled,
   ]);
 
   return (
@@ -3584,11 +3865,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               }}
             >
               <div
+                ref={smoothMapNodeRef}
                 className={styles.mapContainer}
                 style={{
-                  transform: playerPosition
+                  // Smooth mode: the rAF loop owns this transform (per-frame
+                  // writes); render the current visual position so re-renders
+                  // mid-tween don't snap the camera. Legacy: CSS transition.
+                  transform: smoothEnabled
+                    ? smoothVisualRef.current
+                      ? `translate(${calculateMapTransform(smoothVisualRef.current)})`
+                      : playerPosition
+                      ? `translate(${calculateMapTransform(playerPosition)})`
+                      : "none"
+                    : playerPosition
                     ? `translate(${calculateMapTransform(playerPosition)})`
                     : "none",
+                  transition: smoothEnabled ? "none" : undefined,
                 }}
               >
                 {environment === "pink_realm" && (
@@ -3909,10 +4201,104 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     heroDeathStateForTiles,
                     warpFlicker,
                     new Set((gameState.mist ?? []).map(([my, mx]) => `${my},${mx}`)),
-                    inNightmare
+                    inNightmare,
+                    // Smooth movement: overlay hero + viewport-fixed vignette.
+                    smoothEnabled && heroDeathPhase === "idle" && !warpFlicker,
+                    smoothEnabled,
+                    smoothEntitySteps
                   )}
                 </div>
               </div>
+              {/* Smooth-movement overlays. The hero is pinned at the viewport
+                  center while the map glides beneath, so the torch glow +
+                  vignette can be fixed at center too (they normally live in
+                  map space; renderTileGrid skips them in smooth mode).
+                  isolation keeps these z-indexes from competing with
+                  page-level modals; FloorTransition is a later sibling, so the
+                  iris wipe still paints above everything here. */}
+              {smoothEnabled && playerPosition && (
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    pointerEvents: "none",
+                    isolation: "isolate",
+                  }}
+                  aria-hidden="true"
+                >
+                  {!gameState.showFullMap &&
+                    !suppressDarknessOverlay &&
+                    heroTorchLitState &&
+                    !inNightmare &&
+                    (() => {
+                      const g = buildHeroLightGradients(300, 300, true);
+                      return (
+                        <>
+                          <div
+                            className={styles.torchGlow}
+                            style={{
+                              backgroundImage: g.torchGradient,
+                              zIndex: 9000,
+                            }}
+                          />
+                          <div
+                            className="pointer-events-none absolute inset-0"
+                            style={{
+                              backgroundImage: g.vignetteGradient,
+                              zIndex: 10000,
+                            }}
+                          />
+                        </>
+                      );
+                    })()}
+                  {/* Death and warp animations still render in-tile (legacy
+                      path); the overlay only handles the alive, walking hero. */}
+                  {heroDeathPhase === "idle" && !warpFlicker && (
+                    <div
+                      data-testid="smooth-hero-overlay"
+                      style={{
+                        position: "absolute",
+                        left: "50%",
+                        top: "50%",
+                        width: 40,
+                        height: 40,
+                        marginLeft: -20,
+                        marginTop: -20,
+                        zIndex: 11000,
+                      }}
+                    >
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          transform:
+                            gameState.playerDirection === Direction.LEFT
+                              ? "scaleX(-1)"
+                              : undefined,
+                        }}
+                      >
+                        <div
+                          ref={smoothHeroSpriteRef}
+                          style={{
+                            position: "absolute",
+                            inset: 0,
+                            backgroundImage: `url(${heroSpritePath(
+                              gameState.playerDirection,
+                              Boolean(gameState.hasSword),
+                              Boolean(gameState.hasShield),
+                              heroTorchLitState
+                            )})`,
+                            backgroundSize: "contain",
+                            backgroundPosition: "center",
+                            backgroundRepeat: "no-repeat",
+                            transformOrigin: "50% 100%",
+                          }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               {/* Floor transition iris wipe overlay */}
               {floorTransition && (
                 <FloorTransition
@@ -4173,7 +4559,14 @@ function renderTileGrid(
   heroDeathState?: HeroDeathState,
   heroWarping: boolean = false,
   mistKeys: Set<string> = new Set(),
-  inNightmare: boolean = false
+  inNightmare: boolean = false,
+  // Smooth movement: hero renders as a viewport overlay instead of in-tile,
+  // and the torch glow / vignette render viewport-fixed (skip them here).
+  suppressHeroSprite: boolean = false,
+  viewportCenteredVignette: boolean = false,
+  // Phase 2: one-tile slide-in animations, keyed "e:y,x" / "n:y,x" by
+  // destination tile (see smoothEntitySteps in the component).
+  entitySteps?: Map<string, SmoothEntityStep>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -4382,6 +4775,13 @@ function renderTileGrid(
             activeCheckpoint={activeCheckpoint}
             heroDeathState={isPlayerTile ? heroDeathState : undefined}
             heroWarping={!!isPlayerTile && heroWarping}
+            suppressHeroSprite={!!isPlayerTile && suppressHeroSprite}
+            enemyStep={
+              hasEnemy ? entitySteps?.get(`e:${rowIndex},${colIndex}`) : undefined
+            }
+            npcStep={
+              npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined
+            }
           />
           {/* Pink-realm mist: a soft drifting haze over the tile (above the floor + actors,
               semi-transparent), shown only where the tile is currently visible. */}
@@ -4393,54 +4793,16 @@ function renderTileGrid(
     })
   );
 
-  // Add a smooth radial gradient overlay centered on the player for continuous fade
-  if (playerPosition && !showFullMap) {
+  // Add a smooth radial gradient overlay centered on the player for continuous
+  // fade. In smooth-movement mode these are rendered viewport-fixed by the
+  // component instead (the hero is always at viewport center there).
+  if (playerPosition && !showFullMap && !viewportCenteredVignette) {
     const [py, px] = playerPosition; // grid coords
     const tileSize = 40; // px (w-10/h-10)
     const centerX = (px + 0.5) * tileSize;
     const centerY = (py + 0.5) * tileSize;
-    // Stronger, darker fade pulled slightly inward
-    const r0 = 3.8 * tileSize; // inner safe
-    const r1 = 4.4 * tileSize; // begin fade
-    const r2 = 5.0 * tileSize; // mid fade
-    const r3 = 5.6 * tileSize; // stronger fade
-    const r4 = 6.2 * tileSize; // near dark
-    const r5 = 7.0 * tileSize; // full dark
-
-    // Warm torch glow radii (expanded for more dramatic effect)
-    const t0 = 2.5 * tileSize; // bright core (larger)
-    const t1 = 3.8 * tileSize; // warm mid (expanded)
-    const t2 = 5.2 * tileSize; // outer falloff (expanded)
-    const t3 = 6.5 * tileSize; // outer glow
-    const t4 = 7.5 * tileSize; // transparent edge (much larger)
-
-    const torchGradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
-      var(--torch-core) ${t0}px,
-      var(--torch-mid) ${t1}px,
-      var(--torch-falloff) ${t2}px,
-      var(--torch-outer) ${t3}px,
-      rgba(0,0,0,0) ${t4}px
-    )`;
-
-    // When the hero's torch is OFF, use a pure black vignette to avoid gray tint.
-    // Otherwise, keep the dark gray for a softer ambiance.
-    const gradient = heroTorchLitForVisibility
-      ? `radial-gradient(circle at ${centerX}px ${centerY}px,
-      rgba(26,26,26,0) ${r0}px,
-      rgba(26,26,26,0.25) ${r1}px,
-      rgba(26,26,26,0.50) ${r2}px,
-      rgba(26,26,26,0.75) ${r3}px,
-      rgba(26,26,26,0.90) ${r4}px,
-      rgba(26,26,26,1) ${r5}px
-    )`
-      : `radial-gradient(circle at ${centerX}px ${centerY}px,
-      rgba(0,0,0,0) ${r0}px,
-      rgba(0,0,0,0.25) ${r1}px,
-      rgba(0,0,0,0.50) ${r2}px,
-      rgba(0,0,0,0.75) ${r3}px,
-      rgba(0,0,0,0.90) ${r4}px,
-      rgba(0,0,0,1) ${r5}px
-    )`;
+    const { torchGradient, vignetteGradient: gradient } =
+      buildHeroLightGradients(centerX, centerY, heroTorchLitForVisibility);
 
     // Push the warm torch glow first (lower z) ONLY if the hero's torch is lit,
     // then the dark vignette (higher z) ONLY when torch is lit as well.
@@ -4478,6 +4840,74 @@ function renderTileGrid(
 }
 
 // Function removed since we're now using GameState
+
+// Locate the player in a (possibly not-yet-committed) game state. Smooth
+// movement uses this to read the post-move position synchronously.
+function findPlayerInState(state: GameState): [number, number] | null {
+  const subs = state.mapData.subtypes;
+  if (!subs) return null;
+  for (let y = 0; y < subs.length; y++) {
+    for (let x = 0; x < subs[y].length; x++) {
+      if (subs[y][x].includes(TileSubtype.PLAYER)) return [y, x];
+    }
+  }
+  return null;
+}
+
+// Torch glow + darkness vignette gradients centered on (centerX, centerY) px.
+// Shared by renderTileGrid (map-space, legacy) and the smooth-movement
+// viewport overlay (fixed at viewport center) so the two never drift.
+function buildHeroLightGradients(
+  centerX: number,
+  centerY: number,
+  torchLit: boolean
+): { torchGradient: string; vignetteGradient: string } {
+  const tileSize = 40;
+  // Stronger, darker fade pulled slightly inward
+  const r0 = 3.8 * tileSize; // inner safe
+  const r1 = 4.4 * tileSize; // begin fade
+  const r2 = 5.0 * tileSize; // mid fade
+  const r3 = 5.6 * tileSize; // stronger fade
+  const r4 = 6.2 * tileSize; // near dark
+  const r5 = 7.0 * tileSize; // full dark
+
+  // Warm torch glow radii (expanded for more dramatic effect)
+  const t0 = 2.5 * tileSize; // bright core (larger)
+  const t1 = 3.8 * tileSize; // warm mid (expanded)
+  const t2 = 5.2 * tileSize; // outer falloff (expanded)
+  const t3 = 6.5 * tileSize; // outer glow
+  const t4 = 7.5 * tileSize; // transparent edge (much larger)
+
+  const torchGradient = `radial-gradient(circle at ${centerX}px ${centerY}px,
+      var(--torch-core) ${t0}px,
+      var(--torch-mid) ${t1}px,
+      var(--torch-falloff) ${t2}px,
+      var(--torch-outer) ${t3}px,
+      rgba(0,0,0,0) ${t4}px
+    )`;
+
+  // When the hero's torch is OFF, use a pure black vignette to avoid gray tint.
+  // Otherwise, keep the dark gray for a softer ambiance.
+  const vignetteGradient = torchLit
+    ? `radial-gradient(circle at ${centerX}px ${centerY}px,
+      rgba(26,26,26,0) ${r0}px,
+      rgba(26,26,26,0.25) ${r1}px,
+      rgba(26,26,26,0.50) ${r2}px,
+      rgba(26,26,26,0.75) ${r3}px,
+      rgba(26,26,26,0.90) ${r4}px,
+      rgba(26,26,26,1) ${r5}px
+    )`
+    : `radial-gradient(circle at ${centerX}px ${centerY}px,
+      rgba(0,0,0,0) ${r0}px,
+      rgba(0,0,0,0.25) ${r1}px,
+      rgba(0,0,0,0.50) ${r2}px,
+      rgba(0,0,0,0.75) ${r3}px,
+      rgba(0,0,0,0.90) ${r4}px,
+      rgba(0,0,0,1) ${r5}px
+    )`;
+
+  return { torchGradient, vignetteGradient };
+}
 
 // Calculate the transform to center the map on the player
 function calculateMapTransform(playerPosition: [number, number]): string {

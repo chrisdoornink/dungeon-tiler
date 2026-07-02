@@ -3,6 +3,7 @@ import { TileType, TileSubtype, Direction } from "../lib/map";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { NPC } from "../lib/npc";
+import type { SmoothEntityStep } from "../lib/smooth_movement";
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -66,6 +67,14 @@ interface TileProps {
   activeCheckpoint?: [number, number] | null; // Active checkpoint position for lit/unlit rendering
   heroDeathState?: HeroDeathState;
   heroWarping?: boolean; // when true, flicker the hero sprite (teleport dematerialize)
+  // Smooth-movement mode renders the hero as a viewport-centered overlay in
+  // TilemapGrid; this suppresses the tile-rendered hero sprite so it doesn't
+  // double up. Everything else about the player tile renders as usual.
+  suppressHeroSprite?: boolean;
+  // Smooth movement Phase 2: slide the enemy/NPC sprite in from its previous
+  // tile (set only on the turn the entity moved exactly one tile).
+  enemyStep?: SmoothEntityStep;
+  npcStep?: SmoothEntityStep;
 }
 
 export const Tile: React.FC<TileProps> = ({
@@ -100,6 +109,9 @@ export const Tile: React.FC<TileProps> = ({
   activeCheckpoint = null,
   heroDeathState,
   heroWarping = false,
+  suppressHeroSprite = false,
+  enemyStep,
+  npcStep,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Torch animations disabled for performance: render static torch sprite when present.
@@ -1085,6 +1097,116 @@ export const Tile: React.FC<TileProps> = ({
   const isDogNpc = npc?.tags?.includes("dog") || npc?.tags?.includes("pet");
   const showNpcPrompt = shouldShowNpc && npcInteractable && !isDogNpc;
 
+  // Smooth movement (Phase 2): style fragment that slides a sprite in from its
+  // previous tile (see SmoothEntityStep). The translate leads so it applies in
+  // tile coordinates before any facing flip/scale in `base`.
+  const smoothStepStyle = (
+    step: SmoothEntityStep | undefined,
+    base: string
+  ): React.CSSProperties | null => {
+    if (!step) return null;
+    const baseSuffix = !base || base === 'none' ? '' : ` ${base}`;
+    return {
+      ['--smooth-step-from' as string]: `translate(${step.dx * 40}px, ${step.dy * 40}px)${baseSuffix}`,
+      ['--smooth-step-to' as string]: !base || base === 'none' ? 'none' : base,
+      animation: `smoothStepSlide ${step.dur}ms ${step.ease} both`,
+    } as React.CSSProperties;
+  };
+
+  // Enemy aura + sprite, shared by the floor (tileId 0) and flowers (tileId 5)
+  // branches so the smooth slide-in logic lives in one place.
+  const renderEnemySprite = () => {
+    if (!hasEnemy) return null;
+    // Facing flip / scale for the sprite (composed into the slide keyframes too).
+    const enemyBaseTransform = (() => {
+      // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
+      if (enemyKind !== 'snake') {
+        if (enemyKind === 'ghost') return 'none';
+        if (enemyKind === 'white-goblin') return 'none';
+        // Pink goblin's side sprite is left-facing, so invert the flip
+        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
+        return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
+      }
+      // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
+      const baseScale = 'scale(0.5)';
+      const moved = !!enemyMoved;
+      if (moved && enemyFacing === 'RIGHT') {
+        return 'scaleX(-1) ' + baseScale;
+      }
+      return baseScale;
+    })();
+    return (
+      <>
+        {enemyAura && (
+          <div
+            className={styles.exitGlow}
+            aria-hidden="true"
+          />
+        )}
+        {((enemyVisible ?? isVisible) === true) && (
+          <div
+            // A fresh step re-keys the node so the CSS animation restarts even
+            // when a different enemy arrives on a still-mounted tile.
+            key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
+            className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
+            style={{
+              backgroundImage: `url(${(() => {
+                // Map Tile.tsx enemyFacing to registry Facing
+                const toFacing = (f: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' | undefined): Facing => {
+                  switch (f) {
+                    case 'UP':
+                      return 'back';
+                    case 'RIGHT':
+                      return 'right';
+                    case 'LEFT':
+                      return 'left';
+                    case 'DOWN':
+                    default:
+                      return 'front';
+                  }
+                };
+                const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
+                // For snakes: use moving sprite when enemyMoved, else coiled
+                if (kind === 'snake') {
+                  const f = enemyFacing;
+                  // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
+                  const useMoving = !!enemyMoved;
+                  if (useMoving) {
+                    return getEnemyIcon('snake', 'left');
+                  }
+                  // coiled sprite follows facing (front/back/right are coiled)
+                  return getEnemyIcon('snake', toFacing(f));
+                }
+                // White goblins: no side asset; sideways uses front or back based on swarm count parity
+                if (kind === 'white-goblin') {
+                  const f = enemyFacing;
+                  const isSideways = f === 'LEFT' || f === 'RIGHT';
+                  const facing: Facing = isSideways
+                    ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
+                    : toFacing(f);
+                  return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
+                }
+                const facing: Facing = toFacing(enemyFacing);
+                return getEnemyIcon(kind, facing);
+              })()})`,
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              zIndex: 10500, // above fog (10000), below wall tops (12000)
+              transform: enemyBaseTransform,
+              // Darken non-torch-carrying enemies in cave/underground environments
+              filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
+                ? 'brightness(var(--enemy-dim, 0.80))'
+                : undefined,
+              ...smoothStepStyle(enemyStep, enemyBaseTransform),
+            }}
+            data-testid="enemy-sprite"
+          />
+        )}
+      </>
+    );
+  };
+
   // If this is a floor tile
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
@@ -1171,8 +1293,9 @@ export const Tile: React.FC<TileProps> = ({
           })()}
           {/* Render dirt road overlay if this floor tile is marked as part of a road */}
           {hasRoad(subtype) && renderRoadOverlay(subtype)}
-          {/* Render hero image on top of floor if this is a player tile */}
-          {isPlayerTile && (
+          {/* Render hero image on top of floor if this is a player tile
+              (unless smooth-movement mode renders it as an overlay instead) */}
+          {isPlayerTile && !suppressHeroSprite && (
             <div
               className={styles.heroImage}
               style={{
@@ -1198,11 +1321,14 @@ export const Tile: React.FC<TileProps> = ({
 
           {shouldShowNpc && npc && (
             <div
+              // Re-key per step so the slide-in animation restarts (see enemy sprite).
+              key={npcStep ? `npc-step-${npcStep.seq}` : 'npc-static'}
               className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
+                ...smoothStepStyle(npcStep, npcTransformWithScale),
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
@@ -1215,88 +1341,7 @@ export const Tile: React.FC<TileProps> = ({
           )}
 
           {/* Enemy rendering: sprite (when visible) */}
-          {hasEnemy && (
-            <>
-              {enemyAura && (
-                <div
-                  className={styles.exitGlow}
-                  aria-hidden="true"
-                />
-              )}
-              {((enemyVisible ?? isVisible) === true) && (
-                <div
-                  className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
-                  style={{
-                    backgroundImage: `url(${(() => {
-                      // Map Tile.tsx enemyFacing to registry Facing
-                      const toFacing = (f: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' | undefined): Facing => {
-                        switch (f) {
-                          case 'UP':
-                            return 'back';
-                          case 'RIGHT':
-                            return 'right';
-                          case 'LEFT':
-                            return 'left';
-                          case 'DOWN':
-                          default:
-                            return 'front';
-                        }
-                      };
-                      const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
-                      // For snakes: use moving sprite when enemyMoved, else coiled
-                      if (kind === 'snake') {
-                        const f = enemyFacing;
-                        // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
-                        const useMoving = !!enemyMoved;
-                        if (useMoving) {
-                          return getEnemyIcon('snake', 'left');
-                        }
-                        // coiled sprite follows facing (front/back/right are coiled)
-                        return getEnemyIcon('snake', toFacing(f));
-                      }
-                      // White goblins: no side asset; sideways uses front or back based on swarm count parity
-                      if (kind === 'white-goblin') {
-                        const f = enemyFacing;
-                        const isSideways = f === 'LEFT' || f === 'RIGHT';
-                        const facing: Facing = isSideways
-                          ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
-                          : toFacing(f);
-                        return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
-                      }
-                      const facing: Facing = toFacing(enemyFacing);
-                      return getEnemyIcon(kind, facing);
-                    })()})`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                    zIndex: 10500, // above fog (10000), below wall tops (12000)
-                    transform: (() => {
-                      // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
-                      if (enemyKind !== 'snake') {
-                        if (enemyKind === 'ghost') return 'none';
-                        if (enemyKind === 'white-goblin') return 'none';
-                        // Pink goblin's side sprite is left-facing, so invert the flip
-                        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
-                        return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
-                      }
-                      // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
-                      const baseScale = 'scale(0.5)';
-                      const moved = !!enemyMoved;
-                      if (moved && enemyFacing === 'RIGHT') {
-                        return 'scaleX(-1) ' + baseScale;
-                      }
-                      return baseScale;
-                    })(),
-                    // Darken non-torch-carrying enemies in cave/underground environments
-                    filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
-                      ? 'brightness(var(--enemy-dim, 0.80))'
-                      : undefined,
-                  }}
-                  data-testid="enemy-sprite"
-                />
-              )}
-            </>
-          )}
+          {renderEnemySprite()}
 
           {/* Render bookshelf if present */}
           {subtype.includes(TileSubtype.BOOKSHELF) && (
@@ -1748,11 +1793,14 @@ export const Tile: React.FC<TileProps> = ({
 
           {shouldShowNpc && npc && (
             <div
+              // Re-key per step so the slide-in animation restarts (see enemy sprite).
+              key={npcStep ? `npc-step-${npcStep.seq}` : 'npc-static'}
               className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
+                ...smoothStepStyle(npcStep, npcTransformWithScale),
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
@@ -1765,88 +1813,7 @@ export const Tile: React.FC<TileProps> = ({
           )}
 
           {/* Enemy rendering: sprite (when visible) */}
-          {hasEnemy && (
-            <>
-              {enemyAura && (
-                <div
-                  className={styles.exitGlow}
-                  aria-hidden="true"
-                />
-              )}
-              {((enemyVisible ?? isVisible) === true) && (
-                <div
-                  className={`absolute inset-0 pointer-events-none ${enemyKind === 'ghost' ? 'ghostFlicker' : ''}`}
-                  style={{
-                    backgroundImage: `url(${(() => {
-                      // Map Tile.tsx enemyFacing to registry Facing
-                      const toFacing = (f: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' | undefined): Facing => {
-                        switch (f) {
-                          case 'UP':
-                            return 'back';
-                          case 'RIGHT':
-                            return 'right';
-                          case 'LEFT':
-                            return 'left';
-                          case 'DOWN':
-                          default:
-                            return 'front';
-                        }
-                      };
-                      const kind: EnemyKind = (enemyKind ?? 'fire-goblin');
-                      // For snakes: use moving sprite when enemyMoved, else coiled
-                      if (kind === 'snake') {
-                        const f = enemyFacing;
-                        // moving sprite only exists for 'left'; request 'left' for moving, coiled otherwise
-                        const useMoving = !!enemyMoved;
-                        if (useMoving) {
-                          return getEnemyIcon('snake', 'left');
-                        }
-                        // coiled sprite follows facing (front/back/right are coiled)
-                        return getEnemyIcon('snake', toFacing(f));
-                      }
-                      // White goblins: no side asset; sideways uses front or back based on swarm count parity
-                      if (kind === 'white-goblin') {
-                        const f = enemyFacing;
-                        const isSideways = f === 'LEFT' || f === 'RIGHT';
-                        const facing: Facing = isSideways
-                          ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
-                          : toFacing(f);
-                        return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
-                      }
-                      const facing: Facing = toFacing(enemyFacing);
-                      return getEnemyIcon(kind, facing);
-                    })()})`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                    zIndex: 10500, // above fog (10000), below wall tops (12000)
-                    transform: (() => {
-                      // Default flip rule (for enemies that only have right-facing art): flip when facing LEFT
-                      if (enemyKind !== 'snake') {
-                        if (enemyKind === 'ghost') return 'none';
-                        if (enemyKind === 'white-goblin') return 'none';
-                        // Pink goblin's side sprite is left-facing, so invert the flip
-                        if (enemyKind === 'pink-goblin') return enemyFacing === 'RIGHT' ? 'scaleX(-1)' : 'none';
-                        return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
-                      }
-                      // Snakes: scale to 50% and flip moving-right to mirror moving-left asset
-                      const baseScale = 'scale(0.5)';
-                      const moved = !!enemyMoved;
-                      if (moved && enemyFacing === 'RIGHT') {
-                        return 'scaleX(-1) ' + baseScale;
-                      }
-                      return baseScale;
-                    })(),
-                    // Darken non-torch-carrying enemies in cave/underground environments
-                    filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
-                      ? 'brightness(var(--enemy-dim, 0.80))'
-                      : undefined,
-                  }}
-                  data-testid="enemy-sprite"
-                />
-              )}
-            </>
-          )}
+          {renderEnemySprite()}
 
           {/* Render all subtypes as standardized icons */}
           {renderSubtypeIcons(subtype)}

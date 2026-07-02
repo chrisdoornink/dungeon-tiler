@@ -22,7 +22,19 @@ export type EnemyUpdateContext = {
   rng?: () => number;
 };
 
+// Monotonic + random suffix so ids never collide within or across sessions.
+// Presentation-only identity (the render layer tracks enemies across turns to
+// animate movement); NOT part of game logic and never touches lib/rng.ts, so
+// daily-seed determinism is unaffected.
+let nextEnemyIdSeq = 0;
+function generateEnemyId(): string {
+  nextEnemyIdSeq += 1;
+  return `en-${nextEnemyIdSeq.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 export class Enemy {
+  // Stable identity across turns and serialization (see generateEnemyId).
+  id: string;
   y: number;
   x: number;
   state: EnemyState = EnemyState.IDLE;
@@ -87,9 +99,10 @@ export class Enemy {
   // Last known player position when LOS was available
   private lastKnownPlayer: { y: number; x: number } | null = null;
 
-  constructor(pos: { y: number; x: number }) {
+  constructor(pos: { y: number; x: number; id?: string }) {
     this.y = pos.y;
     this.x = pos.x;
+    this.id = pos.id ?? generateEnemyId();
   }
 
   update(ctx: EnemyUpdateContext): number {
@@ -388,6 +401,7 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
 
 // Rehydrate a list of plain enemy objects (e.g., from JSON) back into Enemy instances
 export type PlainEnemy = {
+  id?: string;
   y: number;
   x: number;
   kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
@@ -403,7 +417,12 @@ export type PlainEnemy = {
 export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
   if (!Array.isArray(list)) return [];
   return list.map((d: PlainEnemy) => {
-    const e = new Enemy({ y: Number(d?.y ?? 0), x: Number(d?.x ?? 0) });
+    // Preserve the stable id when present (old saves without one get a fresh id).
+    const e = new Enemy({
+      y: Number(d?.y ?? 0),
+      x: Number(d?.x ?? 0),
+      id: typeof d?.id === "string" && d.id ? d.id : undefined,
+    });
     // Kind setter applies any stat adjustments; prefer public kind, else serialized private _kind
     let k: string | undefined = d?.kind ?? d?._kind;
     // Migration: old saved games may have legacy kind names

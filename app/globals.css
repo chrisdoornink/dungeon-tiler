@@ -462,6 +462,19 @@ body {
   animation: itemPickupCenter 1000ms ease-out forwards;
 }
 
+/* Smooth movement (Phase 2): enemies/NPCs slide one tile per turn. The sprite
+   renders in its DESTINATION tile; this animation slides it in from the old
+   tile. from/to are element-scoped CSS vars so the facing flip (scaleX) can be
+   composed into both endpoints. */
+@keyframes smoothStepSlide {
+  from {
+    transform: var(--smooth-step-from, none);
+  }
+  to {
+    transform: var(--smooth-step-to, none);
+  }
+}
+
 /* Responsive scaling: scale all game UI (except bottom controls) as a single unit below 650px */
 
 /* Scale the entire game UI (excluding MobileControls) from a 600px baseline */
