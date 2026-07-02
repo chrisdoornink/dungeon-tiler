@@ -187,11 +187,11 @@ export default function EndPage() {
   if (last.hasExitKey) items.push('🗝️');
   if (last.hasSword) items.push('🗡️');
   if (last.hasShield) items.push('🛡️');
-  if (last.hasSnakeMedallion) items.push('🎖️');
+  if (last.hasSnakeMedallion) items.push('🌀');
   if ((last.rockCount ?? 0) > 0) items.push(`🪨×${last.rockCount}`);
   if ((last.runeCount ?? 0) > 0) items.push(`🪄×${last.runeCount}`);
   if ((last.bombCount ?? 0) > 0) items.push(`💣×${last.bombCount}`);
-  if ((last.foodCount ?? 0) > 0) items.push(`🍖×${last.foodCount}`);
+  if ((last.foodCount ?? 0) > 0) items.push(`🧀×${last.foodCount}`);
   if ((last.potionCount ?? 0) > 0) items.push(`🧪×${last.potionCount}`);
   if ((last.berryCount ?? 0) > 0) items.push(`🍓×${last.berryCount}`);
   // Pink flaming heart shown here only if still HELD (kept unused).
@@ -359,11 +359,11 @@ export default function EndPage() {
             if (last.hasExitKey) inv.push({ emoji: '🗝️', label: 'Exit Key' });
             if (last.hasSword) inv.push({ emoji: '🗡️', label: 'Sword' });
             if (last.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
-            if (last.hasSnakeMedallion) inv.push({ emoji: '🎖️', label: 'Travel Medallion' });
+            if (last.hasSnakeMedallion) inv.push({ emoji: '🌀', label: 'Travel Medallion' });
             if ((last.rockCount ?? 0) > 0) inv.push({ emoji: '🪨', label: `Rock x${last.rockCount}` });
             if ((last.runeCount ?? 0) > 0) inv.push({ emoji: '🪄', label: `Rune x${last.runeCount}` });
             if ((last.bombCount ?? 0) > 0) inv.push({ emoji: '💣', label: `Bomb x${last.bombCount}` });
-            if ((last.foodCount ?? 0) > 0) inv.push({ emoji: '🍖', label: `Food x${last.foodCount}` });
+            if ((last.foodCount ?? 0) > 0) inv.push({ emoji: '🧀', label: `Food x${last.foodCount}` });
             if ((last.potionCount ?? 0) > 0) inv.push({ emoji: '🧪', label: `Potion x${last.potionCount}` });
             if ((last.berryCount ?? 0) > 0) inv.push({ emoji: '🍓', label: `Belted Berry x${last.berryCount}` });
             if ((last.pinkHeartCount ?? 0) > 0) inv.push({ emoji: '💗', label: 'Pink Flaming Heart' });

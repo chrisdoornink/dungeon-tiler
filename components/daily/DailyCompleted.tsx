@@ -111,7 +111,7 @@ export function buildInventoryEntries(
   if (game.hasShield)
     inv.push({ key: "shield", asset: "/images/items/shield.png", emoji: "🛡️", alt: "Shield" });
   if (game.hasSnakeMedallion)
-    inv.push({ key: "medallion", asset: "/images/items/snake-medalion.png", emoji: "🎖️", alt: "Travel Medallion" });
+    inv.push({ key: "medallion", asset: "/images/items/snake-medalion.png", emoji: "🌀", alt: "Travel Medallion" });
   if ((game.rockCount ?? 0) > 0)
     inv.push({ key: "rock", asset: "/images/items/rock-1.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
   if ((game.runeCount ?? 0) > 0)
@@ -119,7 +119,7 @@ export function buildInventoryEntries(
   if ((game.bombCount ?? 0) > 0)
     inv.push({ key: "bomb", asset: "/images/items/bomb-black.png", emoji: "💣", alt: "Bomb", count: game.bombCount });
   if ((game.foodCount ?? 0) > 0)
-    inv.push({ key: "food", asset: "/images/items/food-1.png", emoji: "🍖", alt: "Food", count: game.foodCount });
+    inv.push({ key: "food", asset: "/images/items/food-1.png", emoji: "🧀", alt: "Food", count: game.foodCount });
   if ((game.potionCount ?? 0) > 0)
     inv.push({ key: "potion", asset: "/images/items/meds-1.png", emoji: "🧪", alt: "Potion", count: game.potionCount });
   if ((game.berryCount ?? 0) > 0)
