@@ -475,6 +475,21 @@ body {
   }
 }
 
+/* Regular-goblin variant of the slide above: adds a bob + tilt at the
+   midpoint (--smooth-step-mid, computed alongside from/to) so the walk reads
+   as a step rather than a flat glide. */
+@keyframes smoothStepSlideBob {
+  0% {
+    transform: var(--smooth-step-from, none);
+  }
+  50% {
+    transform: var(--smooth-step-mid, none);
+  }
+  100% {
+    transform: var(--smooth-step-to, none);
+  }
+}
+
 /* Smooth movement: the snuffed-torch FOV classes dim each tile via `filter`
    and set `z-index: 0` — BOTH create a per-tile stacking context, which
    confines the wall-top overlays (z 12000) inside their tile and lets the
