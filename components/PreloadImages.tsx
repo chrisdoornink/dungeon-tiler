@@ -120,6 +120,7 @@ export default function PreloadImages() {
       "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
       "/images/enemies/fire-goblin/pink-goblin-ringless-back.png",
       "/images/enemies/fire-goblin/pink-ring-no-sparkle.png",
+      "/images/enemies/fire-goblin/blue-ring-no-sparkle.png",
       "/images/enemies/fire-goblin/green-goblin-front.png",
       "/images/enemies/fire-goblin/green-goblin-right.png",
       "/images/enemies/fire-goblin/green-goblin-back.png",

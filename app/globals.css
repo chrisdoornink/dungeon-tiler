@@ -551,6 +551,10 @@ body {
   pointer-events: none;
   z-index: 10400; /* above the ring icon, below enemies (10500) */
 }
+/* Blue variant for the snake medallion's portal ring */
+.pink-ring-sparkle.blue {
+  background: radial-gradient(circle, #d9ecff 0%, #86baff 60%, rgba(134, 186, 255, 0) 100%);
+}
 
 /* An enemy dropping face-first into a freshly opened abyss (mirrors the
    hero's dive). --fall-from lets smooth mode slide the sprite in from the
@@ -570,6 +574,41 @@ body {
   100% {
     transform: scale(0);
     opacity: 0.9;
+  }
+}
+
+/* Pink goblin ranged-attack beam: a single fast flash along the attack path.
+   Only opacity animates — the element's static rotate() transform must
+   survive, so keep transform out of these keyframes. */
+@keyframes pinkBeamFlash {
+  0% {
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Bang flash on the hero when a pink beam connects: quick pop-in then fade. */
+@keyframes heroBangPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
   }
 }
 

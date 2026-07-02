@@ -180,14 +180,33 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
-        // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
+        // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns
+        // since ring placed), lastHealth/stunned (hit-reaction defensive mode)
         const mem = e.memory as {
           aware?: boolean;
           ringY?: number;
           ringX?: number;
           ringOrigSubs?: number[];
           ringAge?: number;
+          lastHealth?: number;
+          stunned?: boolean;
         };
+
+        // Taking a hit breaks the goblin's concentration: compare health against last
+        // tick's snapshot — a drop means the hero connected (rock or melee). From then
+        // on it is "stunned": it can never teleport again, and it either swipes at an
+        // adjacent hero or keeps backing away (branch below, dungeon variant only).
+        // ctx.enemy omits health, so read it off the enemies array by index.
+        const selfHealth = ctx.enemies[ctx.enemyIndex]?.health;
+        if (
+          typeof selfHealth === "number" &&
+          typeof mem.lastHealth === "number" &&
+          selfHealth < mem.lastHealth
+        ) {
+          mem.stunned = true;
+          mem.aware = true;
+        }
+        if (typeof selfHealth === "number") mem.lastHealth = selfHealth;
 
         // --- Pink mist (realm only): if standing in the haze the goblin is disoriented.
         // It can only shuffle ONE tile toward the nearest clear tile and cannot attack;
@@ -475,6 +494,40 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             return 0;
           }
           slide(SLIDE_MIN + (rng() < 0.5 ? 0 : 1)); // slide 3-4 tiles
+          return 0;
+        }
+
+        // --- Stunned (has taken a hit): teleporting is permanently disabled. ---
+        // Melee if adjacent, otherwise keep backing away one tile per turn. Ninjas
+        // never reach here (their branch above always returns).
+        if (mem.stunned === true) {
+          if (hasRing) {
+            removeRing();
+            delete mem.ringAge;
+          }
+          facePlayer();
+          if (manhattan === 1) {
+            // Cornered swipe — same base damage as the un-stunned adjacent case.
+            return 1;
+          }
+          // Back away along the larger-gap axis, falling back to the other axis.
+          const dy = py - e.y;
+          const dx = px - e.x;
+          const awayY: [number, number] = [dy > 0 ? -1 : 1, 0];
+          const awayX: [number, number] = [0, dx > 0 ? -1 : 1];
+          const tryMoves = Math.abs(dy) >= Math.abs(dx) ? [awayY, awayX] : [awayX, awayY];
+          for (const [my, mx] of tryMoves) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (ny === py && nx === px) continue;
+            if (isFloor(ny, nx)) {
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              break;
+            }
+          }
+          facePlayer(); // keep eyes on the hero even while retreating
           return 0;
         }
 

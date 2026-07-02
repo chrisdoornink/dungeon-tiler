@@ -932,18 +932,34 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render portal */}
+        {/* Render portal (snake medallion travel point): a blue twin of the
+            pink goblin's teleport ring — same ring asset recolored, same
+            rising sparkles — so the two teleport visuals read as parallels. */}
         {hasPortal(subtypes) && (
-          <div
-            key="portal"
-            data-testid={`subtype-icon-${TileSubtype.PORTAL}`}
-            className={`${styles.assetIcon} ${styles.rockIcon}`}
-            style={{
-              backgroundImage: `url('/images/items/portal-static.png')`,
-              transform: isPlayerTile ? 'scale(0.5)' : 'scale(1)',
-              zIndex: isPlayerTile ? 1 : 10,
-            }}
-          />
+          <>
+            <div
+              key="portal"
+              data-testid={`subtype-icon-${TileSubtype.PORTAL}`}
+              className={`${styles.assetIcon} ${styles.rockIcon}`}
+              style={{
+                backgroundImage: `url('/images/enemies/fire-goblin/blue-ring-no-sparkle.png')`,
+              }}
+            />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={`portal-sparkle-${i}`}
+                className="pink-ring-sparkle blue"
+                aria-hidden="true"
+                style={
+                  {
+                    left: `${28 + i * 11}%`,
+                    ['--dx' as string]: `${(i % 2 ? 1 : -1) * (3 + i * 2)}px`,
+                    animationDelay: `${i * 0.35}s`,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </>
         )}
 
         {/* Render snake medallion (standalone, not inside a chest) */}
@@ -1582,7 +1598,10 @@ export const Tile: React.FC<TileProps> = ({
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
-                ...smoothStepStyle(npcStep, npcTransformWithScale),
+                // Dogs get the bob+tilt step (the wiggle); other NPCs slide flat.
+                ...(isDogNpc
+                  ? smoothStepBobStyle(npcStep, npcTransformWithScale)
+                  : smoothStepStyle(npcStep, npcTransformWithScale)),
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
@@ -2020,7 +2039,11 @@ export const Tile: React.FC<TileProps> = ({
             aria-hidden="true"
           />
           
-          {/* Render hero image on top if this is a player tile */}
+          {/* Render hero image on top if this is a player tile. Same
+              smooth-mode treatment as the floor branch: stay mounted but
+              hidden (the overlay hero renders instead) — this branch was
+              missed originally, which made a duplicate hero pop onto flower
+              tiles a step ahead of the gliding overlay. */}
           {isPlayerTile && (
             <div
               className={styles.heroImage}
@@ -2032,6 +2055,7 @@ export const Tile: React.FC<TileProps> = ({
                 transition: heroTransition,
                 backgroundColor: 'transparent',
                 animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
+                visibility: suppressHeroSprite ? 'hidden' : undefined,
               }}
             />
           )}
@@ -2054,7 +2078,10 @@ export const Tile: React.FC<TileProps> = ({
                 backgroundImage: `url(${npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
-                ...smoothStepStyle(npcStep, npcTransformWithScale),
+                // Dogs get the bob+tilt step (the wiggle); other NPCs slide flat.
+                ...(isDogNpc
+                  ? smoothStepBobStyle(npcStep, npcTransformWithScale)
+                  : smoothStepStyle(npcStep, npcTransformWithScale)),
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
