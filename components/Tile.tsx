@@ -940,9 +940,23 @@ export const Tile: React.FC<TileProps> = ({
             <div
               key="portal"
               data-testid={`subtype-icon-${TileSubtype.PORTAL}`}
-              className={`${styles.assetIcon} ${styles.rockIcon}`}
+              aria-hidden="true"
               style={{
+                // Nudged down a few px (matching the pink goblin's under-ring)
+                // so the ring ellipse sits at the hero's feet when he's standing
+                // on the portal, instead of overlapping his body.
+                position: 'absolute',
+                left: '50%',
+                top: 'calc(50% + 5px)',
+                width: 24,
+                height: 24,
+                transform: 'translate(-50%, -50%)',
                 backgroundImage: `url('/images/enemies/fire-goblin/blue-ring-no-sparkle.png')`,
+                backgroundSize: 'contain',
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'center',
+                zIndex: 1030,
+                pointerEvents: 'none',
               }}
             />
             {[0, 1, 2, 3, 4].map((i) => (
