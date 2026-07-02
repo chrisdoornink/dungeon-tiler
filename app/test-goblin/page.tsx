@@ -55,6 +55,12 @@ function buildGoblinTestRoom(): GameState {
   pg.kind = 'pink-goblin';
   enemies.push(pg);
 
+  // Stone goblin a few tiles to the hero's right, same row, so it walks toward
+  // the hero during a throw turn (for testing rock/rune impact alignment).
+  const sg = new Enemy({ y: centerY, x: centerX + 4 });
+  sg.kind = 'stone-goblin';
+  enemies.push(sg);
+
   // Add some wall torches for visibility
   const torchPositions: Array<[number, number]> = [
     [0, 5],   // Top wall
@@ -74,14 +80,14 @@ function buildGoblinTestRoom(): GameState {
     hasShield: false,
     showFullMap: true,
     win: false,
-    playerDirection: Direction.DOWN,
+    playerDirection: Direction.RIGHT,
     enemies,
     heroHealth: 5,
     heroMaxHealth: 5,
     heroAttack: 1,
     heroTorchLit: true,
-    rockCount: 0,
-    runeCount: 0,
+    rockCount: 10,
+    runeCount: 10,
     foodCount: 0,
     potionCount: 0,
     stats: {
