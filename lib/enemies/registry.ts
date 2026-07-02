@@ -154,10 +154,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "pink-goblin",
     displayName: "Pink Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/pink-goblin-front.png",
-      left: "/images/enemies/fire-goblin/pink-goblin-left.png",
-      right: "/images/enemies/fire-goblin/pink-goblin-left.png",
-      back: "/images/enemies/fire-goblin/pink-goblin-back.png",
+      // Ringless art: the goblin and its teleport ring are separate entities
+      // now — the ring renders as its own tile subtype with CSS sparkles.
+      front: "/images/enemies/fire-goblin/pink-goblin-ringless-front.png",
+      left: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
+      right: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
+      back: "/images/enemies/fire-goblin/pink-goblin-ringless-back.png",
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,

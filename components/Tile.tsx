@@ -862,16 +862,35 @@ export const Tile: React.FC<TileProps> = ({
           </>
         )}
 
-        {/* Render pink ring (teleportation marker from pink goblin) */}
+        {/* Render pink ring (teleportation marker from pink goblin). The ring
+            asset is sparkle-free; dynamic CSS sparkles rise off it instead, so
+            the effect travels with the ring — not the goblin — when the ring
+            is parked on another tile. */}
         {hasPinkRing(subtypes) && (
-          <div
-            key="pink-ring"
-            data-testid={`subtype-icon-${TileSubtype.PINK_RING}`}
-            className={`${styles.assetIcon} ${styles.runeIcon}`}
-            style={{
-              backgroundImage: `url('/images/enemies/fire-goblin/pink-ring.png')`,
-            }}
-          />
+          <>
+            <div
+              key="pink-ring"
+              data-testid={`subtype-icon-${TileSubtype.PINK_RING}`}
+              className={`${styles.assetIcon} ${styles.runeIcon}`}
+              style={{
+                backgroundImage: `url('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')`,
+              }}
+            />
+            {[0, 1, 2, 3, 4].map((i) => (
+              <span
+                key={`pink-ring-sparkle-${i}`}
+                className="pink-ring-sparkle"
+                aria-hidden="true"
+                style={
+                  {
+                    left: `${28 + i * 11}%`,
+                    ['--dx' as string]: `${(i % 2 ? 1 : -1) * (3 + i * 2)}px`,
+                    animationDelay: `${i * 0.35}s`,
+                  } as React.CSSProperties
+                }
+              />
+            ))}
+          </>
         )}
 
         {/* Render the pink flaming heart prize (with a pink glow) only once its chest is

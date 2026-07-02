@@ -502,6 +502,34 @@ body {
   background: rgba(0, 0, 0, 0.75); /* ~ brightness(0.25) */
 }
 
+/* Dynamic sparkles rising off a standing pink teleport ring. The baked-in
+   sparkles were removed from the ring asset (goblin and ring are separate
+   entities now), so the ring carries a live effect wherever it's parked. */
+@keyframes pinkRingSparkleRise {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 0) scale(0.2);
+  }
+  25% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx, 0px)), -18px) scale(1);
+  }
+}
+.pink-ring-sparkle {
+  position: absolute;
+  bottom: 8px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffd9f0 0%, #ff86cf 60%, rgba(255, 134, 207, 0) 100%);
+  animation: pinkRingSparkleRise 1.9s ease-out infinite;
+  pointer-events: none;
+  z-index: 10400; /* above the ring icon, below enemies (10500) */
+}
+
 /* An enemy dropping face-first into a freshly opened abyss (mirrors the
    hero's dive). --fall-from lets smooth mode slide the sprite in from the
    tile it fell from before it shrinks into the hole; legacy leaves it unset
