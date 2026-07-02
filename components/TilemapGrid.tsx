@@ -3869,7 +3869,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           {/* Centered map container */}
           <div className="flex justify-center items-center">
             <div
-              className={`${styles.viewportContainer} max-w-full overflow-auto`}
+              // .smooth-movement scopes CSS overrides that keep per-tile FOV
+              // classes from creating stacking contexts (see globals.css).
+              className={`${styles.viewportContainer} max-w-full overflow-auto${smoothEnabled ? " smooth-movement" : ""}`}
               data-testid="tilemap-grid-container"
               style={{
                 gridTemplateColumns:

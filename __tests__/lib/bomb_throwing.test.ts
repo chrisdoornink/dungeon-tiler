@@ -199,14 +199,13 @@ describe("Bomb blast - fixed damage values", () => {
     expect(withShield.heroHealth).toBe(5); // 9 - 4
   });
 
-  it("a stone goblin (8 HP) survives a single bomb", () => {
+  it("a stone goblin (8 HP) is destroyed by a single bomb", () => {
     const map = makeArena(12, 5, 5);
     map.subtypes[5][6] = [TileSubtype.BOMB_LIVE];
     const goblin = new Enemy({ y: 5, x: 5 }); // in the 3x3
     goblin.kind = "stone-goblin";
     const blown = detonateLiveBombs(baseState(map, { enemies: [goblin], bombCount: 0 }));
-    expect(blown.enemies?.length).toBe(1);
-    expect(blown.enemies?.[0].health).toBe(2); // 8 - 6
+    expect(blown.enemies?.length).toBe(0); // 8 damage kills its 8 HP outright
   });
 });
 
