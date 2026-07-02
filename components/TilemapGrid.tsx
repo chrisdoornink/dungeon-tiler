@@ -4893,6 +4893,14 @@ function renderTileGrid(
             }
             // viewportCenteredVignette is set exactly when smooth mode is on
             smoothMode={viewportCenteredVignette}
+            enemyRingUnder={
+              enemyAtTile?.kind === "pink-goblin" &&
+              typeof (
+                enemyAtTile.behaviorMemory as
+                  | { ringY?: unknown }
+                  | undefined
+              )?.ringY !== "number"
+            }
           />
           {/* Pink-realm mist: a soft drifting haze over the tile (above the floor + actors,
               semi-transparent), shown only where the tile is currently visible. */}
