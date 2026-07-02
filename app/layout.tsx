@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
+import { Geist, Geist_Mono, Press_Start_2P, VT323 } from "next/font/google";
 import "./globals.css";
 import PreloadImages from "../components/PreloadImages";
 import PostHogProvider from "../components/PostHogProvider";
@@ -21,6 +21,15 @@ const pressStart2P = Press_Start_2P({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-press-start-2p",
+});
+
+// Retro terminal font used as the pixel-text fallback (previously loaded via a
+// CSS @import from fonts.googleapis.com; now self-hosted through next/font).
+const vt323 = VT323({
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+  variable: "--font-vt323",
 });
 
 export const metadata: Metadata = {
@@ -79,7 +88,7 @@ export default function RootLayout({
         <link rel="preload" as="image" href="/images/hero/hero-front-static.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} ${pressStart2P.className} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} ${vt323.variable} ${pressStart2P.className} antialiased`}
       >
         <PostHogProvider>
           <PreloadImages />

@@ -45,7 +45,7 @@
   font-size: 24px;
   margin: 0 0 16px 0;
   text-align: center;
-  font-family: 'Press Start 2P', monospace;
+  font-family: var(--font-press-start-2p), monospace;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 

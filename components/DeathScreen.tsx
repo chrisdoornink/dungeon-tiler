@@ -72,7 +72,7 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
           <h1
             className="text-6xl font-bold text-red-500 tracking-wider"
             style={{
-              fontFamily: '"Press Start 2P", "Courier New", monospace',
+              fontFamily: 'var(--font-press-start-2p), "Courier New", monospace',
               textShadow: '4px 4px 0px rgba(0, 0, 0, 0.8)',
             }}
           >
@@ -83,7 +83,7 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
           <p
             className="text-xl text-gray-300"
             style={{
-              fontFamily: '"Press Start 2P", "Courier New", monospace',
+              fontFamily: 'var(--font-press-start-2p), "Courier New", monospace',
               textShadow: '2px 2px 0px rgba(0, 0, 0, 0.8)',
             }}
           >
@@ -97,7 +97,7 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
           onClick={onRestart}
           className="mt-8 px-8 py-4 text-lg font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all duration-200 transform hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
           style={{
-            fontFamily: '"Press Start 2P", "Courier New", monospace',
+            fontFamily: 'var(--font-press-start-2p), "Courier New", monospace',
             textShadow: '2px 2px 0px rgba(0, 0, 0, 0.5)',
           }}
         >
