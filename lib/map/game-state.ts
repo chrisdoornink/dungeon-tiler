@@ -4,6 +4,7 @@ import {
   updateEnemies,
   rehydrateEnemies,
   type PlainEnemy,
+  type EnemyAttackInfo,
 } from "../enemy";
 import { enemyTypeAssignement, assignWhiteGoblinSwarmIds } from "../enemy_assignment";
 import { EnemyRegistry, createEmptyByKind, type EnemyKind } from "../enemies/registry";
@@ -249,6 +250,8 @@ export function performUseFood(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
+      // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+      preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -319,6 +322,8 @@ export function performUsePotion(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
+      // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+      preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -398,6 +403,8 @@ export function performUsePinkHeart(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
+      // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+      preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -467,6 +474,8 @@ export function performUseBerry(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
+      // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+      preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -588,6 +597,8 @@ export function performThrowRock(gameState: GameState): GameState {
           mistBlindSkip(preTickState)(e),
       }
     );
+    // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
       applyHeroDamage(preTickState, applied);
@@ -852,6 +863,8 @@ export function performThrowRune(gameState: GameState): GameState {
         skipEnemy: mistBlindSkip(preTickState),
       }
     );
+    // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
       applyHeroDamage(preTickState, applied);
@@ -1281,6 +1294,8 @@ export function performThrowBomb(gameState: GameState): GameState {
         skipEnemy: mistBlindSkip(preTickState),
       }
     );
+    // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
       applyHeroDamage(preTickState, applied);
@@ -1420,6 +1435,10 @@ export interface GameState {
   recentDeaths?: Array<[number, number]>;
   // Transient: blast centers where a bomb detonated this tick (UI explosion VFX)
   recentBombBlasts?: Array<[number, number]>;
+  // Transient: enemies that dealt damage this tick, with post-move positions
+  // and a ranged flag — consumed by the render layer for attack VFX (e.g. the
+  // pink goblin's beam). Overwritten on every enemy tick; never persisted.
+  recentEnemyAttacks?: EnemyAttackInfo[];
   // Transient: defeated enemies with their memory for onEnemyDefeat processing
   defeatedEnemies?: Array<{
     y: number;
@@ -2644,6 +2663,8 @@ function movePlayerCore(
         },
       }
     );
+    // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    newGameState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(newGameState), result.damage);
       applyHeroDamage(newGameState, applied);
@@ -3014,6 +3035,8 @@ function movePlayerCore(
             },
           }
         );
+        // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+        newGameState.recentEnemyAttacks = result.attackingEnemies;
         // Guarantee at least 1 immediate damage from an ambush
         const dmgNow = Math.max(1, result.damage);
         if (dmgNow > 0) {

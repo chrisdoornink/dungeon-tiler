@@ -81,7 +81,7 @@ function buildPinkGoblinTestRoom(): GameState {
     heroAttack: 1,
     heroTorchLit: true,
     bombCount: 5,
-    rockCount: 0,
+    rockCount: 10,
     runeCount: 0,
     foodCount: 0,
     potionCount: 0,

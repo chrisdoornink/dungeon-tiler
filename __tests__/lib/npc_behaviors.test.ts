@@ -249,11 +249,11 @@ describe("Dog NPC Behavior", () => {
       }
     });
 
-    it("should cycle through front sprites (1-4) when idle", () => {
+    it("should keep its current pose when idle (no more random spinning)", () => {
       const grid = createTestGrid();
       const dog = createDogNPC(2, 2);
-      const player = { y: 2, x: 2 }; // Same position (adjacent)
-      
+      const player = { y: 2, x: 3 }; // Adjacent — dog stays put
+
       const ctx: NPCBehaviorContext = {
         npc: dog,
         grid,
@@ -261,27 +261,41 @@ describe("Dog NPC Behavior", () => {
         npcs: [dog],
         rng: () => 0.9, // Force idle behavior (25% chance)
       };
-      
-      const sprites = new Set<string>();
-      
-      // Run multiple times to see sprite cycling
+
+      const before = dog.sprite;
       for (let i = 0; i < 10; i++) {
         updateDogBehavior(ctx);
-        sprites.add(dog.sprite);
       }
-      
-      // Should have cycled through multiple front sprites
-      expect(sprites.size).toBeGreaterThan(1);
-      Array.from(sprites).forEach(sprite => {
-        expect(sprite).toMatch(/dog-front-[1-4]\.png$/);
-      });
+
+      // Idle no longer cycles poses — the standing dog holds its pose
+      expect(dog.sprite).toBe(before);
     });
 
-    it("should track step count in memory", () => {
+    it("should pick a deterministic pose from movement direction", () => {
       const grid = createTestGrid();
-      const dog = createDogNPC(2, 2);
-      const player = { y: 0, x: 0 };
-      
+      const rng = () => 0.5; // Force follow behavior
+
+      // Moving right -> front-1 (faces right)
+      const right = createDogNPC(2, 1);
+      updateDogBehavior({ npc: right, grid, player: { y: 2, x: 4 }, npcs: [right], rng });
+      expect(right.sprite).toMatch(/dog-front-1\.png$/);
+
+      // Moving left -> front-2 (faces left)
+      const left = createDogNPC(2, 3);
+      updateDogBehavior({ npc: left, grid, player: { y: 2, x: 0 }, npcs: [left], rng });
+      expect(left.sprite).toMatch(/dog-front-2\.png$/);
+
+      // Moving down -> front-4 (faces the camera)
+      const down = createDogNPC(1, 2);
+      updateDogBehavior({ npc: down, grid, player: { y: 4, x: 2 }, npcs: [down], rng });
+      expect(down.sprite).toMatch(/dog-front-4\.png$/);
+    });
+
+    it("should alternate back sprites (tail wag) when moving up, tracked in memory", () => {
+      const grid = createTestGrid();
+      const dog = createDogNPC(4, 2);
+      const player = { y: 0, x: 2 }; // Directly above
+
       const ctx: NPCBehaviorContext = {
         npc: dog,
         grid,
@@ -289,13 +303,20 @@ describe("Dog NPC Behavior", () => {
         npcs: [dog],
         rng: () => 0.5, // Force follow behavior
       };
-      
+
       expect(dog.memory?.dogStep).toBeUndefined();
-      
+
       updateDogBehavior(ctx);
-      
-      expect(dog.memory?.dogStep).toBeDefined();
+
       expect(typeof dog.memory?.dogStep).toBe("number");
+      expect(dog.sprite).toMatch(/dog-back-[12]\.png$/);
+
+      const first = dog.sprite;
+      updateDogBehavior(ctx);
+
+      // Second upward step swaps to the other back sprite
+      expect(dog.sprite).toMatch(/dog-back-[12]\.png$/);
+      expect(dog.sprite).not.toBe(first);
     });
   });
 

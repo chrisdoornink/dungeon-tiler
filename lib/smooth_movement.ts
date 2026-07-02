@@ -49,7 +49,7 @@ export function isSmoothMovementEnabled(): boolean {
   const qp = new URLSearchParams(window.location.search).get("smooth");
   if (qp === "0" || qp === "1") {
     // Persist the explicit choice so it sticks across page navigations —
-    // testers opt in once with ?smooth=1 and back out with ?smooth=0.
+    // opt back out with ?smooth=0 and back in with ?smooth=1.
     try {
       window.localStorage.setItem("tb_smooth_movement", qp);
     } catch {
@@ -57,10 +57,12 @@ export function isSmoothMovementEnabled(): boolean {
     }
     return qp === "1";
   }
+  // ON by default (signed off after full-run prod testing); an explicit
+  // ?smooth=0 opt-out persists via localStorage until ?smooth=1 clears it.
   try {
-    return window.localStorage.getItem("tb_smooth_movement") === "1";
+    return window.localStorage.getItem("tb_smooth_movement") !== "0";
   } catch {
-    return false;
+    return true;
   }
 }
 

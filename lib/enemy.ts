@@ -452,6 +452,17 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
 }
 
 // Overloads for better type inference at call sites
+// One enemy's attack this tick, with enough context for the render layer to
+// draw attack effects (e.g. the pink goblin's ranged beam needs the attacker's
+// post-move position and whether the hit came from range).
+export type EnemyAttackInfo = {
+  kind: string;
+  damage: number;
+  y: number;
+  x: number;
+  ranged: boolean;
+};
+
 export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
@@ -480,7 +491,7 @@ export function updateEnemies(
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
   }
-): { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> };
+): { damage: number; attackingEnemies: EnemyAttackInfo[] };
 export function updateEnemies(
   grid: number[][],
   subtypesOrEnemies: number[][][] | Enemy[],
@@ -503,7 +514,7 @@ export function updateEnemies(
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
   }
-): number | { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> } {
+): number | { damage: number; attackingEnemies: EnemyAttackInfo[] } {
   // Handle backward compatibility: old signature was (grid, enemies, player, opts)
   let subtypes: number[][][] | undefined;
   let enemies: Enemy[];
@@ -529,7 +540,7 @@ export function updateEnemies(
   const suppress = finalOpts?.suppress;
   const skipEnemy = finalOpts?.skipEnemy;
   let totalDamage = 0;
-  const attackingEnemies: Array<{ kind: string; damage: number }> = [];
+  const attackingEnemies: EnemyAttackInfo[] = [];
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
@@ -629,9 +640,16 @@ export function updateEnemies(
       // debug log removed
       totalDamage += effective;
       
-      // Track attacking enemies for condition application
+      // Track attacking enemies for condition application and attack VFX
+      // (post-move position; ranged when the hit landed from beyond melee).
       if (effective > 0) {
-        attackingEnemies.push({ kind: e.kind, damage: effective });
+        attackingEnemies.push({
+          kind: e.kind,
+          damage: effective,
+          y: e.y,
+          x: e.x,
+          ranged: Math.abs(e.y - player.y) + Math.abs(e.x - player.x) > 1,
+        });
       }
     }
 

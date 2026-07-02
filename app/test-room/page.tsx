@@ -208,7 +208,8 @@ function buildTestRoom(): GameState {
     heroHealth: 5,
     heroMaxHealth: 5,
     heroAttack: 1,
-    rockCount: 0,
+    rockCount: 10,
+    hasSnakeMedallion: true,
     stats: {
       damageDealt: 0,
       damageTaken: 0,

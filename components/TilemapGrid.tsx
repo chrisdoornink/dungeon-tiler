@@ -1374,23 +1374,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         break;
     }
 
-    // Compute animation path (up to 4 steps)
+    // Capture pre-throw enemy snapshots by id: the engine mutates Enemy
+    // instances in place (they move and take damage during the throw's enemy
+    // turn), so this is the only reliable "before" view for the floating
+    // damage number.
+    const preHealthById = new Map<string, number>();
+    const preKindById = new Map<string, string>();
+    for (const e of prev.enemies ?? []) {
+      preHealthById.set(e.id, e.health);
+      preKindById.set(e.id, e.kind);
+    }
+
+    // Resolve the throw FIRST: enemies take their turn before the rock flies,
+    // so the animation path must follow POST-move positions — otherwise the
+    // rock visually sails through an enemy that stepped forward and lands on
+    // the tile it used to be on.
+    const next = performThrowRock(prev);
+
+    // Build the animation path against the resolved state (mirrors the
+    // engine's own path scan).
     const path: Array<[number, number]> = [];
     let ty = py,
       tx = px;
     let impact: { y: number; x: number } | null = null;
-    // Track pre-hit enemy (if any) at the impact tile to compute floating damage later
-    let preEnemyAtImpact: Enemy | undefined;
-    let preEnemyHealth = 0;
+    let impactEnemyId: string | null = null;
+    let impactEnemyDied = false;
     for (let step = 1; step <= 4; step++) {
       ty += vy;
       tx += vx;
       // Out of bounds: stop before leaving grid
       if (
         ty < 0 ||
-        ty >= prev.mapData.tiles.length ||
+        ty >= next.mapData.tiles.length ||
         tx < 0 ||
-        tx >= prev.mapData.tiles[0].length
+        tx >= next.mapData.tiles[0].length
       ) {
         // Treat OOB as impact just beyond map; set impact to last in-bounds tile if available
         const last = path[path.length - 1];
@@ -1398,48 +1415,47 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         break;
       }
       // If wall, stop before entering wall
-      if (prev.mapData.tiles[ty][tx] !== 0) {
+      if (next.mapData.tiles[ty][tx] !== 0) {
         // Impact on the wall tile
         impact = { y: ty, x: tx };
         break;
       }
       path.push([ty, tx]);
-      // If enemy at tile, include and stop
-      const enemies = prev.enemies ?? [];
-      const enemyAt = enemies.find((e) => e.y === ty && e.x === tx);
-      const hitEnemy = !!enemyAt;
-      if (hitEnemy) {
+      // Enemy at its post-move tile — or one that died there this tick
+      const enemyAt = (next.enemies ?? []).find((e) => e.y === ty && e.x === tx);
+      const deadAt = (next.defeatedEnemies ?? []).find(
+        (d) => d.y === ty && d.x === tx
+      );
+      if (enemyAt || deadAt) {
         impact = { y: ty, x: tx };
-        preEnemyAtImpact = enemyAt;
-        preEnemyHealth = enemyAt!.health;
+        impactEnemyId = enemyAt?.id ?? deadAt?.id ?? null;
+        impactEnemyDied = !enemyAt && !!deadAt;
         break;
       }
-      // If pot at tile, include and stop (already included above)
-      const subs = prev.mapData.subtypes[ty][tx] || [];
-      if (subs.includes(TileSubtype.POT)) {
+      // Pot check against the PRE-throw map: the engine breaks the pot the
+      // rock stops at, so it's already gone from `next`.
+      const prevSubs = prev.mapData.subtypes[ty]?.[tx] || [];
+      if (prevSubs.includes(TileSubtype.POT)) {
         impact = { y: ty, x: tx };
         break;
       }
     }
 
-    // Apply the throw outcome as a VALUE, plus the post-throw VFX (floating damage, spirits).
+    // Commit the (already-resolved) throw outcome, plus the post-throw VFX
+    // (floating damage, spirits).
     const applyNext = () => {
-      const next = performThrowRock(prev);
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       setGameState(next);
       try {
-        // Spawn floating damage for enemy rock hits based on pre/post enemy health at impact
-        if (preEnemyAtImpact && impact) {
+        // Floating damage for the enemy the rock hit — matched by id since
+        // positions can't be trusted across the enemy turn.
+        if (impactEnemyId && impact) {
           const imp = impact;
-          const postEnemy = (next.enemies || []).find(
-            (e) => e.y === imp.y && e.x === imp.x
-          );
-          const preHP =
-            typeof preEnemyHealth === "number" && !Number.isNaN(preEnemyHealth)
-              ? preEnemyHealth
-              : preEnemyAtImpact.health ?? 0;
+          const hitId = impactEnemyId;
+          const postEnemy = (next.enemies || []).find((e) => e.id === hitId);
+          const preHP = preHealthById.get(hitId) ?? 0;
           let dmg = 0;
-          if (postEnemy) {
+          if (!impactEnemyDied && postEnemy) {
             const postHP = Math.max(0, postEnemy.health ?? 0);
             dmg = Math.max(0, preHP - postHP);
           } else {
@@ -1462,7 +1478,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     amount: dmg,
                     target: "enemy",
                     sign: "-",
-                    kind: preEnemyAtImpact.kind,
+                    kind: preKindById.get(hitId),
                     createdAt: now,
                   },
                 ];
@@ -1784,6 +1800,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   >([]);
   // Transient floating damage numbers (hero/enemy hits)
   const [floating, setFloating] = useState<FloatingNumber[]>([]);
+  // Transient pink-goblin ranged-attack VFX: a fast beam from the attacker to
+  // the hero plus a brief bang flash on the hero. Spawned from the engine's
+  // recentEnemyAttacks transient; deduped by array identity so state spreads
+  // that carry the same array along don't re-fire it.
+  const [pinkBeams, setPinkBeams] = useState<
+    Array<{ id: string; fromY: number; fromX: number; toY: number; toX: number }>
+  >([]);
+  const [heroBangs, setHeroBangs] = useState<Array<{ id: string; y: number; x: number }>>([]);
+  // Seed with the initial state's array so a rehydrated save doesn't replay
+  // its last tick's beam on load.
+  const lastProcessedAttacksRef = useRef<unknown>(gameState.recentEnemyAttacks ?? null);
   const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>("idle");
   const [heroDeathOrientation, setHeroDeathOrientation] = useState<Direction>(Direction.RIGHT);
   const heroDeathPositionRef = useRef<[number, number] | null>(null);
@@ -1862,6 +1889,38 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setHeroDeathOrientation(facing);
     }
   }, [gameState.heroHealth, heroDeathPhase, clearHeroDeathTimeouts, gameState.playerDirection]);
+
+  // Pink goblin ranged-attack VFX: watch the engine's per-tick attack list and
+  // spawn a beam (attacker tile -> hero tile) plus a bang flash on the hero.
+  useEffect(() => {
+    const attacks = gameState.recentEnemyAttacks;
+    if (!attacks || attacks.length === 0) return;
+    if (lastProcessedAttacksRef.current === attacks) return;
+    lastProcessedAttacksRef.current = attacks;
+    const ranged = attacks.filter((a) => a.kind === "pink-goblin" && a.ranged);
+    if (ranged.length === 0) return;
+    const pos = findPlayerInState(gameState);
+    if (!pos) return;
+    const [py, px] = pos;
+    const now = Date.now();
+    const beams = ranged.map((a, i) => ({
+      id: `beam-${a.y},${a.x}-${now}-${i}`,
+      fromY: a.y,
+      fromX: a.x,
+      toY: py,
+      toX: px,
+    }));
+    const beamIds = new Set(beams.map((b) => b.id));
+    setPinkBeams((prev) => [...prev, ...beams]);
+    const bang = { id: `bang-${py},${px}-${now}`, y: py, x: px };
+    setHeroBangs((prev) => [...prev, bang]);
+    window.setTimeout(() => {
+      setPinkBeams((curr) => curr.filter((b) => !beamIds.has(b.id)));
+    }, 160);
+    window.setTimeout(() => {
+      setHeroBangs((curr) => curr.filter((b) => b.id !== bang.id));
+    }, 240);
+  }, [gameState]);
 
   useEffect(() => {
     const prev = previousHeroHealth.current;
@@ -4177,6 +4236,65 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         />
                       );
                     });
+                  })()}
+                {/* Pink goblin ranged-attack beam (attacker -> hero) */}
+                {pinkBeams.length > 0 &&
+                  (() => {
+                    const tileSize = 40; // px
+                    return pinkBeams.map((b) => {
+                      const x1 = (b.fromX + 0.5) * tileSize;
+                      const y1 = (b.fromY + 0.5) * tileSize;
+                      const x2 = (b.toX + 0.5) * tileSize;
+                      const y2 = (b.toY + 0.5) * tileSize;
+                      const len = Math.hypot(x2 - x1, y2 - y1);
+                      const ang = Math.atan2(y2 - y1, x2 - x1) * (180 / Math.PI);
+                      return (
+                        <div
+                          key={b.id}
+                          aria-hidden="true"
+                          className="absolute pointer-events-none"
+                          style={{
+                            left: `${x1}px`,
+                            top: `${y1 - 2}px`,
+                            width: `${len}px`,
+                            height: "4px",
+                            transformOrigin: "0 50%",
+                            transform: `rotate(${ang}deg)`,
+                            background:
+                              "linear-gradient(90deg, rgba(255,105,220,0.95), rgba(255,182,235,0.7))",
+                            borderRadius: "2px",
+                            boxShadow: "0 0 6px 2px rgba(255,105,220,0.55)",
+                            zIndex: 10800, // over enemies, under the hero
+                            animation: "pinkBeamFlash 100ms ease-out forwards",
+                          }}
+                        />
+                      );
+                    });
+                  })()}
+                {/* Bang flash on the hero when a pink beam connects */}
+                {heroBangs.length > 0 &&
+                  (() => {
+                    const tileSize = 40; // px
+                    const size = 28;
+                    return heroBangs.map((b) => (
+                      <div
+                        key={b.id}
+                        aria-hidden="true"
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${(b.x + 0.5) * tileSize - size / 2}px`,
+                          top: `${(b.y + 0.5) * tileSize - size / 2}px`,
+                          width: `${size}px`,
+                          height: `${size}px`,
+                          backgroundImage: "url(/images/items/bam2.png)",
+                          backgroundSize: "contain",
+                          backgroundRepeat: "no-repeat",
+                          backgroundPosition: "center",
+                          zIndex: 11200, // just above the hero sprite
+                          animation: "heroBangPop 200ms ease-out forwards",
+                        }}
+                      />
+                    ));
                   })()}
                 {spirits.length > 0 &&
                   (() => {

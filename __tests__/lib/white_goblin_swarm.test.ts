@@ -30,8 +30,10 @@ describe("white goblin swarm — strength in numbers (damage)", () => {
       rng: neutralRng,
     }) as { damage: number; attackingEnemies: Array<{ kind: string; damage: number }> };
 
+    // Attack entries also carry the attacker's post-move position and a
+    // ranged flag for render-layer VFX.
     expect(result.attackingEnemies).toEqual([
-      { kind: "white-goblin", damage: 2 },
+      { kind: "white-goblin", damage: 2, y: 5, x: 4, ranged: false },
     ]);
     expect(result.damage).toBe(2);
   });

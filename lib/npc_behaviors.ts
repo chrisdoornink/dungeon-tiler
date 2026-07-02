@@ -127,36 +127,32 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
       npc.y = targetY;
       npc.x = targetX;
       
-      // Update sprite based on movement direction
+      // Deterministic sprite by movement direction. The four "front" images
+      // are distinct POSES (1 faces right, 2 faces left, 3 sits, 4 faces the
+      // camera), so cycling through them made the dog appear to flip around
+      // at random. The walk "wiggle" comes from the render layer's step
+      // animation, not from swapping poses.
       if (moveY < 0) {
-        // Moving up - alternate between back sprites
+        // Moving up — alternate the two back sprites (both face up; the
+        // alternation reads as a tail wag).
         const currentStep = (npc.memory?.dogStep as number) || 0;
         const nextStep = (currentStep + 1) % 2;
         npc.setMemory("dogStep", nextStep);
         npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}.png`;
+      } else if (moveX > 0) {
+        npc.sprite = `/images/dog-golden/dog-front-1.png`; // faces right
+      } else if (moveX < 0) {
+        npc.sprite = `/images/dog-golden/dog-front-2.png`; // faces left
       } else {
-        // Moving down, left, or right - alternate between front sprites
-        const currentStep = (npc.memory?.dogStep as number) || 0;
-        const nextStep = (currentStep + 1) % 4;
-        npc.setMemory("dogStep", nextStep);
-        npc.sprite = `/images/dog-golden/dog-front-${nextStep + 1}.png`;
+        npc.sprite = `/images/dog-golden/dog-front-4.png`; // faces the camera
       }
-      
+
       return { moved: true };
     }
   }
-  
-  // Didn't move - alternate front sprite anyway to show idle animation
-  const currentStep = (npc.memory?.dogStep as number) || 0;
-  const nextStep = (currentStep + 1) % 4;
-  npc.setMemory("dogStep", nextStep);
-  const newSprite = `/images/dog-golden/dog-front-${nextStep + 1}.png`;
-  
-  if (npc.sprite !== newSprite) {
-    npc.sprite = newSprite;
-    return { moved: false, spriteChanged: true };
-  }
-  
+
+  // Didn't move — keep the current pose. (Idle used to cycle all four front
+  // poses, which made the standing dog spin in place at random.)
   return { moved: false };
 }
 
