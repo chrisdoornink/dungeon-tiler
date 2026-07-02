@@ -1121,6 +1121,44 @@ export const Tile: React.FC<TileProps> = ({
   // branches so the smooth slide-in logic lives in one place.
   const renderEnemySprite = () => {
     if (!hasEnemy) return null;
+    // Smooth mode: ghosts glide their whole phase move (through walls — that
+    // reads exactly right for a ghost) AND hover with a perpetual ambient
+    // drift. Two transform animations can't share one element, so the slide
+    // runs on the outer wrapper and the float + opacity flicker on the inner
+    // sprite. (The inline animation list must re-include ghost-flicker: the
+    // inline property overrides the .ghostFlicker class's animation.)
+    if (smoothMode && enemyKind === 'ghost') {
+      if ((enemyVisible ?? isVisible) !== true) return null;
+      return (
+        <div
+          key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            zIndex: 10500, // above fog (10000), below wall tops (12000)
+            ...smoothStepStyle(enemyStep, 'none'),
+          }}
+          data-testid="enemy-sprite"
+        >
+          <div
+            className="ghostFlicker"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundImage: `url(${getEnemyIcon('ghost', 'front')})`,
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center',
+              // Same cave dimming as the legacy ghost sprite
+              filter: !environmentConfig.daylight
+                ? 'brightness(var(--enemy-dim, 0.80))'
+                : undefined,
+              animation:
+                'ghost-flicker 2000ms ease-in-out infinite, ghostFloat 3600ms ease-in-out infinite',
+            }}
+          />
+        </div>
+      );
+    }
     // Phase 3 (smooth mode only): white-goblin swarms render as N overlaid
     // SINGLE goblins instead of the baked 1-4 pack images. Singles have real
     // right-facing art, so sideways packs mirror properly instead of the

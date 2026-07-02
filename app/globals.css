@@ -475,6 +475,27 @@ body {
   }
 }
 
+/* Smooth movement: perpetual ambient drift for ghosts — a slow, slightly
+   irregular hover (up/down with a little sideways sway). Runs on the INNER
+   ghost sprite so it composes with the tile-to-tile slide on the wrapper. */
+@keyframes ghostFloat {
+  0% {
+    transform: translate(0px, 0px);
+  }
+  25% {
+    transform: translate(2.5px, -3px);
+  }
+  50% {
+    transform: translate(-1px, -5px);
+  }
+  75% {
+    transform: translate(-3px, -1.5px);
+  }
+  100% {
+    transform: translate(0px, 0px);
+  }
+}
+
 /* Responsive scaling: scale all game UI (except bottom controls) as a single unit below 650px */
 
 /* Scale the entire game UI (excluding MobileControls) from a 600px baseline */
