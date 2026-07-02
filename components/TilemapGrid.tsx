@@ -1736,11 +1736,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (!p) return;
       const dy = p[0] - y;
       const dx = p[1] - x;
-      // Only animate single-tile steps. 0 = stood still; >1 = ghost wall-phase,
-      // pink-ninja slide/blink, room warp — those should snap, not glide.
-      if (Math.abs(dy) + Math.abs(dx) !== 1) return;
-      // Ghosts flicker-phase (and carry their own CSS animation) — never slide.
-      if (kind === "ghost") return;
+      const dist = Math.abs(dy) + Math.abs(dx);
+      if (dist === 0) return; // stood still
+      if (kind === "ghost") {
+        // Ghosts glide their whole phase move — drifting through walls reads
+        // exactly right for them. Cap it so cross-map warps still snap.
+        if (dist > 6) return;
+      } else if (dist !== 1) {
+        // Non-ghosts animate single-tile steps only; pink-ninja slides/blinks
+        // and room warps snap.
+        return;
+      }
       steps.set(`${keyPrefix}:${y},${x}`, { dy, dx, dur, ease, seq });
     };
     for (const e of gameState.enemies ?? []) {
