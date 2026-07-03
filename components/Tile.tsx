@@ -86,7 +86,35 @@ interface TileProps {
   // Pink goblin whose teleport ring is NOT cast elsewhere: render the ring
   // (with sparkles) directly under the goblin.
   enemyRingUnder?: boolean;
+  // Combat lunge: hard shake toward the opponent when a melee hit lands.
+  // dy/dx are the unit direction toward the opponent; seq restarts the
+  // animation on consecutive hits (see combatLungeStyle).
+  heroLunge?: CombatLunge;
+  enemyLunge?: CombatLunge;
 }
+
+export type CombatLunge = { dy: number; dx: number; seq: number };
+
+// Horizontal clashes read best with a bigger excursion; vertical combat
+// overlaps the neighboring tile sooner (sprites already bleed up/down), so
+// it gets a slightly smaller one.
+const LUNGE_X_PX = 9;
+const LUNGE_Y_PX = 7;
+
+// Style fragment for the combat lunge. Animates the standalone `translate`
+// property (keyframes in globals.css) so it composes with the facing-flip /
+// slide transforms on the same element. Alternating A/B keyframe names by
+// seq restarts the shake on back-to-back hits without remounting the sprite.
+export const combatLungeStyle = (
+  lunge: CombatLunge | undefined
+): React.CSSProperties | null => {
+  if (!lunge) return null;
+  return {
+    ["--lunge-x" as string]: `${lunge.dx * LUNGE_X_PX}px`,
+    ["--lunge-y" as string]: `${lunge.dy * LUNGE_Y_PX}px`,
+    animation: `combatLunge${lunge.seq % 2 ? "B" : "A"} 240ms ease-out`,
+  };
+};
 
 export const Tile: React.FC<TileProps> = ({
   tileId,
@@ -125,6 +153,8 @@ export const Tile: React.FC<TileProps> = ({
   npcStep,
   smoothMode = false,
   enemyRingUnder = false,
+  heroLunge,
+  enemyLunge,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
   // Smooth movement: tracks the enemy slide animation finishing (via
@@ -1479,6 +1509,10 @@ export const Tile: React.FC<TileProps> = ({
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
                 : undefined,
+              // Combat lunge (standalone `translate`) — spread before the
+              // slide styles so a live slide's `animation` wins if both fire
+              // on the same turn.
+              ...combatLungeStyle(enemyLunge),
               // Only while actually sliding: once the tween lands the animation
               // style is dropped so the static transform/pose takes over (this
               // is what lets the snake snap back to its coiled sprite). Regular
@@ -1636,7 +1670,22 @@ export const Tile: React.FC<TileProps> = ({
                 scale: heroScale,
                 transition: heroTransition,
                 backgroundColor: 'transparent',
-                animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
+                // Combat lunge rides the standalone `translate` property, so
+                // it can share the element with the warp flicker (opacity) —
+                // both animations are comma-joined. Suppressed while dying so
+                // it can't fight the death transitions.
+                ...(heroDeathState ? null : combatLungeStyle(heroLunge)),
+                animation:
+                  [
+                    heroWarping
+                      ? 'heroWarpFlicker 0.16s steps(2) infinite'
+                      : null,
+                    !heroDeathState && heroLunge
+                      ? combatLungeStyle(heroLunge)?.animation
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(', ') || undefined,
                 visibility: suppressHeroSprite ? 'hidden' : undefined,
               }}
             >

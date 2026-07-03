@@ -469,4 +469,66 @@ describe('Tile component', () => {
       expect(potIcon.style.getPropertyValue('--snake-pot-delay')).toBe('');
     });
   });
+
+  describe('combat lunge', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+
+    it('applies a horizontal lunge to the hero sprite toward the opponent', () => {
+      const { container } = render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.PLAYER]}
+          row={5}
+          col={5}
+          heroLunge={{ dy: 0, dx: 1, seq: 2 }}
+        />
+      );
+
+      const heroImage = container.querySelector('.heroImage') as HTMLElement;
+      expect(heroImage.style.getPropertyValue('--lunge-x')).toBe('9px');
+      expect(heroImage.style.getPropertyValue('--lunge-y')).toBe('0px');
+      // even seq -> A variant
+      expect(heroImage.style.animation).toContain('combatLungeA');
+    });
+
+    it('applies a vertical lunge with the smaller amplitude and B variant on odd seq', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[]}
+          row={5}
+          col={5}
+          hasEnemy
+          enemyKind="fire-goblin"
+          enemyFacing="UP"
+          enemyLunge={{ dy: -1, dx: 0, seq: 3 }}
+        />
+      );
+
+      const enemySprite = screen.getByTestId('enemy-sprite');
+      expect(enemySprite.style.getPropertyValue('--lunge-x')).toBe('0px');
+      expect(enemySprite.style.getPropertyValue('--lunge-y')).toBe('-7px');
+      expect(enemySprite.style.animation).toContain('combatLungeB');
+    });
+
+    it('suppresses the hero lunge while a death animation is active', () => {
+      const { container } = render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.PLAYER]}
+          row={5}
+          col={5}
+          heroLunge={{ dy: 0, dx: -1, seq: 1 }}
+          heroDeathState={{ phase: 'spinning', orientation: Direction.RIGHT }}
+        />
+      );
+
+      const heroImage = container.querySelector('.heroImage') as HTMLElement;
+      expect(heroImage.style.getPropertyValue('--lunge-x')).toBe('');
+      expect(heroImage.style.animation).not.toContain('combatLunge');
+    });
+  });
 });

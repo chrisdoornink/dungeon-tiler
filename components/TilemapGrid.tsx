@@ -23,7 +23,13 @@ import { rehydrateEnemies } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
 import { rehydrateNPCs } from "../lib/npc";
 import { canSee, calculateDistance } from "../lib/line_of_sight";
-import { Tile, type HeroDeathPhase, type HeroDeathState } from "./Tile";
+import {
+  Tile,
+  combatLungeStyle,
+  type CombatLunge,
+  type HeroDeathPhase,
+  type HeroDeathState,
+} from "./Tile";
 import {
   getEnemyIcon,
   createEmptyByKind,
@@ -1766,6 +1772,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     Array<{ id: string; fromY: number; fromX: number; toY: number; toX: number }>
   >([]);
   const [heroBangs, setHeroBangs] = useState<Array<{ id: string; y: number; x: number }>>([]);
+  // Combat lunges: hard shake toward the opponent when a melee hit lands.
+  // Keyed "hero" or "e:y,x"; entries clear themselves once the shake is done.
+  const [combatLunges, setCombatLunges] = useState<Map<string, CombatLunge>>(
+    () => new Map()
+  );
+  const lungeSeqRef = useRef(0);
+  const fireCombatLunges = useCallback(
+    (entries: Array<[string, { dy: number; dx: number }]>) => {
+      const seq = ++lungeSeqRef.current;
+      setCombatLunges((prev) => {
+        const next = new Map(prev);
+        for (const [key, dir] of entries) next.set(key, { ...dir, seq });
+        return next;
+      });
+      if (typeof window !== "undefined") {
+        window.setTimeout(() => {
+          setCombatLunges((prev) => {
+            const next = new Map(prev);
+            for (const [key] of entries) {
+              if (next.get(key)?.seq === seq) next.delete(key);
+            }
+            return next;
+          });
+        }, 300);
+      }
+    },
+    []
+  );
   // Seed with the initial state's array so a rehydrated save doesn't replay
   // its last tick's beam on load.
   const lastProcessedAttacksRef = useRef<unknown>(gameState.recentEnemyAttacks ?? null);
@@ -1879,6 +1913,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       setHeroBangs((curr) => curr.filter((b) => b.id !== bang.id));
     }, 240);
   }, [gameState]);
+
+  // Melee enemy attacks: both combatants shake hard toward each other, same
+  // as when the hero lands a hit. Same engine transient as the beams above,
+  // but deduped separately so neither effect starves the other.
+  const lastProcessedMeleeRef = useRef<unknown>(
+    gameState.recentEnemyAttacks ?? null
+  );
+  useEffect(() => {
+    const attacks = gameState.recentEnemyAttacks;
+    if (!attacks || attacks.length === 0) return;
+    if (lastProcessedMeleeRef.current === attacks) return;
+    lastProcessedMeleeRef.current = attacks;
+    const melee = attacks.filter((a) => !a.ranged);
+    if (melee.length === 0) return;
+    const pos = findPlayerInState(gameState);
+    if (!pos) return;
+    const [py, px] = pos;
+    const entries: Array<[string, { dy: number; dx: number }]> = melee.map(
+      (a) => [
+        `e:${a.y},${a.x}`,
+        { dy: Math.sign(py - a.y), dx: Math.sign(px - a.x) },
+      ]
+    );
+    // The hero shakes back toward the (first) attacker — skip if this hit
+    // killed him so the shake can't fight the death animation.
+    if (gameState.heroHealth > 0) {
+      const first = melee[0];
+      entries.push([
+        "hero",
+        { dy: Math.sign(first.y - py), dx: Math.sign(first.x - px) },
+      ]);
+    }
+    fireCombatLunges(entries);
+  }, [gameState, fireCombatLunges]);
 
   useEffect(() => {
     const prev = previousHeroHealth.current;
@@ -2654,6 +2722,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           setBamEffect({ y: yMid, x: xMid, src });
           // Clear after ~600ms
           setTimeout(() => setBamEffect(null), 200);
+          // Both combatants shake hard toward each other as the bang lands
+          const lungeDy = Math.sign(enemy.y - py);
+          const lungeDx = Math.sign(enemy.x - px);
+          fireCombatLunges([
+            ["hero", { dy: lungeDy, dx: lungeDx }],
+            [`e:${enemy.y},${enemy.x}`, { dy: -lungeDy, dx: -lungeDx }],
+          ]);
         }
       }
 
@@ -2915,7 +2990,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // to start the camera tween synchronously.
       return newGameState;
     },
-    [gameState, playerPosition, resolvedStorageSlot]
+    [gameState, playerPosition, resolvedStorageSlot, fireCombatLunges]
   );
 
   const handleMoveInput = useCallback(
@@ -4377,7 +4452,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // Smooth movement: overlay hero + viewport-fixed vignette.
                     smoothEnabled && heroDeathPhase === "idle" && !warpFlicker,
                     smoothEnabled,
-                    smoothEntitySteps
+                    smoothEntitySteps,
+                    combatLunges
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -4418,6 +4494,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             gameState.playerDirection === Direction.LEFT
                               ? "scaleX(-1)"
                               : undefined,
+                          // Combat lunge: standalone `translate` composes
+                          // BEFORE `transform`, so the shake direction stays
+                          // in world coords even when the sprite is flipped.
+                          ...combatLungeStyle(combatLunges.get("hero")),
                         }}
                       >
                         <div
@@ -4773,7 +4853,9 @@ function renderTileGrid(
   viewportCenteredVignette: boolean = false,
   // Phase 2: one-tile slide-in animations, keyed "e:y,x" / "n:y,x" by
   // destination tile (see smoothEntitySteps in the component).
-  entitySteps?: Map<string, SmoothEntityStep>
+  entitySteps?: Map<string, SmoothEntityStep>,
+  // Combat lunges keyed "hero" / "e:y,x" (see combatLunges in the component).
+  combatLunges?: Map<string, CombatLunge>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -4988,6 +5070,10 @@ function renderTileGrid(
             }
             npcStep={
               npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined
+            }
+            heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
+            enemyLunge={
+              hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined
             }
             // viewportCenteredVignette is set exactly when smooth mode is on
             smoothMode={viewportCenteredVignette}

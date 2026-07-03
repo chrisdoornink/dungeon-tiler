@@ -410,6 +410,27 @@ body {
   animation: heartPop 600ms ease-out forwards;
 }
 
+/* Combat lunge: a hard shake toward the opponent when a melee hit lands.
+   Animates the standalone `translate` property so it composes with facing
+   flips / slide animations (which use `transform`). --lunge-x/--lunge-y are
+   set per-attack from the combat direction. A and B are identical: elements
+   alternate between them on consecutive hits so the animation restarts
+   without remounting the sprite. */
+@keyframes combatLungeA {
+  0% { translate: 0 0; }
+  30% { translate: var(--lunge-x, 0px) var(--lunge-y, 0px); }
+  55% { translate: calc(var(--lunge-x, 0px) * -0.35) calc(var(--lunge-y, 0px) * -0.35); }
+  75% { translate: calc(var(--lunge-x, 0px) * 0.4) calc(var(--lunge-y, 0px) * 0.4); }
+  100% { translate: 0 0; }
+}
+@keyframes combatLungeB {
+  0% { translate: 0 0; }
+  30% { translate: var(--lunge-x, 0px) var(--lunge-y, 0px); }
+  55% { translate: calc(var(--lunge-x, 0px) * -0.35) calc(var(--lunge-y, 0px) * -0.35); }
+  75% { translate: calc(var(--lunge-x, 0px) * 0.4) calc(var(--lunge-y, 0px) * 0.4); }
+  100% { translate: 0 0; }
+}
+
 /* Hero teleport dematerialize: rapid opacity flicker while the iris transition plays. */
 @keyframes heroWarpFlicker {
   0% { opacity: 1; }
