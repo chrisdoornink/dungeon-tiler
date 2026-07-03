@@ -2754,6 +2754,42 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const preDamageDealt = gameState.stats?.damageDealt ?? 0;
       const newGameState = movePlayer(gameState, direction);
 
+      // Smashing a pot by hand should read as an impact, just like breaking it
+      // with a thrown rock: flash a "bam" over the pot as it shatters to reveal
+      // its contents, instead of the pot silently vanishing. Detect it by the pot
+      // tag disappearing from the tile the player moved into.
+      if (playerPosition) {
+        const [py, px] = playerPosition;
+        let ty = py;
+        let tx = px;
+        switch (direction) {
+          case Direction.UP:
+            ty = py - 1;
+            break;
+          case Direction.RIGHT:
+            tx = px + 1;
+            break;
+          case Direction.DOWN:
+            ty = py + 1;
+            break;
+          case Direction.LEFT:
+            tx = px - 1;
+            break;
+        }
+        const preHadPot = (gameState.mapData.subtypes?.[ty]?.[tx] || []).includes(
+          TileSubtype.POT
+        );
+        const postHasPot = (
+          newGameState.mapData.subtypes?.[ty]?.[tx] || []
+        ).includes(TileSubtype.POT);
+        if (preHadPot && !postHasPot) {
+          const bamIdx = 1 + Math.floor(Math.random() * 3);
+          setBamEffect({ y: ty, x: tx, src: `/images/items/bam${bamIdx}.png` });
+          setTimeout(() => setBamEffect(null), 300);
+          triggerScreenShake();
+        }
+      }
+
       // Pink-realm warp: first show the hero step ONTO the ring tile, then flicker
       // (dematerialize) and run the iris transition into the realm — rather than swapping
       // the map instantly (which made the hero flicker on the tile beside the ring).
