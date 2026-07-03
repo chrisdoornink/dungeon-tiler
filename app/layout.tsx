@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Press_Start_2P, VT323 } from "next/font/google";
 import "./globals.css";
 import PreloadImages from "../components/PreloadImages";
@@ -39,7 +39,12 @@ export const metadata: Metadata = {
     icon: [
       { url: "/images/favicon.ico", type: "image/x-icon" },
     ],
-    apple: "/images/hero/hero-front-static.png",
+    apple: "/icons/apple-touch-icon.png",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Torch Boy",
   },
   openGraph: {
     title: "Torch Boy",
@@ -56,6 +61,10 @@ export const metadata: Metadata = {
       "/images/hero/hero-front-static.png",
     ],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#1B1B1B",
 };
 
 export default function RootLayout({
