@@ -56,4 +56,46 @@ describe('Bam effect UI', () => {
 
     jest.useRealTimers();
   });
+
+  it('shows a bam overlay on the pot when it is smashed by hand', async () => {
+    jest.useFakeTimers();
+    // Player at (1,1), a pot to the right at (1,2), no enemies.
+    const size = 25;
+    const tiles = Array.from({ length: size }, () => Array(size).fill(0));
+    const subtypes = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [] as number[])
+    );
+    subtypes[1][1] = [TileSubtype.PLAYER];
+    subtypes[1][2] = [TileSubtype.POT];
+    const state: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      enemies: [],
+      heroHealth: 5,
+      heroAttack: 1,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    render(<TilemapGrid tileTypes={{}} initialGameState={state} />);
+
+    act(() => {
+      fireEvent.keyDown(window, { key: 'ArrowRight' });
+    });
+
+    // Bam appears directly on the pot tile (1,2), not a midpoint.
+    const bam = await screen.findByTestId('bam-effect');
+    expect(bam).toHaveAttribute('data-bam-y', '1');
+    expect(bam).toHaveAttribute('data-bam-x', '2');
+
+    act(() => {
+      jest.advanceTimersByTime(600);
+    });
+    expect(screen.queryByTestId('bam-effect')).toBeNull();
+
+    jest.useRealTimers();
+  });
 });
