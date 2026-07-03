@@ -641,12 +641,22 @@
   border: 1px solid #1a1a1a;
 }
 
-/* Open abyss: triggered faulty floor with subtle pink sparkle */
+/* Open abyss: triggered faulty floor with subtle pink sparkle. Keeps the floor
+   texture as its base so that, on the frame the pit first opens, the tile still
+   looks like solid floor until the black ::before "breaks" in (see abyssOpen). */
 .openAbyss {
   position: relative;
+  background-color: var(--floor-bg);
+  background-image: url("/images/floor/floor-try-1.png");
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
 }
 
-/* Solid black background to completely hide floor texture */
+/* Solid black background to completely hide floor texture. It opens AFTER the
+   step (animation-delay) with `backwards` fill so the floor reads as intact
+   while the enemy walks on, then the pit breaks open from the centre — timed to
+   the hold beat of enemyAbyssFall. */
 .openAbyss::before {
   content: '';
   position: absolute;
@@ -655,6 +665,39 @@
   box-shadow: inset 0 0 20px 5px rgba(0, 0, 0, 0.9);
   border: 1px solid #0a0a0a;
   z-index: 1;
+  transform-origin: center;
+  animation: abyssOpen 220ms ease-in 200ms backwards;
+}
+
+/* The crack breaks away as the pit opens — same delay/duration as abyssOpen so
+   the cracked floor reads as intact during the step, then shatters into the pit
+   (opacity only, so the inline rotate transform is preserved). */
+.faultyFloorIconBreaking {
+  animation: crackBreak 220ms ease-in 200ms forwards;
+}
+
+@keyframes crackBreak {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* The floor giving way: the pit punches open from the centre. */
+@keyframes abyssOpen {
+  0% {
+    opacity: 0;
+    transform: scale(0.25);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* Pink sparkle effect on top */

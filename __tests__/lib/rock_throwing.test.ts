@@ -280,4 +280,71 @@ describe('Rock Throwing - stops at wall and disappears', () => {
     expect(beyond).not.toContain(TileSubtype.ROCK);
   });
 });
+
+describe('Rock Throwing - rune-killed stone-goblin is frozen (no jump)', () => {
+  // A stone-goblin (8 HP) two tiles down a clear corridor. It chases like any
+  // goblin, so it WOULD step toward the hero on the throw turn. A held rune makes
+  // the throw an instant kill, so the engine must freeze it (like a <=2 HP rock
+  // kill) — otherwise it walks off its tile first and the bang/ghost land where
+  // it used to be. See performThrowRock pre-scan.
+  function corridorState(overrides: Partial<GameState> = {}): GameState {
+    const base = generateMapWithSubtypes();
+    for (let y = 0; y < base.tiles.length; y++) {
+      for (let x = 0; x < base.tiles[y].length; x++) {
+        base.tiles[y][x] = 1;
+        base.subtypes[y][x] = [];
+      }
+    }
+    const py = 5, px = 5;
+    for (let x = px - 1; x <= px + 4; x++) {
+      base.tiles[py][x] = 0;
+      base.subtypes[py][x] = [];
+    }
+    base.subtypes[py][px] = [TileSubtype.PLAYER];
+    const stone = new Enemy({ y: py, x: px + 2 }); // on the ray, 2 tiles right
+    stone.kind = 'stone-goblin'; // 8 HP: never frozen by the 2-damage rule
+    return {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      mapData: base,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      enemies: [stone],
+      heroHealth: 5,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      rockCount: 1,
+      heroTorchLit: true,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      recentDeaths: [],
+      ...overrides,
+    } as GameState;
+  }
+
+  it('with a rune: the stone-goblin is frozen and dies on its own tile, not the one it would have walked to', () => {
+    const after = performThrowRock(corridorState({ runeCount: 1 }));
+    // Killed, rune consumed.
+    expect(after.enemies?.length ?? 0).toBe(0);
+    expect(after.runeCount).toBe(0);
+    // Death recorded on its PRE-move tile (5,7) — it did not step to (5,6) first.
+    expect(after.defeatedEnemies).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ y: 5, x: 7, kind: 'stone-goblin' }),
+      ])
+    );
+    expect(after.recentDeaths).toContainEqual([5, 7]);
+  });
+
+  it('control (no rune): the same stone-goblin is NOT frozen — it advances and survives the rock', () => {
+    const after = performThrowRock(corridorState({ runeCount: 0 }));
+    // Proves it WOULD move here: it stepped to (5,6) and took 2 damage (8 -> 6).
+    expect(after.enemies?.length ?? 0).toBe(1);
+    const g = (after.enemies ?? [])[0];
+    expect([g.y, g.x]).toEqual([5, 6]);
+    expect(g.health).toBe(6);
+  });
+});
 });

@@ -1060,12 +1060,18 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render faulty floor cracks overlay */}
-        {hasFaultyFloor(subtypes) && (
+        {/* Render faulty floor cracks overlay. Kept mounted (same key) through the
+            faulty -> open-abyss transition so it never blinks to plain floor; once
+            the tile opens, it breaks away in sync with the pit (see abyssOpen). */}
+        {(hasFaultyFloor(subtypes) || hasOpenAbyss(subtypes)) && (
           <div
             key="faulty-floor"
             data-testid={`subtype-icon-${TileSubtype.FAULTY_FLOOR}`}
-            className={`${styles.assetIcon} ${styles.faultyFloorIcon}`}
+            className={`${styles.assetIcon} ${styles.faultyFloorIcon}${
+              hasOpenAbyss(subtypes) && !hasFaultyFloor(subtypes)
+                ? ` ${styles.faultyFloorIconBreaking}`
+                : ""
+            }`}
             style={{
               transform: `translate(-50%, -50%) rotate(${getFaultyFloorRotation()}deg)`,
             }}

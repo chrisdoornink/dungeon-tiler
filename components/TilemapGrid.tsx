@@ -1444,12 +1444,106 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
     }
 
-    // Commit the resolved outcome AND fire the impact VFX together, so the rock
-    // landing, the bang, the floating damage, and any ghost all happen at the
-    // same instant on the same tile.
-    const commitAndImpact = () => {
+    // A surviving enemy the rock hit ALSO moved this turn. Rock KILLS (<=2 HP)
+    // are frozen by the engine so they read cleanly, but a survivor walks first
+    // and then takes the hit. If we kept the pre-move impact above, the bang
+    // would land on the tile it left and it would appear to "jump" to where it
+    // walked. Instead: commit the move up front so the enemy visibly takes its
+    // step, and home the rock to its POST-move tile so the bang connects where
+    // it actually ends up. Gameplay is unchanged — only the timing/target of
+    // the VFX. The rock deals a flat 2, so the survivor is the enemy whose HP
+    // dropped by exactly 2 this turn.
+    // Only worth doing in smooth mode: the homing relies on the enemy sliding
+    // to its post-move tile. Without smooth movement there is no slide (the
+    // sprite renders at its logical tile), so committing up front would just
+    // teleport it early — keep the pre-move impact path in that case.
+    let earlyCommit = false;
+    const rockDamaged = (next.enemies ?? []).find((e) => {
+      const preH = preHealthById.get(e.id);
+      return preH != null && preH - (e.health ?? 0) === 2;
+    });
+    if (rockDamaged && smoothEnabled) {
+      const colinear = vy === 0 ? rockDamaged.y === py : rockDamaged.x === px;
+      const forward =
+        vy !== 0
+          ? Math.sign(rockDamaged.y - py) === vy
+          : Math.sign(rockDamaged.x - px) === vx;
+      const dist = Math.abs(rockDamaged.y - py) + Math.abs(rockDamaged.x - px);
+      if (colinear && forward && dist >= 1 && dist <= 4) {
+        earlyCommit = true;
+        impact = { y: rockDamaged.y, x: rockDamaged.x };
+        impactEnemyId = rockDamaged.id;
+        // Re-aim the projectile path straight to the post-move tile.
+        path.length = 0;
+        let cy = py;
+        let cx = px;
+        for (let s = 0; s < dist; s++) {
+          cy += vy;
+          cx += vx;
+          path.push([cy, cx]);
+        }
+      }
+    }
+
+    const applyState = () => {
+      // Enemies that stepped into a freshly-opened pit during this throw's enemy
+      // turn dive in with the same shrink/fall as on a movement turn (the move
+      // handler owns that spawn, so replicate it here). Clear the transient after
+      // so the dive isn't replayed on the next turn.
+      const fell = (next.defeatedEnemies ?? []).filter((d) =>
+        next.mapData.subtypes[d.y]?.[d.x]?.includes(TileSubtype.OPEN_ABYSS)
+      );
+      if (fell.length > 0) {
+        const nowTs = Date.now();
+        const entries = fell.map((f) => {
+          let fallFrom: string | undefined;
+          let dir: "up" | "down" | "left" | "right" | undefined;
+          if (smoothEnabled && f.id) {
+            const p = smoothEntityPrevRef.current.get(`e:${f.id}`);
+            if (p && Math.abs(p[0] - f.y) + Math.abs(p[1] - f.x) === 1) {
+              fallFrom = `translate(${(p[1] - f.x) * 40}px, ${(p[0] - f.y) * 40}px) scale(1)`;
+              const dy = f.y - p[0];
+              const dx = f.x - p[1];
+              dir = dy < 0 ? "up" : dy > 0 ? "down" : dx < 0 ? "left" : "right";
+            }
+          }
+          return {
+            id: `fall-${f.y},${f.x}-${nowTs}-${Math.random().toString(36).slice(2, 7)}`,
+            y: f.y,
+            x: f.x,
+            kind: f.kind,
+            fallFrom,
+            dir,
+          };
+        });
+        setEnemyAbyssFalls((prev) => [...prev, ...entries]);
+        for (const e of entries) {
+          setTimeout(() => {
+            setEnemyAbyssFalls((curr) => curr.filter((c) => c.id !== e.id));
+          }, 800);
+        }
+        next.defeatedEnemies = [];
+      }
       CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
       setGameState(next);
+    };
+    // Survivor-hit: start the enemy's step now so it slides toward its post-move
+    // tile as the rock flies in, rather than popping there after the bang.
+    if (earlyCommit) applyState();
+
+    // Identifies THIS throw's projectile so clearing it never wipes a newer
+    // throw's rock (rapid taps / key autorepeat can overlap two flights).
+    const rockId = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    // Commit the resolved outcome AND fire the impact VFX together, so the rock
+    // landing, the bang, the floating damage, and any ghost all happen at the
+    // same instant on the same tile. (State already applied above when
+    // earlyCommit is set.)
+    const commitAndImpact = () => {
+      if (!earlyCommit) applyState();
+      // The rock has reached the impact tile — clear it as the bang lands, but
+      // only if it's still THIS throw's rock on screen.
+      setRockEffect((cur) => (cur && cur.id === rockId ? null : cur));
       if (impact) {
         const bamIdx = 1 + Math.floor(Math.random() * 3);
         setBamEffect({
@@ -1462,7 +1556,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
       try {
         // Floating damage for the enemy the rock hit — matched by id, shown on
-        // the tile where the rock visibly connected (its pre-move tile).
+        // the tile where the rock visibly connected (post-move for a survivor
+        // that stepped this turn, otherwise its resting tile).
         if (impactEnemyId && impact) {
           const imp = impact;
           const hitId = impactEnemyId;
@@ -1521,28 +1616,35 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
     // Animate the rock, then land everything as it reaches the impact tile.
     const stepMs = 50; // faster animation per tile
+    const flightMs = path.length * stepMs;
+    // On a survivor-hit we committed the enemy's move up front; give its slide
+    // (walkStepMs) time to finish so the bang doesn't beat it to the tile. The
+    // rock rests on the impact tile during that beat.
+    const impactDelay = earlyCommit
+      ? Math.max(flightMs, SMOOTH_TUNING.walkStepMs) + 10
+      : flightMs + 10;
     if (path.length > 0) {
-      const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       let idx = 0;
-      setRockEffect({ y: path[0][0], x: path[0][1], id });
+      setRockEffect({ y: path[0][0], x: path[0][1], id: rockId });
       const interval = setInterval(() => {
         idx += 1;
         if (idx >= path.length || !path[idx]) {
+          // Reached the impact tile — stop advancing but leave the rock resting
+          // there; commitAndImpact clears it as the bang lands.
           clearInterval(interval);
-          setRockEffect((cur) => (cur && cur.id === id ? null : cur));
           return;
         }
         const [ny, nx] = path[idx];
         setRockEffect((cur) =>
-          cur && cur.id === id ? { ...cur, y: ny, x: nx } : cur
+          cur && cur.id === rockId ? { ...cur, y: ny, x: nx } : cur
         );
       }, stepMs);
       // Safety: clear after 1s
       setTimeout(() => {
-        setRockEffect((cur) => (cur && cur.id === id ? null : cur));
+        setRockEffect((cur) => (cur && cur.id === rockId ? null : cur));
       }, 1000);
-      // Land the outcome + VFX exactly as the rock reaches the impact tile.
-      setTimeout(commitAndImpact, path.length * stepMs + 10);
+      // Land the outcome + VFX as the rock reaches the impact tile.
+      setTimeout(commitAndImpact, impactDelay);
     } else {
       // No travel (e.g., wall adjacent) — resolve now.
       commitAndImpact();
@@ -1765,9 +1867,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   >([]);
   // Transient "enemy fell into the abyss" dives (spawn when a defeated
   // enemy's tile just became an open abyss). fallFrom is the smooth-mode
-  // slide-in offset from the tile it fell from, when known.
+  // slide-in offset from the tile it fell from, when known; dir is the
+  // direction it stepped in (drives which facing sprite we show as it drops).
   const [enemyAbyssFalls, setEnemyAbyssFalls] = useState<
-    Array<{ id: string; y: number; x: number; kind: string; fallFrom?: string }>
+    Array<{
+      id: string;
+      y: number;
+      x: number;
+      kind: string;
+      fallFrom?: string;
+      dir?: "up" | "down" | "left" | "right";
+    }>
   >([]);
   // Transient floating damage numbers (hero/enemy hits)
   const [floating, setFloating] = useState<FloatingNumber[]>([]);
@@ -3000,12 +3110,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const entries = fell.map((f) => {
             // Smooth mode: slide in from the tile it fell from. The entity
             // diff hasn't rebuilt yet, so the prev map still holds pre-move
-            // positions for this turn.
+            // positions for this turn. The same prev->abyss delta tells us
+            // which way it was walking, so we can show the matching facing.
             let fallFrom: string | undefined;
+            let dir: "up" | "down" | "left" | "right" | undefined;
             if (smoothEnabled && f.id) {
               const p = smoothEntityPrevRef.current.get(`e:${f.id}`);
               if (p && Math.abs(p[0] - f.y) + Math.abs(p[1] - f.x) === 1) {
                 fallFrom = `translate(${(p[1] - f.x) * 40}px, ${(p[0] - f.y) * 40}px) scale(1)`;
+                const dy = f.y - p[0];
+                const dx = f.x - p[1];
+                dir = dy < 0 ? "up" : dy > 0 ? "down" : dx < 0 ? "left" : "right";
               }
             }
             return {
@@ -3016,6 +3131,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               x: f.x,
               kind: f.kind,
               fallFrom,
+              dir,
             };
           });
           setEnemyAbyssFalls((prev) => [...prev, ...entries]);
@@ -4314,13 +4430,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       );
                     });
                   })()}
-                {/* Enemies dropping face-first into a freshly opened abyss */}
+                {/* Enemies dropping into a freshly opened abyss, facing the way
+                    they stepped, shrinking to nothing as they fall. */}
                 {enemyAbyssFalls.length > 0 &&
                   (() => {
                     const tileSize = 40; // px
                     return enemyAbyssFalls.map((f) => {
                       const pxLeft = (f.x + 0.5) * tileSize;
                       const pxTop = (f.y + 0.5) * tileSize;
+                      // Show the sprite for the direction it walked in: toward the
+                      // viewer (down) = front, away (up) = back, sideways = the
+                      // right-facing asset mirrored for left.
+                      const facing =
+                        f.dir === "up"
+                          ? "back"
+                          : f.dir === "left" || f.dir === "right"
+                          ? "right"
+                          : "front";
+                      const flip = f.dir === "left";
                       return (
                         <div
                           key={f.id}
@@ -4331,20 +4458,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             top: `${pxTop - tileSize / 2}px`,
                             width: `${tileSize}px`,
                             height: `${tileSize}px`,
-                            backgroundImage: `url(${getEnemyIcon(
-                              f.kind as EnemyKind,
-                              "front"
-                            )})`,
-                            backgroundSize: "contain",
-                            backgroundRepeat: "no-repeat",
-                            backgroundPosition: "center",
                             zIndex: 10500, // same layer as live enemies
-                            animation: "enemyAbyssFall 620ms forwards",
+                            // The animation owns `transform` (slide + shrink);
+                            // the horizontal flip lives on the inner sprite so
+                            // the two never clobber each other.
+                            animation: "enemyAbyssFall 640ms forwards",
                             ...(f.fallFrom
                               ? ({ ["--fall-from" as string]: f.fallFrom } as React.CSSProperties)
                               : null),
                           }}
-                        />
+                        >
+                          <div
+                            style={{
+                              width: "100%",
+                              height: "100%",
+                              backgroundImage: `url(${getEnemyIcon(
+                                f.kind as EnemyKind,
+                                facing
+                              )})`,
+                              backgroundSize: "contain",
+                              backgroundRepeat: "no-repeat",
+                              backgroundPosition: "center",
+                              transform: flip ? "scaleX(-1)" : undefined,
+                            }}
+                          />
+                        </div>
                       );
                     });
                   })()}

@@ -274,6 +274,10 @@ export function performUseFood(gameState: GameState): GameState {
     }
   }
 
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
+
   // Use the food: heal 1 HP (capped at heroMaxHealth) and consume 1 food
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(newGameState.heroMaxHealth ?? 5, newGameState.heroHealth + 1);
@@ -344,6 +348,10 @@ export function performUsePotion(gameState: GameState): GameState {
       }
     }
   }
+
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
 
   // Use the potion: heal 2 HP (capped at heroMaxHealth) and consume 1 potion
   const newGameState = { ...preTickState };
@@ -426,6 +434,10 @@ export function performUsePinkHeart(gameState: GameState): GameState {
     }
   }
 
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
+
   // Consume the heart: full heal + 3 temporary pink bonus hearts.
   const newGameState = { ...preTickState };
   newGameState.heroHealth = newGameState.heroMaxHealth ?? 5;
@@ -497,6 +509,10 @@ export function performUseBerry(gameState: GameState): GameState {
     }
   }
 
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
+
   // Consume the berry: heal a variable 2-3 hearts (capped at heroMaxHealth).
   const healRng = preTickState.combatRng ?? Math.random;
   const heal = healRng() < 0.5 ? 2 : 3;
@@ -559,9 +575,14 @@ export function performThrowRock(gameState: GameState): GameState {
       if (hitIdx !== -1) {
         const target = enemiesNow[hitIdx];
         const targetHp = target.health ?? 1;
-        // Only skip the enemy's turn if the rock will outright kill it (2 dmg).
-        // Surviving targets still get to act this tick.
-        if (targetHp <= 2) {
+        // Skip the enemy's turn only if THIS throw will outright kill it — either
+        // the rock's 2 damage finishes it, or it's a stone-goblin and a held rune
+        // instantly kills it (see the rune branch below). A frozen target doesn't
+        // move, so it dies on the tile it's shown on and the impact/ghost line up
+        // (no "jump"). Surviving targets still get to act this tick.
+        const runeWillKill =
+          target.kind === "stone-goblin" && (preTickState.runeCount ?? 0) > 0;
+        if (targetHp <= 2 || runeWillKill) {
           rockKillTargetIdx = hitIdx;
         }
         break; // rock stops at first enemy regardless
@@ -609,6 +630,11 @@ export function performThrowRock(gameState: GameState): GameState {
     }
     // Note: Do NOT apply adjacent ghost vanish on rock-throw turns; only move enemies.
   }
+
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn. Without this, throwing lets
+  // them walk over pits unharmed and simply step back off on the next turn.
+  applyEnemyHazardDeaths(preTickState);
 
   // Determine direction vector
   let vx = 0,
@@ -874,6 +900,10 @@ export function performThrowRune(gameState: GameState): GameState {
       };
     }
   }
+
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
 
   const newMapData = JSON.parse(
     JSON.stringify(preTickState.mapData)
@@ -1312,6 +1342,10 @@ export function performThrowBomb(gameState: GameState): GameState {
       };
     }
   }
+
+  // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
+  // the abyss now, exactly as on a movement turn (see performThrowRock).
+  applyEnemyHazardDeaths(preTickState);
 
   // Direction vector
   let vx = 0,

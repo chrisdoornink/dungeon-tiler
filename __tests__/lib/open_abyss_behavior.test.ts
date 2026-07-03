@@ -1,6 +1,11 @@
 import { Enemy } from "../../lib/enemy";
 import { TileSubtype, Direction } from "../../lib/map";
-import { movePlayer, initializeGameState } from "../../lib/map/game-state";
+import {
+  movePlayer,
+  performThrowRock,
+  performThrowBomb,
+  performUsePotion,
+} from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
 
 describe("Open Abyss Behavior", () => {
@@ -93,6 +98,67 @@ describe("Open Abyss Behavior", () => {
     });
   });
 
+  describe("Hazard deaths on non-movement turns", () => {
+    // A goblin one tile above a faulty floor, with the player straight below it,
+    // so the goblin's chase step lands on the faulty floor during any turn that
+    // ticks enemies. Regression guard: throwing/using an item is a full turn and
+    // must resolve the fall, otherwise enemies walk over pits for free and step
+    // back off on the next turn.
+    function pitTrapState(overrides: Partial<GameState> = {}): GameState {
+      const goblin = new Enemy({ y: 0, x: 1 });
+      goblin.kind = "fire-goblin"; // 4 HP: would survive a rock, so only the pit can kill it here
+      const mapData = {
+        tiles: [
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+          [0, 0, 0],
+        ],
+        subtypes: [
+          [[], [], []],
+          [[], [TileSubtype.FAULTY_FLOOR], []],
+          [[], [], []],
+          [[], [TileSubtype.PLAYER], []],
+        ] as number[][][],
+      };
+      return {
+        hasKey: false,
+        hasExitKey: false,
+        mapData,
+        showFullMap: false,
+        win: false,
+        playerDirection: Direction.LEFT, // throw sideways so the rock can't hit the goblin
+        heroHealth: 5,
+        heroMaxHealth: 5,
+        heroAttack: 1,
+        enemies: [goblin],
+        npcs: [],
+        stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+        ...overrides,
+      } as GameState;
+    }
+
+    function expectPitDeath(next: GameState) {
+      // Goblin fell in and is gone.
+      expect(next.enemies?.length ?? 0).toBe(0);
+      // Its faulty tile opened into an abyss at [1,1].
+      expect(next.mapData.subtypes[1][1]).toContain(TileSubtype.OPEN_ABYSS);
+      expect(next.mapData.subtypes[1][1]).not.toContain(TileSubtype.FAULTY_FLOOR);
+    }
+
+    test("throwing a rock resolves an enemy's fall into the abyss", () => {
+      expectPitDeath(performThrowRock(pitTrapState({ rockCount: 3 })));
+    });
+
+    test("throwing a bomb resolves an enemy's fall into the abyss", () => {
+      expectPitDeath(performThrowBomb(pitTrapState({ bombCount: 3 })));
+    });
+
+    test("using a potion resolves an enemy's fall into the abyss", () => {
+      expectPitDeath(performUsePotion(pitTrapState({ potionCount: 1 })));
+    });
+  });
+
   describe("Goblin avoidance behavior", () => {
     test("goblin avoids faulty floor when patrolling (not chasing)", () => {
       // Test the underlying isSafeFloorForEnemy logic directly
@@ -111,7 +177,6 @@ describe("Open Abyss Behavior", () => {
 
       // Simulate checking if position [1,1] is safe for a goblin when NOT chasing
       // This tests the core logic without relying on random wandering behavior
-      const Enemy = require("../../lib/enemy").Enemy;
       const testEnemy = new Enemy({ y: 0, x: 0 });
       testEnemy.kind = 'fire-goblin';
       
