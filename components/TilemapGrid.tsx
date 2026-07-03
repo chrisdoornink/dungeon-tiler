@@ -17,7 +17,7 @@ import {
   serializeNPCs,
   type RoomSnapshot,
 } from "../lib/map";
-import { removePlayerFromMapData } from "../lib/map/player";
+import { findPlayerPosition, removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
@@ -1675,6 +1675,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const latestMoveInputRef = useRef<(d: Direction) => void>(() => {});
   const playerPositionRef = useRef<[number, number] | null>(null);
   playerPositionRef.current = playerPosition;
+  // Current map dimensions in tiles, for clamping the camera at map edges.
+  const mapRows = gameState.mapData.tiles.length;
+  const mapCols = gameState.mapData.tiles[0]?.length ?? 0;
+  const mapDimsRef = useRef<[number, number]>([mapRows, mapCols]);
+  mapDimsRef.current = [mapRows, mapCols];
+  // Smooth-mode light overlay anchor; the rAF loop drags it with the hero.
+  const smoothLightAnchorRef = useRef<HTMLDivElement | null>(null);
 
   // --- Phase 2: enemies/NPCs slide one tile per turn ---
   // id -> [y, x] as of the previously diffed gameState.
@@ -2133,12 +2140,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const nextFloorState = advanceToNextFloor(gameState, dailySeed);
       nextFloorState.needsFloorTransition = false;
 
-      // Player is always centered in the 600×600 viewport
-      const viewportCenter = { x: 300, y: 300 };
+      // Close on the hero's actual viewport position (off-center when the
+      // camera is clamped at a map edge), and open on his next-floor spawn.
+      const closeCenter = playerPosition
+        ? heroViewportPosition(playerPosition, mapRows, mapCols)
+        : { x: 300, y: 300 };
+      const nextTiles = nextFloorState.mapData.tiles;
+      const nextSpawn = findPlayerPosition(nextFloorState.mapData);
+      const openCenter = nextSpawn
+        ? heroViewportPosition(
+            nextSpawn,
+            nextTiles.length,
+            nextTiles[0]?.length ?? 0
+          )
+        : { x: 300, y: 300 };
 
       setFloorTransition({
-        closeCenter: viewportCenter,
-        openCenter: viewportCenter,
+        closeCenter,
+        openCenter,
         pendingGameState: nextFloorState,
       });
     }
@@ -2778,9 +2797,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
         setTimeout(() => {
           setWarpFlicker(true);
+          const closeCenter = playerPosition
+            ? heroViewportPosition(playerPosition, mapRows, mapCols)
+            : { x: 300, y: 300 };
+          const warpTiles = newGameState.mapData.tiles;
+          const warpSpawn = findPlayerPosition(newGameState.mapData);
+          const openCenter = warpSpawn
+            ? heroViewportPosition(
+                warpSpawn,
+                warpTiles.length,
+                warpTiles[0]?.length ?? 0
+              )
+            : { x: 300, y: 300 };
           setFloorTransition({
-            closeCenter: { x: 300, y: 300 },
-            openCenter: { x: 300, y: 300 },
+            closeCenter,
+            openCenter,
             pendingGameState: newGameState,
           });
         }, 160);
@@ -3125,9 +3156,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
       const v = smoothVisualRef.current;
       if (v && smoothMapNodeRef.current) {
+        const [rows, cols] = mapDimsRef.current;
         smoothMapNodeRef.current.style.transform = `translate(${calculateMapTransform(
-          [v[0], v[1]]
+          [v[0], v[1]],
+          rows,
+          cols
         )})`;
+        // Keep the torch/vignette glued to the hero: he leaves viewport
+        // center whenever the camera is clamped at a map edge.
+        if (smoothLightAnchorRef.current) {
+          const hero = heroViewportPosition([v[0], v[1]], rows, cols);
+          smoothLightAnchorRef.current.style.transform = `translate3d(${
+            hero.x - LIGHT_BOX_CENTER
+          }px, ${hero.y - LIGHT_BOX_CENTER}px, 0)`;
+        }
       }
       // Hero anchor rides the same visual position, so camera + hero cancel
       // out and he stays pinned at the viewport center.
@@ -3423,7 +3465,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             </div>
           )}
         {/* Vertically center the entire game UI within the viewport */}
-        <div className="w-full mt-12 flex items-center justify-center">
+        <div className="w-full mt-12 max-[600px]:mt-1 flex items-center justify-center">
           <div className="game-scale relative" data-testid="game-scale">
             {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
             <div
@@ -4027,12 +4069,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   // mid-tween don't snap the camera. Legacy: CSS transition.
                   transform: smoothEnabled
                     ? smoothVisualRef.current
-                      ? `translate(${calculateMapTransform(smoothVisualRef.current)})`
+                      ? `translate(${calculateMapTransform(smoothVisualRef.current, mapRows, mapCols)})`
                       : playerPosition
-                      ? `translate(${calculateMapTransform(playerPosition)})`
+                      ? `translate(${calculateMapTransform(playerPosition, mapRows, mapCols)})`
                       : "none"
                     : playerPosition
-                    ? `translate(${calculateMapTransform(playerPosition)})`
+                    ? `translate(${calculateMapTransform(playerPosition, mapRows, mapCols)})`
                     : "none",
                   transition: smoothEnabled ? "none" : undefined,
                 }}
@@ -4556,6 +4598,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     inset: 0,
                     pointerEvents: "none",
                     isolation: "isolate",
+                    overflow: "hidden",
                   }}
                   aria-hidden="true"
                 >
@@ -4564,9 +4607,32 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     heroTorchLitState &&
                     !inNightmare &&
                     (() => {
-                      const g = buildHeroLightGradients(300, 300, true);
+                      // Gradients bake centered into an oversized box that
+                      // follows the hero (the rAF loop updates the transform
+                      // mid-step), so the light stays on him even when the
+                      // clamped camera parks him off-center at map edges.
+                      const v = smoothVisualRef.current ?? playerPosition;
+                      const hero = heroViewportPosition(v, mapRows, mapCols);
+                      const g = buildHeroLightGradients(
+                        LIGHT_BOX_CENTER,
+                        LIGHT_BOX_CENTER,
+                        true
+                      );
                       return (
-                        <>
+                        <div
+                          ref={smoothLightAnchorRef}
+                          style={{
+                            position: "absolute",
+                            left: 0,
+                            top: 0,
+                            width: LIGHT_BOX_SIZE,
+                            height: LIGHT_BOX_SIZE,
+                            willChange: "transform",
+                            transform: `translate3d(${
+                              hero.x - LIGHT_BOX_CENTER
+                            }px, ${hero.y - LIGHT_BOX_CENTER}px, 0)`,
+                          }}
+                        >
                           <div
                             className={styles.torchGlow}
                             style={{
@@ -4581,7 +4647,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                               zIndex: 10000,
                             }}
                           />
-                        </>
+                        </div>
                       );
                     })()}
                 </div>
@@ -4724,6 +4790,99 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         runeCount={gameState.runeCount ?? 0}
         onThrowBomb={handleThrowBomb}
         bombCount={gameState.bombCount ?? 0}
+        inventoryItems={[
+          ...((gameState.rockCount ?? 0) > 0
+            ? [{
+                key: "rock",
+                label: "Rock",
+                icon: "/images/items/rock-1.png",
+                count: gameState.rockCount,
+                onUse: handleThrowRock,
+              }]
+            : []),
+          ...((gameState.runeCount ?? 0) > 0
+            ? [{
+                key: "rune",
+                label: "Rune",
+                icon: "/images/items/rune1.png",
+                count: gameState.runeCount,
+                onUse: handleThrowRune,
+              }]
+            : []),
+          ...((gameState.bombCount ?? 0) > 0
+            ? [{
+                key: "bomb",
+                label: "Bomb",
+                icon: "/images/items/bomb-black.png",
+                count: gameState.bombCount,
+                onUse: handleThrowBomb,
+              }]
+            : []),
+          ...((gameState.foodCount ?? 0) > 0
+            ? [{
+                key: "food",
+                label: "Food",
+                icon: "/images/items/food-1.png",
+                count: gameState.foodCount,
+                onUse: handleUseFood,
+              }]
+            : []),
+          ...((gameState.potionCount ?? 0) > 0
+            ? [{
+                key: "potion",
+                label: "Potion",
+                icon: "/images/items/meds-1.png",
+                count: gameState.potionCount,
+                onUse: handleUsePotion,
+              }]
+            : []),
+          ...((gameState.berryCount ?? 0) > 0
+            ? [{
+                key: "berry",
+                label: "Berry",
+                icon: "/images/items/berry.png",
+                count: gameState.berryCount,
+                onUse: handleUseBerry,
+              }]
+            : []),
+          ...((gameState.pinkHeartCount ?? 0) > 0
+            ? [{
+                key: "pink-heart",
+                label: "Pink Heart",
+                icon: "/images/items/pink-heart.png",
+                count: gameState.pinkHeartCount,
+                onUse: handleUsePinkHeart,
+              }]
+            : []),
+          ...(gameState.hasSnakeMedallion
+            ? [{
+                key: "medallion",
+                label: "Medallion",
+                icon: "/images/items/snake-medalion.png",
+                onUse: handleSnakeMedallionClick,
+              }]
+            : []),
+          ...(diaryEntries.length > 0
+            ? [{ key: "diary", label: "Diary", emoji: "📖", onUse: () => setHeroDiaryOpen(true) }]
+            : []),
+          ...(gameState.hasKey || (gameState.chestKeyCount ?? 0) > 0
+            ? [{
+                key: "key",
+                label: (gameState.chestKeyCount ?? 0) > 1 ? "Keys" : "Key",
+                icon: "/images/items/key.png",
+                count: (gameState.chestKeyCount ?? 0) > 0 ? gameState.chestKeyCount : undefined,
+              }]
+            : []),
+          ...(gameState.hasExitKey
+            ? [{ key: "exit-key", label: "Exit Key", icon: "/images/items/exit-key.png" }]
+            : []),
+          ...(gameState.hasSword
+            ? [{ key: "sword", label: "Sword", icon: "/images/items/sword.png" }]
+            : []),
+          ...(gameState.hasShield
+            ? [{ key: "shield", label: "Shield", icon: "/images/items/shield.png" }]
+            : []),
+        ]}
       />
     </div>
   );
@@ -5212,10 +5371,15 @@ function buildHeroLightGradients(
   return { torchGradient, vignetteGradient };
 }
 
-// Calculate the transform to center the map on the player
-function calculateMapTransform(playerPosition: [number, number]): string {
-  if (!playerPosition) return "0px, 0px";
-
+// Camera offsets that center the player where possible, clamped so the
+// 600px viewport never slides past the map edges (which would show the page
+// background through the empty part of the viewport). Maps smaller than the
+// viewport stay centered.
+function calculateMapOffsets(
+  playerPosition: [number, number],
+  mapRows?: number,
+  mapCols?: number
+): { tx: number; ty: number } {
   const tileSize = 40; // px
   const viewportWidth = 600; // px (from CSS)
   const viewportHeight = 600; // px (from CSS)
@@ -5225,8 +5389,57 @@ function calculateMapTransform(playerPosition: [number, number]): string {
   const playerY = (playerPosition[0] + 0.5) * tileSize;
 
   // Calculate the transform to center the player in the viewport
-  const translateX = viewportWidth / 2 - playerX;
-  const translateY = viewportHeight / 2 - playerY;
+  let tx = viewportWidth / 2 - playerX;
+  let ty = viewportHeight / 2 - playerY;
 
-  return `${translateX}px, ${translateY}px`;
+  if (mapCols) {
+    const mapWidth = mapCols * tileSize;
+    tx =
+      mapWidth <= viewportWidth
+        ? (viewportWidth - mapWidth) / 2
+        : Math.min(0, Math.max(viewportWidth - mapWidth, tx));
+  }
+  if (mapRows) {
+    const mapHeight = mapRows * tileSize;
+    ty =
+      mapHeight <= viewportHeight
+        ? (viewportHeight - mapHeight) / 2
+        : Math.min(0, Math.max(viewportHeight - mapHeight, ty));
+  }
+
+  return { tx, ty };
 }
+
+// Calculate the transform to center the map on the player
+export function calculateMapTransform(
+  playerPosition: [number, number],
+  mapRows?: number,
+  mapCols?: number
+): string {
+  if (!playerPosition) return "0px, 0px";
+  const { tx, ty } = calculateMapOffsets(playerPosition, mapRows, mapCols);
+  return `${tx}px, ${ty}px`;
+}
+
+// Where the hero lands inside the 600px viewport under the clamped camera:
+// dead center normally, off-center when the camera is pinned at a map edge.
+export function heroViewportPosition(
+  playerPosition: [number, number],
+  mapRows?: number,
+  mapCols?: number
+): { x: number; y: number } {
+  const { tx, ty } = calculateMapOffsets(playerPosition, mapRows, mapCols);
+  return {
+    x: tx + (playerPosition[1] + 0.5) * 40,
+    y: ty + (playerPosition[0] + 0.5) * 40,
+  };
+}
+
+// Oversized backing box for the smooth-mode torch/vignette overlay: the
+// gradients are baked centered in this box and the box itself is translated
+// to follow the hero, so per-frame updates are transform-only. Past the
+// gradient's last stop the vignette continues as solid black, so the extra
+// 320px margin keeps the viewport covered even when the clamped camera lets
+// the hero drift up to ~300px from center.
+const LIGHT_BOX_SIZE = 1240;
+const LIGHT_BOX_CENTER = LIGHT_BOX_SIZE / 2;
