@@ -5,6 +5,10 @@ import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
 import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
+import PixelFlame, {
+  HERO_FLAME_ANCHOR,
+  GOBLIN_FLAME_ANCHOR,
+} from "./PixelFlame";
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -699,14 +703,22 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* Render wall torch as a static sprite (no animation). Suppress on checkpoint tiles */}
+        {/* Render wall torch: flameless base sprite + animated flame overlay.
+            Suppress on checkpoint tiles */}
         {hasWallTorch(subtypes) && !(subtypes?.includes(TileSubtype.CHECKPOINT)) && (
-          <div
-            key="wall-torch"
-            data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
-            className={`${styles.assetIcon} ${styles.torchSprite}`}
-            style={{ backgroundImage: `url(/images/items/wall-torch-2.png)` }}
-          />
+          <React.Fragment key="wall-torch">
+            <div
+              data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
+              className={`${styles.assetIcon} ${styles.torchSprite}`}
+              style={{ backgroundImage: `url(/images/items/wall-torch-2-base.png)` }}
+            />
+            <PixelFlame
+              cell={1.5}
+              glow
+              seed={(row ?? 0) * 31 + (col ?? 0)}
+              className={styles.wallTorchFlame}
+            />
+          </React.Fragment>
         )}
 
         {/* Render key with asset if present */}
@@ -1074,8 +1086,9 @@ export const Tile: React.FC<TileProps> = ({
           default:
             dir = 'front';
         }
-        const snuff = heroTorchLit ? '' : '-snuff';
-        return `/images/hero/hero-${dir}${equip()}${snuff}-static.png`;
+        // Lit torch uses the flameless base sprite; PixelFlame supplies the fire
+        const variant = heroTorchLit ? '-noflame' : '-snuff';
+        return `/images/hero/hero-${dir}${equip()}${variant}-static.png`;
       })()
     : '';
 
@@ -1448,6 +1461,13 @@ export const Tile: React.FC<TileProps> = ({
                   return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
                 }
                 const facing: Facing = toFacing(enemyFacing);
+                // Fire goblins carry an animated torch (see PixelFlame below):
+                // swap in the flameless base art. Registry paths stay flamed
+                // for non-game UI (summaries, end screens).
+                if (kind === 'fire-goblin') {
+                  const f = facing === 'left' ? 'right' : facing;
+                  return `/images/enemies/fire-goblin/fire-goblin-${f}-base.png`;
+                }
                 return getEnemyIcon(kind, facing);
               })()})`,
               backgroundSize: 'contain',
@@ -1480,7 +1500,26 @@ export const Tile: React.FC<TileProps> = ({
               }
             }}
             data-testid="enemy-sprite"
-          />
+          >
+            {/* Fire goblin torch flame; nested so the facing flip and smooth
+                slide transforms carry it along */}
+            {enemyKind === 'fire-goblin' && (() => {
+              const dirKey =
+                enemyFacing === 'UP'
+                  ? 'back'
+                  : enemyFacing === 'RIGHT' || enemyFacing === 'LEFT'
+                  ? 'right'
+                  : 'front';
+              const anchor = GOBLIN_FLAME_ANCHOR[dirKey];
+              return (
+                <PixelFlame
+                  cell={1.4}
+                  seed={(row ?? 0) * 17 + (col ?? 0) * 7 + 3}
+                  style={{ ...anchor, transform: 'translateX(-50%)' }}
+                />
+              );
+            })()}
+          </div>
         )}
       </>
     );
@@ -1563,10 +1602,19 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url(${isActive ? '/images/items/checkpoint-lit.png' : '/images/items/checkpoint-unlit.png'})`
+                    backgroundImage: `url('/images/items/checkpoint-unlit.png')`
                   }}
                   aria-label="checkpoint"
                 />
+                {/* Lit checkpoints burn with an animated flame on the torch nub */}
+                {isActive && (
+                  <PixelFlame
+                    cell={1.1}
+                    glow
+                    seed={(row ?? 0) * 13 + (col ?? 0) * 3}
+                    className={styles.checkpointFlame}
+                  />
+                )}
               </>
             );
           })()}
@@ -1591,7 +1639,27 @@ export const Tile: React.FC<TileProps> = ({
                 animation: heroWarping ? 'heroWarpFlicker 0.16s steps(2) infinite' : undefined,
                 visibility: suppressHeroSprite ? 'hidden' : undefined,
               }}
-            />
+            >
+              {/* Torch flame rides inside the hero div so facing flips, warp
+                  flicker, and death transforms all apply to it too */}
+              {heroTorchLit && (() => {
+                const dirKey =
+                  heroDirectionForSprite === Direction.UP
+                    ? 'back'
+                    : heroDirectionForSprite === Direction.RIGHT ||
+                      heroDirectionForSprite === Direction.LEFT
+                    ? 'right'
+                    : 'front';
+                const anchor = HERO_FLAME_ANCHOR[dirKey];
+                return (
+                  <PixelFlame
+                    cell={1.4}
+                    seed={5}
+                    style={{ ...anchor, transform: 'translateX(-50%)' }}
+                  />
+                );
+              })()}
+            </div>
           )}
           {/* Hero poison visuals: glow + stench wisps */}
           {isPlayerTile && heroPoisoned && (
@@ -2027,10 +2095,19 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url(${isActive ? '/images/items/checkpoint-lit.png' : '/images/items/checkpoint-unlit.png'})`
+                    backgroundImage: `url('/images/items/checkpoint-unlit.png')`
                   }}
                   aria-label="checkpoint"
                 />
+                {/* Lit checkpoints burn with an animated flame on the torch nub */}
+                {isActive && (
+                  <PixelFlame
+                    cell={1.1}
+                    glow
+                    seed={(row ?? 0) * 13 + (col ?? 0) * 3}
+                    className={styles.checkpointFlame}
+                  />
+                )}
               </>
             );
           })()}

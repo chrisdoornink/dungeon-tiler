@@ -31,6 +31,7 @@ import {
   type EnemyKind,
 } from "../lib/enemies/registry";
 import MobileControls from "./MobileControls";
+import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
 import {
   computeTorchGlow,
@@ -4435,7 +4436,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             backgroundRepeat: "no-repeat",
                             transformOrigin: "50% 100%",
                           }}
-                        />
+                        >
+                          {/* Torch flame rides inside the sprite div so the
+                              procedural step animation carries it along */}
+                          {heroTorchLitState && (() => {
+                            const dirKey =
+                              gameState.playerDirection === Direction.UP
+                                ? ("back" as const)
+                                : gameState.playerDirection === Direction.DOWN
+                                ? ("front" as const)
+                                : ("right" as const);
+                            const anchor = HERO_FLAME_ANCHOR[dirKey];
+                            return (
+                              <PixelFlame
+                                cell={1.4}
+                                seed={5}
+                                style={{
+                                  ...anchor,
+                                  transform: "translateX(-50%)",
+                                }}
+                              />
+                            );
+                          })()}
+                        </div>
                       </div>
                     </div>
                   )}

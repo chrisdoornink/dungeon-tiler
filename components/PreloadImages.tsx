@@ -82,6 +82,7 @@ export default function PreloadImages() {
       "/images/window.png",
       "/images/items/wall-torch-1.png",
       "/images/items/wall-torch-2.png",
+      "/images/items/wall-torch-2-base.png",
       "/images/items/wall-torch-3.png",
 
       // Flowers and bushes
@@ -104,6 +105,9 @@ export default function PreloadImages() {
       "/images/enemies/fire-goblin/fire-goblin-front.png",
       "/images/enemies/fire-goblin/fire-goblin-right.png",
       "/images/enemies/fire-goblin/fire-goblin-back.png",
+      "/images/enemies/fire-goblin/fire-goblin-front-base.png",
+      "/images/enemies/fire-goblin/fire-goblin-right-base.png",
+      "/images/enemies/fire-goblin/fire-goblin-back-base.png",
       "/images/enemies/fire-goblin/blue-goblin-front.png",
       "/images/enemies/fire-goblin/blue-goblin-right.png",
       "/images/enemies/fire-goblin/blue-goblin-back.png",
@@ -126,19 +130,24 @@ export default function PreloadImages() {
       "/images/enemies/fire-goblin/green-goblin-back.png",
       "/images/enemies/lantern-wisp.png",
 
-      // Hero base poses (commonly visible on load)
+      // Hero base poses (commonly visible on load). In-game lit-torch poses
+      // use the -noflame bases (PixelFlame draws the fire); the flamed
+      // originals stay for menus/end screens.
+      "/images/hero/hero-front-noflame-static.png",
+      "/images/hero/hero-right-noflame-static.png",
+      "/images/hero/hero-back-noflame-static.png",
+      "/images/hero/hero-front-sword-noflame-static.png",
+      "/images/hero/hero-right-sword-noflame-static.png",
+      "/images/hero/hero-back-sword-noflame-static.png",
+      "/images/hero/hero-front-shield-noflame-static.png",
+      "/images/hero/hero-right-shield-noflame-static.png",
+      "/images/hero/hero-back-shield-noflame-static.png",
+      "/images/hero/hero-front-shield-sword-noflame-static.png",
+      "/images/hero/hero-right-shield-sword-noflame-static.png",
+      "/images/hero/hero-back-shield-sword-noflame-static.png",
       "/images/hero/hero-front-static.png",
       "/images/hero/hero-right-static.png",
       "/images/hero/hero-back-static.png",
-      "/images/hero/hero-front-sword-static.png",
-      "/images/hero/hero-right-sword-static.png",
-      "/images/hero/hero-back-sword-static.png",
-      "/images/hero/hero-front-shield-static.png",
-      "/images/hero/hero-right-shield-static.png",
-      "/images/hero/hero-back-shield-static.png",
-      "/images/hero/hero-front-shield-sword-static.png",
-      "/images/hero/hero-right-shield-sword-static.png",
-      "/images/hero/hero-back-shield-sword-static.png",
     ];
 
     urls.forEach((src) => {

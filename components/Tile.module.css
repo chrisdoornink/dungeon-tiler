@@ -184,6 +184,25 @@
   z-index: 10800; /* below hero (11000), above enemies (10500) */
 }
 
+/* Animated flame riding the wall torch sprite (see PixelFlame.tsx).
+   The torch sprite is 18x24 anchored at bottom: 6px; its head sits ~10px
+   below the sprite top, so the flame base lands right on it. */
+.wallTorchFlame {
+  left: 50%;
+  bottom: 19px;
+  transform: translateX(-50%);
+  z-index: 10801; /* one above the torch sprite */
+}
+
+/* Animated flame on a lit checkpoint's torch nub (nub base ~10px from the
+   tile top given the 130%/115% overlay scaling) */
+.checkpointFlame {
+  left: 55%;
+  top: -1px;
+  transform: translateX(-50%);
+  z-index: 10901; /* one above the checkpoint overlay */
+}
+
 /* Absolute overlay for revealed items to appear above chests */
 .overlayIcon {
   position: absolute;

@@ -16,12 +16,12 @@ export const CRITICAL_ASSETS: string[] = [
   "/images/items/key.png",
   "/images/items/exit-key.png",
 
-  // Essential hero poses
-  "/images/hero/hero-front-static.png",
-  "/images/hero/hero-right-static.png",
+  // Essential hero poses (noflame = lit torch base; PixelFlame draws the fire)
+  "/images/hero/hero-front-noflame-static.png",
+  "/images/hero/hero-right-noflame-static.png",
 
   // One enemy for immediate gameplay
-  "/images/enemies/fire-goblin/fire-goblin-front.png",
+  "/images/enemies/fire-goblin/fire-goblin-front-base.png",
 ];
 
 // Full asset list for background loading after game starts
@@ -67,6 +67,7 @@ export const ASSET_URLS: string[] = [
   // Torch frames (large files - load later)
   "/images/items/wall-torch-1.png",
   "/images/items/wall-torch-2.png",
+  "/images/items/wall-torch-2-base.png",
   "/images/items/wall-torch-3.png",
 
   // Remaining items
@@ -118,8 +119,8 @@ export const ASSET_URLS: string[] = [
   "/images/items/bookshelf.png",
 
   // Remaining enemies (large files - load later)
-  "/images/enemies/fire-goblin/fire-goblin-right.png",
-  "/images/enemies/fire-goblin/fire-goblin-back.png",
+  "/images/enemies/fire-goblin/fire-goblin-right-base.png",
+  "/images/enemies/fire-goblin/fire-goblin-back-base.png",
   "/images/enemies/fire-goblin/blue-goblin-front.png",
   "/images/enemies/fire-goblin/blue-goblin-right.png",
   "/images/enemies/fire-goblin/blue-goblin-back.png",
@@ -150,17 +151,21 @@ export const ASSET_URLS: string[] = [
   "/images/enemies/fire-goblin/white-goblins-back-3.png",
   "/images/enemies/fire-goblin/white-goblins-back-4.png",
 
-  // Remaining hero poses
+  // Remaining hero poses (in-game lit-torch sprites are the -noflame bases;
+  // the flamed originals stay for menus/end screens)
+  "/images/hero/hero-back-noflame-static.png",
+  "/images/hero/hero-front-sword-noflame-static.png",
+  "/images/hero/hero-right-sword-noflame-static.png",
+  "/images/hero/hero-back-sword-noflame-static.png",
+  "/images/hero/hero-front-shield-noflame-static.png",
+  "/images/hero/hero-right-shield-noflame-static.png",
+  "/images/hero/hero-back-shield-noflame-static.png",
+  "/images/hero/hero-front-shield-sword-noflame-static.png",
+  "/images/hero/hero-right-shield-sword-noflame-static.png",
+  "/images/hero/hero-back-shield-sword-noflame-static.png",
+  "/images/hero/hero-front-static.png",
+  "/images/hero/hero-right-static.png",
   "/images/hero/hero-back-static.png",
-  "/images/hero/hero-front-sword-static.png",
-  "/images/hero/hero-right-sword-static.png",
-  "/images/hero/hero-back-sword-static.png",
-  "/images/hero/hero-front-shield-static.png",
-  "/images/hero/hero-right-shield-static.png",
-  "/images/hero/hero-back-shield-static.png",
-  "/images/hero/hero-front-shield-sword-static.png",
-  "/images/hero/hero-right-shield-sword-static.png",
-  "/images/hero/hero-back-shield-sword-static.png",
 
   // NPC sprites
   "/images/npcs/boy-1.png",

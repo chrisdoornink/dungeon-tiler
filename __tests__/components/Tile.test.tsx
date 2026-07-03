@@ -211,7 +211,7 @@ describe('Tile component', () => {
     // Find the hero image overlay
     const heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
     expect(heroImage).toBeInTheDocument();
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-noflame-static.png')");
     expect(heroImage).toHaveStyle('transform: none');
   });
 
@@ -230,7 +230,7 @@ describe('Tile component', () => {
     );
     
     let heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-back-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-back-noflame-static.png')");
     
     // Test RIGHT direction
     rerender(
@@ -244,7 +244,7 @@ describe('Tile component', () => {
     );
     
     heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static.png')");
     expect(heroImage).toHaveStyle('transform: none');
     
     // Test LEFT direction (should use right image with horizontal flip)
@@ -259,7 +259,7 @@ describe('Tile component', () => {
     );
     
     heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static.png')");
     expect(heroImage).toHaveStyle('transform: scaleX(-1)');
   });
 

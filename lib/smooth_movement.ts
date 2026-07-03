@@ -95,8 +95,9 @@ export function heroSpritePath(
       : hasSword
       ? "-sword"
       : "";
-  const snuff = torchLit ? "" : "-snuff";
-  return `/images/hero/hero-${dir}${equip}${snuff}-static.png`;
+  // Lit torch uses the flameless base sprite; PixelFlame supplies the fire
+  const variant = torchLit ? "-noflame" : "-snuff";
+  return `/images/hero/hero-${dir}${equip}${variant}-static.png`;
 }
 
 export const smoothEaseInOut = (t: number): number =>
