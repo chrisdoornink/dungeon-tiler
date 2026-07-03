@@ -31,6 +31,7 @@ const vt323 = VT323({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://torchboy.com"),
   title: "Torch Boy",
   description: "Torch Boy – Daily Dungeon Challenge",
   icons: {
@@ -46,18 +47,15 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Torch Boy",
-    description: "Light your way through the dungeon.",
-    images: [
-      { url: "/images/hero/hero-front-static.png" },
-    ],
+    description: "A new dungeon every day. Light your way out.",
+    // Share image comes from the app/opengraph-image.tsx file convention
+    // (a purpose-built card), not a static sprite.
   },
   twitter: {
-    card: "summary",
+    card: "summary_large_image",
     title: "Torch Boy",
-    description: "Light your way through the dungeon.",
-    images: [
-      "/images/hero/hero-front-static.png",
-    ],
+    description: "A new dungeon every day. Light your way out.",
+    // Image supplied by app/twitter-image.tsx.
   },
 };
 

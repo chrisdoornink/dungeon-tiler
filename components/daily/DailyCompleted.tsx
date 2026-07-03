@@ -990,6 +990,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               </a>
             </div>
           </div>
+          <div className="flex items-center justify-center text-xs text-gray-400 pt-1">
+            <a href="/privacy" className="underline underline-offset-4 hover:text-gray-200">
+              Privacy
+            </a>
+          </div>
         </div>
       </div>
       

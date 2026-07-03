@@ -2,6 +2,7 @@
 
 import React from "react";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
+import SiteFooter from "../SiteFooter";
 
 interface DailyAvailableProps {
   data: DailyChallengeData;
@@ -161,6 +162,8 @@ export default function DailyAvailable({
           </>
         )}
       </div>
+
+      <SiteFooter />
     </div>
   );
 }
