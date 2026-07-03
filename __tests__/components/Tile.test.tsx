@@ -470,6 +470,39 @@ describe('Tile component', () => {
     });
   });
 
+  describe('rune reveal', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+
+    it('shows the one-shot sparkle burst alongside a revealed rune', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.RUNE]}
+          row={5}
+          col={5}
+        />
+      );
+
+      expect(screen.getByTestId(`subtype-icon-${TileSubtype.RUNE}`)).toBeInTheDocument();
+      expect(screen.getByTestId('rune-reveal-sparkle')).toBeInTheDocument();
+    });
+
+    it('does not render the rune or sparkle while still inside a pot', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.POT, TileSubtype.RUNE]}
+          row={5}
+          col={5}
+        />
+      );
+
+      expect(screen.queryByTestId('rune-reveal-sparkle')).not.toBeInTheDocument();
+    });
+  });
+
   describe('combat lunge', () => {
     const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
 

@@ -906,6 +906,17 @@ export const Tile: React.FC<TileProps> = ({
                 backgroundImage: `url('/images/items/rune1.png')`,
               }}
             />
+            {/* One-shot portal-sparkle burst on reveal: this block mounts the
+                moment the pot smashes, so the burst marks the rune appearing */}
+            <div
+              className={styles.runeRevealSparkle}
+              data-testid="rune-reveal-sparkle"
+              aria-hidden="true"
+            />
+            <div
+              className={`${styles.runeRevealSparkle} ${styles.runeRevealSparkleSmall}`}
+              aria-hidden="true"
+            />
           </>
         )}
 
