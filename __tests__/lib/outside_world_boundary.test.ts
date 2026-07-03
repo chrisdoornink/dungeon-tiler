@@ -4,7 +4,7 @@ import {
   TREE_BORDER,
 } from "../../lib/map/outside-world";
 import { Direction, TREE, FLOOR, TileSubtype } from "../../lib/map/constants";
-import { detonateLiveBombs, type GameState } from "../../lib/map";
+import { detonateLiveBombs, movePlayer, type GameState } from "../../lib/map";
 
 // dungeon-facing (open) edge for each outward direction the player stepped
 const innerFor = (d: Direction): "top" | "bottom" | "left" | "right" =>
@@ -78,5 +78,41 @@ describe("trees are destructible by bombs", () => {
 
     const after = detonateLiveBombs(state);
     expect(after.mapData.tiles[2][3]).toBe(FLOOR); // tree blown to floor
+    // Trees are counted separately (for the "blowing up trees outside" metric).
+    expect(after.stats.treesDestroyed).toBe(1);
+  });
+});
+
+describe("reachedOutsideWorld latches when breaching to the grassland", () => {
+  it("stepping through a top-edge breach enters the outside world and sets the run flag", () => {
+    const size = 8;
+    const tiles = Array.from({ length: size }, () => Array(size).fill(FLOOR));
+    const subtypes = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [] as number[])
+    );
+    // Player standing on a breached top-edge tile, about to step out (UP).
+    subtypes[0][4] = [TileSubtype.PLAYER, TileSubtype.BREACH];
+
+    const state = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.UP,
+      enemies: [],
+      heroHealth: 5,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      heroTorchLit: true,
+      mode: "normal",
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      recentDeaths: [],
+    } as unknown as GameState;
+
+    expect(state.reachedOutsideWorld).toBeFalsy();
+    const after = movePlayer(state, Direction.UP);
+    expect(after.inOutsideWorld).toBe(true);
+    expect(after.reachedOutsideWorld).toBe(true);
   });
 });

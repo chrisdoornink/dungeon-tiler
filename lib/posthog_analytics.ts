@@ -114,6 +114,16 @@ export function trackGameComplete(params: {
   deathCause?: string;
   deathCauseEnemyKind?: string;
   currentFloor?: number;
+  // Run-level progress, for slicing completions (completionists, item-skips,
+  // hidden-area explorers). All optional so older callers keep working.
+  chestsOpened?: number;
+  totalChests?: number;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  treesDestroyed?: number;
+  wallsDestroyed?: number;
+  reachedOutsideWorld?: boolean;
+  reachedPinkRealm?: boolean;
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -128,7 +138,80 @@ export function trackGameComplete(params: {
     enemies_by_kind: params.byKind,
     death_cause: params.deathCause,
     death_cause_enemy_kind: params.deathCauseEnemyKind,
-    level_reached: params.currentFloor != null ? String(params.currentFloor) : undefined
+    level_reached: params.currentFloor != null ? String(params.currentFloor) : undefined,
+    chests_opened: params.chestsOpened,
+    total_chests: params.totalChests,
+    // "opened everything the run offered" — the completionist signal.
+    all_chests_opened:
+      params.chestsOpened != null && params.totalChests != null && params.totalChests > 0
+        ? params.chestsOpened >= params.totalChests
+        : undefined,
+    has_sword: params.hasSword,
+    has_shield: params.hasShield,
+    trees_destroyed: params.treesDestroyed,
+    walls_destroyed: params.wallsDestroyed,
+    reached_outside_world: params.reachedOutsideWorld,
+    reached_pink_realm: params.reachedPinkRealm,
+  });
+}
+
+/**
+ * Fire once per run the first time the player breaches an exterior wall and
+ * steps into the outdoor grassland — a hidden, bomb-gated action. Pair with
+ * unique game_start users to get a "% who found the outside world" rate.
+ */
+export function trackOutsideWorldReached(params?: {
+  mode?: "daily" | "normal";
+  floor?: number;
+  dateSeed?: string;
+}) {
+  captureEvent('outside_world_reached', {
+    game_mode: params?.mode,
+    floor: params?.floor,
+    date_seed: params?.dateSeed,
+  });
+}
+
+/**
+ * Fire once per run the first time the player blows up a tree while in the
+ * outdoor world. `count` carries how many trees had fallen at that point (>=1).
+ */
+export function trackOutsideTreeDestroyed(params?: {
+  mode?: "daily" | "normal";
+  count?: number;
+  floor?: number;
+  dateSeed?: string;
+}) {
+  captureEvent('outside_tree_destroyed', {
+    game_mode: params?.mode,
+    count: params?.count,
+    floor: params?.floor,
+    date_seed: params?.dateSeed,
+  });
+}
+
+/**
+ * Fire on each floor transition in a daily run, carrying the loadout the player
+ * carried up. Filtering `to_floor=2 & has_sword=false` answers "do people skip
+ * the sword/shield and rush level two?".
+ */
+export function trackFloorAdvance(params: {
+  mode?: "daily" | "normal";
+  fromFloor: number;
+  toFloor: number;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  hasKey?: boolean;
+  dateSeed?: string;
+}) {
+  captureEvent('floor_advanced', {
+    game_mode: params.mode,
+    from_floor: params.fromFloor,
+    to_floor: params.toFloor,
+    has_sword: params.hasSword,
+    has_shield: params.hasShield,
+    has_key: params.hasKey,
+    date_seed: params.dateSeed,
   });
 }
 

@@ -64,7 +64,15 @@ type SmoothStepTween = {
 };
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
-import { trackGameComplete, trackUse, trackPickup, trackPinkRealmReached } from "../lib/analytics";
+import {
+  trackGameComplete,
+  trackUse,
+  trackPickup,
+  trackPinkRealmReached,
+  trackOutsideWorldReached,
+  trackOutsideTreeDestroyed,
+  trackFloorAdvance,
+} from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { hashStringToSeed } from "../lib/rng";
 import { computeMapId, advanceToNextFloor } from "../lib/map";
@@ -160,6 +168,29 @@ function floatingColor(f: Pick<FloatingNumber, "target" | "sign" | "kind" | "mis
   if (f.miss) return MISS_COLOR;
   if (f.target === "hero") return f.sign === "+" ? HERO_HEAL_COLOR : HERO_DAMAGE_COLOR;
   return (f.kind && ENEMY_NUMBER_COLOR[f.kind]) || ENEMY_NUMBER_COLOR["fire-goblin"];
+}
+
+/**
+ * Run-level progress properties attached to every game_complete event so
+ * completions can be sliced by completionist behaviour (chests), loadout
+ * (sword/shield), and hidden-area exploration (outside world / pink realm).
+ * total_chests is summed from the pre-computed per-floor allocation.
+ */
+function runProgressProps(gs: GameState) {
+  const totalChests = Object.values(gs.floorChestAllocation ?? {}).reduce(
+    (sum, alloc) => sum + (alloc?.chests ?? 0),
+    0
+  );
+  return {
+    chestsOpened: gs.stats?.chestsOpened ?? 0,
+    totalChests,
+    hasSword: !!gs.hasSword,
+    hasShield: !!gs.hasShield,
+    treesDestroyed: gs.stats?.treesDestroyed ?? 0,
+    wallsDestroyed: gs.stats?.wallsDestroyed ?? 0,
+    reachedOutsideWorld: !!gs.reachedOutsideWorld,
+    reachedPinkRealm: !!gs.reachedPinkRealm,
+  };
 }
 
 interface TilemapGridProps {
@@ -2250,6 +2281,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const nextFloorState = advanceToNextFloor(gameState, dailySeed);
       nextFloorState.needsFloorTransition = false;
 
+      // Telemetry: record the loadout carried UP a floor, so we can see e.g. how
+      // many people rush to level 2 without grabbing the sword/shield.
+      try {
+        const fromFloor = gameState.currentFloor ?? 1;
+        trackFloorAdvance({
+          mode: "daily",
+          fromFloor,
+          toFloor: fromFloor + 1,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          hasKey: !!gameState.hasKey,
+          dateSeed: localToday,
+        });
+      } catch {}
+
       // Close on the hero's actual viewport position (off-center when the
       // camera is clamped at a map edge), and open on his next-floor spawn.
       const closeCenter = playerPosition
@@ -2272,6 +2318,39 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       });
     }
   }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot, floorTransition]);
+
+  // One-off exploration milestones (hidden, bomb-gated actions). The ref is
+  // seeded from the state at mount so a mid-run reload — where the flag is
+  // already set — doesn't re-fire; we only report milestones newly reached in
+  // this session. Tutorial runs are excluded to keep the funnels clean.
+  const explorationFiredRef = useRef({
+    outsideWorld: !!gameState.reachedOutsideWorld,
+    outsideTrees: (gameState.stats?.treesDestroyed ?? 0) > 0,
+  });
+  useEffect(() => {
+    if (gameState.mode === "tutorial") return;
+    const mode = isDailyChallenge ? "daily" : "normal";
+    const dateSeed = isDailyChallenge ? DateUtils.getTodayString() : undefined;
+    if (gameState.reachedOutsideWorld && !explorationFiredRef.current.outsideWorld) {
+      explorationFiredRef.current.outsideWorld = true;
+      try {
+        trackOutsideWorldReached({ mode, floor: gameState.currentFloor, dateSeed });
+      } catch {}
+    }
+    const trees = gameState.stats?.treesDestroyed ?? 0;
+    if (trees > 0 && !explorationFiredRef.current.outsideTrees) {
+      explorationFiredRef.current.outsideTrees = true;
+      try {
+        trackOutsideTreeDestroyed({ mode, count: trees, floor: gameState.currentFloor, dateSeed });
+      } catch {}
+    }
+  }, [
+    gameState.reachedOutsideWorld,
+    gameState.stats?.treesDestroyed,
+    gameState.mode,
+    gameState.currentFloor,
+    isDailyChallenge,
+  ]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
   useEffect(() => {
@@ -2297,6 +2376,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             damageTaken: gameState.stats.damageTaken,
             byKind: gameState.stats.byKind,
             currentFloor: gameState.currentFloor,
+            ...runProgressProps(gameState),
           });
         } catch {}
       }
@@ -2650,6 +2730,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause: gameState.deathCause?.type,
           deathCauseEnemyKind: gameState.deathCause?.enemyKind,
           currentFloor: gameState.currentFloor,
+          ...runProgressProps(gameState),
         });
       } catch {}
       return;
@@ -2679,6 +2760,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause: gameState.deathCause?.type,
           deathCauseEnemyKind: gameState.deathCause?.enemyKind,
           currentFloor: gameState.currentFloor,
+          ...runProgressProps(gameState),
         });
       } catch {}
       return;

@@ -1161,6 +1161,7 @@ export function detonateLiveBombs(state: GameState): GameState {
   const blastCenters: Array<[number, number]> = [];
   const stats = { ...state.stats, byKind: state.stats.byKind, byFloor: state.stats.byFloor };
   let wallsDestroyed = 0;
+  let treesDestroyed = 0;
   let enemiesDefeated = 0;
   // Snake pots destroyed by the blast are counted separately: they add to the kill
   // tally but push nothing onto defeatedEnemies, so they must stay OUT of the
@@ -1182,12 +1183,14 @@ export function detonateLiveBombs(state: GameState): GameState {
         // Walls AND trees become floor (unless protected, e.g. the exit door). Trees are
         // destructible so the outside-world / nightmare boundaries can be blasted — they're
         // just made several layers thick so two bombs can't tunnel all the way through.
+        const wasTree = newMapData.tiles[y][x] === TREE;
         const wasWall =
-          newMapData.tiles[y][x] === WALL || newMapData.tiles[y][x] === TREE;
+          newMapData.tiles[y][x] === WALL || wasTree;
         const openedWall = wasWall && !isProtected;
         if (openedWall) {
           newMapData.tiles[y][x] = FLOOR;
           wallsDestroyed += 1;
+          if (wasTree) treesDestroyed += 1;
         }
 
         // Damage enemies caught in the blast. Most die; tough enemies (stone goblin,
@@ -1254,6 +1257,7 @@ export function detonateLiveBombs(state: GameState): GameState {
 
   stats.enemiesDefeated = stats.enemiesDefeated + enemiesDefeated + snakePotKills;
   stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
+  stats.treesDestroyed = (stats.treesDestroyed ?? 0) + treesDestroyed;
 
   let heroHealth = state.heroHealth;
   let bonusHearts = state.bonusHearts;
@@ -1458,6 +1462,7 @@ export interface GameState {
     rocksCollected?: number;
     bombsThrown?: number;
     wallsDestroyed?: number;
+    treesDestroyed?: number;
     runesUsed?: number;
     foodUsed?: number;
     potionsUsed?: number;
@@ -1542,6 +1547,10 @@ export interface GameState {
   // the pink realm and persists for the rest of the run (across returns + floors)
   // so the endgame results can record that the secret area was found.
   reachedPinkRealm?: boolean;
+  // Run-level flag: latches true the first time the player breaches an exterior
+  // wall and steps into the outdoor grassland. Persists across returns/floors so
+  // analytics can record that the hidden outside world was found.
+  reachedOutsideWorld?: boolean;
   // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
   // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
   // in it are blinded. Undefined / absent outside the realm.
@@ -2343,6 +2352,7 @@ function enterOutsideWorld(
     playerDirection: direction,
     inOutsideWorld: true,
     outsideDirection: direction,
+    reachedOutsideWorld: true,
     dungeonReturn,
     recentDeaths: [],
     recentBombBlasts: [],

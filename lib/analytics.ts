@@ -27,8 +27,36 @@ export function trackGameComplete(params: {
   deathCause?: string;
   deathCauseEnemyKind?: string;
   currentFloor?: number;
+  chestsOpened?: number;
+  totalChests?: number;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  treesDestroyed?: number;
+  wallsDestroyed?: number;
+  reachedOutsideWorld?: boolean;
+  reachedPinkRealm?: boolean;
 }) {
   posthogAnalytics.trackGameComplete(params);
+}
+
+export function trackOutsideWorldReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+  posthogAnalytics.trackOutsideWorldReached(params);
+}
+
+export function trackOutsideTreeDestroyed(params?: { mode?: "daily" | "normal"; count?: number; floor?: number; dateSeed?: string }) {
+  posthogAnalytics.trackOutsideTreeDestroyed(params);
+}
+
+export function trackFloorAdvance(params: {
+  mode?: "daily" | "normal";
+  fromFloor: number;
+  toFloor: number;
+  hasSword?: boolean;
+  hasShield?: boolean;
+  hasKey?: boolean;
+  dateSeed?: string;
+}) {
+  posthogAnalytics.trackFloorAdvance(params);
 }
 
 export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "rock" | "rune" | "bomb" | "food" | "potion" | "pink_heart" | "berry") {
