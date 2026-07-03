@@ -1202,6 +1202,13 @@ export function detonateLiveBombs(state: GameState): GameState {
 
         // Strip everything destructible; keep preserved/cosmetic markers; scorch the tile.
         const kept = subs.filter((s) => BOMB_PRESERVED_SUBTYPES.has(s));
+        // A WALL_TORCH is preserved through a blast only while its wall still stands.
+        // Once the wall is blown to floor, the mounted torch must go with it — otherwise
+        // it lingers as a floor torch that still blocks movement like a wall.
+        if (openedWall) {
+          const torchIdx = kept.indexOf(TileSubtype.WALL_TORCH);
+          if (torchIdx !== -1) kept.splice(torchIdx, 1);
+        }
         if (!kept.includes(TileSubtype.SINGED)) kept.push(TileSubtype.SINGED);
         if (openedWall) {
           const onPerimeter =

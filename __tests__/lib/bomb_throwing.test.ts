@@ -118,6 +118,27 @@ describe("Bomb detonation - 3x3 blast", () => {
     expect(blown.recentBombBlasts).toContainEqual([5, 7]);
   });
 
+  it("removes a mounted wall torch when its wall is blasted to floor", () => {
+    const map = makeArena(12, 5, 5);
+    map.tiles[5][8] = WALL;
+    map.subtypes[5][8] = [TileSubtype.WALL_TORCH];
+    const thrown = performThrowBomb(baseState(map, { playerDirection: Direction.RIGHT }));
+    const blown = detonateLiveBombs(thrown);
+
+    expect(blown.mapData.tiles[5][8]).toBe(FLOOR); // wall destroyed
+    // The mounted torch must not linger on the now-open floor tile.
+    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.WALL_TORCH);
+    // Hero can now walk onto the tile (a lingering torch would block it).
+    const stepped = movePlayer(
+      { ...blown, playerDirection: Direction.RIGHT },
+      Direction.RIGHT
+    );
+    // Player started at (5,5); after three rightward steps they should reach (5,8).
+    let s = stepped;
+    for (let i = 0; i < 2; i++) s = movePlayer(s, Direction.RIGHT);
+    expect(findPlayer(s.mapData)).toEqual([5, 8]);
+  });
+
   it("detonates automatically on the player's next turn", () => {
     const map = makeArena(12, 5, 5);
     map.tiles[5][8] = WALL;
