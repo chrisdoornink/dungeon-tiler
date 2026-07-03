@@ -60,4 +60,43 @@ describe('MobileControls', () => {
     fireEvent.click(screen.getByTestId('mobile-control-right'));
     expect(handleMove).toHaveBeenCalledWith('RIGHT');
   });
+
+  it('shows usable inventory items as buttons in the mobile strip', () => {
+    global.innerWidth = 500;
+    global.dispatchEvent(new Event('resize'));
+
+    const handleUseFood = jest.fn();
+    render(
+      <MobileControls
+        onMove={jest.fn()}
+        inventoryItems={[
+          { key: 'rock', label: 'Rock', icon: '/images/items/rock-1.png', count: 3, onUse: jest.fn() },
+          { key: 'food', label: 'Food', icon: '/images/items/food-1.png', count: 2, onUse: handleUseFood },
+          { key: 'sword', label: 'Sword', icon: '/images/items/sword.png' },
+        ]}
+      />
+    );
+
+    // Rock keeps its long-standing action testid
+    expect(screen.getByTestId('mobile-action-rock')).toBeInTheDocument();
+
+    // Usable item triggers its handler
+    fireEvent.click(screen.getByTestId('mobile-inventory-item-food'));
+    expect(handleUseFood).toHaveBeenCalled();
+
+    // Passive items (no onUse) are not part of the strip
+    expect(screen.queryByTestId('mobile-inventory-item-sword')).not.toBeInTheDocument();
+  });
+
+  it('does not render inventory strip items on desktop', () => {
+    global.innerWidth = 800;
+    global.dispatchEvent(new Event('resize'));
+    render(
+      <MobileControls
+        onMove={jest.fn()}
+        inventoryItems={[{ key: 'food', label: 'Food', onUse: jest.fn() }]}
+      />
+    );
+    expect(screen.queryByTestId('mobile-inventory-item-food')).not.toBeInTheDocument();
+  });
 });

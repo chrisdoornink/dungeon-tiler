@@ -44,16 +44,21 @@
   width: 100%;
 }
 
+/* On small screens the HUD scales down; widen it so the scaled result still
+   spans the full bar (left-2/right-2 insets = 16px) instead of leaving a gap
+   on the right. */
 @media (max-width: 600px) {
   .hudBar {
     transform: scale(0.9);
     transform-origin: top left;
+    width: calc((100% - 16px) / 0.9);
   }
 }
 
 @media (max-width: 480px) {
   .hudBar {
     transform: scale(0.82);
+    width: calc((100% - 16px) / 0.82);
   }
 }
 

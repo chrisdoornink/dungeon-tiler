@@ -182,6 +182,13 @@
   }
 }
 
+html {
+  /* Keep the layout viewport at device width: without this, the 600px game
+     boxes can expand the mobile layout viewport and push fixed bottom
+     controls out of view. */
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -192,7 +199,7 @@ body {
   /* The game grid is a fixed-width (600px) scaled box; on sub-600px phones it
      would otherwise overhang and let the whole page pan sideways. Clip it so
      the playfield stays put on narrow screens. */
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 /* Global theme tokens moved from CSS Modules to avoid purity errors on Vercel */
@@ -663,6 +670,16 @@ body {
   margin: 0 auto; /* keep centered when scaled */
   will-change: transform;
   display: block;
+}
+
+/* Desktop: cap the game unit at ~550px wide (600 baseline * 0.9167). zoom
+   rather than transform so the layout box shrinks with it — the page gets
+   shorter instead of leaving a dead strip below the board. Below 600px the
+   transform steps further down take over (zoom stays 1 there). */
+@media (min-width: 601px) {
+  .game-scale {
+    zoom: 0.9167;
+  }
 }
 
 /* Reserve space for HUD above the grid so it doesn't overlap when there's room */

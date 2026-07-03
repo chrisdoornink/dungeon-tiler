@@ -193,7 +193,7 @@ function GameViewInner({
 
   return (
     <div
-      className="min-h-screen flex flex-row items-start justify-center p-4 gap-4 text-white relative"
+      className="min-h-screen flex flex-row items-start justify-center p-4 max-[600px]:p-2 gap-4 text-white relative"
       style={{
         backgroundImage: "url(/images/presentational/wall-up-close.png)",
         backgroundRepeat: "repeat",
@@ -202,7 +202,7 @@ function GameViewInner({
     >
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
-        <h1 className="text-1xl font-bold text-center mb-4 text-gray-400">
+        <h1 className="text-1xl font-bold text-center mb-4 max-[600px]:mb-1 text-gray-400">
           Torch Boy
         </h1>
         <TilemapGrid

@@ -1,5 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
+export interface MobileInventoryItem {
+  key: string;
+  label: string;
+  icon?: string;
+  emoji?: string;
+  count?: number;
+  onUse?: () => void;
+}
+
 interface MobileControlsProps {
   onMove: (direction: string) => void;
   onThrowRock?: () => void;
@@ -8,7 +17,55 @@ interface MobileControlsProps {
   runeCount?: number;
   onThrowBomb?: () => void;
   bombCount?: number;
+  inventoryItems?: MobileInventoryItem[];
 }
+
+const ARROW_ROTATION: Record<string, number> = {
+  UP: 0,
+  RIGHT: 90,
+  DOWN: 180,
+  LEFT: 270,
+};
+
+const DirectionArrow = ({ direction }: { direction: string }) => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    aria-hidden="true"
+    style={{ transform: `rotate(${ARROW_ROTATION[direction]}deg)` }}
+  >
+    <path
+      d="M10 5 L15.5 14 H4.5 Z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+const ItemIcon = ({ src, size }: { src: string; size: number }) => (
+  <span
+    aria-hidden="true"
+    style={{
+      display: 'inline-block',
+      width: size,
+      height: size,
+      backgroundImage: `url(${src})`,
+      backgroundSize: 'contain',
+      backgroundRepeat: 'no-repeat',
+      backgroundPosition: 'center',
+    }}
+  />
+);
+
+// 3x3 d-pad layout; null cells are empty spacers
+const DPAD_CELLS: (string | null)[] = [
+  null, 'UP', null,
+  'LEFT', null, 'RIGHT',
+  null, 'DOWN', null,
+];
 
 const MobileControls: React.FC<MobileControlsProps> = ({
   onMove,
@@ -18,8 +75,10 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   runeCount,
   onThrowBomb,
   bombCount,
+  inventoryItems = [],
 }) => {
   const [isMobile, setIsMobile] = useState(false);
+  const [viewportWidth, setViewportWidth] = useState(0);
   const [activeKeys, setActiveKeys] = useState<Record<string, boolean>>({
     UP: false,
     DOWN: false,
@@ -31,6 +90,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   useEffect(() => {
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 600);
+      setViewportWidth(window.innerWidth);
     };
 
     // Initial check
@@ -46,7 +106,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   // Handle keyboard events to highlight the corresponding button
   const handleKeyDown = useCallback((event: KeyboardEvent) => {
     let direction = '';
-    
+
     switch (event.key) {
       case 'ArrowUp':
         direction = 'UP';
@@ -63,9 +123,9 @@ const MobileControls: React.FC<MobileControlsProps> = ({
       default:
         return;
     }
-    
+
     setActiveKeys(prev => ({ ...prev, [direction]: true }));
-    
+
     // Reset after a short delay to create a flash effect
     setTimeout(() => {
       setActiveKeys(prev => ({ ...prev, [direction]: false }));
@@ -79,169 +139,155 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     };
   }, [handleKeyDown]);
 
-  // Determine button style based on mobile/desktop and active state
-  const getButtonStyle = (direction: string) => {
-    const isActive = activeKeys[direction];
-    
-    if (isMobile) {
-      // Mobile style - more prominent
-      return isActive
-        ? "bg-[#555555] text-white p-3 rounded-md transition-colors"
-        : "bg-[#333333] text-white p-3 rounded-md hover:bg-[#444444] transition-colors";
-    } else {
-      // Desktop style - subtle outline
-      return isActive
-        ? "bg-[#333333] text-white p-2 rounded-md border border-[#555555] transition-colors"
-        : "bg-transparent text-[#777777] p-2 rounded-md border border-[#444444] hover:border-[#555555] transition-colors";
-    }
-  };
+  const quickActions = [
+    {
+      key: 'rock',
+      testId: 'mobile-action-rock',
+      icon: '/images/items/rock-1.png',
+      count: rockCount ?? 0,
+      onUse: onThrowRock,
+      label: 'Throw Rock',
+      title: `Throw rock (${rockCount})`,
+    },
+    {
+      key: 'rune',
+      testId: 'mobile-action-rune',
+      icon: '/images/items/rune1.png',
+      count: runeCount ?? 0,
+      onUse: onUseRune,
+      label: 'Use Rune',
+      title: `Use rune (${runeCount})`,
+    },
+    {
+      key: 'bomb',
+      testId: 'mobile-action-bomb',
+      icon: '/images/items/bomb-black.png',
+      count: bombCount ?? 0,
+      onUse: onThrowBomb,
+      label: 'Throw Bomb',
+      title: `Throw bomb (${bombCount})`,
+    },
+  ].filter((action) => action.count > 0 && action.onUse);
 
-  // Always render the controls, but with different styles based on device
-  return (
-    <div 
-      data-testid="mobile-controls" 
-      className={`fixed right-4 z-10 ${!isMobile ? 'opacity-70 scale-90' : ''}`}
-      style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
-    >
-      {/* Action bar above d-pad: Rock and Rune buttons */}
-      <div className="flex justify-end gap-2 mb-2">
-        {(rockCount ?? 0) > 0 && (
+  const renderDpad = (buttonClass: (direction: string) => string, gapClass: string) => (
+    <div className={`grid grid-cols-3 ${gapClass}`}>
+      {DPAD_CELLS.map((direction, i) =>
+        direction ? (
           <button
-            data-testid="mobile-action-rock"
-            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
-              (rockCount ?? 0) > 0
-                ? (isMobile
-                    ? 'bg-[#333333] hover:bg-[#444444] text-white'
-                    : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]')
-                : 'bg-[#222222] text-[#666666] cursor-not-allowed'
-            }`}
-            onClick={() => (rockCount ?? 0) > 0 && onThrowRock && onThrowRock()}
-            aria-label="Throw Rock"
-            title={`Throw rock (${rockCount})`}
+            key={direction}
+            data-testid={`mobile-control-${direction.toLowerCase()}`}
+            className={buttonClass(direction)}
+            onClick={() => onMove(direction)}
+            aria-label={`Move ${direction.charAt(0)}${direction.slice(1).toLowerCase()}`}
           >
-            <span
-              aria-hidden="true"
-              style={{
-                display: 'inline-block',
-                width: isMobile ? 22 : 18,
-                height: isMobile ? 22 : 18,
-                backgroundImage: "url(/images/items/rock-1.png)",
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                verticalAlign: 'middle'
-              }}
-            />
+            <DirectionArrow direction={direction} />
           </button>
-        )}
-        {(runeCount ?? 0) > 0 && (
-          <button
-            data-testid="mobile-action-rune"
-            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
-              (runeCount ?? 0) > 0
-                ? (isMobile
-                    ? 'bg-[#333333] hover:bg-[#444444] text-white'
-                    : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]')
-                : 'bg-[#222222] text-[#666666] cursor-not-allowed'
-            }`}
-            onClick={() => (runeCount ?? 0) > 0 && onUseRune && onUseRune()}
-            aria-label="Use Rune"
-            title={`Use rune (${runeCount})`}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                display: 'inline-block',
-                width: isMobile ? 22 : 18,
-                height: isMobile ? 22 : 18,
-                backgroundImage: "url(/images/items/rune1.png)",
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                verticalAlign: 'middle'
-              }}
-            />
-          </button>
-        )}
-        {(bombCount ?? 0) > 0 && (
-          <button
-            data-testid="mobile-action-bomb"
-            className={`${isMobile ? 'p-3' : 'p-2'} rounded-md ${
-              isMobile
-                ? 'bg-[#333333] hover:bg-[#444444] text-white'
-                : 'bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]'
-            }`}
-            onClick={() => (bombCount ?? 0) > 0 && onThrowBomb && onThrowBomb()}
-            aria-label="Throw Bomb"
-            title={`Throw bomb (${bombCount})`}
-          >
-            <span
-              aria-hidden="true"
-              style={{
-                display: 'inline-block',
-                width: isMobile ? 22 : 18,
-                height: isMobile ? 22 : 18,
-                backgroundImage: "url(/images/items/bomb-black.png)",
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                verticalAlign: 'middle'
-              }}
-            />
-          </button>
-        )}
+        ) : (
+          <div key={`spacer-${i}`} />
+        )
+      )}
+    </div>
+  );
+
+  if (!isMobile) {
+    // Desktop: subtle outline controls pinned bottom-right
+    const desktopDpadClass = (direction: string) =>
+      activeKeys[direction]
+        ? 'flex h-9 w-9 items-center justify-center bg-[#333333] text-white rounded-md border border-[#555555] transition-colors'
+        : 'flex h-9 w-9 items-center justify-center bg-transparent text-[#777777] rounded-md border border-[#444444] hover:border-[#555555] transition-colors';
+
+    return (
+      <div
+        data-testid="mobile-controls"
+        className="fixed right-4 z-10 opacity-70 scale-90"
+        style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
+      >
+        <div className="flex justify-end gap-2 mb-2">
+          {quickActions.map((action) => (
+            <button
+              key={action.key}
+              data-testid={action.testId}
+              className="p-2 rounded-md bg-transparent border border-[#444444] hover:border-[#555555] text-[#dddddd]"
+              onClick={action.onUse}
+              aria-label={action.label}
+              title={action.title}
+            >
+              <ItemIcon src={action.icon} size={18} />
+            </button>
+          ))}
+        </div>
+        {renderDpad(desktopDpadClass, 'gap-1')}
       </div>
+    );
+  }
 
-      {/* D-pad grid */}
-      <div className={`grid grid-cols-3 gap-1`}>
-        {/* Empty space for top-left */}
-        <div></div>
-        {/* Up button */}
-        <button 
-          data-testid="mobile-control-up"
-          className={getButtonStyle('UP')}
-          onClick={() => onMove('UP')}
-          aria-label="Move Up"
-        >
-          ▲
-        </button>
-        {/* Empty space for top-right */}
-        <div></div>
-        
-        {/* Left button */}
-        <button 
-          data-testid="mobile-control-left"
-          className={getButtonStyle('LEFT')}
-          onClick={() => onMove('LEFT')}
-          aria-label="Move Left"
-        >
-          ◄
-        </button>
-        {/* Center placeholder */}
-        <div></div>
-        {/* Right button */}
-        <button 
-          data-testid="mobile-control-right"
-          className={getButtonStyle('RIGHT')}
-          onClick={() => onMove('RIGHT')}
-          aria-label="Move Right"
-        >
-          ►
-        </button>
-        
-        {/* Empty space for bottom-left */}
-        <div></div>
-        {/* Down button */}
-        <button 
-          data-testid="mobile-control-down"
-          className={getButtonStyle('DOWN')}
-          onClick={() => onMove('DOWN')}
-          aria-label="Move Down"
-        >
-          ▼
-        </button>
-        {/* Empty space for bottom-right */}
-        <div></div>
+  // Mobile: full-width control bar. All usable items sit in a strip above the
+  // d-pad, filling from the right edge (nearest the thumb) and wrapping to a
+  // second row when they run out of space.
+  const mobileDpadClass = (direction: string) =>
+    `flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 shadow-md text-gray-200 transition-colors ${
+      activeKeys[direction] ? 'bg-[#555555]' : 'bg-[#333333] active:bg-[#555555]'
+    }`;
+
+  const stripItems = inventoryItems.filter((item) => item.onUse);
+  // Rock/rune/bomb keep their long-standing action testids
+  const stripTestId = (key: string) =>
+    ['rock', 'rune', 'bomb'].includes(key)
+      ? `mobile-action-${key}`
+      : `mobile-inventory-item-${key}`;
+
+  const renderStripButton = (item: MobileInventoryItem) => (
+    <button
+      key={item.key}
+      data-testid={stripTestId(item.key)}
+      className="relative flex h-14 w-14 items-center justify-center rounded-xl border border-white/10 bg-[#333333] shadow-md transition-colors active:bg-[#555555]"
+      onClick={item.onUse}
+      aria-label={item.label}
+      title={(item.count ?? 0) > 0 ? `${item.label} (${item.count})` : item.label}
+    >
+      {item.icon ? (
+        <ItemIcon src={item.icon} size={26} />
+      ) : (
+        <span className="text-xl leading-none" aria-hidden="true">
+          {item.emoji}
+        </span>
+      )}
+      {(item.count ?? 0) > 0 && (
+        <span className="absolute bottom-0.5 right-1 text-[10px] font-medium text-white/90">
+          {item.count}
+        </span>
+      )}
+    </button>
+  );
+
+  // Serpentine fill: the first row starts at the right edge (nearest the
+  // thumb) and runs left; overflow drops to a second row that comes back
+  // from the left. Buttons are 56px wide with an 8px gap inside px-3 padding.
+  const perRow = Math.max(1, Math.floor((viewportWidth - 24 + 8) / 64));
+  const firstRowItems = stripItems.slice(0, perRow);
+  const overflowItems = stripItems.slice(perRow);
+
+  return (
+    <div data-testid="mobile-controls" className="fixed inset-x-0 bottom-0 z-30 pointer-events-none">
+      <div
+        className="pointer-events-auto bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 pt-4"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
+      >
+        {stripItems.length > 0 && (
+          <div className="mb-2 flex flex-col gap-2">
+            <div className="flex flex-row-reverse gap-2">
+              {firstRowItems.map(renderStripButton)}
+            </div>
+            {overflowItems.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {overflowItems.map(renderStripButton)}
+              </div>
+            )}
+          </div>
+        )}
+        <div className="flex items-end justify-end">
+          {renderDpad(mobileDpadClass, 'gap-1.5')}
+        </div>
       </div>
     </div>
   );
