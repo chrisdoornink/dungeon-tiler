@@ -44,41 +44,44 @@ export default function DailyAvailable({
 
   return (
     <div
-      className="min-h-screen py-8 px-4"
+      className="min-h-screen flex flex-col px-4 py-5 sm:py-8"
       style={{
         backgroundImage: "url(/images/presentational/wall-up-close.png)",
         backgroundRepeat: "repeat",
         backgroundSize: "auto",
       }}
     >
-      <div className="max-w-4xl mx-auto rounded-lg shadow-xl p-8">
-        <h1 className="text-3xl font-bold text-center mb-6 text-blue-400">
-          Torch Boy
-        </h1>
-        <div
-          className="w-20 h-20 sm:w-24 sm:h-24 mx-auto"
-          style={{
-            backgroundImage: "url(/images/hero/hero-front-static.png)",
-            backgroundSize: "contain",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        />
-        <h2 className="text-xl font-bold text-center mb-6 text-gray-100">
-          Daily Dungeon Challenge
-        </h2>
-        <p className="text-center text-gray-200">{today}</p>
+      <div className="flex-1 w-full max-w-sm mx-auto flex flex-col justify-center gap-6 sm:gap-8">
+        {/* Header */}
+        <header className="text-center">
+          <h1 className="text-2xl sm:text-3xl font-bold text-blue-400">
+            Torch Boy
+          </h1>
+          <div
+            className="w-14 h-14 sm:w-20 sm:h-20 mx-auto my-3 sm:my-4"
+            style={{
+              backgroundImage: "url(/images/hero/hero-front-static.png)",
+              backgroundSize: "contain",
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "center",
+            }}
+          />
+          <h2 className="text-base sm:text-xl font-bold text-gray-100 leading-snug">
+            Daily Dungeon Challenge
+          </h2>
+          <p className="text-xs sm:text-sm text-gray-300 mt-2">{today}</p>
+        </header>
 
         {firstTime ? (
           /* First-run fork: lead with the guided run, offer a skip for
              players who already know the ropes. The pb clearance keeps the
              skip link from colliding with the fixed bottom-left help/feedback
              buttons on short phone screens. */
-          <div className="text-center mt-6 sm:mt-16 pb-28">
-            <p className="text-lg text-gray-200 mb-2">
+          <div className="text-center pb-24">
+            <p className="text-base sm:text-lg text-gray-200 mb-2 leading-snug">
               First time in the dungeon?
             </p>
-            <p className="text-sm text-gray-400 mb-6 max-w-md mx-auto leading-relaxed">
+            <p className="text-[11px] sm:text-sm text-gray-400 mb-6 leading-relaxed">
               Your first run is a guided one — we&apos;ll walk you through
               moving, fighting, and grabbing loot, then hand you the rest of
               today&apos;s challenge.
@@ -87,16 +90,16 @@ export default function DailyAvailable({
             <button
               type="button"
               onClick={onGuideMe}
-              className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
+              className="px-8 py-4 text-lg sm:text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
             >
               Guide Me
             </button>
 
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 type="button"
                 onClick={handleStartGame}
-                className="text-sm text-gray-400 underline underline-offset-4 hover:text-gray-200 transition-colors"
+                className="text-[11px] sm:text-sm text-gray-400 underline underline-offset-4 hover:text-gray-200 transition-colors leading-relaxed"
               >
                 I&apos;ve played before — skip the guide
               </button>
@@ -105,32 +108,30 @@ export default function DailyAvailable({
         ) : (
           <>
             {/* Call to Action */}
-            <div className="text-center mt-16">
-              <div className="mb-6">
-                <p className="text-lg text-gray-200 mb-2">
-                  Ready to take on today&apos;s challenge?
-                </p>
-              </div>
+            <div className="text-center">
+              <p className="text-sm sm:text-lg text-gray-200 mb-4 sm:mb-6 leading-snug">
+                Ready to take on today&apos;s challenge?
+              </p>
 
               <button
                 type="button"
                 onClick={handleStartGame}
-                className="px-8 py-4 text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
+                className="px-10 py-4 text-lg sm:text-xl font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors shadow-lg"
               >
                 Start
               </button>
             </div>
 
             {/* Stats Panel */}
-            <div className="bg-black/50 rounded-lg p-6 border border-gray-600 mt-16 mx-16">
-              <h2 className="text-xl font-semibold text-gray-100 mb-4">
+            <div className="bg-black/50 rounded-lg p-4 sm:p-6 border border-gray-600">
+              <h2 className="text-sm sm:text-lg font-semibold text-gray-100 mb-3 sm:mb-4">
                 Your Progress
               </h2>
-              <div className="space-y-3">
+              <div className="space-y-2.5 sm:space-y-3 text-xs sm:text-base">
                 {data.currentStreak > 1 && (
                   <div className="flex justify-between items-center">
                     <span className="text-gray-300">Current Streak</span>
-                    <span className="font-bold text-lg text-blue-300">
+                    <span className="font-bold text-blue-300">
                       {data.currentStreak}
                     </span>
                   </div>
