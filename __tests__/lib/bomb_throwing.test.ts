@@ -309,3 +309,47 @@ describe("Outside world breach", () => {
     expect(findPlayer(back.mapData)).toEqual([4, size - 1]);
   });
 });
+
+describe("Bombs and the abyss", () => {
+  it("a bomb thrown onto an open abyss drops in — no live bomb is armed", () => {
+    const map = makeArena(12, 5, 5);
+    // Open pit exactly at max range (4 tiles right); floor the rest of the way.
+    map.subtypes[5][9] = [TileSubtype.OPEN_ABYSS];
+    const after = performThrowBomb(baseState(map, { playerDirection: Direction.RIGHT }));
+
+    // Bomb is spent and counted, but it fell into the pit: no live bomb anywhere.
+    expect(after.bombCount).toBe(0);
+    expect(after.stats.bombsThrown).toBe(1);
+    let live = 0;
+    for (const row of after.mapData.subtypes)
+      for (const cell of row) if (cell.includes(TileSubtype.BOMB_LIVE)) live++;
+    expect(live).toBe(0);
+    // The abyss is untouched.
+    expect(after.mapData.subtypes[5][9]).toContain(TileSubtype.OPEN_ABYSS);
+  });
+
+  it("a blast breaks a faulty (cracked) floor open into an abyss instead of scorching it", () => {
+    const map = makeArena(12, 5, 5);
+    map.subtypes[5][7] = [TileSubtype.BOMB_LIVE];
+    map.subtypes[5][8] = [TileSubtype.FAULTY_FLOOR]; // cracked floor in the blast
+    const blown = detonateLiveBombs(baseState(map, { bombCount: 0 }));
+
+    // The cracked floor is now an open pit — and a pit can't be scorched.
+    expect(blown.mapData.subtypes[5][8]).toContain(TileSubtype.OPEN_ABYSS);
+    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.FAULTY_FLOOR);
+    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.SINGED);
+    // A plain floor tile in the blast is still just scorched (not turned into a pit).
+    expect(blown.mapData.subtypes[5][6]).toContain(TileSubtype.SINGED);
+    expect(blown.mapData.subtypes[5][6]).not.toContain(TileSubtype.OPEN_ABYSS);
+  });
+
+  it("a blast leaves an already-open abyss open, never filled or scorched", () => {
+    const map = makeArena(12, 5, 5);
+    map.subtypes[5][7] = [TileSubtype.BOMB_LIVE];
+    map.subtypes[5][8] = [TileSubtype.OPEN_ABYSS];
+    const blown = detonateLiveBombs(baseState(map, { bombCount: 0 }));
+
+    expect(blown.mapData.subtypes[5][8]).toContain(TileSubtype.OPEN_ABYSS);
+    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.SINGED);
+  });
+});

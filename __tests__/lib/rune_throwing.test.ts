@@ -228,3 +228,50 @@ describe('Rune Throwing - does not remove EXIT tile', () => {
     expect(after.mapData.subtypes[py][px + 4]).not.toContain(TileSubtype.RUNE);
   });
 });
+
+describe('Rune Throwing - lands on an open abyss: falls in, nothing sits on it', () => {
+  it('a rune that comes to rest on an OPEN_ABYSS is consumed, not placed', () => {
+    const base = generateMapWithSubtypes();
+    for (let y = 0; y < base.tiles.length; y++) {
+      for (let x = 0; x < base.tiles[y].length; x++) {
+        base.tiles[y][x] = 1; // wall everywhere
+        base.subtypes[y][x] = [];
+      }
+    }
+    const py = 5, px = 5;
+    base.tiles[py][px] = 0;
+    base.subtypes[py][px] = [TileSubtype.PLAYER];
+    for (let d = 1; d <= 4; d++) {
+      base.tiles[py][px + d] = 0;
+      base.subtypes[py][px + d] = [];
+    }
+    // The 4th (landing) tile is an open pit.
+    base.subtypes[py][px + 4] = [TileSubtype.OPEN_ABYSS];
+
+    const gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      mapData: base,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      enemies: [],
+      heroHealth: 5,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      runeCount: 1,
+      heroTorchLit: true,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      recentDeaths: [],
+    };
+
+    const after = performThrowRune(gameState);
+
+    // Rune is spent but fell into the pit rather than resting on it.
+    expect(after.runeCount).toBe(0);
+    expect(after.mapData.subtypes[py][px + 4]).not.toContain(TileSubtype.RUNE);
+    expect(after.mapData.subtypes[py][px + 4]).toContain(TileSubtype.OPEN_ABYSS);
+  });
+});

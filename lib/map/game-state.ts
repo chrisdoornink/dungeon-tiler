@@ -819,10 +819,15 @@ export function performThrowRock(gameState: GameState): GameState {
     }
   }
 
-  // Land the rock on the 4th tile, preserving existing overlays (e.g., ROAD)
+  // Land the rock on the 4th tile, preserving existing overlays (e.g., ROAD).
+  // A rock that comes to rest on an open abyss falls straight into the pit —
+  // nothing can sit on a broken abyss — so it is consumed without being placed.
   {
-    const base = (newMapData.subtypes[ty][tx] || []).filter((t) => t !== TileSubtype.ROCK);
-    newMapData.subtypes[ty][tx] = base.concat([TileSubtype.ROCK]);
+    const landing = newMapData.subtypes[ty][tx] || [];
+    if (!landing.includes(TileSubtype.OPEN_ABYSS)) {
+      const base = landing.filter((t) => t !== TileSubtype.ROCK);
+      newMapData.subtypes[ty][tx] = base.concat([TileSubtype.ROCK]);
+    }
   }
 
   return {
@@ -936,8 +941,12 @@ export function performThrowRune(gameState: GameState): GameState {
         );
         
         if (!hasImportantTile) {
-          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
-          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          // A rune dropping back onto an open abyss falls into the pit and is
+          // gone — nothing sits on a broken abyss — but it is still spent.
+          if (!lastSubs.includes(TileSubtype.OPEN_ABYSS)) {
+            const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+            newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          }
           return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
         }
       }
@@ -1011,8 +1020,12 @@ export function performThrowRune(gameState: GameState): GameState {
         );
         
         if (!hasImportantTile) {
-          const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
-          newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          // A rune dropping back onto an open abyss falls into the pit and is
+          // gone — nothing sits on a broken abyss — but it is still spent.
+          if (!lastSubs.includes(TileSubtype.OPEN_ABYSS)) {
+            const base = lastSubs.filter((t) => t !== TileSubtype.RUNE);
+            newMapData.subtypes[lastFloorY][lastFloorX] = base.concat([TileSubtype.RUNE]);
+          }
           return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
         }
       }
@@ -1038,7 +1051,11 @@ export function performThrowRune(gameState: GameState): GameState {
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
-        newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+        // If the drop-back tile is an open abyss the rune falls in and is gone,
+        // but it is still spent (nothing sits on a broken abyss).
+        if (!(newMapData.subtypes[lastFloorY][lastFloorX] || []).includes(TileSubtype.OPEN_ABYSS)) {
+          newMapData.subtypes[lastFloorY][lastFloorX] = [TileSubtype.RUNE];
+        }
         runeLanded = true;
       }
       return {
@@ -1071,10 +1088,11 @@ export function performThrowRune(gameState: GameState): GameState {
       s === TileSubtype.CHECKPOINT
     );
     
-    if (!hasImportantTile) {
+    if (!hasImportantTile && !subs.includes(TileSubtype.OPEN_ABYSS)) {
       const base = subs.filter((t) => t !== TileSubtype.RUNE);
       newMapData.subtypes[ty][tx] = base.concat([TileSubtype.RUNE]);
     }
+    // A rune landing on an open abyss falls into the pit and is gone (still spent).
     return { ...preTickState, mapData: newMapData, runeCount: count - 1 };
   }
   return preTickState;
@@ -1242,7 +1260,18 @@ export function detonateLiveBombs(state: GameState): GameState {
           const torchIdx = kept.indexOf(TileSubtype.WALL_TORCH);
           if (torchIdx !== -1) kept.splice(torchIdx, 1);
         }
-        if (!kept.includes(TileSubtype.SINGED)) kept.push(TileSubtype.SINGED);
+        // A blast breaks a cracked (faulty) floor open into an abyss, and leaves an
+        // already-open abyss open. You can't scorch or fill a hole, so an abyss tile
+        // takes OPEN_ABYSS instead of SINGED. (Walls never carry these subtypes, so
+        // this can't collide with openedWall.)
+        const becomesAbyss =
+          subs.includes(TileSubtype.FAULTY_FLOOR) ||
+          subs.includes(TileSubtype.OPEN_ABYSS);
+        if (becomesAbyss) {
+          if (!kept.includes(TileSubtype.OPEN_ABYSS)) kept.push(TileSubtype.OPEN_ABYSS);
+        } else if (!kept.includes(TileSubtype.SINGED)) {
+          kept.push(TileSubtype.SINGED);
+        }
         if (openedWall) {
           const onPerimeter =
             y === 0 || y === height - 1 || x === 0 || x === width - 1;
@@ -1389,10 +1418,14 @@ export function performThrowBomb(gameState: GameState): GameState {
     restX = nx;
   }
 
-  const restBase = (newMapData.subtypes[restY][restX] || []).filter(
-    (t) => t !== TileSubtype.BOMB_LIVE
-  );
-  newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
+  const restSubs = newMapData.subtypes[restY][restX] || [];
+  // A bomb that comes to rest on an open abyss drops into the pit and is lost —
+  // no fuse is armed and no blast follows (nothing sits on a broken abyss). The
+  // bomb is still consumed and counts as thrown.
+  if (!restSubs.includes(TileSubtype.OPEN_ABYSS)) {
+    const restBase = restSubs.filter((t) => t !== TileSubtype.BOMB_LIVE);
+    newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
+  }
 
   return {
     ...preTickState,
