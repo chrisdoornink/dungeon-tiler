@@ -66,4 +66,50 @@ describe('Wall torch glow integration', () => {
     expect(hasInnerClass(6,4,'fov-tier-1')).toBeInTheDocument();
     expect(hasInnerClass(6,6,'fov-tier-1')).toBeInTheDocument();
   });
+
+  it('casts a flickering torch falloff (bright arms, dimmer corners) instead of a hard cross with black corners when the hero torch is out', () => {
+    const h = 11, w = 11;
+    const tiles = makeGrid(h, w, 0);
+    tiles[5][5] = 1;
+    const sub = emptySubtypes(h, w);
+    sub[5][5] = [TileSubtype.WALL_TORCH];
+    // Player far from the torch so its own snuff ring can't overlap the corners.
+    sub[0][0] = [TileSubtype.PLAYER];
+
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes: sub },
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.DOWN,
+      heroHealth: 5,
+      heroAttack: 1,
+      heroTorchLit: false, // torch snuffed
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    };
+
+    render(
+      <TilemapGrid tileTypes={tileTypes} initialGameState={initialGameState} />
+    );
+
+    const getTile = (y: number, x: number) =>
+      document.querySelector(`[data-row="${y}"][data-col="${x}"]`);
+    const hasInnerClass = (y: number, x: number, cls: string) =>
+      (getTile(y, x) as Element | null)?.querySelector(`.${cls}`);
+
+    // Orthogonal arms get the bright flickering torch-arm class (not the plain
+    // lit-mode tier-2, and not the near-black snuff ring).
+    for (const [y, x] of [[4,5],[6,5],[5,4],[5,6]] as const) {
+      expect(hasInnerClass(y, x, 'fov-tier-torch-adj')).toBeInTheDocument();
+      expect(hasInnerClass(y, x, 'fov-tier-snuff-ring')).not.toBeInTheDocument();
+    }
+
+    // Diagonal corners get the dimmer flickering half-light class instead of the
+    // near-black snuff ring.
+    for (const [y, x] of [[4,4],[4,6],[6,4],[6,6]] as const) {
+      expect(hasInnerClass(y, x, 'fov-tier-torch-diag')).toBeInTheDocument();
+      expect(hasInnerClass(y, x, 'fov-tier-snuff-ring')).not.toBeInTheDocument();
+    }
+  });
 });

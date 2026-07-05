@@ -7,8 +7,11 @@ export const SECOND_RING_GLOW = 0.03;
  * Returns a map keyed as "y,x" with intensity values for nearby tiles.
  * - Adjacent N/E/S/W: ADJACENT_GLOW
  * - Diagonals (distance 1): DIAGONAL_GLOW
- * - Second ring (Chebyshev distance 2): SECOND_RING_GLOW
- * - Others: omitted
+ * - Second ring (Chebyshev distance 2), EXCEPT the four far corners: SECOND_RING_GLOW
+ * - Others (incl. the far (±2,±2) corners): omitted
+ *
+ * Dropping the far corners rounds the lit area into an octagon instead of a hard
+ * 5x5 square, so a snuffed-torch glow falls off in a circle-ish shape.
  */
 export function computeTorchGlow(
   y: number,
@@ -43,11 +46,14 @@ export function computeTorchGlow(
     if (inBounds(yy, xx)) res.set(`${yy},${xx}`, DIAGONAL_GLOW);
   }
 
-  // Second ring (Chebyshev distance 2)
+  // Second ring (Chebyshev distance 2), minus the four far corners so the glow
+  // rounds off into an octagon rather than a hard square.
   for (let dy = -2; dy <= 2; dy++) {
     for (let dx = -2; dx <= 2; dx++) {
       const dist = Math.max(Math.abs(dy), Math.abs(dx));
       if (dist !== 2) continue;
+      // Drop the (±2, ±2) corners.
+      if (Math.abs(dy) === 2 && Math.abs(dx) === 2) continue;
       const yy = y + dy;
       const xx = x + dx;
       if (!inBounds(yy, xx)) continue;

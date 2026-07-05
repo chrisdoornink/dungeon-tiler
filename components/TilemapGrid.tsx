@@ -43,6 +43,7 @@ import {
   computeTorchGlow,
   ADJACENT_GLOW,
   DIAGONAL_GLOW,
+  SECOND_RING_GLOW,
 } from "../lib/torch_glow";
 import {
   SMOOTH_TUNING,
@@ -5374,7 +5375,17 @@ function renderTileGrid(
         tier = Math.max(tier, 2);
       } else if (g === DIAGONAL_GLOW) {
         tier = Math.max(tier, 1);
+      } else if (g === SECOND_RING_GLOW) {
+        tier = Math.max(tier, 1);
       }
+      // Classify a tile by its strongest torch contribution so that, while the
+      // hero's own torch is out, wall torches cast a soft flickering falloff:
+      // orthogonal arms brightest (.fov-tier-torch-adj), diagonal corners dimmer
+      // (.fov-tier-torch-diag), and the rounded second ring faintest
+      // (.fov-tier-torch-far) — instead of a hard cross with black corners.
+      const isTorchAdjacentGlow = g === ADJACENT_GLOW;
+      const isTorchDiagonalGlow = g === DIAGONAL_GLOW;
+      const isTorchSecondRingGlow = g === SECOND_RING_GLOW;
       const isVisible = tier > 0;
 
       // Get neighboring tiles
@@ -5411,11 +5422,28 @@ function renderTileGrid(
           key={`${rowIndex}-${colIndex}`}
           className={`relative ${styles.tileWrapper}`}
           style={(() => {
+            const wrapperStyle: React.CSSProperties = {};
             // Raise z-index so lit tiles appear above the dark vignette overlay
             if (g != null || isSelfTorch) {
-              return { zIndex: 10050 as number };
+              wrapperStyle.zIndex = 10050;
             }
-            return undefined;
+            // Desync each torch tile's flicker so neighbors don't pulse in
+            // lockstep. Deterministic from coords (stable across renders); the
+            // CSS var cascades into the tile's torch-glow flicker animation.
+            if (
+              (isTorchDiagonalGlow ||
+                isTorchAdjacentGlow ||
+                isTorchSecondRingGlow) &&
+              !heroTorchLit
+            ) {
+              const delayMs = ((rowIndex * 53 + colIndex * 97) % 13) * 130;
+              (wrapperStyle as Record<string, string | number>)[
+                "--flicker-delay"
+              ] = `${delayMs}ms`;
+            }
+            return Object.keys(wrapperStyle).length > 0
+              ? wrapperStyle
+              : undefined;
           })()}
           data-row={rowIndex}
           data-col={colIndex}
@@ -5428,6 +5456,9 @@ function renderTileGrid(
             col={colIndex}
             isVisible={isVisible}
             visibilityTier={tier}
+            torchDiagonalGlow={isTorchDiagonalGlow}
+            torchAdjacentGlow={isTorchAdjacentGlow}
+            torchSecondRingGlow={isTorchSecondRingGlow}
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}

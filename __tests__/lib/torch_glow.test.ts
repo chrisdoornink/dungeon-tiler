@@ -37,21 +37,32 @@ describe('computeTorchGlow', () => {
     const maxDiag = Math.max(...(diag as number[]));
     expect(minAdj).toBeGreaterThan(maxDiag);
 
-    // Second ring tiles should exist but be weaker than diagonals
+    // Second ring tiles should exist but be weaker than diagonals — EXCEPT the
+    // four far corners, which are dropped so the glow rounds into an octagon.
     const ring2Keys = [
       `${ty - 2},${tx}`,
       `${ty + 2},${tx}`,
       `${ty},${tx - 2}`,
       `${ty},${tx + 2}`,
-      `${ty - 2},${tx - 2}`,
-      `${ty - 2},${tx + 2}`,
-      `${ty + 2},${tx - 2}`,
-      `${ty + 2},${tx + 2}`,
+      `${ty - 2},${tx - 1}`,
+      `${ty - 1},${tx - 2}`,
+      `${ty + 2},${tx + 1}`,
+      `${ty + 1},${tx + 2}`,
     ];
     const ring2 = ring2Keys.map((k) => glow.get(k));
     ring2.forEach((v) => expect(v).toBeDefined());
     const maxRing2 = Math.max(...(ring2 as number[]));
     expect(maxDiag).toBeGreaterThan(maxRing2);
+
+    // Far corners are dropped (rounding).
+    for (const k of [
+      `${ty - 2},${tx - 2}`,
+      `${ty - 2},${tx + 2}`,
+      `${ty + 2},${tx - 2}`,
+      `${ty + 2},${tx + 2}`,
+    ]) {
+      expect(glow.get(k)).toBeUndefined();
+    }
   });
 
   test('handles edge torch without out-of-bounds keys', () => {

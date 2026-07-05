@@ -48,6 +48,19 @@ interface TileProps {
   col?: number; // grid col (x)
   isVisible?: boolean; // Whether this tile is in the player's field of view
   visibilityTier?: number; // 0-3 for FOV fade tiers
+  // True when this tile is diagonally adjacent to a wall torch / torch-carrier
+  // (its strongest glow contribution is DIAGONAL_GLOW). Used to give torch
+  // corners a soft flickering half-light while the hero's own torch is out,
+  // instead of the near-black snuff ring.
+  torchDiagonalGlow?: boolean;
+  // True when this tile is orthogonally adjacent to a wall torch / torch-carrier
+  // (strongest glow is ADJACENT_GLOW). While the hero's torch is out these arms
+  // get the brightest flickering torchlight.
+  torchAdjacentGlow?: boolean;
+  // True when this tile is in the torch's rounded second ring (strongest glow is
+  // SECOND_RING_GLOW). While snuffed these get the faintest flicker, softening
+  // the glow's edge so it doesn't read as a hard square.
+  torchSecondRingGlow?: boolean;
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
@@ -124,6 +137,9 @@ export const Tile: React.FC<TileProps> = ({
   col,
   isVisible = true,
   visibilityTier = 3,
+  torchDiagonalGlow = false,
+  torchAdjacentGlow = false,
+  torchSecondRingGlow = false,
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
@@ -205,6 +221,13 @@ export const Tile: React.FC<TileProps> = ({
     if (!isVisible) return "";
     if (!heroTorchLit && !suppressDarknessOverlay) {
       if (isPlayerTile) return "fov-tier-snuff-core";
+      // Wall torches stay light sources even while snuffed: bright flickering
+      // arms, dimmer flickering corners, instead of a hard cross with black
+      // corners. (Adjacent wins over diagonal — they're mutually exclusive
+      // anyway since ADJACENT_GLOW > DIAGONAL_GLOW.)
+      if (torchAdjacentGlow) return "fov-tier-torch-adj";
+      if (torchDiagonalGlow) return "fov-tier-torch-diag";
+      if (torchSecondRingGlow) return "fov-tier-torch-far";
       if (visibilityTier <= 1) return "fov-tier-snuff-ring";
     }
     if (visibilityTier === 3) return "fov-tier-3";
