@@ -1885,6 +1885,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     y: number;
     x: number;
     src: string;
+    size?: number;
   }>(null);
   // Transient heart effect (petting dogs)
   const [heartEffect, setHeartEffect] = useState<null | {
@@ -2976,9 +2977,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         ).includes(TileSubtype.POT);
         if (preHadPot && !postHasPot) {
           const bamIdx = 1 + Math.floor(Math.random() * 3);
-          setBamEffect({ y: ty, x: tx, src: `/images/items/bam${bamIdx}.png` });
+          // A hand-smashed pot should read as a small ping on the pot itself,
+          // not an explosion: keep the bam compact and skip the screen shake.
+          setBamEffect({ y: ty, x: tx, src: `/images/items/bam${bamIdx}.png`, size: 20 });
           setTimeout(() => setBamEffect(null), 300);
-          triggerScreenShake();
         }
       }
 
@@ -4404,7 +4406,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // Use tile centers: add 0.5 to grid coords before converting to pixels
                     const pxLeft = (bamEffect.x + 0.5) * tileSize;
                     const pxTop = (bamEffect.y + 0.5) * tileSize;
-                    const size = 48; // effect image size in px
+                    const size = bamEffect.size ?? 48; // effect image size in px
                     return (
                       <div
                         data-testid="bam-effect"
