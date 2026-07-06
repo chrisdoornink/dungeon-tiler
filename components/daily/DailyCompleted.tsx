@@ -115,7 +115,7 @@ export function buildInventoryEntries(
   if ((game.rockCount ?? 0) > 0)
     inv.push({ key: "rock", asset: "/images/items/rock-1.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
   if ((game.runeCount ?? 0) > 0)
-    inv.push({ key: "rune", asset: "/images/items/rune1.png", emoji: "🪄", alt: "Rune", count: game.runeCount });
+    inv.push({ key: "rune", asset: "/images/items/rune1.png", emoji: "💠", alt: "Rune", count: game.runeCount });
   if ((game.bombCount ?? 0) > 0)
     inv.push({ key: "bomb", asset: "/images/items/bomb-black.png", emoji: "💣", alt: "Bomb", count: game.bombCount });
   if ((game.foodCount ?? 0) > 0)

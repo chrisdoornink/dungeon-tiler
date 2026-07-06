@@ -349,6 +349,60 @@ describe('Rock Throwing - rune-killed stone-goblin is frozen (no jump)', () => {
 });
 });
 
+describe('Rock Throwing - killed by a ranged pink goblin records the death cause', () => {
+  it('sets deathCause to the pink goblin when its laser kills the hero on the throw turn', () => {
+    const base = generateMapWithSubtypes();
+    for (let y = 0; y < base.tiles.length; y++) {
+      for (let x = 0; x < base.tiles[y].length; x++) {
+        base.tiles[y][x] = 1; // wall everywhere
+        base.subtypes[y][x] = [];
+      }
+    }
+    const py = 5, px = 5;
+    // Clear a row to the RIGHT so the goblin has line of sight to laser the hero.
+    for (let d = 0; d <= 4; d++) {
+      base.tiles[py][px + d] = 0;
+      base.subtypes[py][px + d] = [];
+    }
+    base.subtypes[py][px] = [TileSubtype.PLAYER];
+    // (py, px-1) stays a wall: the hero throws LEFT, so the rock is harmless and
+    // never touches the goblin — the death must come purely from the ranged laser.
+
+    // Pink goblin 4 tiles right (manhattan 4): it always lasers at that distance,
+    // for 1 damage, and is never adjacent — the old adjacency search missed it.
+    const goblin = new Enemy({ y: py, x: px + 4 });
+    goblin.kind = 'pink-goblin';
+    goblin.behaviorMemory.aware = true;
+
+    const gameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      mapData: base,
+      showFullMap: false,
+      win: false,
+      playerDirection: Direction.LEFT,
+      enemies: [goblin],
+      heroHealth: 1,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      rockCount: 1,
+      heroTorchLit: true,
+      combatRng: () => 0.5,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      recentDeaths: [],
+    };
+
+    const after = performThrowRock(gameState);
+
+    // The laser killed the hero...
+    expect(after.heroHealth).toBe(0);
+    // ...and the killer is recorded even though it never came adjacent.
+    expect(after.deathCause).toEqual({ type: 'enemy', enemyKind: 'pink-goblin' });
+  });
+});
+
 describe('Rock Throwing - lands on an open abyss: falls in, nothing sits on it', () => {
   it('a rock that comes to rest on an OPEN_ABYSS is consumed, not placed', () => {
     const base = generateMapWithSubtypes();
