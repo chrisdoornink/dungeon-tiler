@@ -48,14 +48,13 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Torch Boy",
     description: "A new dungeon every day. Light your way out.",
-    // Share image comes from the app/opengraph-image.tsx file convention
-    // (a purpose-built card), not a static sprite.
+    // Share image comes from the static app/opengraph-image.png file convention.
   },
   twitter: {
     card: "summary_large_image",
     title: "Torch Boy",
     description: "A new dungeon every day. Light your way out.",
-    // Image supplied by app/twitter-image.tsx.
+    // Image supplied by app/twitter-image.png.
   },
 };
 
