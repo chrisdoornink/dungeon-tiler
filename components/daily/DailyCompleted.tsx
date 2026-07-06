@@ -341,6 +341,13 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // Header
     lines.push(`#TorchBoy ${today}`);
 
+    // On a loss, most runs never reach the final floor — call out how far you
+    // got right above the skull/cause-of-death line. Wins already say this via
+    // the trophy emoji, so skip it there.
+    if (!isWin && lastGame?.currentFloor != null) {
+      lines.push(`📍 Level ${lastGame.currentFloor}`);
+    }
+
     // Result and basic stats
     const resultEmoji = isWin ? EMOJI_MAP.win : EMOJI_MAP.death;
     // If player died, add emoji for cause of death (enemy kind or faulty floor)
@@ -397,29 +404,33 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     lines.push(`🗃️ ${items.join(" ")}`);
 
     // Health visualization: one heart per max HP (5 by default, 6+ if an Extra
-    // Heart was collected), filled up to final health. Default to empty if unknown.
-    const health =
-      typeof lastGame?.heroHealth === "number" ? lastGame!.heroHealth : 0;
-    // Never render fewer hearts than current HP: older snapshots (pre-heroMaxHealth)
-    // can carry heroHealth 6 from an Extra Heart with no max stored, so floor at health.
-    const maxHealth = Math.max(
-      typeof lastGame?.heroMaxHealth === "number" ? lastGame!.heroMaxHealth : 5,
-      health
-    );
-    const healthTiles: string[] = [];
-    for (let i = 1; i <= maxHealth; i++) {
-      if (i <= health) {
-        healthTiles.push("❤️"); // Filled heart for remaining health
-      } else {
-        healthTiles.push("🤍"); // Empty heart for lost health
+    // Heart was collected), filled up to final health. Only shown on a win — on
+    // a loss the hearts are all empty anyway, and "Reached Level N" above already
+    // conveys how far the run got, so the row would just be dead space.
+    if (isWin) {
+      const health =
+        typeof lastGame?.heroHealth === "number" ? lastGame!.heroHealth : 0;
+      // Never render fewer hearts than current HP: older snapshots (pre-heroMaxHealth)
+      // can carry heroHealth 6 from an Extra Heart with no max stored, so floor at health.
+      const maxHealth = Math.max(
+        typeof lastGame?.heroMaxHealth === "number" ? lastGame!.heroMaxHealth : 5,
+        health
+      );
+      const healthTiles: string[] = [];
+      for (let i = 1; i <= maxHealth; i++) {
+        if (i <= health) {
+          healthTiles.push("❤️"); // Filled heart for remaining health
+        } else {
+          healthTiles.push("🤍"); // Empty heart for lost health
+        }
       }
+      // Temporary pink overheal hearts still active at the end (i.e. the heart was USED and the
+      // buffer survived) ride along after the normal row.
+      const bonusHearts =
+        typeof lastGame?.bonusHearts === "number" ? lastGame.bonusHearts : 0;
+      for (let i = 0; i < bonusHearts; i++) healthTiles.push("💗");
+      lines.push(healthTiles.join(""));
     }
-    // Temporary pink overheal hearts still active at the end (i.e. the heart was USED and the
-    // buffer survived) ride along after the normal row.
-    const bonusHearts =
-      typeof lastGame?.bonusHearts === "number" ? lastGame.bonusHearts : 0;
-    for (let i = 0; i < bonusHearts; i++) healthTiles.push("💗");
-    lines.push(healthTiles.join(""));
 
     // Grade (moved below hearts), intentionally commented out for now until accuracy is improved
     // if (scoreBreakdown) {
@@ -575,9 +586,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     <div className="mb-1">
                       #TorchBoy {new Date().toLocaleDateString("en-CA")}
                     </div>
-                    {lastGame?.currentFloor != null && (
+                    {!isWin && lastGame?.currentFloor != null && (
                       <div className="mb-1 text-gray-300">
-                        Level {lastGame.currentFloor}
+                        📍 Level {lastGame.currentFloor}
                       </div>
                     )}
                     {/* Result + steps */}
@@ -621,7 +632,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                     {isWin && data.currentStreak > 1 && (
                       <div className="mb-2">streak: {data.currentStreak}</div>
                     )}
-                    {/* Monsters defeated: one icon per group with a count, plus a total */}
+                    {/* Monsters defeated: total + one icon per group, in a single row */}
                     {(() => {
                       const summary = summarizeMonsters(
                         lastGame.stats.byKind,
@@ -629,35 +640,31 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                       );
                       if (summary.total <= 0) return null;
                       return (
-                        <div className="mb-1">
-                          <div className="flex items-center justify-center gap-3 flex-wrap">
-                            <span className="mr-1">⚔️</span>
-                            {summary.groups.map((g) => (
+                        <div className="mb-1 flex items-center justify-center gap-3 flex-wrap">
+                          <span className="text-sm text-gray-300">
+                            ⚔️ {summary.total}
+                          </span>
+                          {summary.groups.map((g) => (
+                            <div
+                              key={g.key}
+                              className="flex items-center gap-1"
+                              title={g.label}
+                            >
                               <div
-                                key={g.key}
-                                className="flex items-center gap-1"
-                                title={g.label}
-                              >
-                                <div
-                                  className="w-6 h-6"
-                                  style={{
-                                    backgroundImage: `url(${g.spriteSrc})`,
-                                    backgroundSize: "contain",
-                                    backgroundRepeat: "no-repeat",
-                                    backgroundPosition: "center",
-                                  }}
-                                  aria-label={g.label}
-                                />
-                                <span className="text-sm text-gray-300">
-                                  ×{g.count}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                          {/* Total defeated count */}
-                          <div className="text-center text-xs text-gray-400 mt-1">
-                            Total: {summary.total} defeated
-                          </div>
+                                className="w-6 h-6"
+                                style={{
+                                  backgroundImage: `url(${g.spriteSrc})`,
+                                  backgroundSize: "contain",
+                                  backgroundRepeat: "no-repeat",
+                                  backgroundPosition: "center",
+                                }}
+                                aria-label={g.label}
+                              />
+                              <span className="text-sm text-gray-300">
+                                ×{g.count}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       );
                     })()}
@@ -694,7 +701,9 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         );
                       })}
                     </div>
-                    {/* Hearts */}
+                    {/* Hearts — win only; a loss run's row would be all empty anyway
+                        and the Level line above already says how far it got. */}
+                    {isWin && (
                     <div className="flex items-center justify-center gap-1">
                       {(() => {
                         const health =
@@ -757,6 +766,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         return tiles;
                       })()}
                     </div>
+                    )}
                     {/* Grade moved below hearts; hidden for now until accuracy is improved.
                         When re-enabling, render something like:
                         <div className="mt-2 text-sm text-gray-300">

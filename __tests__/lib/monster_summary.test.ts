@@ -75,7 +75,7 @@ describe("summarizeMonsters", () => {
 });
 
 describe("monsterShareLines", () => {
-  it("renders a total line plus a grouped breakdown line", () => {
+  it("renders a single line combining the total and the grouped breakdown", () => {
     const summary = summarizeMonsters({
       "fire-goblin": 10,
       "pink-goblin": 1,
@@ -83,8 +83,7 @@ describe("monsterShareLines", () => {
       snake: 2,
     });
     expect(monsterShareLines(summary)).toEqual([
-      "⚔️ 14 slain",
-      "👹×10 🔮×1 🗿×1 🐍×2",
+      "⚔️ 14: 👹×10 🔮×1 🗿×1 🐍×2",
     ]);
   });
 

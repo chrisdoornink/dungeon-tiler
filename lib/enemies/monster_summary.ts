@@ -2,8 +2,7 @@
 //
 // Collapses the many goblin variants into a single "Goblin" bucket and gives the
 // distinctive enemies their own identity, so the daily share reads as
-//   ⚔️ 14 slain
-//   👹×10 🔮×1 🗿×1 🐍×2
+//   ⚔️ 14: 👹×10 🔮×1 🗿×1 🐍×2
 // instead of a wall of unintuitive colored dots. Used by both the daily completed
 // screen and the non-daily /end screen so the two stay in lockstep.
 import { EnemyKind, getEnemyIcon } from "./registry";
@@ -135,17 +134,14 @@ export function summarizeMonsters(
 }
 
 /**
- * Share-text lines for the monster summary, e.g.:
- *   ⚔️ 14 slain
- *   👹×10 🔮×1 🗿×1 🐍×2
+ * Share-text line for the monster summary, e.g.:
+ *   ⚔️ 14: 👹×10 🔮×1 🗿×1 🐍×2
  * Returns [] when nothing was defeated.
  */
 export function monsterShareLines(summary: MonsterSummary): string[] {
   if (summary.total <= 0) return [];
-  const lines = [`⚔️ ${summary.total} slain`];
   const breakdown = summary.groups
     .map((g) => `${g.emoji}×${g.count}`)
     .join(" ");
-  if (breakdown) lines.push(breakdown);
-  return lines;
+  return [breakdown ? `⚔️ ${summary.total}: ${breakdown}` : `⚔️ ${summary.total}`];
 }
