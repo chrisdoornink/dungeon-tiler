@@ -189,7 +189,7 @@ export default function EndPage() {
   if (last.hasShield) items.push('🛡️');
   if (last.hasSnakeMedallion) items.push('🌀');
   if ((last.rockCount ?? 0) > 0) items.push(`🪨×${last.rockCount}`);
-  if ((last.runeCount ?? 0) > 0) items.push(`🪄×${last.runeCount}`);
+  if ((last.runeCount ?? 0) > 0) items.push(`💠×${last.runeCount}`);
   if ((last.bombCount ?? 0) > 0) items.push(`💣×${last.bombCount}`);
   if ((last.foodCount ?? 0) > 0) items.push(`🧀×${last.foodCount}`);
   if ((last.potionCount ?? 0) > 0) items.push(`🧪×${last.potionCount}`);
@@ -361,7 +361,7 @@ export default function EndPage() {
             if (last.hasShield) inv.push({ emoji: '🛡️', label: 'Shield' });
             if (last.hasSnakeMedallion) inv.push({ emoji: '🌀', label: 'Travel Medallion' });
             if ((last.rockCount ?? 0) > 0) inv.push({ emoji: '🪨', label: `Rock x${last.rockCount}` });
-            if ((last.runeCount ?? 0) > 0) inv.push({ emoji: '🪄', label: `Rune x${last.runeCount}` });
+            if ((last.runeCount ?? 0) > 0) inv.push({ emoji: '💠', label: `Rune x${last.runeCount}` });
             if ((last.bombCount ?? 0) > 0) inv.push({ emoji: '💣', label: `Bomb x${last.bombCount}` });
             if ((last.foodCount ?? 0) > 0) inv.push({ emoji: '🧀', label: `Food x${last.foodCount}` });
             if ((last.potionCount ?? 0) > 0) inv.push({ emoji: '🧪', label: `Potion x${last.potionCount}` });

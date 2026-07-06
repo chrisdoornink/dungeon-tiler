@@ -221,6 +221,24 @@ function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
   return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
 }
 
+/**
+ * Record which enemy killed the hero on an action turn (throw/use-item). Ranged
+ * attackers like pink goblins fire from a distance and then move, so an adjacency
+ * search after the enemy turn misses them — read the killer straight from the
+ * attack result instead, matching the movement-turn logic. No-op unless the hero
+ * just died and no death cause has been set yet.
+ */
+function recordEnemyDeathCause(
+  state: GameState,
+  attackingEnemies: EnemyAttackInfo[]
+): void {
+  if (state.heroHealth !== 0 || state.deathCause) return;
+  const killer = attackingEnemies[0];
+  if (killer) {
+    state.deathCause = { type: "enemy", enemyKind: killer.kind };
+  }
+}
+
 export function performUseFood(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
@@ -259,17 +277,7 @@ export function performUseFood(gameState: GameState): GameState {
         preTickState.stats.damageTaken += applied;
 
         // If player dies from enemy damage, track which enemy killed them
-        if (preTickState.heroHealth === 0) {
-          const killerEnemy = preTickState.enemies.find(
-            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
-          );
-          if (killerEnemy) {
-            preTickState.deathCause = {
-              type: "enemy",
-              enemyKind: killerEnemy.kind,
-            };
-          }
-        }
+        recordEnemyDeathCause(preTickState, result.attackingEnemies);
       }
     }
   }
@@ -334,17 +342,7 @@ export function performUsePotion(gameState: GameState): GameState {
         applyHeroDamage(preTickState, applied);
         preTickState.stats.damageTaken += applied;
 
-        if (preTickState.heroHealth === 0) {
-          const killerEnemy = preTickState.enemies.find(
-            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
-          );
-          if (killerEnemy) {
-            preTickState.deathCause = {
-              type: "enemy",
-              enemyKind: killerEnemy.kind,
-            };
-          }
-        }
+        recordEnemyDeathCause(preTickState, result.attackingEnemies);
       }
     }
   }
@@ -419,17 +417,7 @@ export function performUsePinkHeart(gameState: GameState): GameState {
         applyHeroDamage(preTickState, applied);
         preTickState.stats.damageTaken += applied;
 
-        if (preTickState.heroHealth === 0) {
-          const killerEnemy = preTickState.enemies.find(
-            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
-          );
-          if (killerEnemy) {
-            preTickState.deathCause = {
-              type: "enemy",
-              enemyKind: killerEnemy.kind,
-            };
-          }
-        }
+        recordEnemyDeathCause(preTickState, result.attackingEnemies);
       }
     }
   }
@@ -494,17 +482,7 @@ export function performUseBerry(gameState: GameState): GameState {
         applyHeroDamage(preTickState, applied);
         preTickState.stats.damageTaken += applied;
 
-        if (preTickState.heroHealth === 0) {
-          const killerEnemy = preTickState.enemies.find(
-            (e) => Math.abs(e.y - py) + Math.abs(e.x - px) === 1
-          );
-          if (killerEnemy) {
-            preTickState.deathCause = {
-              type: "enemy",
-              enemyKind: killerEnemy.kind,
-            };
-          }
-        }
+        recordEnemyDeathCause(preTickState, result.attackingEnemies);
       }
     }
   }
@@ -627,6 +605,9 @@ export function performThrowRock(gameState: GameState): GameState {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
       };
+      // Record the killer (e.g. a pink goblin's ranged laser) so the end screen
+      // can show how the hero died instead of a bare "You died".
+      recordEnemyDeathCause(preTickState, result.attackingEnemies);
     }
     // Note: Do NOT apply adjacent ghost vanish on rock-throw turns; only move enemies.
   }
@@ -903,6 +884,9 @@ export function performThrowRune(gameState: GameState): GameState {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
       };
+      // Record the killer (e.g. a pink goblin's ranged laser) so the end screen
+      // can show how the hero died instead of a bare "You died".
+      recordEnemyDeathCause(preTickState, result.attackingEnemies);
     }
   }
 
@@ -1373,6 +1357,9 @@ export function performThrowBomb(gameState: GameState): GameState {
         ...preTickState.stats,
         damageTaken: preTickState.stats.damageTaken + applied,
       };
+      // Record the killer (e.g. a pink goblin's ranged laser) so the end screen
+      // can show how the hero died instead of a bare "You died".
+      recordEnemyDeathCause(preTickState, result.attackingEnemies);
     }
   }
 
