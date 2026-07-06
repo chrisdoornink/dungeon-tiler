@@ -1800,6 +1800,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const smoothQueuedRef = useRef<Direction | null>(null);
   // Direction keys currently held (most recent last).
   const smoothHeldRef = useRef<Direction[]>([]);
+  // Held-to-run timers for the on-screen d-pad when smooth mode is off (smooth
+  // mode chains held inputs via the rAF loop instead).
+  const mobileHoldTimeoutRef = useRef<number | null>(null);
+  const mobileHoldIntervalRef = useRef<number | null>(null);
   const smoothMapNodeRef = useRef<HTMLDivElement | null>(null);
   // Map-space anchor for the hero (inside mapContainer so walls/trees occlude
   // him via the map's z-order); the rAF loop moves it with the camera.
@@ -3437,26 +3441,77 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return () => cancelAnimationFrame(raf);
   }, [smoothEnabled]);
 
-  // Handle mobile control button clicks
-  const handleMobileMove = useCallback(
+  // On-screen d-pad hold-to-run. Press fires a move immediately; holding keeps
+  // moving in that direction the same way a held keyboard arrow does.
+  const directionFromString = (directionStr: string): Direction | null => {
+    switch (directionStr) {
+      case "UP":
+        return Direction.UP;
+      case "RIGHT":
+        return Direction.RIGHT;
+      case "DOWN":
+        return Direction.DOWN;
+      case "LEFT":
+        return Direction.LEFT;
+      default:
+        return null;
+    }
+  };
+
+  const clearMobileHold = useCallback(() => {
+    if (mobileHoldTimeoutRef.current !== null) {
+      window.clearTimeout(mobileHoldTimeoutRef.current);
+      mobileHoldTimeoutRef.current = null;
+    }
+    if (mobileHoldIntervalRef.current !== null) {
+      window.clearInterval(mobileHoldIntervalRef.current);
+      mobileHoldIntervalRef.current = null;
+    }
+  }, []);
+
+  const handleMobileMoveStart = useCallback(
     (directionStr: string) => {
-      switch (directionStr) {
-        case "UP":
-          handleMoveInput(Direction.UP);
-          break;
-        case "RIGHT":
-          handleMoveInput(Direction.RIGHT);
-          break;
-        case "DOWN":
-          handleMoveInput(Direction.DOWN);
-          break;
-        case "LEFT":
-          handleMoveInput(Direction.LEFT);
-          break;
+      const direction = directionFromString(directionStr);
+      if (direction === null) return;
+      if (smoothEnabled) {
+        // Mirror a keyboard keydown: mark the direction held so the rAF loop
+        // chains steps into a run, then kick off the first step now.
+        smoothHeldRef.current = smoothHeldRef.current.filter(
+          (d) => d !== direction
+        );
+        smoothHeldRef.current.push(direction);
+        handleMoveInput(direction);
+      } else {
+        // No rAF chaining without smooth mode, so emulate keyboard key-repeat.
+        clearMobileHold();
+        handleMoveInput(direction);
+        mobileHoldTimeoutRef.current = window.setTimeout(() => {
+          mobileHoldIntervalRef.current = window.setInterval(() => {
+            handleMoveInput(direction);
+          }, 130);
+        }, 180);
       }
     },
-    [handleMoveInput]
+    [smoothEnabled, handleMoveInput, clearMobileHold]
   );
+
+  const handleMobileMoveEnd = useCallback(
+    (directionStr: string) => {
+      const direction = directionFromString(directionStr);
+      if (direction === null) return;
+      if (smoothEnabled) {
+        smoothHeldRef.current = smoothHeldRef.current.filter(
+          (d) => d !== direction
+        );
+      } else {
+        clearMobileHold();
+      }
+    },
+    [smoothEnabled, clearMobileHold]
+  );
+
+  // Stop any held-to-run repeat if the component unmounts mid-press.
+  useEffect(() => clearMobileHold, [clearMobileHold]);
 
   // Add keyboard event listener
   useEffect(() => {
@@ -5042,7 +5097,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       
       {/* Mobile controls - Outside ScreenShake to prevent displacement */}
       <MobileControls
-        onMove={handleMobileMove}
+        onMove={handleMobileMoveStart}
+        onMoveEnd={handleMobileMoveEnd}
         onThrowRock={handleThrowRock}
         rockCount={gameState.rockCount ?? 0}
         onUseRune={handleThrowRune}
