@@ -54,26 +54,48 @@ describe('MobileControls', () => {
     expect(upButton).toHaveClass('bg-[#333333]');
   });
   
-  it('should call onMove with correct direction when arrow buttons are clicked', () => {
+  it('calls onMove with the correct direction when arrow buttons are pressed', () => {
     // Mock window.innerWidth to be less than 600px
     global.innerWidth = 500;
     global.dispatchEvent(new Event('resize'));
-    
+
     const handleMove = jest.fn();
     render(<MobileControls onMove={handleMove} />);
-    
-    // Click each direction button and verify the callback is called with correct direction
-    fireEvent.click(screen.getByTestId('mobile-control-up'));
+
+    // Press each direction button and verify the callback fires on press
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-up'));
     expect(handleMove).toHaveBeenCalledWith('UP');
-    
-    fireEvent.click(screen.getByTestId('mobile-control-down'));
+
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-down'));
     expect(handleMove).toHaveBeenCalledWith('DOWN');
-    
-    fireEvent.click(screen.getByTestId('mobile-control-left'));
+
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-left'));
     expect(handleMove).toHaveBeenCalledWith('LEFT');
-    
-    fireEvent.click(screen.getByTestId('mobile-control-right'));
+
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-right'));
     expect(handleMove).toHaveBeenCalledWith('RIGHT');
+  });
+
+  it('fires onMove on press and onMoveEnd on release (for hold-to-run)', () => {
+    global.innerWidth = 500;
+    global.dispatchEvent(new Event('resize'));
+
+    const handleMove = jest.fn();
+    const handleMoveEnd = jest.fn();
+    render(<MobileControls onMove={handleMove} onMoveEnd={handleMoveEnd} />);
+
+    const up = screen.getByTestId('mobile-control-up');
+    fireEvent.pointerDown(up);
+    expect(handleMove).toHaveBeenCalledWith('UP');
+    expect(handleMoveEnd).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(up);
+    expect(handleMoveEnd).toHaveBeenCalledWith('UP');
+
+    // A cancelled touch (e.g. system gesture) also ends the hold
+    fireEvent.pointerDown(up);
+    fireEvent.pointerCancel(up);
+    expect(handleMoveEnd).toHaveBeenCalledTimes(2);
   });
 
   it('shows usable inventory items as buttons in the mobile strip', () => {
@@ -186,7 +208,7 @@ describe('MobileControls', () => {
     const { unmount } = render(<MobileControls onMove={jest.fn()} />);
     expect(screen.queryByTestId('keyboard-tip')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId('mobile-control-up'));
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-up'));
     expect(screen.getByTestId('keyboard-tip')).toBeInTheDocument();
     expect(window.localStorage.getItem('tb_kbd_tip_seen')).toBe('1');
 
@@ -194,7 +216,7 @@ describe('MobileControls', () => {
 
     // Already seen — a later session should not show the tip again
     render(<MobileControls onMove={jest.fn()} />);
-    fireEvent.click(screen.getByTestId('mobile-control-up'));
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-up'));
     expect(screen.queryByTestId('keyboard-tip')).not.toBeInTheDocument();
   });
 
@@ -202,7 +224,7 @@ describe('MobileControls', () => {
     global.innerWidth = 500;
     global.dispatchEvent(new Event('resize'));
     render(<MobileControls onMove={jest.fn()} />);
-    fireEvent.click(screen.getByTestId('mobile-control-up'));
+    fireEvent.pointerDown(screen.getByTestId('mobile-control-up'));
     expect(screen.queryByTestId('keyboard-tip')).not.toBeInTheDocument();
   });
 });

@@ -11,6 +11,9 @@ export interface MobileInventoryItem {
 
 interface MobileControlsProps {
   onMove: (direction: string) => void;
+  // Called when a direction button is released (or the touch is cancelled), so
+  // the game can stop a held-to-run repeat. onMove fires on press.
+  onMoveEnd?: (direction: string) => void;
   onThrowRock?: () => void;
   rockCount?: number;
   onUseRune?: () => void;
@@ -84,8 +87,21 @@ const DPAD_WIDTH = 3 * 56 + 2 * 6;
 const DRAG_TAP_THRESHOLD = 8; // px of travel below which a press counts as a tap (no-op)
 const DPAD_SNAP_MS = 160;
 
+// Suppress the mobile long-press artifacts on the controls: the blue text/element
+// selection highlight, the tap flash, and the iOS callout menu.
+const NO_SELECT: React.CSSProperties = {
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  WebkitTapHighlightColor: 'transparent',
+  WebkitTouchCallout: 'none',
+};
+// Direction buttons additionally claim the touch so a press-and-hold never turns
+// into a scroll/zoom gesture.
+const NO_SELECT_TOUCH: React.CSSProperties = { ...NO_SELECT, touchAction: 'none' };
+
 const MobileControls: React.FC<MobileControlsProps> = ({
   onMove,
+  onMoveEnd,
   onThrowRock,
   rockCount,
   onUseRune,
@@ -182,12 +198,27 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     tipTimer.current = window.setTimeout(() => setShowKbdTip(false), 6000);
   }, [isMobile]);
 
-  const move = useCallback(
-    (direction: string) => {
+  // Press a direction: fire the move now and (via onMove -> game) start the
+  // held-to-run repeat. Capturing the pointer keeps the hold alive even if the
+  // finger drifts off the button, so a slight wobble doesn't stop the run.
+  const pressDirection = useCallback(
+    (direction: string, target: HTMLElement, pointerId: number) => {
+      try {
+        target.setPointerCapture(pointerId);
+      } catch {
+        // pointer capture unsupported — hold still works while over the button
+      }
       onMove(direction);
       activateControl();
     },
     [onMove, activateControl]
+  );
+
+  const releaseDirection = useCallback(
+    (direction: string) => {
+      onMoveEnd?.(direction);
+    },
+    [onMoveEnd]
   );
 
   // Handle keyboard events to highlight the corresponding button
@@ -268,7 +299,11 @@ const MobileControls: React.FC<MobileControlsProps> = ({
             key={direction}
             data-testid={`mobile-control-${direction.toLowerCase()}`}
             className={buttonClass(direction)}
-            onClick={() => move(direction)}
+            style={NO_SELECT_TOUCH}
+            onPointerDown={(e) => pressDirection(direction, e.currentTarget, e.pointerId)}
+            onPointerUp={() => releaseDirection(direction)}
+            onPointerCancel={() => releaseDirection(direction)}
+            onContextMenu={(e) => e.preventDefault()}
             aria-label={`Move ${direction.charAt(0)}${direction.slice(1).toLowerCase()}`}
           >
             <DirectionArrow direction={direction} />
@@ -294,7 +329,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
         <div
           data-testid="mobile-controls"
           className="fixed right-4 z-10 opacity-70 scale-90"
-          style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))' }}
+          style={{ bottom: 'max(1rem, env(safe-area-inset-bottom, 1rem))', ...NO_SELECT }}
         >
           <div className="flex justify-end gap-2 mb-2">
             {quickActions.map((action) => (
@@ -372,8 +407,9 @@ const MobileControls: React.FC<MobileControlsProps> = ({
       key={item.key}
       data-testid={stripTestId(item.key)}
       className="relative flex items-center justify-center rounded-xl border border-white/10 bg-[#333333] shadow-md transition-colors active:bg-[#555555]"
-      style={{ width: btnSize, height: btnSize }}
+      style={{ width: btnSize, height: btnSize, ...NO_SELECT }}
       onClick={item.onUse}
+      onContextMenu={(e) => e.preventDefault()}
       aria-label={item.label}
       title={(item.count ?? 0) > 0 ? `${item.label} (${item.count})` : item.label}
     >
@@ -471,7 +507,8 @@ const MobileControls: React.FC<MobileControlsProps> = ({
       onPointerUp={(e) => endDrag(e.clientX)}
       onPointerCancel={() => endDrag(null)}
       className="flex h-14 w-14 cursor-grab items-center justify-center rounded-xl bg-transparent text-white/25 transition-colors active:cursor-grabbing active:text-white/50"
-      style={{ touchAction: 'none' }}
+      style={NO_SELECT_TOUCH}
+      onContextMenu={(e) => e.preventDefault()}
     >
       <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
         <line x1="3" y1="5" x2="13" y2="5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -485,7 +522,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     <div data-testid="mobile-controls" className="fixed inset-x-0 bottom-0 z-30 pointer-events-none">
       <div
         className="pointer-events-auto bg-gradient-to-t from-black/85 via-black/55 to-transparent px-3 pt-4"
-        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))' }}
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0.75rem))', ...NO_SELECT }}
       >
         {stripItems.length > 0 && (
           <div className={`mb-2 flex flex-wrap gap-2 ${stripFlowClass}`}>
