@@ -427,7 +427,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     // }
 
     // A link to the game at torchboy.com
-    lines.push("\n#TorchBoy https://torchboy.com");
+    lines.push("\nhttps://torchboy.com");
 
     return lines.join("\n");
   };
