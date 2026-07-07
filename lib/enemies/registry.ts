@@ -54,6 +54,9 @@ export interface EnemyConfig {
   displayName: string;
   assets: Partial<Record<Facing, string>> & { front: string };
   base: { health: number; attack: number };
+  // Carries a lit torch: renders glowing/visible in darkness, and striking it
+  // in melee relights the hero's own snuffed torch (flame transfer).
+  carriesTorch?: boolean;
   // Desired per-level count bounds used by assignment logic
   desiredMinCount?: number;
   desiredMaxCount?: number;
@@ -82,6 +85,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     desiredMinCount: 2,
     desiredMaxCount: 3,
     base: { health: 4, attack: 1 },
+    carriesTorch: true,
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {},

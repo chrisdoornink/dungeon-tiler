@@ -1440,12 +1440,14 @@ export interface GameState {
   hasShield?: boolean;
   chestKeyCount?: number; // Multi-tier: consumable keys for opening locked chests (separate from universal key)
   floorChestAllocation?: Record<number, { chests: number; keys: number; chestContents: number[] }>; // Multi-tier: pre-computed chest/key distribution across floors
-  mode?: 'normal' | 'daily' | 'story' | 'tutorial';
+  mode?: 'normal' | 'daily' | 'story' | 'tutorial' | 'endless';
   allowCheckpoints?: boolean;
   /** Tutorial-only: tracks which scripted beats have already fired. */
   tutorialBeats?: Record<string, boolean>;
   currentFloor?: number; // Current floor number for multi-tier daily mode (1-indexed)
   maxFloors?: number; // Maximum number of floors for multi-tier daily mode
+  endlessSeed?: number; // Endless mode: per-run seed; floor N generates from (seed + N)
+  endlessPlan?: { swordFloor: number; shieldFloor: number; medallionFloor: number }; // Endless mode: which floors carry the guaranteed item chests
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)
   win: boolean; // Win state when player opens exit and steps onto it
@@ -3323,6 +3325,13 @@ function movePlayerCore(
         try { /* debug log removed */ } catch {}
         enemy.health -= heroDamage;
         newGameState.stats.damageDealt += heroDamage;
+
+        // Flame transfer: striking a torch-carrying enemy at melee range relights
+        // the hero's snuffed torch, same as brushing a wall torch. Applies whether
+        // the blow kills or not — the flame is caught in the exchange.
+        if (!newGameState.heroTorchLit && EnemyRegistry[enemy.kind]?.carriesTorch) {
+          newGameState.heroTorchLit = true;
+        }
 
         if (enemy.health <= 0) {
           // Clean up pink ring if a pink goblin dies

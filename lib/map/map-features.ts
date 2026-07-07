@@ -631,8 +631,14 @@ export function addChestKeysToMap(mapData: MapData, keyCount: number): MapData {
 export function generateCompleteMapForFloor(
   floorAllocation: { chests: number; keys: number; chestContents: TileSubtype[] },
   floor?: number,
+  opts?: {
+    gridSize?: [number, number]; // override the daily floor-based grid sizes (endless mode)
+    rocksFloor?: number; // which floor's rock-count rule to apply when `floor` is not passed
+    wallTorches?: number; // override the default wall torch count (endless dark floor)
+    includeFaultyFloors?: boolean; // set false to guarantee no abyss holes (endless dark floor)
+  },
 ): MapData {
-  const [gridW, gridH] = floor !== undefined ? gridSizeForFloor(floor) : [GRID_SIZE, GRID_SIZE];
+  const [gridW, gridH] = opts?.gridSize ?? (floor !== undefined ? gridSizeForFloor(floor) : [GRID_SIZE, GRID_SIZE]);
   const base = generateMapWithSubtypes(gridW, gridH);
   const withExit = generateMapWithExit(base);
   const withExitKey = addExitKeyToMap(withExit);
@@ -642,9 +648,10 @@ export function generateCompleteMapForFloor(
   const withKeys = addChestKeysToMap(withChests, floorAllocation.keys);
 
   const withPots = addPotsToMap(withKeys);
-  const withRocks = addRocksToMap(withPots, floor);
-  const withFaultyFloors = addFaultyFloorsToMap(withRocks);
-  const withTorches = addWallTorchesToMap(withFaultyFloors);
+  const withRocks = addRocksToMap(withPots, opts?.rocksFloor ?? floor);
+  const withFaultyFloors =
+    opts?.includeFaultyFloors === false ? withRocks : addFaultyFloorsToMap(withRocks);
+  const withTorches = addWallTorchesToMap(withFaultyFloors, opts?.wallTorches);
   // Floor 3 is the escape floor (key + exit only): spawn the hero far from both
   // objectives so the run requires traversal rather than a lucky short hop. Other
   // floors keep the original fully-random spawn.
@@ -658,7 +665,7 @@ export function generateCompleteMapForFloor(
   return addPlayerToMap(withTorches);
 }
 
-export function addWallTorchesToMap(mapData: MapData): MapData {
+export function addWallTorchesToMap(mapData: MapData, count: number = 6): MapData {
   const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
   const grid = newMapData.tiles;
   const h = grid.length;
@@ -682,7 +689,7 @@ export function addWallTorchesToMap(mapData: MapData): MapData {
     [eligible[i], eligible[j]] = [eligible[j], eligible[i]];
   }
 
-  const toPlace = Math.min(6, eligible.length);
+  const toPlace = Math.min(count, eligible.length);
   for (let i = 0; i < toPlace; i++) {
     const [ty, tx] = eligible[i];
     newMapData.subtypes[ty][tx] = [TileSubtype.WALL_TORCH];

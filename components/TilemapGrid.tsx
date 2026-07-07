@@ -76,7 +76,8 @@ import {
 } from "../lib/analytics";
 import { DateUtils } from "../lib/date_utils";
 import { hashStringToSeed } from "../lib/rng";
-import { computeMapId, advanceToNextFloor } from "../lib/map";
+import { computeMapId, advanceToNextFloor, advanceToNextEndlessFloor } from "../lib/map";
+import { EndlessStorage } from "../lib/endless_storage";
 import { CurrentGameStorage, type GameStorageSlot } from "../lib/current_game_storage";
 import {
   DEFAULT_ENVIRONMENT,
@@ -115,7 +116,13 @@ type DialogueSession = {
   consumedScriptIds: string[];
 };
 
-const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(["fire-goblin"]);
+// Enemies whose registry config flags them as carrying a lit torch: they render
+// glowing in darkness, and melee-striking them relights the hero's torch.
+const TORCH_CARRIER_ENEMIES = new Set<EnemyKind>(
+  (Object.keys(EnemyRegistry) as EnemyKind[]).filter(
+    (k) => EnemyRegistry[k].carriesTorch
+  )
+);
 
 function cloneDialogueLines(lines: DialogueLine[]): DialogueLine[] {
   return lines.map((line) => ({
@@ -233,10 +240,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     ? 'daily-new'
     : 'default';
 
+  // Endless mode: unbounded floors, per-run seed, floor-reached scorekeeping.
+  const isEndless = resolvedStorageSlot === 'endless';
+
   // Play the death cinematic (spin/topple or abyss-sink -> spirit) in story AND
-  // daily, so death reads as a transition instead of an instant cut to results.
+  // daily/endless, so death reads as a transition instead of an instant cut to results.
   const shouldAnimateHeroDeath =
-    resolvedStorageSlot === 'story' || isDailyChallenge;
+    resolvedStorageSlot === 'story' || isDailyChallenge || isEndless;
 
   // Router removed; daily flow handled via onDailyComplete callback
 
@@ -2191,15 +2201,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   useEffect(() => {
     if (!shouldAnimateHeroDeath) return;
     if (heroDeathPhase === "spirit") {
-      // Daily bridges to its own results screen with a fade; story shows the
-      // full death overlay (with restart). Don't show that overlay in daily.
-      if (isDailyChallenge) {
+      // Daily/endless bridge to their own results screens with a fade; story
+      // shows the full death overlay (with restart). Don't show that overlay here.
+      if (isDailyChallenge || isEndless) {
         setDeathFade(true);
       } else {
         setShowDeathScreen(true);
       }
     }
-  }, [heroDeathPhase, shouldAnimateHeroDeath, isDailyChallenge]);
+  }, [heroDeathPhase, shouldAnimateHeroDeath, isDailyChallenge, isEndless]);
 
   // Determine the currently active checkpoint tile from the lastCheckpoint snapshot
   const activeCheckpoint: [number, number] | null = React.useMemo(() => {
@@ -2278,13 +2288,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState.showFullMap, suppressDarknessOverlay]);
 
-  // Handle floor transition for multi-tier daily mode — start iris wipe animation
+  // Handle floor transition for multi-tier daily and endless modes — start iris wipe animation
   useEffect(() => {
-    if (gameState.needsFloorTransition && isDailyChallenge && resolvedStorageSlot === 'daily-new' && !floorTransition) {
+    const isMultiTierDaily = isDailyChallenge && resolvedStorageSlot === 'daily-new';
+    if (gameState.needsFloorTransition && (isMultiTierDaily || isEndless) && !floorTransition) {
       // Pre-compute the next floor state so it's ready when the screen goes black
       const localToday = DateUtils.getTodayString();
-      const dailySeed = hashStringToSeed(localToday);
-      const nextFloorState = advanceToNextFloor(gameState, dailySeed);
+      const nextFloorState = isEndless
+        ? advanceToNextEndlessFloor(gameState)
+        : advanceToNextFloor(gameState, hashStringToSeed(localToday));
       nextFloorState.needsFloorTransition = false;
 
       // Telemetry: record the loadout carried UP a floor, so we can see e.g. how
@@ -2292,13 +2304,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       try {
         const fromFloor = gameState.currentFloor ?? 1;
         trackFloorAdvance({
-          mode: "daily",
+          mode: isEndless ? "endless" : "daily",
           fromFloor,
           toFloor: fromFloor + 1,
           hasSword: !!gameState.hasSword,
           hasShield: !!gameState.hasShield,
           hasKey: !!gameState.hasKey,
-          dateSeed: localToday,
+          dateSeed: isEndless ? undefined : localToday,
         });
       } catch {}
 
@@ -2323,7 +2335,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         pendingGameState: nextFloorState,
       });
     }
-  }, [gameState.needsFloorTransition, isDailyChallenge, resolvedStorageSlot, floorTransition]);
+  }, [gameState.needsFloorTransition, isDailyChallenge, isEndless, resolvedStorageSlot, floorTransition]);
 
   // One-off exploration milestones (hidden, bomb-gated actions). The ref is
   // seeded from the state at mount so a mid-run reload — where the flag is
@@ -2774,7 +2786,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     
     // For non-story modes, handle permanent death with redirect
     try {
-      const mode = isDailyChallenge ? "daily" : "normal";
+      const mode = isEndless ? "endless" : isDailyChallenge ? "daily" : "normal";
       const mapId = computeMapId(gameState.mapData);
       trackGameComplete({
         outcome: "dead",
@@ -2792,6 +2804,37 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         currentFloor: gameState.currentFloor,
       });
     } catch {}
+
+    if (isEndless) {
+      // Endless run over: the floor reached is the score. Persist the record,
+      // clear the run save, and hand off to the page's game-over screen.
+      try {
+        EndlessStorage.recordRun({
+          floor: gameState.currentFloor ?? 1,
+          enemiesDefeated: gameState.stats.enemiesDefeated,
+          steps: gameState.stats.steps,
+          damageDealt: gameState.stats.damageDealt,
+          damageTaken: gameState.stats.damageTaken,
+          hasSword: !!gameState.hasSword,
+          hasShield: !!gameState.hasShield,
+          diedAt: new Date().toISOString(),
+          deathCause: gameState.deathCause?.type,
+        });
+      } catch {
+        // ignore storage errors
+      }
+      try {
+        if (typeof window !== "undefined") {
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
+        }
+      } catch {
+        // ignore storage errors
+      }
+      if (onDailyComplete) {
+        onDailyComplete("lost");
+      }
+      return;
+    }
 
     if (isDailyChallenge) {
       // Handle daily challenge death

@@ -87,7 +87,7 @@ function captureEvent(eventName: string, properties?: EventParams) {
 
 // Game-specific event tracking functions
 export function trackGameStart(params: {
-  mode: "daily" | "normal";
+  mode: "daily" | "normal" | "endless";
   mapId?: string;
   dateSeed?: string;
   algorithm?: string;
@@ -102,7 +102,7 @@ export function trackGameStart(params: {
 
 export function trackGameComplete(params: {
   outcome: "win" | "dead";
-  mode: "daily" | "normal";
+  mode: "daily" | "normal" | "endless";
   mapId?: string;
   dateSeed?: string;
   heroHealth: number;
@@ -161,7 +161,7 @@ export function trackGameComplete(params: {
  * unique game_start users to get a "% who found the outside world" rate.
  */
 export function trackOutsideWorldReached(params?: {
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   floor?: number;
   dateSeed?: string;
 }) {
@@ -177,7 +177,7 @@ export function trackOutsideWorldReached(params?: {
  * outdoor world. `count` carries how many trees had fallen at that point (>=1).
  */
 export function trackOutsideTreeDestroyed(params?: {
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   count?: number;
   floor?: number;
   dateSeed?: string;
@@ -196,7 +196,7 @@ export function trackOutsideTreeDestroyed(params?: {
  * the sword/shield and rush level two?".
  */
 export function trackFloorAdvance(params: {
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   fromFloor: number;
   toFloor: number;
   hasSword?: boolean;
@@ -223,7 +223,7 @@ export function trackUse(item: "rock" | "rune" | "bomb" | "food" | "potion" | "p
   captureEvent('item_use', { item });
 }
 
-export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
   captureEvent('pink_realm_reached', { ...params });
 }
 
@@ -236,7 +236,7 @@ export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floo
  */
 export function trackShare(params: {
   surface: "end_screen" | "daily_completed";
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   outcome?: "win" | "dead";
   levelReached?: number;
   dateSeed?: string;

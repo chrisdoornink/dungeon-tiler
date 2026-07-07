@@ -84,3 +84,15 @@ export {
 } from "./map/game-state";
 
 export type { GameState, CheckpointSnapshot } from "./map/game-state";
+
+export {
+  initializeGameStateForEndless,
+  advanceToNextEndlessFloor,
+  endlessGridSizeForFloor,
+  endlessEnemyCountForFloor,
+  endlessPhaseFloor,
+  endlessAllocationForFloor,
+  rollEndlessItemPlan,
+  ENDLESS_MAX_FLOORS,
+  type EndlessItemPlan,
+} from "./map/endless";

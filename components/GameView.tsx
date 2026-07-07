@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
+import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateForEndless, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies, type PlainEnemy } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
 import { DateUtils } from "../lib/date_utils";
@@ -18,7 +18,7 @@ export interface GameViewProps {
   isDailyChallenge?: boolean;
   forceDaylightDefault?: boolean;
   onDailyComplete?: (result: "won" | "lost") => void;
-  storageSlot?: "default" | "daily-new" | "story";
+  storageSlot?: "default" | "daily-new" | "story" | "endless";
 }
 
 function GameViewInner({
@@ -112,6 +112,9 @@ function GameViewInner({
           state.mode = 'daily';
           state.allowCheckpoints = false;
         }
+      } else if (slot === 'endless') {
+        // Endless mode: per-run random seed baked into the state (not the daily seed)
+        state = initializeGameStateForEndless();
       } else {
         if (algorithm === "default") {
           generateMap();
@@ -148,7 +151,7 @@ function GameViewInner({
     }
 
     return state;
-  }, [algorithm, replayExact, mapId, isDailyChallenge]);
+  }, [algorithm, replayExact, mapId, isDailyChallenge, storageSlot]);
 
   // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
   const [replayState, setReplayState] = useState<GameState | undefined>();
@@ -184,12 +187,12 @@ function GameViewInner({
   useEffect(() => {
     try {
       if (!finalInitialState || !finalInitialState.mapData) return;
-      const mode = isDailyChallenge ? "daily" : "normal";
+      const mode = storageSlot === "endless" ? "endless" : isDailyChallenge ? "daily" : "normal";
       const mapId = computeMapId(finalInitialState.mapData);
       const dateSeed = isDailyChallenge ? DateUtils.getTodayString() : undefined;
       trackGameStart({ mode, mapId, dateSeed, algorithm });
     } catch {}
-  }, [finalInitialState, isDailyChallenge, algorithm]);
+  }, [finalInitialState, isDailyChallenge, algorithm, storageSlot]);
 
   return (
     <div
@@ -203,7 +206,9 @@ function GameViewInner({
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
         <h1 className="text-1xl font-bold text-center mb-4 max-[600px]:mb-1 text-gray-400">
-          Torch Boy
+          {storageSlot === "endless" && currentFloor
+            ? `Torch Boy — Floor ${currentFloor}`
+            : "Torch Boy"}
         </h1>
         <TilemapGrid
           tilemap={finalInitialState.mapData.tiles}

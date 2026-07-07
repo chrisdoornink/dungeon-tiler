@@ -5,7 +5,7 @@ import * as posthogAnalytics from './posthog_analytics';
 
 // Domain-specific wrappers for convenience
 export function trackGameStart(params: {
-  mode: "daily" | "normal";
+  mode: "daily" | "normal" | "endless";
   mapId?: string;
   dateSeed?: string; // YYYY-MM-DD when daily
   algorithm?: string;
@@ -15,7 +15,7 @@ export function trackGameStart(params: {
 
 export function trackGameComplete(params: {
   outcome: "win" | "dead";
-  mode: "daily" | "normal";
+  mode: "daily" | "normal" | "endless";
   mapId?: string;
   dateSeed?: string;
   heroHealth: number;
@@ -39,16 +39,16 @@ export function trackGameComplete(params: {
   posthogAnalytics.trackGameComplete(params);
 }
 
-export function trackOutsideWorldReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+export function trackOutsideWorldReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
   posthogAnalytics.trackOutsideWorldReached(params);
 }
 
-export function trackOutsideTreeDestroyed(params?: { mode?: "daily" | "normal"; count?: number; floor?: number; dateSeed?: string }) {
+export function trackOutsideTreeDestroyed(params?: { mode?: "daily" | "normal" | "endless"; count?: number; floor?: number; dateSeed?: string }) {
   posthogAnalytics.trackOutsideTreeDestroyed(params);
 }
 
 export function trackFloorAdvance(params: {
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   fromFloor: number;
   toFloor: number;
   hasSword?: boolean;
@@ -67,13 +67,13 @@ export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion" | "p
   posthogAnalytics.trackUse(name);
 }
 
-export function trackPinkRealmReached(params?: { mode?: "daily" | "normal"; floor?: number; dateSeed?: string }) {
+export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
   posthogAnalytics.trackPinkRealmReached(params);
 }
 
 export function trackShare(params: {
   surface: "end_screen" | "daily_completed";
-  mode?: "daily" | "normal";
+  mode?: "daily" | "normal" | "endless";
   outcome?: "win" | "dead";
   levelReached?: number;
   dateSeed?: string;
