@@ -107,12 +107,6 @@ export default function EndlessPage() {
               Descend as far as you can. Every floor is deadlier than the last,
               and there is no way out — only down.
             </p>
-            <p className="text-gray-400 text-sm">
-              You begin in total darkness with an unlit torch. Fire goblins
-              carry the only moving lights — strike one to steal its flame, or
-              find a wall torch. Beware the wisps that come to snuff it out,
-              and keep to the shadows until you find your steel.
-            </p>
             {records && (
               <p className="text-gray-200">
                 Best: <span className="font-bold text-amber-300">Floor {records.bestFloor}</span>
