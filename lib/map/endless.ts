@@ -1,6 +1,6 @@
 import { Enemy, placeEnemies } from "../enemy";
 import { enemyTypeAssignement, assignWhiteGoblinSwarmIds } from "../enemy_assignment";
-import { createEmptyByKind } from "../enemies/registry";
+import { createEmptyByKind, type EnemyKind } from "../enemies/registry";
 import { createInitialStoryFlags } from "../story/event_registry";
 import { Direction, TileSubtype } from "./constants";
 import type { MapData } from "./types";
@@ -28,6 +28,10 @@ import type { GameState } from "./game-state";
  *   3-5 — fixed windows for consistency, random exact floor for variety.
  * - Grids grow and enemy counts/mix ramp with depth; an extra-heart chest every
  *   5th floor is the sustain economy that makes deep runs earnable.
+ * - The goblin mix ramps GRADUALLY (its own tables, not the daily's): basics
+ *   through floor 3, armed goblins trickle in on 4-5, pink/stone goblins first
+ *   appear lightly on 6-7, and the full daily-floor-3 menagerie waits until 8+.
+ *   Early playtesting had pink+stone on floor 3 and it walled new runs.
  * - Score is the floor reached. Each run has its own seed; floors are generated
  *   deterministically from (runSeed + floor) so a resumed run stays consistent.
  */
@@ -38,10 +42,34 @@ import type { GameState } from "./game-state";
 export const ENDLESS_MAX_FLOORS = 9999;
 
 export interface EndlessItemPlan {
-  swordFloor: number; // 2-4
-  shieldFloor: number; // 3-5 (never the same floor as the sword)
-  medallionFloor: number; // 6-9
+  // Floors 1-10: which guaranteed starter items appear on each floor. Each of
+  // the five starter items sits on its own distinct random floor (see
+  // ITEM_PLAN_FLOOR_MIN..MAX), so the early game hands out sword, shield, a
+  // bomb pack, the medallion, and one extra heart in an unpredictable order.
+  floorItems: Record<number, TileSubtype[]>;
 }
+
+// The five guaranteed starter items, each dropped once across the early floors.
+const STARTER_ITEMS: TileSubtype[] = [
+  TileSubtype.SWORD,
+  TileSubtype.SHIELD,
+  TileSubtype.BOMB,
+  TileSubtype.SNAKE_MEDALLION,
+  TileSubtype.EXTRA_HEART,
+];
+
+// Starter items land somewhere in this floor range. Floor 1 (the blind floor)
+// is excluded on purpose: a locked chest you can't see there would too often
+// strand your only sword in the dark.
+const ITEM_PLAN_FLOOR_MIN = 2;
+const ITEM_PLAN_FLOOR_MAX = 10;
+
+// Deep-floor sustain economy (floor 11+). Extra hearts keep arriving on the
+// 5-floor cadence; bombs and (only when still missing) sword/shield appear by
+// chance so a player who whiffed an early chest can still recover.
+const POST10_HEART_CADENCE = 5; // hearts on floors 15, 20, 25, ...
+const POST10_BOMB_CHANCE = 0.25;
+const POST10_WEAPON_FILL_CHANCE = 0.3;
 
 /** Grids start tight (16x16) and grow +2 per floor to a 28x28 cap. */
 export function endlessGridSizeForFloor(floor: number): [number, number] {
@@ -55,14 +83,61 @@ export function endlessEnemyCountForFloor(floor: number, rng: () => number = Mat
 }
 
 /**
- * Map an endless floor onto the daily floor-1/2/3 difficulty tables that drive
- * the goblin mix, ghost count, and white-goblin swarm odds:
- * floors 1-2 → basic unarmed goblins, 3-6 → the daily floor-2 mix, 7+ → floor-3.
+ * Map an endless floor onto the daily floor-1/2/3 tables — now used ONLY for
+ * white-goblin swarm odds (goblin mixes come from endlessGoblinWeights):
+ * no swarms through floor 3, the daily-F2 10% chance on 4-7, full F3 odds 8+.
  */
 export function endlessPhaseFloor(floor: number): number {
-  if (floor <= 2) return 1;
-  if (floor <= 6) return 2;
+  if (floor <= 3) return 1;
+  if (floor <= 7) return 2;
   return 3;
+}
+
+/**
+ * Endless goblin mix by depth — a four-stage ramp instead of the daily's cliff.
+ * Playtesting showed pink/stone goblins on floor 3 ended runs before they began;
+ * the hardest kinds now wait until the hero has steel and a few floors of rhythm.
+ */
+export function endlessGoblinWeights(
+  floor: number
+): Array<{ kind: EnemyKind; weight: number }> {
+  if (floor <= 3) {
+    // Basics only: the weaponless-into-first-sword stretch stays about evasion.
+    return [
+      { kind: "earth-goblin", weight: 20 },
+      { kind: "fire-goblin", weight: 17 },
+      { kind: "water-goblin", weight: 17 },
+    ];
+  }
+  if (floor <= 5) {
+    // Armed goblins trickle in; still no pink or stone.
+    return [
+      { kind: "earth-goblin", weight: 14 },
+      { kind: "fire-goblin", weight: 14 },
+      { kind: "water-goblin", weight: 12 },
+      { kind: "earth-goblin-knives", weight: 10 },
+      { kind: "water-goblin-spear", weight: 6 },
+    ];
+  }
+  if (floor <= 7) {
+    // Weapon-heavy with a light first taste of pink and stone.
+    return [
+      { kind: "earth-goblin-knives", weight: 20 },
+      { kind: "water-goblin-spear", weight: 18 },
+      { kind: "fire-goblin", weight: 8 },
+      { kind: "water-goblin", weight: 8 },
+      { kind: "stone-goblin", weight: 8 },
+      { kind: "pink-goblin", weight: 8 },
+    ];
+  }
+  // 8+: the daily floor-3 menagerie.
+  return [
+    { kind: "earth-goblin-knives", weight: 25 },
+    { kind: "water-goblin-spear", weight: 25 },
+    { kind: "stone-goblin", weight: 22 },
+    { kind: "pink-goblin", weight: 18 },
+    { kind: "fire-goblin", weight: 5 },
+  ];
 }
 
 /** Rock counts by depth: 5 on floor 1, 4 on floor 2, 3 deeper (daily's own curve). */
@@ -134,26 +209,50 @@ function endlessEnemyMinDistance(floor: number): number {
 }
 
 export function rollEndlessItemPlan(rng: () => number = Math.random): EndlessItemPlan {
-  const swordFloor = 2 + Math.floor(rng() * 3); // 2-4
-  let shieldFloor = 3 + Math.floor(rng() * 3); // 3-5
-  if (shieldFloor === swordFloor) shieldFloor += 1; // at most 6
-  const medallionFloor = 6 + Math.floor(rng() * 4); // 6-9
-  return { swordFloor, shieldFloor, medallionFloor };
+  // Shuffle the eligible floors and give the first five (one per starter item)
+  // a distinct home, so items spread out instead of clumping onto one floor.
+  const floors: number[] = [];
+  for (let f = ITEM_PLAN_FLOOR_MIN; f <= ITEM_PLAN_FLOOR_MAX; f++) floors.push(f);
+  for (let i = floors.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [floors[i], floors[j]] = [floors[j], floors[i]];
+  }
+
+  const floorItems: Record<number, TileSubtype[]> = {};
+  STARTER_ITEMS.forEach((item, idx) => {
+    const f = floors[idx];
+    (floorItems[f] ??= []).push(item);
+  });
+  return { floorItems };
 }
 
 /**
- * Chest/key allocation for one endless floor: sword/shield/medallion land on
- * their planned floors, and every 5th floor carries an extra-heart chest.
+ * Chest/key allocation for one endless floor.
+ * - Floors 1-10: the guaranteed starter items assigned by the run's item plan.
+ * - Floors 11+: the sustain economy — an extra heart on the 5-floor cadence, a
+ *   bomb pack by chance, and a sword/shield only when the hero still lacks one.
+ *
+ * Post-10 randomness draws from Math.random, which callers patch to the seeded
+ * per-floor RNG, so a given (seed, floor, inventory) is deterministic.
  */
 export function endlessAllocationForFloor(
   floor: number,
-  plan: EndlessItemPlan
+  plan: EndlessItemPlan,
+  opts: { hasSword?: boolean; hasShield?: boolean; rng?: () => number } = {}
 ): { chests: number; keys: number; chestContents: TileSubtype[] } {
   const chestContents: TileSubtype[] = [];
-  if (floor === plan.swordFloor) chestContents.push(TileSubtype.SWORD);
-  if (floor === plan.shieldFloor) chestContents.push(TileSubtype.SHIELD);
-  if (floor === plan.medallionFloor) chestContents.push(TileSubtype.SNAKE_MEDALLION);
-  if (floor > 0 && floor % 5 === 0) chestContents.push(TileSubtype.EXTRA_HEART);
+
+  if (floor <= ITEM_PLAN_FLOOR_MAX) {
+    const planned = plan.floorItems[floor];
+    if (planned) chestContents.push(...planned);
+  } else {
+    const rng = opts.rng ?? Math.random;
+    if (floor % POST10_HEART_CADENCE === 0) chestContents.push(TileSubtype.EXTRA_HEART);
+    if (rng() < POST10_BOMB_CHANCE) chestContents.push(TileSubtype.BOMB);
+    if (!opts.hasSword && rng() < POST10_WEAPON_FILL_CHANCE) chestContents.push(TileSubtype.SWORD);
+    if (!opts.hasShield && rng() < POST10_WEAPON_FILL_CHANCE) chestContents.push(TileSubtype.SHIELD);
+  }
+
   return { chests: chestContents.length, keys: chestContents.length, chestContents };
 }
 
@@ -207,9 +306,18 @@ export function movePlayerAwayFromWallTorches(mapData: MapData, minDist: number)
 }
 
 /** Generate the map + enemies for one endless floor. Call inside a seeded RNG patch. */
-function buildEndlessFloor(floor: number, plan: EndlessItemPlan): { mapData: MapData; enemies: Enemy[] } {
+function buildEndlessFloor(
+  floor: number,
+  plan: EndlessItemPlan,
+  inventory: { hasSword?: boolean; hasShield?: boolean } = {}
+): { mapData: MapData; enemies: Enemy[] } {
   const isDarkFloor = floor === 1;
-  const allocation = endlessAllocationForFloor(floor, plan);
+  // Math.random is patched to the seeded per-floor RNG in the callers, so the
+  // post-10 chance-based chests stay deterministic for a given (seed, floor).
+  const allocation = endlessAllocationForFloor(floor, plan, {
+    hasSword: inventory.hasSword,
+    hasShield: inventory.hasShield,
+  });
   // Pass floor via opts only: the floor param would trigger the daily grid sizes
   // and the floor-3 escape-floor special cases.
   let mapData = generateCompleteMapForFloor(allocation, undefined, {
@@ -246,7 +354,10 @@ function buildEndlessFloor(floor: number, plan: EndlessItemPlan): { mapData: Map
   }
 
   const phase = endlessPhaseFloor(floor);
-  const { whiteGoblinCount } = enemyTypeAssignement(enemies, { floor: phase });
+  const { whiteGoblinCount } = enemyTypeAssignement(enemies, {
+    floor: phase, // drives swarm odds only
+    goblinWeights: endlessGoblinWeights(floor),
+  });
   // Endless overrides the daily ghost table: more wisps at every depth.
   const ghostCount = endlessGhostCountForFloor(floor);
   if (ghostCount > 0 && playerPos) {
@@ -292,7 +403,10 @@ export function initializeGameStateForEndless(): GameState {
   const endlessPlan = rollEndlessItemPlan(() => planRng.next());
 
   const floorRng = mulberry32(endlessSeed + 1);
-  const { mapData, enemies } = withPatchedMathRandom(floorRng, () => buildEndlessFloor(1, endlessPlan));
+  // Fresh run: the hero starts with neither sword nor shield.
+  const { mapData, enemies } = withPatchedMathRandom(floorRng, () =>
+    buildEndlessFloor(1, endlessPlan, { hasSword: false, hasShield: false })
+  );
 
   return {
     hasKey: false,
@@ -346,7 +460,13 @@ export function advanceToNextEndlessFloor(currentState: GameState): GameState {
   const plan = currentState.endlessPlan ?? rollEndlessItemPlan(() => planRng.next());
 
   const rng = mulberry32(seed + nextFloor);
-  const { mapData, enemies } = withPatchedMathRandom(rng, () => buildEndlessFloor(nextFloor, plan));
+  // Post-10 sword/shield fill-ins depend on what the hero is still missing.
+  const { mapData, enemies } = withPatchedMathRandom(rng, () =>
+    buildEndlessFloor(nextFloor, plan, {
+      hasSword: !!currentState.hasSword,
+      hasShield: !!currentState.hasShield,
+    })
+  );
 
   return {
     ...currentState,

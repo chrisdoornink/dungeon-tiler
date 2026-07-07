@@ -1447,7 +1447,7 @@ export interface GameState {
   currentFloor?: number; // Current floor number for multi-tier daily mode (1-indexed)
   maxFloors?: number; // Maximum number of floors for multi-tier daily mode
   endlessSeed?: number; // Endless mode: per-run seed; floor N generates from (seed + N)
-  endlessPlan?: { swordFloor: number; shieldFloor: number; medallionFloor: number }; // Endless mode: which floors carry the guaranteed item chests
+  endlessPlan?: { floorItems: Record<number, number[]> }; // Endless mode: which floors carry the guaranteed starter-item chests
   endlessRunId?: string; // Endless mode: server-issued run id for checkpoint attestation
   mapData: MapData;
   showFullMap: boolean; // Whether to show the full map (ignores visibility constraints)

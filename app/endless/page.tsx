@@ -171,7 +171,7 @@ export default function EndlessPage() {
                 )}
               </div>
             )}
-            <div className="flex gap-2 items-center justify-center">
+            <div className="flex flex-col gap-2 items-stretch">
               <input
                 value={playerName}
                 onChange={(e) => {
@@ -180,14 +180,14 @@ export default function EndlessPage() {
                 }}
                 placeholder="Name on the board"
                 maxLength={16}
-                className="bg-black/50 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 w-44 focus:outline-none focus:border-amber-500"
+                className="bg-black/50 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 w-full focus:outline-none focus:border-amber-500"
               />
               <button
                 onClick={handleSaveName}
                 disabled={!playerName.trim() || nameSaved}
                 className="text-sm bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-100 py-2 px-3 rounded transition-colors"
               >
-                {nameSaved ? "Saved" : "Save"}
+                {nameSaved ? "Saved" : "Save Name"}
               </button>
             </div>
             <button

@@ -101,14 +101,19 @@ describe("checkpoint validation", () => {
     expect(flags.some((f) => f.startsWith("kills"))).toBe(true);
   });
 
-  it("flags a sword before it can exist", () => {
+  it("allows a sword as early as entering floor 2 (starter items land floors 2-10)", () => {
     const flags = validateCheckpoint(freshRun(), 2, stats({ hasSword: true }), later);
-    expect(flags).toContain("item:sword-early");
+    expect(flags).toEqual([]);
   });
 
-  it("allows the sword once floor 2 is complete", () => {
+  it("allows both sword and shield carried into a later floor", () => {
     const run = freshRun({ floor: 2, steps: 40 });
-    const flags = validateCheckpoint(run, 3, stats({ steps: 80, hasSword: true }), later);
+    const flags = validateCheckpoint(
+      run,
+      3,
+      stats({ steps: 80, hasSword: true, hasShield: true }),
+      later
+    );
     expect(flags).toEqual([]);
   });
 

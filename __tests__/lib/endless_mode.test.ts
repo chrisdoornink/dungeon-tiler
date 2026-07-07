@@ -4,6 +4,7 @@ import {
   endlessAllocationForFloor,
   endlessEnemyCountForFloor,
   endlessGhostCountForFloor,
+  endlessGoblinWeights,
   endlessGridSizeForFloor,
   endlessPhaseFloor,
   initializeGameStateForEndless,
@@ -44,35 +45,70 @@ describe("endless mode scaling", () => {
     expect(endlessGhostCountForFloor(1)).toBe(0);
   });
 
-  it("maps endless floors onto the daily difficulty phases", () => {
+  it("maps endless floors onto the daily swarm-odds phases", () => {
     expect(endlessPhaseFloor(1)).toBe(1);
-    expect(endlessPhaseFloor(2)).toBe(1);
-    expect(endlessPhaseFloor(3)).toBe(2);
-    expect(endlessPhaseFloor(6)).toBe(2);
-    expect(endlessPhaseFloor(7)).toBe(3);
+    expect(endlessPhaseFloor(3)).toBe(1);
+    expect(endlessPhaseFloor(4)).toBe(2);
+    expect(endlessPhaseFloor(7)).toBe(2);
+    expect(endlessPhaseFloor(8)).toBe(3);
     expect(endlessPhaseFloor(50)).toBe(3);
+  });
+
+  it("ramps the goblin mix gradually: no pink/stone before floor 6, no armed goblins before 4", () => {
+    const kindsAt = (floor: number) => endlessGoblinWeights(floor).map((w) => w.kind);
+    for (const f of [1, 2, 3]) {
+      expect(kindsAt(f)).toEqual(
+        expect.not.arrayContaining([
+          "earth-goblin-knives",
+          "water-goblin-spear",
+          "pink-goblin",
+          "stone-goblin",
+        ])
+      );
+    }
+    for (const f of [4, 5]) {
+      expect(kindsAt(f)).toContain("earth-goblin-knives");
+      expect(kindsAt(f)).toEqual(expect.not.arrayContaining(["pink-goblin", "stone-goblin"]));
+    }
+    for (const f of [6, 7, 8, 20]) {
+      expect(kindsAt(f)).toContain("pink-goblin");
+      expect(kindsAt(f)).toContain("stone-goblin");
+    }
   });
 });
 
 describe("endless item plan", () => {
-  it("puts the sword on floors 2-4 and the shield on 3-6, never together", () => {
+  const STARTER = [
+    TileSubtype.SWORD,
+    TileSubtype.SHIELD,
+    TileSubtype.BOMB,
+    TileSubtype.SNAKE_MEDALLION,
+    TileSubtype.EXTRA_HEART,
+  ];
+
+  it("places all five starter items on distinct floors within 2-10", () => {
     for (let i = 0; i < 200; i++) {
       const plan = rollEndlessItemPlan();
-      expect(plan.swordFloor).toBeGreaterThanOrEqual(2);
-      expect(plan.swordFloor).toBeLessThanOrEqual(4);
-      expect(plan.shieldFloor).toBeGreaterThanOrEqual(3);
-      expect(plan.shieldFloor).toBeLessThanOrEqual(6);
-      expect(plan.shieldFloor).not.toBe(plan.swordFloor);
-      expect(plan.medallionFloor).toBeGreaterThanOrEqual(6);
-      expect(plan.medallionFloor).toBeLessThanOrEqual(9);
+      const floors = Object.keys(plan.floorItems).map(Number);
+      const placed = floors.flatMap((f) => plan.floorItems[f]);
+      // Every starter item appears exactly once
+      for (const item of STARTER) {
+        expect(placed.filter((x) => x === item).length).toBe(1);
+      }
+      expect(placed.length).toBe(5);
+      // On distinct floors, all within 2-10, never on the blind floor 1
+      expect(new Set(floors).size).toBe(floors.length);
+      for (const f of floors) {
+        expect(f).toBeGreaterThanOrEqual(2);
+        expect(f).toBeLessThanOrEqual(10);
+      }
     }
   });
 
   it("never allocates chests to floor 1 and always matches keys to chests", () => {
     for (let i = 0; i < 50; i++) {
       const plan = rollEndlessItemPlan();
-      const f1 = endlessAllocationForFloor(1, plan);
-      expect(f1.chests).toBe(0);
+      expect(endlessAllocationForFloor(1, plan).chests).toBe(0);
       for (let floor = 1; floor <= 20; floor++) {
         const alloc = endlessAllocationForFloor(floor, plan);
         expect(alloc.keys).toBe(alloc.chests);
@@ -81,11 +117,49 @@ describe("endless item plan", () => {
     }
   });
 
-  it("adds an extra-heart chest every 5th floor", () => {
-    const plan = { swordFloor: 2, shieldFloor: 3, medallionFloor: 7 };
-    expect(endlessAllocationForFloor(5, plan).chestContents).toContain(TileSubtype.EXTRA_HEART);
-    expect(endlessAllocationForFloor(10, plan).chestContents).toContain(TileSubtype.EXTRA_HEART);
-    expect(endlessAllocationForFloor(4, plan).chestContents).not.toContain(TileSubtype.EXTRA_HEART);
+  it("mirrors the plan's floor items on floors 2-10", () => {
+    const plan = rollEndlessItemPlan();
+    for (let floor = 2; floor <= 10; floor++) {
+      const expected = plan.floorItems[floor] ?? [];
+      expect(endlessAllocationForFloor(floor, plan).chestContents).toEqual(expected);
+    }
+  });
+
+  it("keeps an extra-heart chest on the 5-floor cadence past floor 10", () => {
+    const plan = rollEndlessItemPlan();
+    // rng that never triggers the bomb/weapon chances, isolating the heart cadence
+    const noChance = () => 0.99;
+    expect(
+      endlessAllocationForFloor(15, plan, { rng: noChance }).chestContents
+    ).toContain(TileSubtype.EXTRA_HEART);
+    expect(
+      endlessAllocationForFloor(20, plan, { rng: noChance }).chestContents
+    ).toContain(TileSubtype.EXTRA_HEART);
+    expect(
+      endlessAllocationForFloor(13, plan, { rng: noChance }).chestContents
+    ).not.toContain(TileSubtype.EXTRA_HEART);
+  });
+
+  it("offers bombs by chance and a sword only when the hero lacks one, past floor 10", () => {
+    const plan = rollEndlessItemPlan();
+    const always = () => 0.0; // every chance fires
+    const missing = endlessAllocationForFloor(12, plan, {
+      hasSword: false,
+      hasShield: false,
+      rng: always,
+    }).chestContents;
+    expect(missing).toContain(TileSubtype.BOMB);
+    expect(missing).toContain(TileSubtype.SWORD);
+    expect(missing).toContain(TileSubtype.SHIELD);
+
+    const equipped = endlessAllocationForFloor(12, plan, {
+      hasSword: true,
+      hasShield: true,
+      rng: always,
+    }).chestContents;
+    expect(equipped).toContain(TileSubtype.BOMB);
+    expect(equipped).not.toContain(TileSubtype.SWORD);
+    expect(equipped).not.toContain(TileSubtype.SHIELD);
   });
 });
 
@@ -193,7 +267,7 @@ describe("advancing endless floors", () => {
     );
   });
 
-  it("keeps floor 2 sword-free when the plan says the sword is deeper", () => {
+  it("lays floor 2's chests out to match its slot in the item plan", () => {
     for (let i = 0; i < 10; i++) {
       const state = initializeGameStateForEndless();
       const next = advanceToNextEndlessFloor(state);
@@ -204,7 +278,9 @@ describe("advancing endless floors", () => {
           if (cell.includes(TileSubtype.CHEST)) chests++;
         }
       }
-      const expected = plan.swordFloor === 2 ? 1 : 0;
+      // Floor 2 carries exactly the items the plan assigned to floor 2 (0 or 1
+      // — the plan gives each floor at most one starter item).
+      const expected = (plan.floorItems[2] ?? []).length;
       expect(chests).toBe(expected);
     }
   });

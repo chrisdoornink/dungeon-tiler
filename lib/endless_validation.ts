@@ -52,7 +52,7 @@ export const MIN_STEPS_PER_FLOOR = 8;
 export function maxKillsOnFloor(floor: number): number {
   const goblins = Math.min(1 + floor, 12) + 1;
   const ghosts = floor === 1 ? 2 : floor <= 6 ? 2 : 3;
-  const swarmGoblins = floor <= 2 ? 0 : floor <= 6 ? 4 : 12;
+  const swarmGoblins = floor <= 3 ? 0 : floor <= 7 ? 4 : 12;
   const snakes = floor === 1 ? 0 : floor <= 6 ? 1 : 3;
   return goblins + ghosts + swarmGoblins + snakes;
 }
@@ -65,12 +65,19 @@ export function maxKillsThroughFloor(floor: number): number {
 }
 
 /**
- * Max hearts by the time the hero ENTERS `floor`: base 5, +1 per extra-heart
- * chest (every 5th completed floor), +1 margin for mechanics beyond this
- * module's knowledge (e.g. secret-realm rewards).
+ * Max hearts by the time the hero ENTERS `floor`: base 5, plus every extra-heart
+ * chest that could have been opened on a completed floor, plus a +1 margin for
+ * mechanics beyond this module's knowledge (e.g. secret-realm rewards).
+ *
+ * Extra-heart chests: exactly one somewhere in the floor-2-10 starter plan (so
+ * available as early as entering floor 3), then one on every 5th floor past 10
+ * (15, 20, 25, ...). Post-10 sword/shield fill-ins never add hearts.
  */
 export function maxHeartsEnteringFloor(floor: number): number {
-  return 5 + Math.floor((floor - 1) / 5) + 1;
+  const completed = floor - 1;
+  const planHeart = completed >= 2 ? 1 : 0; // earliest starter heart sits on floor 2
+  const post10Hearts = Math.max(0, Math.floor(completed / 5) - 2); // floors 15,20,25,...
+  return 5 + planHeart + post10Hearts + 1;
 }
 
 /**
@@ -121,11 +128,9 @@ export function validateCheckpoint(
     flags.push(`kills:${stats.enemiesDefeated}`);
   }
 
-  // Item legality: sword chest lands on floors 2-4, shield 3-6 — entering
-  // floor f means floors 1..f-1 are complete, so the earliest carry-ins are
-  // f>=3 and f>=4 respectively.
-  if (stats.hasSword && floor < 3) flags.push("item:sword-early");
-  if (stats.hasShield && floor < 4) flags.push("item:shield-early");
+  // Sword/shield now land on any starter-plan floor (2-10) and can be carried in
+  // as early as floor 3, so there is no meaningful "too early" bound to flag —
+  // the timing, step, and kill checks carry the anti-fraud weight instead.
 
   if (stats.heroMaxHealth > maxHeartsEnteringFloor(floor)) {
     flags.push(`hearts:${stats.heroMaxHealth}`);

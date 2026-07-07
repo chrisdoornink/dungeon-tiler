@@ -150,7 +150,13 @@ function getWhiteGoblinSwarmCount(floor: number | undefined, rng: () => number):
 
 export function enemyTypeAssignement(
   enemies: Enemy[],
-  opts?: { rng?: () => number; floor?: number }
+  opts?: {
+    rng?: () => number;
+    floor?: number;
+    // Custom goblin weight table (endless mode has its own, more gradual
+    // difficulty ramp than the daily's three floor tables).
+    goblinWeights?: Array<{ kind: EnemyKind; weight: number }>;
+  }
 ): { ghostCount: number; whiteGoblinCount: number } {
   const rng = opts?.rng ?? Math.random;
   const floor = opts?.floor;
@@ -165,9 +171,9 @@ export function enemyTypeAssignement(
   if (target === 0) return { ghostCount, whiteGoblinCount };
 
   // Get floor-adjusted goblin weights
-  const goblinWeights = floor !== undefined
-    ? getFloorGoblinWeights(floor)
-    : BASE_GOBLIN_WEIGHTS;
+  const goblinWeights =
+    opts?.goblinWeights ??
+    (floor !== undefined ? getFloorGoblinWeights(floor) : BASE_GOBLIN_WEIGHTS);
   const totalGoblinWeight = goblinWeights.reduce((sum, g) => sum + g.weight, 0);
 
   // Fill all enemy slots with goblins
