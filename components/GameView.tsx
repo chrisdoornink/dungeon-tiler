@@ -178,10 +178,29 @@ function GameViewInner({
 
   const finalInitialState = replayState || initialState;
 
-  // Track current floor for display in the title area
-  const [currentFloor, setCurrentFloor] = useState<number | undefined>(
-    finalInitialState?.currentFloor
-  );
+  // Track the hero's location (floor + pink realm) for the title area
+  const [heroLocation, setHeroLocation] = useState<{
+    floor?: number;
+    inPinkRealm: boolean;
+  }>({
+    floor: finalInitialState?.currentFloor,
+    inPinkRealm: !!finalInitialState?.inPinkRealm,
+  });
+
+  // Header title: "Torch Boy — Floor 2 out of 3" in the multi-floor daily,
+  // "Torch Boy — Floor 7" in endless (no cap worth advertising), and the floor
+  // word becomes "Pink Realm" while the hero is warped into the secret realm.
+  const title = (() => {
+    const floor = heroLocation.floor;
+    const maxFloors = finalInitialState?.maxFloors ?? 1;
+    const isEndless = storageSlot === "endless";
+    const isMultiFloor = maxFloors > 1;
+    if (!floor || (!isEndless && !isMultiFloor)) return "Torch Boy";
+    const place = heroLocation.inPinkRealm ? "Pink Realm" : "Floor";
+    return isEndless
+      ? `Torch Boy — ${place} ${floor}`
+      : `Torch Boy — ${place} ${floor} out of ${maxFloors}`;
+  })();
 
   // Fire analytics for game start once we have an initial state
   useEffect(() => {
@@ -206,9 +225,7 @@ function GameViewInner({
       <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
       <div className="flex flex-col items-center relative z-10">
         <h1 className="text-1xl font-bold text-center mb-4 max-[600px]:mb-1 text-gray-400">
-          {storageSlot === "endless" && currentFloor
-            ? `Torch Boy — Floor ${currentFloor}`
-            : "Torch Boy"}
+          {title}
         </h1>
         <TilemapGrid
           tilemap={finalInitialState.mapData.tiles}
@@ -219,7 +236,7 @@ function GameViewInner({
           isDailyChallenge={!!isDailyChallenge}
           onDailyComplete={onDailyComplete}
           storageSlot={storageSlot}
-          onFloorChange={setCurrentFloor}
+          onLocationChange={setHeroLocation}
         />
       </div>
     </div>

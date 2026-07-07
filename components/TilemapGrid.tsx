@@ -217,7 +217,9 @@ interface TilemapGridProps {
    */
   onWin?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
-  onFloorChange?: (floor: number) => void; // notify parent when floor changes
+  // Notify parent where the hero is (floor number + pink realm status) so it
+  // can render a location title. Fires on mount and whenever either changes.
+  onLocationChange?: (loc: { floor?: number; inPinkRealm: boolean }) => void;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -230,7 +232,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onDailyComplete,
   onWin,
   storageSlot,
-  onFloorChange,
+  onLocationChange,
 }) => {
   const router = useRouter();
 
@@ -2287,6 +2289,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return () => clearTimeout(timer);
     }
   }, [gameState.showFullMap, suppressDarknessOverlay]);
+
+  // Report the hero's location (floor + pink realm) up to the parent for the
+  // header title. Keyed on committed game state, so it covers floor swaps,
+  // pink-realm warps in and out, and the initial mount.
+  useEffect(() => {
+    onLocationChange?.({
+      floor: gameState.currentFloor,
+      inPinkRealm: !!gameState.inPinkRealm,
+    });
+  }, [gameState.currentFloor, gameState.inPinkRealm, onLocationChange]);
 
   // Handle floor transition for multi-tier daily and endless modes — start iris wipe animation
   useEffect(() => {
@@ -5019,9 +5031,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       const nextState = floorTransition.pendingGameState;
                       setGameState(nextState);
                       CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
-                      if (onFloorChange && nextState.currentFloor != null) {
-                        onFloorChange(nextState.currentFloor);
-                      }
                     }
                   }}
                   onComplete={() => {
