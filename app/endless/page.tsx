@@ -7,6 +7,12 @@ import BlockingPreloader from "../../components/BlockingPreloader";
 import BackgroundAssetLoader from "../../lib/background_asset_loader";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
 import { EndlessStorage, type EndlessData } from "../../lib/endless_storage";
+import {
+  fetchEndlessLeaderboard,
+  getEndlessPlayerName,
+  saveEndlessPlayerName,
+  type LeaderboardData,
+} from "../../lib/endless_leaderboard";
 import { trackPageView } from "../../lib/posthog_analytics";
 
 type Phase = "start" | "playing" | "gameover";
@@ -22,8 +28,17 @@ export default function EndlessPage() {
   const [phase, setPhase] = useState<Phase>("start");
   const [records, setRecords] = useState<EndlessData | null>(null);
   const [endedAsNewBest, setEndedAsNewBest] = useState<boolean>(false);
+  const [board, setBoard] = useState<LeaderboardData | null>(null);
+  const [playerName, setPlayerName] = useState<string>("");
+  const [nameSaved, setNameSaved] = useState<boolean>(false);
   // Remount key so "Descend Again" always starts a fresh run
   const [runId, setRunId] = useState<number>(0);
+
+  const refreshBoard = useCallback(() => {
+    void fetchEndlessLeaderboard().then((data) => {
+      if (data) setBoard(data);
+    });
+  }, []);
 
   const handleAssetsReady = useCallback(() => {
     setAssetsReady(true);
@@ -33,11 +48,20 @@ export default function EndlessPage() {
   useEffect(() => {
     trackPageView("endless");
     setRecords(EndlessStorage.load());
+    setPlayerName(getEndlessPlayerName());
+    refreshBoard();
     // Resume an in-progress run directly
     if (CurrentGameStorage.hasCurrentGame("endless")) {
       setPhase("playing");
     }
-  }, []);
+  }, [refreshBoard]);
+
+  const handleSaveName = useCallback(() => {
+    const trimmed = playerName.trim().slice(0, 16);
+    if (!trimmed) return;
+    setNameSaved(true);
+    void saveEndlessPlayerName(trimmed).then(refreshBoard);
+  }, [playerName, refreshBoard]);
 
   const handleStart = useCallback(() => {
     setRunId((n) => n + 1);
@@ -50,7 +74,9 @@ export default function EndlessPage() {
     setRecords(data);
     setEndedAsNewBest(!!data?.lastRun && data.lastRun.floor > prevBest);
     setPhase("gameover");
-  }, [records]);
+    // The run was submitted before this callback fired; fetch fresh standings.
+    refreshBoard();
+  }, [records, refreshBoard]);
 
   if (!assetsReady) {
     return <BlockingPreloader onReady={handleAssetsReady} />;
@@ -93,6 +119,12 @@ export default function EndlessPage() {
                 <span className="text-gray-400 text-sm"> · {records.totalRuns} run{records.totalRuns === 1 ? "" : "s"}</span>
               </p>
             )}
+            {board && board.top.length > 0 && (
+              <p className="text-gray-400 text-sm">
+                World record: <span className="text-amber-300">Floor {board.top[0].floor}</span> by{" "}
+                {board.top[0].name}
+              </p>
+            )}
             <button
               onClick={handleStart}
               className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"
@@ -122,6 +154,48 @@ export default function EndlessPage() {
                 {lastRun.enemiesDefeated} enemies defeated · {lastRun.steps} steps
               </p>
             )}
+            {board && board.top.length > 0 && (
+              <div className="text-left bg-black/40 rounded-lg p-4">
+                <h2 className="text-amber-300 font-bold text-sm mb-2 text-center">
+                  All-Time Deepest Descents
+                </h2>
+                <ol className="text-sm text-gray-200 flex flex-col gap-1">
+                  {board.top.map((entry, i) => (
+                    <li key={`${entry.playerId}-${i}`} className="flex justify-between gap-2">
+                      <span className="truncate">
+                        {i + 1}. {entry.name}
+                      </span>
+                      <span className="text-amber-200 whitespace-nowrap">Floor {entry.floor}</span>
+                    </li>
+                  ))}
+                </ol>
+                {board.rank != null && (
+                  <p className="text-gray-300 text-sm mt-3 text-center">
+                    You: <span className="text-amber-300 font-semibold">#{board.rank}</span> of{" "}
+                    {board.totalPlayers} · best Floor {board.bestFloor}
+                  </p>
+                )}
+              </div>
+            )}
+            <div className="flex gap-2 items-center justify-center">
+              <input
+                value={playerName}
+                onChange={(e) => {
+                  setPlayerName(e.target.value);
+                  setNameSaved(false);
+                }}
+                placeholder="Name on the board"
+                maxLength={16}
+                className="bg-black/50 border border-gray-600 rounded px-3 py-2 text-sm text-gray-100 w-44 focus:outline-none focus:border-amber-500"
+              />
+              <button
+                onClick={handleSaveName}
+                disabled={!playerName.trim() || nameSaved}
+                className="text-sm bg-gray-700 hover:bg-gray-600 disabled:opacity-50 text-gray-100 py-2 px-3 rounded transition-colors"
+              >
+                {nameSaved ? "Saved" : "Save"}
+              </button>
+            </div>
             <button
               onClick={handleStart}
               className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"

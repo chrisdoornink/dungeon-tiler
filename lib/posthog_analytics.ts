@@ -5,8 +5,8 @@ import posthog from 'posthog-js';
 
 type EventParams = Record<string, unknown>;
 
-// Generate a persistent anonymous user ID
-function getOrCreateUserId(): string {
+// Generate a persistent anonymous user ID (also the endless leaderboard identity)
+export function getOrCreateUserId(): string {
   if (typeof window === 'undefined') return 'server-user';
   
   const storageKey = 'dungeon-tiler-user-id';

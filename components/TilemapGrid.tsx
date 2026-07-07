@@ -78,6 +78,11 @@ import { DateUtils } from "../lib/date_utils";
 import { hashStringToSeed } from "../lib/rng";
 import { computeMapId, advanceToNextFloor, advanceToNextEndlessFloor } from "../lib/map";
 import { EndlessStorage } from "../lib/endless_storage";
+import {
+  startEndlessRun,
+  reportEndlessCheckpoint,
+  submitEndlessRun,
+} from "../lib/endless_leaderboard";
 import { CurrentGameStorage, type GameStorageSlot } from "../lib/current_game_storage";
 import {
   DEFAULT_ENVIRONMENT,
@@ -2300,6 +2305,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     });
   }, [gameState.currentFloor, gameState.inPinkRealm, onLocationChange]);
 
+  // Endless: register the run with the server so floor checkpoints can be
+  // attested (anti-fraud for the leaderboard). Fail-soft — a run that can't
+  // register still plays normally, it just ends up unverified.
+  const runRegistrationStarted = useRef(false);
+  useEffect(() => {
+    if (!isEndless || gameState.endlessRunId || runRegistrationStarted.current) return;
+    runRegistrationStarted.current = true;
+    void startEndlessRun().then((runId) => {
+      if (runId) {
+        setGameState((prev) => {
+          const next = { ...prev, endlessRunId: runId };
+          // Persist immediately: the autosave only fires on gameplay changes,
+          // and a mid-run reload must not orphan the server attestation.
+          try {
+            CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+          } catch {
+            // ignore storage errors
+          }
+          return next;
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEndless, gameState.endlessRunId]);
+
   // Handle floor transition for multi-tier daily and endless modes — start iris wipe animation
   useEffect(() => {
     const isMultiTierDaily = isDailyChallenge && resolvedStorageSlot === 'daily-new';
@@ -2310,6 +2340,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         ? advanceToNextEndlessFloor(gameState)
         : advanceToNextFloor(gameState, hashStringToSeed(localToday));
       nextFloorState.needsFloorTransition = false;
+
+      // Endless anti-fraud: report the floor entry so the server can attest it.
+      // Fire-and-forget — never blocks the wipe animation.
+      if (isEndless && nextFloorState.currentFloor != null) {
+        reportEndlessCheckpoint(nextFloorState, nextFloorState.currentFloor);
+      }
 
       // Telemetry: record the loadout carried UP a floor, so we can see e.g. how
       // many people rush to level 2 without grabbing the sword/shield.
@@ -2842,8 +2878,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       } catch {
         // ignore storage errors
       }
-      if (onDailyComplete) {
-        onDailyComplete("lost");
+      // Submit the run for its server-verified leaderboard score, then hand
+      // off to the game-over screen. Capped at 3s so a dead network can never
+      // hold the results screen hostage.
+      {
+        const finish = () => {
+          if (onDailyComplete) onDailyComplete("lost");
+        };
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+        Promise.race([submitEndlessRun(gameState).then(() => undefined), timeout]).then(
+          finish,
+          finish
+        );
       }
       return;
     }
