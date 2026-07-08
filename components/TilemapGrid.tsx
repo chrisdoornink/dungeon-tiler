@@ -3922,7 +3922,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             />
                             <EnemyHealthDisplay
                               health={e.health}
-                              maxHealth={EnemyRegistry[e.kind].base.health}
+                              maxHealth={e.maxHealth ?? EnemyRegistry[e.kind].base.health}
                             />
                           </li>
                         ))}

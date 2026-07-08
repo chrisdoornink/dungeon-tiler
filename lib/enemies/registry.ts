@@ -14,6 +14,14 @@ export interface BehaviorContext {
   enemies: Array<{ y: number; x: number; kind: EnemyKind; health: number; behaviorMemory?: Record<string, unknown> }>;
   enemyIndex: number; // index into enemies array for this enemy
   player: { y: number; x: number; torchLit: boolean };
+  // The hero's predicted tile at the END of this turn, once their pending move
+  // resolves. Enemies tick before the hero's move is applied, so `player` is the
+  // tile the hero is LEAVING. Ranged attackers gate line-of-sight on `playerNext`
+  // instead, so they can't fire at a hero stepping out of sight around a corner.
+  // Absent (or equal to `player`) on turns where the hero doesn't move; the engine
+  // only fills it for a confident clean walk, so behaviors should fall back to
+  // `player` when it's undefined.
+  playerNext?: { y: number; x: number };
   ghosts?: Array<{ y: number; x: number }>;
   // Pink-mist tiles for the current tick (pink realm only). Lets mist-aware behaviors
   // (e.g. pink goblins fleeing the haze) see where the mist is. Absent outside the realm.
@@ -424,7 +432,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return 0;
         };
 
-        const hasLOS = canSee(grid, [e.y, e.x], [py, px]);
+        // Fire at where the hero WILL be when the turn resolves, not the tile they
+        // are stepping off of. Enemies act before the hero's move is applied, so
+        // checking LOS against the pre-move tile let the goblin laser a hero who was
+        // rounding a corner out of sight. Fall back to the current tile when the
+        // engine didn't hand us a prediction (e.g. non-movement turns).
+        const aimY = ctx.playerNext ? ctx.playerNext.y : py;
+        const aimX = ctx.playerNext ? ctx.playerNext.x : px;
+        const hasLOS = canSee(grid, [e.y, e.x], [aimY, aimX]);
         const hasRing = typeof mem.ringY === "number" && typeof mem.ringX === "number";
 
         // --- Pink-realm "ninja" variant (tagged at spawn via behaviorMemory.ninja) ---

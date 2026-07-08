@@ -2488,6 +2488,7 @@ export function buildPinkRealmEnemies(realmMap: MapData, entry: [number, number]
       const goblin = new Enemy({ y: loc.y, x: loc.x });
       goblin.kind = "white-goblin";
       goblin.health = REALM_WHITE_GOBLIN_HP; // override the kind setter's baseline of 1
+      goblin.maxHealth = REALM_WHITE_GOBLIN_HP; // keep HUD hearts in sync with the buffed HP
       (goblin.behaviorMemory as Record<string, unknown>).realmBuffed = true; // stronger bite
       enemies.push(goblin);
     }
@@ -2702,6 +2703,32 @@ function movePlayerCore(
 
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
+  // Predict where the hero will stand once this move resolves, so ranged attackers
+  // (the pink goblin) can gate line-of-sight on the destination rather than the tile
+  // the hero is leaving — the fix for "the beam fired through the wall as I rounded
+  // the corner". We only trust the prediction for a clean walk onto an open floor tile
+  // (nothing blocking, no occupant); anything ambiguous falls back to the current tile,
+  // i.e. today's behavior, so there is no regression.
+  const destTileForLos = newMapData.tiles[newY]?.[newX];
+  const destSubsForLos = newMapData.subtypes[newY]?.[newX] ?? [];
+  const destBlockedForLos =
+    destSubsForLos.includes(TileSubtype.ROCK) ||
+    destSubsForLos.includes(TileSubtype.POT) ||
+    destSubsForLos.includes(TileSubtype.CHEST) ||
+    destSubsForLos.includes(TileSubtype.BOOKSHELF);
+  const destOccupiedForLos =
+    (newGameState.enemies?.some((e) => e.y === newY && e.x === newX) ?? false) ||
+    (newGameState.npcs?.some(
+      (n) => n.y === newY && n.x === newX && !n.isDead()
+    ) ?? false);
+  const heroWillMove =
+    (newY !== currentY || newX !== currentX) &&
+    destTileForLos === FLOOR &&
+    !destBlockedForLos &&
+    !destOccupiedForLos;
+  const playerNextPos = heroWillMove
+    ? { y: newY, x: newX }
+    : { y: currentY, x: currentX };
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
     // console.log(`[ENEMY TURN] Starting enemy turn. Player at (${currentY},${currentX}), moving ${direction}. Enemies:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x})`).join(', '));
     const result = updateEnemies(
@@ -2717,6 +2744,7 @@ function movePlayerCore(
         setPlayerTorchLit: (lit: boolean) => {
           newGameState.heroTorchLit = lit;
         },
+        playerNext: playerNextPos,
         // Pink mist blinds enemies standing in it (no move/attack) — EXCEPT pink goblins,
         // which instead shuffle one tile toward the nearest clear tile (handled in their
         // behavior via the `mist` context below). The realm haze tiles are passed so that

@@ -39,6 +39,10 @@ export class Enemy {
   x: number;
   state: EnemyState = EnemyState.IDLE;
   health: number = 5; // Goblin base health aligned with hero baseline
+  // Tracks each enemy's actual max HP (kind baseline, or a spawn-time override like the
+  // pink-realm white-goblin buff) so HUD hearts scale correctly instead of reading the
+  // static per-kind registry value.
+  maxHealth: number = 5;
   attack: number = 1; // Goblin base attack
   // Simple facing state without importing Direction to avoid circular deps
   // Allowed values: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT'
@@ -89,10 +93,12 @@ export class Enemy {
       this.attack = 1;
     } else if (k === 'white-goblin') {
       // White goblin swarm member: very fragile, light attack. Pink-realm swarms are
-      // buffed at spawn by overriding .health directly (see buildPinkRealmEnemies).
+      // buffed at spawn by overriding .health directly (see buildPinkRealmEnemies), which
+      // also updates maxHealth so the HUD reflects the buffed baseline.
       this.health = 1;
       this.attack = 1;
     }
+    this.maxHealth = this.health;
   }
   // Pursuit memory: how many ticks to keep chasing after losing LOS
   private pursuitTtl: number = 0;
@@ -475,6 +481,9 @@ export function updateEnemies(
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
+    // Hero's predicted end-of-turn tile (after their pending move resolves). Used
+    // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
+    playerNext?: { y: number; x: number };
   }
 ): number;
 export function updateEnemies(
@@ -490,6 +499,9 @@ export function updateEnemies(
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
+    // Hero's predicted end-of-turn tile (after their pending move resolves). Used
+    // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
+    playerNext?: { y: number; x: number };
   }
 ): { damage: number; attackingEnemies: EnemyAttackInfo[] };
 export function updateEnemies(
@@ -504,6 +516,9 @@ export function updateEnemies(
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
+    // Hero's predicted end-of-turn tile (after their pending move resolves). Used
+    // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
+    playerNext?: { y: number; x: number };
   },
   opts?: {
     rng?: () => number;
@@ -513,6 +528,9 @@ export function updateEnemies(
     playerTorchLit?: boolean;
     setPlayerTorchLit?: (lit: boolean) => void;
     mist?: Array<[number, number]>;
+    // Hero's predicted end-of-turn tile (after their pending move resolves). Used
+    // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
+    playerNext?: { y: number; x: number };
   }
 ): number | { damage: number; attackingEnemies: EnemyAttackInfo[] } {
   // Handle backward compatibility: old signature was (grid, enemies, player, opts)
@@ -578,6 +596,7 @@ export function updateEnemies(
         enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health, behaviorMemory: en.behaviorMemory })),
         enemyIndex: i,
         player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
+        playerNext: finalOpts?.playerNext,
         ghosts: ghostPositions,
         rng,
         setPlayerTorchLit: opts?.setPlayerTorchLit,
