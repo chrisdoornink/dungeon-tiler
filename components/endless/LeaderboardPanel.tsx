@@ -66,6 +66,7 @@ export const LeaderboardPanel: React.FC<LeaderboardPanelProps> = ({
             <EndlessLeaderboard
               entries={entries}
               highlightPlayerId={highlightPlayerId}
+              detailed
             />
           )}
         </div>

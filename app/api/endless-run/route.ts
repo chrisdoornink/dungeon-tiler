@@ -30,6 +30,26 @@ const RUN_TTL_SECONDS = 60 * 60 * 48;
 const MAX_STARTS_PER_DAY = 200; // generous: a real run takes minutes
 const LEADERBOARD_KEY = "endless:lb";
 
+// An anonymous run only earns a board slot if it cracks the top N — otherwise
+// the board would fill with throwaway "Anonymous" floor-1 deaths. Named players
+// are always saved (see the submit handler).
+const ANON_BOARD_TOP_N = 20;
+
+/**
+ * Would `floor` place within the top N of the current board? True when the board
+ * isn't full yet, or when the floor is at least the current Nth-place score.
+ */
+async function isTopNFloor(floor: number, n: number): Promise<boolean> {
+  const count = await redis.zcard(LEADERBOARD_KEY);
+  if (count < n) return true;
+  const nth = await redis.zrange<(string | number)[]>(LEADERBOARD_KEY, n - 1, n - 1, {
+    rev: true,
+    withScores: true,
+  });
+  const cutoff = nth.length >= 2 ? Number(nth[1]) : 0;
+  return floor >= cutoff;
+}
+
 function runKey(runId: string): string {
   return `endless:run:${runId}`;
 }
@@ -118,8 +138,11 @@ export async function GET(req: NextRequest) {
   try {
     const playerId = req.nextUrl.searchParams.get("playerId");
     // Callers can request a longer board (e.g. the full-leaderboard panel). Default 10,
-    // clamped so a bad query can't ask Redis for an unbounded range.
-    const limitParam = Number(req.nextUrl.searchParams.get("limit"));
+    // clamped so a bad query can't ask Redis for an unbounded range. Guard the raw
+    // string first: an absent param is null, and Number(null) is 0 (finite), which
+    // would otherwise silently collapse the board to a single row.
+    const limitRaw = req.nextUrl.searchParams.get("limit");
+    const limitParam = limitRaw === null || limitRaw === "" ? NaN : Number(limitRaw);
     const limit = Number.isFinite(limitParam)
       ? Math.min(100, Math.max(1, Math.floor(limitParam)))
       : 10;
@@ -223,15 +246,12 @@ export async function POST(req: NextRequest) {
       run.submittedAt = Date.now();
       await saveRun(runId, run);
 
-      if (name) {
-        await redis.hset(playerKey(run.playerId), { name });
-      }
-
       // The score is the floor the server witnessed — the client never sends one.
       const verifiedFloor = run.floor;
 
       if (flags.length > 0) {
         // Shadow-flag: keep for review, stay off the public board, reveal nothing.
+        // A flagged run never touches the player's stored best either.
         await redis.rpush(
           "endless:flagged",
           JSON.stringify({ runId, run, finalStats, flaggedAt: Date.now() })
@@ -240,24 +260,41 @@ export async function POST(req: NextRequest) {
           topEntries(10),
           redis.zcard(LEADERBOARD_KEY),
         ]);
-        return NextResponse.json({ verified: true, floor: verifiedFloor, top, totalPlayers: total });
+        return NextResponse.json({ verified: true, floor: verifiedFloor, saved: false, top, totalPlayers: total });
       }
 
-      // GT: only improves a player's existing best; never downgrades.
-      await redis.zadd(LEADERBOARD_KEY, { gt: true }, {
-        score: verifiedFloor,
-        member: run.playerId,
-      });
-      const { rank, bestFloor } = await playerRank(run.playerId);
-      if (bestFloor === verifiedFloor) {
-        // This run IS the best on record: store its stat line for display.
-        await redis.hset(playerKey(run.playerId), {
-          bestFloor: verifiedFloor,
-          bestSteps: finalStats.steps,
-          bestKills: finalStats.enemiesDefeated,
-          bestAt: Date.now(),
+      // Resolve the run's display name: this submission's name, else one the
+      // player saved on a previous run. Any name at all makes the run "named".
+      const existingName = await redis.hget<string>(playerKey(run.playerId), "name");
+      const effectiveName = name || existingName || "";
+
+      // Always keep the player's best-run stat line current (manual GT), even for
+      // an anonymous run that won't hit the board — so naming later can promote it.
+      const prevBest = await redis.hget<number>(playerKey(run.playerId), "bestFloor");
+      const patch: Record<string, string | number> = {};
+      if (name) patch.name = name; // save/override the display name
+      if (prevBest === null || prevBest === undefined || verifiedFloor > Number(prevBest)) {
+        patch.bestFloor = verifiedFloor;
+        patch.bestSteps = finalStats.steps;
+        patch.bestKills = finalStats.enemiesDefeated;
+        patch.bestAt = Date.now();
+      }
+      if (Object.keys(patch).length > 0) {
+        await redis.hset(playerKey(run.playerId), patch);
+      }
+
+      // Save to the public board when the run is named, or (anonymous) good
+      // enough to crack the top N. GT: only ever improves a player's best.
+      const saved =
+        !!effectiveName || (await isTopNFloor(verifiedFloor, ANON_BOARD_TOP_N));
+      if (saved) {
+        await redis.zadd(LEADERBOARD_KEY, { gt: true }, {
+          score: verifiedFloor,
+          member: run.playerId,
         });
       }
+
+      const { rank, bestFloor } = await playerRank(run.playerId);
       const [top, total] = await Promise.all([
         topEntries(10),
         redis.zcard(LEADERBOARD_KEY),
@@ -265,6 +302,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         verified: true,
         floor: verifiedFloor,
+        saved,
         rank,
         bestFloor,
         top,
@@ -277,8 +315,18 @@ export async function POST(req: NextRequest) {
       const name = sanitizeName(body.name);
       if (playerId && name) {
         await redis.hset(playerKey(playerId), { name });
+        // Naming makes any prior run significant: promote the player's stored
+        // best onto the board (no-op if they were already on it).
+        const best = await redis.hget<number>(playerKey(playerId), "bestFloor");
+        if (best !== null && best !== undefined) {
+          await redis.zadd(LEADERBOARD_KEY, { gt: true }, {
+            score: Number(best),
+            member: playerId,
+          });
+        }
       }
-      return NextResponse.json({ ok: true });
+      const me = playerId ? await playerRank(playerId) : { rank: null, bestFloor: null };
+      return NextResponse.json({ ok: true, ...me });
     }
 
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });

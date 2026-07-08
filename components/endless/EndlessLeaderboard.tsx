@@ -5,6 +5,13 @@ interface EndlessLeaderboardProps {
   entries: LeaderboardEntry[];
   /** Short (8-char) player id of the viewer, so their own row can be emphasised. */
   highlightPlayerId?: string;
+  /**
+   * Show the Steps/Kills detail columns. Off by default: the compact inline
+   * board (start + game-over cards, narrow on mobile) shows only rank, name,
+   * and floor. The full-leaderboard panel is wide enough for the detail, so it
+   * opts in. This keeps every row inside the card width — no horizontal scroll.
+   */
+  detailed?: boolean;
   className?: string;
 }
 
@@ -31,11 +38,14 @@ const compactSteps = (n: number | null | undefined): string => {
  * deepest floor reached, plus the steps taken and enemies killed on that run.
  *
  * A real <table> keeps the Floor/Steps/Kills columns aligned between the header
- * and every row (independent grids would drift out of alignment).
+ * and every row (independent grids would drift out of alignment). It uses a
+ * FIXED layout with a flexible Player column so a long name truncates in place
+ * — the row never widens past the card, so there is never a horizontal scroll.
  */
 export const EndlessLeaderboard: React.FC<EndlessLeaderboardProps> = ({
   entries,
   highlightPlayerId,
+  detailed = false,
   className = "",
 }) => {
   if (entries.length === 0) {
@@ -47,15 +57,26 @@ export const EndlessLeaderboard: React.FC<EndlessLeaderboardProps> = ({
   }
 
   return (
-    <div className={`overflow-x-auto ${className}`}>
-      <table className="w-full text-xs sm:text-sm border-collapse">
+    <div className={className}>
+      <table className="w-full table-fixed text-xs sm:text-sm border-collapse">
+        <colgroup>
+          <col className="w-7" />
+          <col />
+          <col className="w-20" />
+          {detailed && <col className="w-20" />}
+          {detailed && <col className="w-20" />}
+        </colgroup>
         <thead>
           <tr className="text-gray-500 border-b border-white/10">
-            <th className="w-5 pb-1 pr-1 font-normal text-right">#</th>
+            <th className="pb-1 pr-1 font-normal text-right">#</th>
             <th className="pb-1 font-normal text-left">Player</th>
             <th className="pb-1 pl-1.5 font-normal text-right">Floor</th>
-            <th className="pb-1 pl-1.5 font-normal text-right">Steps</th>
-            <th className="pb-1 pl-1.5 font-normal text-right">Kills</th>
+            {detailed && (
+              <th className="pb-1 pl-1.5 font-normal text-right">Steps</th>
+            )}
+            {detailed && (
+              <th className="pb-1 pl-1.5 font-normal text-right">Kills</th>
+            )}
           </tr>
         </thead>
         <tbody>
@@ -71,22 +92,32 @@ export const EndlessLeaderboard: React.FC<EndlessLeaderboardProps> = ({
                   {i + 1}
                 </td>
                 <td
-                  className={`py-1 pr-2 max-w-[8rem] truncate ${
+                  className={`py-1 pr-2 ${
                     isMe ? "text-amber-300 font-semibold" : "text-gray-100"
                   }`}
                 >
-                  {entry.name}
-                  {isMe && <span className="text-amber-400/70"> (you)</span>}
+                  {/* min-w-0 lets the name span shrink so truncate engages; the
+                      "(you)" tag never shrinks and so is never clipped. */}
+                  <div className="flex items-baseline gap-1 min-w-0">
+                    <span className="truncate">{entry.name}</span>
+                    {isMe && (
+                      <span className="shrink-0 text-amber-400/70">(you)</span>
+                    )}
+                  </div>
                 </td>
                 <td className="py-1 pl-1.5 text-right tabular-nums whitespace-nowrap text-amber-200">
                   {entry.floor}
                 </td>
-                <td className="py-1 pl-1.5 text-right tabular-nums whitespace-nowrap text-gray-300">
-                  {compactSteps(entry.steps)}
-                </td>
-                <td className="py-1 pl-1.5 text-right tabular-nums whitespace-nowrap text-gray-300">
-                  {fmt(entry.kills)}
-                </td>
+                {detailed && (
+                  <td className="py-1 pl-1.5 text-right tabular-nums whitespace-nowrap text-gray-300">
+                    {compactSteps(entry.steps)}
+                  </td>
+                )}
+                {detailed && (
+                  <td className="py-1 pl-1.5 text-right tabular-nums whitespace-nowrap text-gray-300">
+                    {fmt(entry.kills)}
+                  </td>
+                )}
               </tr>
             );
           })}

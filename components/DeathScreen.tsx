@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
+import { deathCauseMessage, type DeathCause } from '../lib/death_message';
 
 interface DeathScreenProps {
-  deathCause?: {
-    type: 'enemy' | 'faulty_floor' | 'poison' | 'bomb' | 'darkness';
-    enemyKind?: string;
-  };
+  deathCause?: DeathCause;
   onRestart: () => void;
   hasCheckpoint?: boolean;
 }
@@ -18,30 +16,8 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
     return () => clearTimeout(timer);
   }, []);
 
-  // Generate death message based on cause
-  const getDeathMessage = () => {
-    if (!deathCause) return 'You have fallen';
-    
-    switch (deathCause.type) {
-      case 'faulty_floor':
-        return 'You fell into the abyss';
-      case 'poison':
-        return 'The poison consumed you';
-      case 'darkness':
-        return 'You were swallowed by the dark';
-      case 'bomb':
-        return 'Caught in your own bomb blast';
-      case 'enemy':
-        const enemyName = deathCause.enemyKind || 'enemy';
-        const formattedName = enemyName
-          .split('-')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-        return `Slain by ${formattedName}`;
-      default:
-        return 'You have fallen';
-    }
-  };
+  // Shared "how you died" wording (see lib/death_message).
+  const getDeathMessage = () => deathCauseMessage(deathCause);
 
   return (
     <div

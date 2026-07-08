@@ -3,6 +3,8 @@
  * persisted in localStorage. The floor reached is the score.
  */
 
+import type { DeathCause } from "./death_message";
+
 const ENDLESS_DATA_KEY = "endlessMode";
 
 export interface EndlessRunSummary {
@@ -14,7 +16,8 @@ export interface EndlessRunSummary {
   hasSword: boolean;
   hasShield: boolean;
   diedAt: string; // ISO timestamp
-  deathCause?: string;
+  // Full cause so the game-over screen can say e.g. "Slain by Fire Goblin".
+  deathCause?: DeathCause;
 }
 
 export interface EndlessData {

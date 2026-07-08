@@ -15,6 +15,7 @@ import {
 } from "../../lib/endless_leaderboard";
 import { EndlessLeaderboard } from "../../components/endless/EndlessLeaderboard";
 import { LeaderboardPanel } from "../../components/endless/LeaderboardPanel";
+import { deathCauseMessage } from "../../lib/death_message";
 import { getOrCreateUserId, trackPageView } from "../../lib/posthog_analytics";
 
 type Phase = "start" | "playing" | "gameover";
@@ -64,7 +65,10 @@ export default function EndlessPage() {
   useEffect(() => {
     trackPageView("endless");
     setRecords(EndlessStorage.load());
-    setPlayerName(getEndlessPlayerName());
+    const savedName = getEndlessPlayerName();
+    setPlayerName(savedName);
+    // If a name is already on file, the field starts in its saved/locked state.
+    setNameSaved(!!savedName);
     setMyShortId(getOrCreateUserId().slice(0, 8));
     refreshBoard();
     // Resume an in-progress run directly
@@ -116,7 +120,7 @@ export default function EndlessPage() {
       className="min-h-screen flex items-center justify-center p-4 text-white"
       style={backgroundStyle}
     >
-      <div className="max-w-md w-full bg-black/70 rounded-lg p-5 sm:p-8 backdrop-blur-sm text-center flex flex-col gap-5">
+      <div className="max-w-md sm:max-w-xl w-full bg-black/70 rounded-lg p-5 sm:p-8 backdrop-blur-sm text-center flex flex-col gap-5">
         {phase === "start" ? (
           <>
             <h1 className="text-2xl font-bold text-amber-300">Endless Mode</h1>
@@ -157,6 +161,9 @@ export default function EndlessPage() {
         ) : (
           <>
             <h1 className="text-2xl font-bold text-red-400">The Dungeon Claims You</h1>
+            {lastRun?.deathCause && (
+              <p className="text-gray-300">{deathCauseMessage(lastRun.deathCause)}</p>
+            )}
             {lastRun && (
               <p className="text-xl text-gray-100">
                 You reached <span className="font-bold text-amber-300">Floor {lastRun.floor}</span>
@@ -200,6 +207,17 @@ export default function EndlessPage() {
               </div>
             )}
             <div className="flex flex-col gap-2 items-stretch">
+              {board && board.rank == null ? (
+                <p className="text-gray-400 text-xs">
+                  Add a name to save this run to the leaderboard.
+                </p>
+              ) : (
+                nameSaved && (
+                  <p className="text-gray-400 text-xs">
+                    Saved as this name. Edit it to change how you appear.
+                  </p>
+                )
+              )}
               <input
                 value={playerName}
                 onChange={(e) => {

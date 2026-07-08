@@ -2866,7 +2866,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           hasSword: !!gameState.hasSword,
           hasShield: !!gameState.hasShield,
           diedAt: new Date().toISOString(),
-          deathCause: gameState.deathCause?.type,
+          // Full cause (type + enemyKind) so the game-over screen can name it.
+          deathCause: gameState.deathCause,
         });
       } catch {
         // ignore storage errors

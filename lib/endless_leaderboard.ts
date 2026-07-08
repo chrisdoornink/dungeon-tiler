@@ -27,6 +27,7 @@ export interface LeaderboardData {
 export interface SubmitResult {
   verified: boolean;
   floor?: number;
+  saved?: boolean; // whether this run earned a spot on the public board
   rank?: number | null;
   bestFloor?: number | null;
   top?: LeaderboardEntry[];
