@@ -13,7 +13,9 @@ import {
   saveEndlessPlayerName,
   type LeaderboardData,
 } from "../../lib/endless_leaderboard";
-import { trackPageView } from "../../lib/posthog_analytics";
+import { EndlessLeaderboard } from "../../components/endless/EndlessLeaderboard";
+import { LeaderboardPanel } from "../../components/endless/LeaderboardPanel";
+import { getOrCreateUserId, trackPageView } from "../../lib/posthog_analytics";
 
 type Phase = "start" | "playing" | "gameover";
 
@@ -33,10 +35,24 @@ export default function EndlessPage() {
   const [nameSaved, setNameSaved] = useState<boolean>(false);
   // Remount key so "Descend Again" always starts a fresh run
   const [runId, setRunId] = useState<number>(0);
+  // Full-leaderboard panel (top 50) — fetched lazily when opened.
+  const [panelOpen, setPanelOpen] = useState<boolean>(false);
+  const [fullBoard, setFullBoard] = useState<LeaderboardData | null>(null);
+  const [panelLoading, setPanelLoading] = useState<boolean>(false);
+  const [myShortId, setMyShortId] = useState<string>("");
 
   const refreshBoard = useCallback(() => {
     void fetchEndlessLeaderboard().then((data) => {
       if (data) setBoard(data);
+    });
+  }, []);
+
+  const openPanel = useCallback(() => {
+    setPanelOpen(true);
+    setPanelLoading(true);
+    void fetchEndlessLeaderboard(50).then((data) => {
+      if (data) setFullBoard(data);
+      setPanelLoading(false);
     });
   }, []);
 
@@ -49,6 +65,7 @@ export default function EndlessPage() {
     trackPageView("endless");
     setRecords(EndlessStorage.load());
     setPlayerName(getEndlessPlayerName());
+    setMyShortId(getOrCreateUserId().slice(0, 8));
     refreshBoard();
     // Resume an in-progress run directly
     if (CurrentGameStorage.hasCurrentGame("endless")) {
@@ -99,7 +116,7 @@ export default function EndlessPage() {
       className="min-h-screen flex items-center justify-center p-4 text-white"
       style={backgroundStyle}
     >
-      <div className="max-w-md w-full bg-black/70 rounded-lg p-8 backdrop-blur-sm text-center flex flex-col gap-5">
+      <div className="max-w-md w-full bg-black/70 rounded-lg p-5 sm:p-8 backdrop-blur-sm text-center flex flex-col gap-5">
         {phase === "start" ? (
           <>
             <h1 className="text-2xl font-bold text-amber-300">Endless Mode</h1>
@@ -114,10 +131,21 @@ export default function EndlessPage() {
               </p>
             )}
             {board && board.top.length > 0 && (
-              <p className="text-gray-400 text-sm">
-                World record: <span className="text-amber-300">Floor {board.top[0].floor}</span> by{" "}
-                {board.top[0].name}
-              </p>
+              <div className="text-left bg-black/40 rounded-lg p-3 sm:p-4 flex flex-col gap-3">
+                <h2 className="text-amber-300 font-bold text-sm text-center">
+                  All-Time Deepest Descents
+                </h2>
+                <EndlessLeaderboard
+                  entries={board.top.slice(0, 5)}
+                  highlightPlayerId={myShortId}
+                />
+                <button
+                  onClick={openPanel}
+                  className="text-amber-300 hover:text-amber-200 text-sm underline underline-offset-2 self-center"
+                >
+                  View full leaderboard
+                </button>
+              </div>
             )}
             <button
               onClick={handleStart}
@@ -149,26 +177,26 @@ export default function EndlessPage() {
               </p>
             )}
             {board && board.top.length > 0 && (
-              <div className="text-left bg-black/40 rounded-lg p-4">
-                <h2 className="text-amber-300 font-bold text-sm mb-2 text-center">
+              <div className="text-left bg-black/40 rounded-lg p-3 sm:p-4 flex flex-col gap-3">
+                <h2 className="text-amber-300 font-bold text-sm text-center">
                   All-Time Deepest Descents
                 </h2>
-                <ol className="text-sm text-gray-200 flex flex-col gap-1">
-                  {board.top.map((entry, i) => (
-                    <li key={`${entry.playerId}-${i}`} className="flex justify-between gap-2">
-                      <span className="truncate">
-                        {i + 1}. {entry.name}
-                      </span>
-                      <span className="text-amber-200 whitespace-nowrap">Floor {entry.floor}</span>
-                    </li>
-                  ))}
-                </ol>
+                <EndlessLeaderboard
+                  entries={board.top.slice(0, 10)}
+                  highlightPlayerId={myShortId}
+                />
                 {board.rank != null && (
-                  <p className="text-gray-300 text-sm mt-3 text-center">
+                  <p className="text-gray-300 text-sm text-center">
                     You: <span className="text-amber-300 font-semibold">#{board.rank}</span> of{" "}
                     {board.totalPlayers} · best Floor {board.bestFloor}
                   </p>
                 )}
+                <button
+                  onClick={openPanel}
+                  className="text-amber-300 hover:text-amber-200 text-sm underline underline-offset-2 self-center"
+                >
+                  View full leaderboard
+                </button>
               </div>
             )}
             <div className="flex flex-col gap-2 items-stretch">
@@ -202,6 +230,14 @@ export default function EndlessPage() {
           Back to Torch Boy
         </Link>
       </div>
+      {panelOpen && (
+        <LeaderboardPanel
+          board={fullBoard}
+          loading={panelLoading}
+          highlightPlayerId={myShortId}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
     </div>
   );
 }

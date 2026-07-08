@@ -387,7 +387,7 @@ describe("realm white goblin buff", () => {
 });
 
 describe("pink realm population (on warp)", () => {
-  it("spawns 4 buffed white-goblin swarms and 4 ninja pink goblins", () => {
+  it("spawns 2 buffed white-goblin swarms and 2 ninja pink goblins", () => {
     // Stand next to an unclaimed leftover pink ring (no living pink goblins) and step on
     // it to warp into the realm, which runs buildPinkRealmEnemies.
     const map = arena(25, 12, 12);
@@ -401,8 +401,8 @@ describe("pink realm population (on warp)", () => {
     const whites = enemies.filter((e) => e.kind === "white-goblin");
     const pinks = enemies.filter((e) => e.kind === "pink-goblin");
 
-    expect(whites.length).toBe(16); // 4 swarms x 4 goblins
-    expect(pinks.length).toBe(4);
+    expect(whites.length).toBe(8); // 2 swarms x 4 goblins
+    expect(pinks.length).toBe(2);
     // Ninjas are tagged so the registry runs the realm hit-and-run behavior.
     expect(pinks.every((p) => p.behaviorMemory?.ninja === true)).toBe(true);
     // Whites are buffed: tougher (HP 3) and harder-hitting (realmBuffed flag).

@@ -12,7 +12,9 @@ import type { GameState } from "./map";
 export interface LeaderboardEntry {
   playerId: string; // truncated server-side; display only
   name: string;
-  floor: number;
+  floor: number; // deepest floor reached (the leaderboard score)
+  steps?: number | null; // steps/kills from that player's best run; null for legacy rows
+  kills?: number | null;
 }
 
 export interface LeaderboardData {
@@ -119,11 +121,13 @@ export async function submitEndlessRun(state: GameState): Promise<SubmitResult |
   }
 }
 
-export async function fetchEndlessLeaderboard(): Promise<LeaderboardData | null> {
+export async function fetchEndlessLeaderboard(
+  limit?: number
+): Promise<LeaderboardData | null> {
   try {
-    const res = await fetch(
-      `/api/endless-run?playerId=${encodeURIComponent(getUserId())}`
-    );
+    const params = new URLSearchParams({ playerId: getUserId() });
+    if (limit) params.set("limit", String(limit));
+    const res = await fetch(`/api/endless-run?${params.toString()}`);
     if (!res.ok) return null;
     return (await res.json()) as LeaderboardData;
   } catch {

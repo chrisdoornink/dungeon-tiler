@@ -2462,10 +2462,12 @@ function reverseDirection(direction: Direction): Direction {
   }
 }
 
-// Pink-realm population tuning. The realm is a hard gauntlet guarding the heart chest.
-const REALM_WHITE_SWARMS = 4; // four sets of white goblins (4 goblins each)
+// Pink-realm population tuning. The realm guards the heart chest, but the old density
+// (4 swarms of 4 + 4 ninjas = 20 enemies) made the reward not worth the trouble, so the
+// counts are halved. Still a fight, no longer a wall.
+const REALM_WHITE_SWARMS = 2; // two sets of white goblins (4 goblins each)
 const REALM_WHITE_GOBLIN_HP = 3; // buffed from 1 so a single hero swing can't clear them
-const REALM_PINK_NINJAS = 4; // four hit-and-run ninja pink goblins
+const REALM_PINK_NINJAS = 2; // two hit-and-run ninja pink goblins
 
 /**
  * Populate the pink realm: four white-goblin swarms (buffed — tougher and harder-hitting
@@ -2566,6 +2568,50 @@ function returnFromPinkRealm(
     recentDeaths: [],
     recentBombBlasts: [],
   };
+}
+
+// A "chase hit": the hero lands a clipping melee blow on a pink goblin that just fled
+// from point-blank range. Pink goblins retreat when you're adjacent (see their behavior),
+// vacating the tile before the hero's strike resolves — so a melee-only hero could chase
+// one forever without connecting. This gives a determined chase a real-but-reduced chance
+// to wound the fleer, tuned so a full-health pink goblin (4 HP) falls within ~5-10 tiles.
+// Damage is floored to at least 1 so every landed hit makes progress. Records the death
+// VFX at the goblin's CURRENT (fled-to) tile. Mirrors the melee block in movePlayerCore.
+function applyHeroChaseHit(
+  state: GameState,
+  goblin: Enemy,
+  rng: () => number
+): void {
+  const variance = ((r) => (r < 0.2 ? -1 : r < 0.6 ? 0 : 1))(rng());
+  const swordBonus = state.hasSword ? 2 : 0;
+  const raw = EnemyRegistry[goblin.kind].calcMeleeDamage({
+    heroAttack: state.heroAttack,
+    swordBonus,
+    variance,
+  });
+  const dmg = Math.max(1, raw);
+  goblin.health -= dmg;
+  state.stats.damageDealt += dmg;
+  if (goblin.health <= 0) {
+    cleanupPinkRing(goblin, state.mapData.subtypes);
+    if (!state.defeatedEnemies) state.defeatedEnemies = [];
+    const defeated = {
+      y: goblin.y,
+      x: goblin.x,
+      kind: goblin.kind,
+      behaviorMemory: goblin.behaviorMemory,
+    };
+    state.defeatedEnemies.push(defeated);
+    const updated = processEnemyDefeat(state, defeated);
+    Object.assign(state, updated);
+    state.enemies = (state.enemies ?? []).filter((e) => e !== goblin);
+    state.stats.enemiesDefeated += 1;
+    state.stats.enemiesKilledBySword =
+      (state.stats.enemiesKilledBySword ?? 0) + 1;
+    trackEnemyKill(state.stats, goblin.kind as EnemyKind, state.currentFloor ?? 1);
+    if (!state.recentDeaths) state.recentDeaths = [];
+    state.recentDeaths.push([goblin.y, goblin.x]);
+  }
 }
 
 export function movePlayer(
@@ -2729,6 +2775,16 @@ function movePlayerCore(
   const playerNextPos = heroWillMove
     ? { y: newY, x: newX }
     : { y: currentY, x: currentX };
+  // If this move lunges at an adjacent pink goblin, remember it: pink goblins flee
+  // point-blank and vacate the tile before the strike resolves, so the normal melee
+  // block below finds nothing. We roll a reduced chance to clip the fleer after the
+  // enemy tick (see applyHeroChaseHit) so a melee chase can't go on forever.
+  const chasedPinkGoblin =
+    (newY !== currentY || newX !== currentX)
+      ? newGameState.enemies?.find(
+          (e) => e.y === newY && e.x === newX && e.kind === "pink-goblin"
+        ) ?? null
+      : null;
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
     // console.log(`[ENEMY TURN] Starting enemy turn. Player at (${currentY},${currentX}), moving ${direction}. Enemies:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x})`).join(', '));
     const result = updateEnemies(
@@ -2846,6 +2902,21 @@ function movePlayerCore(
             Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1
           )
       );
+    }
+  }
+
+  // Pink-goblin chase hit: if the goblin we lunged at fled its tile during the enemy
+  // turn (rather than getting cornered and zapping from it), roll a reduced chance to
+  // clip it as it scrambles away. If it stayed put, the normal melee block below hits it.
+  if (
+    chasedPinkGoblin &&
+    (newGameState.enemies?.includes(chasedPinkGoblin) ?? false) &&
+    !(chasedPinkGoblin.y === newY && chasedPinkGoblin.x === newX)
+  ) {
+    const chaseRng = newGameState.combatRng ?? Math.random;
+    const CHASE_HIT_CHANCE = 0.5;
+    if (chaseRng() < CHASE_HIT_CHANCE) {
+      applyHeroChaseHit(newGameState, chasedPinkGoblin, chaseRng);
     }
   }
 

@@ -66,6 +66,8 @@ interface BoardEntry {
   playerId: string;
   name: string;
   floor: number;
+  steps: number | null; // from the player's best-run stat line; null for legacy rows
+  kills: number | null;
 }
 
 async function topEntries(count: number): Promise<BoardEntry[]> {
@@ -79,13 +81,21 @@ async function topEntries(count: number): Promise<BoardEntry[]> {
       playerId: String(raw[i]),
       name: "",
       floor: Number(raw[i + 1]),
+      steps: null,
+      kills: null,
     });
   }
-  // Attach display names
+  // Attach display name + the best-run stat line (steps/kills), stored per player.
   await Promise.all(
     entries.map(async (e) => {
-      const name = await redis.hget<string>(playerKey(e.playerId), "name");
+      const [name, bestSteps, bestKills] = await Promise.all([
+        redis.hget<string>(playerKey(e.playerId), "name"),
+        redis.hget<number>(playerKey(e.playerId), "bestSteps"),
+        redis.hget<number>(playerKey(e.playerId), "bestKills"),
+      ]);
       e.name = name || "Anonymous";
+      e.steps = bestSteps === null || bestSteps === undefined ? null : Number(bestSteps);
+      e.kills = bestKills === null || bestKills === undefined ? null : Number(bestKills);
       // Never leak raw player ids to other clients
       e.playerId = e.playerId.slice(0, 8);
     })
@@ -107,8 +117,14 @@ async function playerRank(playerId: string): Promise<{ rank: number | null; best
 export async function GET(req: NextRequest) {
   try {
     const playerId = req.nextUrl.searchParams.get("playerId");
+    // Callers can request a longer board (e.g. the full-leaderboard panel). Default 10,
+    // clamped so a bad query can't ask Redis for an unbounded range.
+    const limitParam = Number(req.nextUrl.searchParams.get("limit"));
+    const limit = Number.isFinite(limitParam)
+      ? Math.min(100, Math.max(1, Math.floor(limitParam)))
+      : 10;
     const [top, total] = await Promise.all([
-      topEntries(10),
+      topEntries(limit),
       redis.zcard(LEADERBOARD_KEY),
     ]);
     const me = playerId ? await playerRank(playerId) : { rank: null, bestFloor: null };
