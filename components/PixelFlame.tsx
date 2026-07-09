@@ -15,13 +15,24 @@ export const FLAME_ROWS = 9;
 // Must match animation-duration in PixelFlame.module.css
 const CYCLE_S = 0.52;
 
-// Palette matches the baked flames on the original sprites
-const COLORS: Record<string, string> = {
-  Y: "#FFEFB4", // pale core
-  G: "#FFC94D", // gold
-  O: "#FF8C1E", // orange
-  o: "#E86A14", // deep orange
-  D: "#C24E12", // dark base
+// "warm" matches the baked flames on the original sprites; "blue" is the cold
+// spirit fire shown when a wisp snuffs the hero's torch (see FlamePalette).
+export type FlamePalette = "warm" | "blue";
+const PALETTES: Record<FlamePalette, Record<string, string>> = {
+  warm: {
+    Y: "#FFEFB4", // pale core
+    G: "#FFC94D", // gold
+    O: "#FF8C1E", // orange
+    o: "#E86A14", // deep orange
+    D: "#C24E12", // dark base
+  },
+  blue: {
+    Y: "#EAF6FF", // pale core
+    G: "#9CD8FF", // light blue
+    O: "#5AA8FF", // blue
+    o: "#3B78E0", // deep blue
+    D: "#284F9E", // dark base
+  },
 };
 
 const FRAMES: string[][] = [
@@ -75,14 +86,15 @@ const FRAMES: string[][] = [
 // many tiles render flames with the same cell size every frame.
 const shadowCache = new Map<string, string>();
 
-function frameShadow(frame: number, cell: number): string {
-  const key = `${frame}|${cell}`;
+function frameShadow(frame: number, cell: number, palette: FlamePalette = "warm"): string {
+  const key = `${frame}|${cell}|${palette}`;
   const cached = shadowCache.get(key);
   if (cached) return cached;
+  const colors = PALETTES[palette];
   const parts: string[] = [];
   FRAMES[frame].forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
-      const color = COLORS[row[x]];
+      const color = colors[row[x]];
       // Offsets start at +1 cell because outer box-shadows don't paint under
       // the element's own box; the element is parked one cell up-left.
       if (color) parts.push(`${(x + 1) * cell}px ${(y + 1) * cell}px 0 0 ${color}`);
@@ -100,6 +112,8 @@ export type PixelFlameProps = {
   seed?: number;
   /** Adds a soft pulsing warm halo behind the flame */
   glow?: boolean;
+  /** Flame color palette; "blue" is the snuffed-spirit fire */
+  palette?: FlamePalette;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -108,6 +122,7 @@ export default function PixelFlame({
   cell,
   seed = 0,
   glow = false,
+  palette = "warm",
   className,
   style,
 }: PixelFlameProps) {
@@ -129,7 +144,7 @@ export default function PixelFlame({
             top: -cell,
             width: cell,
             height: cell,
-            boxShadow: frameShadow(i, cell),
+            boxShadow: frameShadow(i, cell, palette),
             animationDelay: delay,
           }}
         />

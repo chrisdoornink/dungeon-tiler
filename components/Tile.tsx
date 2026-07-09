@@ -64,6 +64,7 @@ interface TileProps {
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
+  heroTorchSnuffing?: boolean; // brief window after a snuff: show the blue flame flutter-out
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
@@ -143,6 +144,7 @@ export const Tile: React.FC<TileProps> = ({
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
+  heroTorchSnuffing = false,
   heroPoisoned = false,
   hasEnemy = false,
   enemyVisible = undefined,
@@ -1745,6 +1747,30 @@ export const Tile: React.FC<TileProps> = ({
                     cell={1.4}
                     seed={5}
                     style={{ ...anchor, transform: 'translateX(-50%)' }}
+                  />
+                );
+              })()}
+              {!heroTorchLit && heroTorchSnuffing && (() => {
+                const dirKey =
+                  heroDirectionForSprite === Direction.UP
+                    ? 'back'
+                    : heroDirectionForSprite === Direction.RIGHT ||
+                      heroDirectionForSprite === Direction.LEFT
+                    ? 'right'
+                    : 'front';
+                const anchor = HERO_FLAME_ANCHOR[dirKey];
+                // Blue spirit flame fluttering up and fading as the wisp takes it.
+                // Same anchor + centering as the lit flame so it sits on the torch.
+                return (
+                  <PixelFlame
+                    cell={1.4}
+                    seed={5}
+                    palette="blue"
+                    style={{
+                      ...anchor,
+                      transform: 'translateX(-50%)',
+                      animation: 'flameSnuffAway 0.56s ease-out forwards',
+                    }}
                   />
                 );
               })()}

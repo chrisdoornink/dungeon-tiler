@@ -356,6 +356,26 @@ body {
   }
 }
 
+/* A snuffed torch flame: the cold blue spirit fire flutters upward, shrinks, and
+   fades in about half a second, as if the wisp is carrying the light away. The
+   inner flame keeps its own flicker, so it reads as a live flame guttering out. */
+@keyframes flameSnuffAway {
+  /* translateX(-50%) is preserved through every step: it's the same horizontal
+     centering the lit flame uses, so the snuff flame stays on the torch. */
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1);
+    opacity: 1;
+  }
+  60% {
+    transform: translateX(-50%) translateY(-6px) scale(0.7);
+    opacity: 0.85;
+  }
+  100% {
+    transform: translateX(-50%) translateY(-14px) scale(0.25);
+    opacity: 0;
+  }
+}
+
 /* Gentle ethereal drift — a soft sway + tilt, replacing the old hard mirror snap. */
 @keyframes spiritSway {
   0% {

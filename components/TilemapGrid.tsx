@@ -2018,6 +2018,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environmentDaylight = environmentConfig.daylight;
   const autoPhaseVisibility = environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
+
+  // One-shot "flame guttering out" VFX: when the torch goes lit -> snuffed (a
+  // wisp reaching the hero), play a blue flame flutter-and-fade for ~560ms. The
+  // render sites below key their snuff flame off `torchSnuffing`.
+  const [torchSnuffing, setTorchSnuffing] = useState(false);
+  const prevTorchLitRef = useRef(heroTorchLitState);
+  const snuffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const was = prevTorchLitRef.current;
+    prevTorchLitRef.current = heroTorchLitState;
+    if (was && !heroTorchLitState) {
+      setTorchSnuffing(true);
+      if (snuffTimerRef.current) clearTimeout(snuffTimerRef.current);
+      snuffTimerRef.current = setTimeout(() => setTorchSnuffing(false), 560);
+    }
+  }, [heroTorchLitState]);
+  useEffect(
+    () => () => {
+      if (snuffTimerRef.current) clearTimeout(snuffTimerRef.current);
+    },
+    []
+  );
+
   // The nightmare room is always pitch black: never suppress its darkness regardless of
   // environment, forceDaylight, or torch state, so it renders dark from the first frame.
   const inNightmare = !!gameState.inNightmare;
@@ -3210,7 +3233,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               return next;
             });
           };
-          if (process.env.NODE_ENV === "test") {
+          // A wisp isn't fought — it vanishes when you reach it — so it never
+          // shows a "miss". Two guards, because the kind can't always be
+          // resolved for a vanished enemy (hitKind falls back to a goblin):
+          //  - explicit ghost kind, and
+          //  - any 0-damage hit where the target is GONE (a vanish/death, not a
+          //    real swing-and-miss). A genuine miss only happens when the enemy
+          //    SURVIVES a 0-damage swing, i.e. enemyAtTargetPost is still there.
+          const targetVanished = dealt === 0 && !enemyAtTargetPost;
+          if (hitKind === "ghost" || targetVanished) {
+            /* no floating number: ghosts/vanishes are not misses */
+          } else if (process.env.NODE_ENV === "test") {
             spawn();
           } else {
             setTimeout(spawn, 120); // let the BAM flash land first
@@ -4911,7 +4944,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothEnabled && heroDeathPhase === "idle" && !warpFlicker,
                     smoothEnabled,
                     smoothEntitySteps,
-                    combatLunges
+                    combatLunges,
+                    torchSnuffing
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -4992,6 +5026,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                                 style={{
                                   ...anchor,
                                   transform: "translateX(-50%)",
+                                }}
+                              />
+                            );
+                          })()}
+                          {!heroTorchLitState && torchSnuffing && (() => {
+                            const dirKey =
+                              gameState.playerDirection === Direction.UP
+                                ? ("back" as const)
+                                : gameState.playerDirection === Direction.DOWN
+                                ? ("front" as const)
+                                : ("right" as const);
+                            const anchor = HERO_FLAME_ANCHOR[dirKey];
+                            // Blue spirit flame flutters up, shrinks, and fades. Same
+                            // anchor + centering as the lit flame so it sits on the
+                            // torch; the keyframe adds the rise/scale/fade.
+                            return (
+                              <PixelFlame
+                                cell={1.4}
+                                seed={5}
+                                palette="blue"
+                                style={{
+                                  ...anchor,
+                                  transform: "translateX(-50%)",
+                                  animation: "flameSnuffAway 0.56s ease-out forwards",
                                 }}
                               />
                             );
@@ -5428,7 +5486,9 @@ function renderTileGrid(
   // destination tile (see smoothEntitySteps in the component).
   entitySteps?: Map<string, SmoothEntityStep>,
   // Combat lunges keyed "hero" / "e:y,x" (see combatLunges in the component).
-  combatLunges?: Map<string, CombatLunge>
+  combatLunges?: Map<string, CombatLunge>,
+  // One-shot blue snuff-flame VFX window for the in-tile hero (?smooth=0).
+  heroTorchSnuffing: boolean = false
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -5617,6 +5677,7 @@ function renderTileGrid(
             neighbors={neighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
+            heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
