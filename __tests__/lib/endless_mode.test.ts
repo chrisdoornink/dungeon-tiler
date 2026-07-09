@@ -163,13 +163,14 @@ describe("endless item plan", () => {
   });
 });
 
-describe("endless run initialization (the blind floor)", () => {
-  it("starts on floor 1 of a 16x16 map with the torch OUT", () => {
+describe("endless run initialization (floor 1)", () => {
+  it("starts on floor 1 of a 16x16 map with the torch LIT", () => {
     const state = initializeGameStateForEndless();
     expect(state.mode).toBe("endless");
     expect(state.currentFloor).toBe(1);
     expect(state.maxFloors).toBe(ENDLESS_MAX_FLOORS);
-    expect(state.heroTorchLit).toBe(false);
+    // The hero can see from the first step; the corner wisps take the light soon.
+    expect(state.heroTorchLit).toBe(true);
     expect(state.mapData.tiles.length).toBe(16);
     expect(state.mapData.tiles[0].length).toBe(16);
     expect(typeof state.endlessSeed).toBe("number");
@@ -219,24 +220,6 @@ describe("endless run initialization (the blind floor)", () => {
     }
   });
 
-  it("spawns the hero away from every wall torch", () => {
-    for (let i = 0; i < 10; i++) {
-      const state = initializeGameStateForEndless();
-      const player = findPlayerPosition(state.mapData);
-      expect(player).not.toBeNull();
-      const [py, px] = player!;
-      for (let y = 0; y < state.mapData.subtypes.length; y++) {
-        for (let x = 0; x < state.mapData.subtypes[y].length; x++) {
-          if (state.mapData.subtypes[y][x].includes(TileSubtype.WALL_TORCH)) {
-            const d = Math.hypot(y - py, x - px);
-            // 6 when the map allows it; the fallback picks the farthest tile,
-            // which on a 16x16 grid with 2 torches should still clear 4.
-            expect(d).toBeGreaterThanOrEqual(4);
-          }
-        }
-      }
-    }
-  });
 });
 
 describe("advancing endless floors", () => {

@@ -14,20 +14,19 @@ import type { GameState } from "./game-state";
  * Endless mode: descend as far as you can through an unbounded tower of floors.
  *
  * Design intent (see /endless):
- * - Floor 1 is the BLIND floor: the hero starts with his torch out, spawned away
- *   from every wall torch, seeing only the tiles at his feet. Fire goblins are
- *   the only goblin kind — they carry the only moving lights (and striking one
- *   relights your torch) — there are no faulty floors to blunder into, and only
- *   2 wall torches exist as distant beacons. Two wisps start in the far corners
- *   to snuff any light you find, hammering home that light is the resource.
+ * - Floor 1 is the LIGHT-PRESSURE intro: the hero starts with his torch LIT so he
+ *   can see and never feels stranded, but two wisps wait in the far corners to
+ *   snuff it. Fire goblins are the only goblin kind — they carry the only moving
+ *   lights, and striking one relights your torch — and a couple of wall torches
+ *   sit around as relight beacons. No faulty floors, so losing your light in the
+ *   dark can't drop you straight into an abyss. The floor teaches that light is a
+ *   resource you WILL lose and have to reclaim.
  * - Ghosts are more common on every endless floor than in the daily (1-2 early,
  *   2-3 deep, vs the daily's 0-1) — light pressure is endless mode's identity.
- * - Floors 1-2 are a weaponless stealth act on small grids: basic goblins only,
- *   extra rocks, and no chance of sword/shield. Avoidance is correct play.
- * - The sword appears in a locked chest on a random floor 2-4 and the shield on
- *   3-5 — fixed windows for consistency, random exact floor for variety.
- * - Grids grow and enemy counts/mix ramp with depth; an extra-heart chest every
- *   5th floor is the sustain economy that makes deep runs earnable.
+ * - All five starter items (sword, shield, bomb pack, medallion, extra heart) each
+ *   land on a distinct random floor 2-10; past floor 10 the sustain economy takes
+ *   over (heart every 5th floor, bombs by chance, sword/shield fill-in if missing).
+ * - Grids grow and enemy counts ramp with depth.
  * - The goblin mix ramps GRADUALLY (its own tables, not the daily's): basics
  *   through floor 3, armed goblins trickle in on 4-5, pink/stone goblins first
  *   appear lightly on 6-7, and the full daily-floor-3 menagerie waits until 8+.
@@ -256,54 +255,8 @@ export function endlessAllocationForFloor(
   return { chests: chestContents.length, keys: chestContents.length, chestContents };
 }
 
-/** Wall torches on the blind first floor: few enough that finding one is the task. */
+/** Wall torches on floor 1: a couple of relight beacons scattered around. */
 const DARK_FLOOR_WALL_TORCHES = 2;
-/** The blind-floor spawn keeps at least this distance from every wall torch. */
-const DARK_FLOOR_MIN_TORCH_DISTANCE = 6;
-
-/**
- * Relocate the player so no wall torch is within minDist (Euclidean). Used by
- * the blind first floor so the hero never spawns with a free light. Falls back
- * to the farthest available tile when the map has no spot beyond minDist.
- */
-export function movePlayerAwayFromWallTorches(mapData: MapData, minDist: number): MapData {
-  const playerPos = findPlayerPosition(mapData);
-  if (!playerPos) return mapData;
-
-  const torches: Array<[number, number]> = [];
-  for (let y = 0; y < mapData.subtypes.length; y++) {
-    for (let x = 0; x < mapData.subtypes[y].length; x++) {
-      if (mapData.subtypes[y][x].includes(TileSubtype.WALL_TORCH)) torches.push([y, x]);
-    }
-  }
-  if (torches.length === 0) return mapData;
-
-  const distToNearestTorch = (y: number, x: number) =>
-    Math.min(...torches.map(([ty, tx]) => Math.hypot(ty - y, tx - x)));
-  if (distToNearestTorch(playerPos[0], playerPos[1]) >= minDist) return mapData;
-
-  const newMapData = JSON.parse(JSON.stringify(mapData)) as MapData;
-  const candidates: Array<{ y: number; x: number; d: number }> = [];
-  for (let y = 0; y < newMapData.tiles.length; y++) {
-    for (let x = 0; x < newMapData.tiles[y].length; x++) {
-      if (newMapData.tiles[y][x] !== 0) continue;
-      const subs = newMapData.subtypes[y][x];
-      if (subs.length > 0 && !subs.every((s) => s === TileSubtype.NONE)) continue;
-      candidates.push({ y, x, d: distToNearestTorch(y, x) });
-    }
-  }
-  if (candidates.length === 0) return mapData;
-
-  const farEnough = candidates.filter((c) => c.d >= minDist);
-  const pool = farEnough.length > 0 ? farEnough : [candidates.sort((a, b) => b.d - a.d)[0]];
-  const target = pool[Math.floor(Math.random() * pool.length)];
-
-  newMapData.subtypes[playerPos[0]][playerPos[1]] = newMapData.subtypes[playerPos[0]][
-    playerPos[1]
-  ].filter((s) => s !== TileSubtype.PLAYER);
-  newMapData.subtypes[target.y][target.x] = [TileSubtype.PLAYER];
-  return newMapData;
-}
 
 /** Generate the map + enemies for one endless floor. Call inside a seeded RNG patch. */
 function buildEndlessFloor(
@@ -320,17 +273,17 @@ function buildEndlessFloor(
   });
   // Pass floor via opts only: the floor param would trigger the daily grid sizes
   // and the floor-3 escape-floor special cases.
-  let mapData = generateCompleteMapForFloor(allocation, undefined, {
+  const mapData = generateCompleteMapForFloor(allocation, undefined, {
     gridSize: endlessGridSizeForFloor(floor),
     rocksFloor: endlessRocksFloor(floor),
-    // Blind floor: only a couple of distant beacons, and no abyss holes to
-    // stumble into while the hero can't see the ground ahead.
+    // Floor 1: a couple of wall torches as relight beacons, and no abyss holes —
+    // losing your light here must never mean instant death in the dark.
     wallTorches: isDarkFloor ? DARK_FLOOR_WALL_TORCHES : undefined,
     includeFaultyFloors: !isDarkFloor,
   });
-  if (isDarkFloor) {
-    mapData = movePlayerAwayFromWallTorches(mapData, DARK_FLOOR_MIN_TORCH_DISTANCE);
-  }
+  // NOTE: the hero starts with his torch LIT (see initializeGameStateForEndless),
+  // so we no longer push his spawn away from the wall torches — being near a
+  // relight beacon when a wisp snuffs him is a feature, not an exploit.
 
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
@@ -431,9 +384,10 @@ export function initializeGameStateForEndless(): GameState {
     heroAttack: 1,
     rockCount: 0,
     runeCount: 0,
-    // The blind floor: the run starts with the torch out. Reaching a wall torch
-    // relights it (existing adjacency mechanic in game-state).
-    heroTorchLit: false,
+    // Start with the torch LIT: the hero can see from the first step and never
+    // feels stranded. The corner wisps on floor 1 will take it soon enough, and
+    // reaching a wall torch (or striking a fire goblin) relights it.
+    heroTorchLit: true,
     stats: {
       damageDealt: 0,
       damageTaken: 0,
