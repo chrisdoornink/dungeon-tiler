@@ -252,6 +252,22 @@ export function trackShare(params: {
   });
 }
 
+/**
+ * Fire when a player taps the "Try Endless Mode" prompt on the daily completion
+ * screen. Pairs with `game_start` (game_mode=endless) to measure how many
+ * finishers cross over into Endless from the endgame CTA — i.e. is the prompt
+ * actually driving people into the mode.
+ */
+export function trackEndlessPromptClick(params?: {
+  surface?: "daily_completed";
+  outcome?: "win" | "dead";
+}) {
+  captureEvent('endless_prompt_clicked', {
+    surface: params?.surface ?? "daily_completed",
+    outcome: params?.outcome,
+  });
+}
+
 export function trackDailyChallenge(action: 'intro_viewed' | 'started' | 'completed', params?: EventParams) {
   captureEvent('daily_challenge', {
     action,

@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { DailyChallengeData } from "../../lib/daily_challenge_storage";
+import FeedbackButton from "../FeedbackButton";
 // import { ScoreCalculator, ScoreBreakdown } from "../../lib/score_calculator";
 import * as Analytics from "../../lib/posthog_analytics";
 import { GameState } from "../../lib/map/game-state";
@@ -146,6 +148,11 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
   
   // Determine defeat image number once to prevent flickering
   const [defeatImageNum] = useState(() => Math.random() < 0.5 ? 1 : 2);
+
+  // Badges are temporarily hidden while the feature gets more work — the badge
+  // calc + effect still run so flipping this back to true re-enables the section
+  // with no other changes. Typed as boolean so the render gate isn't dead code.
+  const SHOW_BADGES: boolean = false;
 
   // Get death details from last game result stored in localStorage
   const getLastGame = () => {
@@ -792,11 +799,34 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           </div>
         </div>
 
-        {/* Badges Section - Show earned badges.
+        {/* Endless Mode CTA — a "want more?" nudge shown directly under the run
+            results. No surrounding box (matches the lifetime-stats list further
+            down). The tap is tracked (endless_prompt_clicked) so we can measure
+            crossover into Endless from the endgame screen. */}
+        <div className="max-w-lg mx-auto text-center">
+          <p className="text-gray-200 mb-3">Want to keep playing?</p>
+          <Link
+            href="/endless"
+            onClick={() => {
+              try {
+                Analytics.trackEndlessPromptClick?.({
+                  surface: "daily_completed",
+                  outcome: isWin ? "win" : "dead",
+                });
+              } catch {}
+            }}
+            className="inline-block px-6 py-3 rounded-md bg-[#2E7D32] text-white hover:bg-[#256628] transition-colors font-semibold"
+          >
+            Try Endless Mode
+          </Link>
+        </div>
+
+        {/* Badges Section - temporarily hidden (SHOW_BADGES) while the feature
+            gets more work.
             Note: reachedPinkRealm is intentionally tracked silently (run-level flag +
             pink_realm_reached PostHog event + lastGame payload) but NOT shown here yet —
             a richer realm reveal will land once the realm has real secrets/stats. */}
-        {badges.length > 0 && (
+        {SHOW_BADGES && badges.length > 0 && (
           <div className="max-w-2xl mx-auto">
             <div className="rounded-lg shadow-xl p-6 bg-black/50 border border-gray-600">
               <h2 className="text-xl font-semibold text-gray-100 mb-4 text-center">
@@ -1008,6 +1038,10 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
         </div>
       </div>
       
+      {/* Floating feedback button — fixed bottom-left, uses the pixel chat-box
+          icon. No How-to-Play companion; the feedback channel is the only one. */}
+      <FeedbackButton />
+
       {/* Daily Challenge Poll Modal */}
       <DailyPollModal
         open={showPoll}
