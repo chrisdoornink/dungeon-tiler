@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import HeartPopAnimation from './HeartPopAnimation';
+import { assetUrl } from "../lib/asset_url";
 
 interface HealthDisplayProps {
   health: number;
@@ -42,7 +43,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src={isPoisoned ? "/images/presentational/heart-poison-green.png" : "/images/presentational/heart-red.png"}
+          src={isPoisoned ? assetUrl("/images/presentational/heart-poison-green.png") : assetUrl("/images/presentational/heart-red.png")}
           alt={isPoisoned ? "💚" : "❤️"}
           width={16}
           height={16}
@@ -54,7 +55,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src="/images/presentational/heart-empty.png"
+          src={assetUrl("/images/presentational/heart-empty.png")}
           alt="🤍"
           width={16}
           height={16}
@@ -73,7 +74,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
     hearts.push(
       <Image
         key={`bonus-${b}`}
-        src="/images/presentational/heart-pink.png"
+        src={assetUrl("/images/presentational/heart-pink.png")}
         alt="💗"
         width={16}
         height={16}

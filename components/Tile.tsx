@@ -17,6 +17,7 @@ import {
   getFloorAsset,
   getWallAsset,
 } from "../lib/environment";
+import { assetUrl } from "../lib/asset_url";
 
 type NeighborInfo = {
   top: number | null;
@@ -510,14 +511,14 @@ export const Tile: React.FC<TileProps> = ({
 
   const getBedAsset = (subtypes: number[] | undefined): string | null => {
     if (!subtypes) return null;
-    if (subtypes.includes(TileSubtype.BED_EMPTY_1)) return '/images/items/beds/bed-1-empty.png';
-    if (subtypes.includes(TileSubtype.BED_EMPTY_2)) return '/images/items/beds/bed-2-empty.png';
-    if (subtypes.includes(TileSubtype.BED_EMPTY_3)) return '/images/items/beds/bed-3-empty.png';
-    if (subtypes.includes(TileSubtype.BED_EMPTY_4)) return '/images/items/beds/bed-4-empty.png';
-    if (subtypes.includes(TileSubtype.BED_FULL_1)) return '/images/items/beds/bed-1-full.png';
-    if (subtypes.includes(TileSubtype.BED_FULL_2)) return '/images/items/beds/bed-2-full.png';
-    if (subtypes.includes(TileSubtype.BED_FULL_3)) return '/images/items/beds/bed-3-full.png';
-    if (subtypes.includes(TileSubtype.BED_FULL_4)) return '/images/items/beds/bed-4-full.png';
+    if (subtypes.includes(TileSubtype.BED_EMPTY_1)) return assetUrl('/images/items/beds/bed-1-empty.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_2)) return assetUrl('/images/items/beds/bed-2-empty.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_3)) return assetUrl('/images/items/beds/bed-3-empty.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_4)) return assetUrl('/images/items/beds/bed-4-empty.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_1)) return assetUrl('/images/items/beds/bed-1-full.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_2)) return assetUrl('/images/items/beds/bed-2-full.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_3)) return assetUrl('/images/items/beds/bed-3-full.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_4)) return assetUrl('/images/items/beds/bed-4-full.png');
     return null;
   };
 
@@ -545,15 +546,15 @@ export const Tile: React.FC<TileProps> = ({
   const getRoadAsset = (shape: TileSubtype | null): string | null => {
     switch (shape) {
       case TileSubtype.ROAD_STRAIGHT:
-        return "/images/floor/dirt-road-i.png";
+        return assetUrl("/images/floor/dirt-road-i.png");
       case TileSubtype.ROAD_CORNER:
-        return "/images/floor/dirt-road-r.png";
+        return assetUrl("/images/floor/dirt-road-r.png");
       case TileSubtype.ROAD_T:
-        return "/images/floor/dirt-road-t.png";
+        return assetUrl("/images/floor/dirt-road-t.png");
       case TileSubtype.ROAD_END:
-        return "/images/floor/dirt-road-end.png";
+        return assetUrl("/images/floor/dirt-road-end.png");
       case TileSubtype.ROAD:
-        return "/images/floor/dirt-road-i.png";
+        return assetUrl("/images/floor/dirt-road-i.png");
       default:
         return null;
     }
@@ -728,7 +729,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url('/images/items/snake-medalion.png')`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medalion.png')})`,
             }}
           />
         )}
@@ -763,7 +764,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
               className={`${styles.assetIcon} ${styles.torchSprite}`}
-              style={{ backgroundImage: `url(/images/items/wall-torch-2-base.png)` }}
+              style={{ backgroundImage: `url(${assetUrl('/images/items/wall-torch-2-base.png')})` }}
             />
             <PixelFlame
               cell={1.5}
@@ -814,7 +815,7 @@ export const Tile: React.FC<TileProps> = ({
               data-testid={`subtype-icon-${TileSubtype.EXIT}`}
               className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
               style={{
-                backgroundImage: `url(${playerHasExitKey ? '/images/door/exit-transparent.png' : '/images/door/exit-dark.png'})`,
+                backgroundImage: `url(${playerHasExitKey ? assetUrl('/images/door/exit-transparent.png') : assetUrl('/images/door/exit-dark.png')})`,
               }}
             />
             <div
@@ -832,7 +833,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.CAVE_OPENING}`}
             className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
             style={{
-              backgroundImage: `url('/images/door/exit-dark.png')`,
+              backgroundImage: `url(${assetUrl('/images/door/exit-dark.png')})`,
             }}
           />
         )}
@@ -853,9 +854,9 @@ export const Tile: React.FC<TileProps> = ({
               className={`${styles.assetIcon} ${styles.potIcon}${isSnakePot ? ` ${styles.potIconSnake}` : ''}`}
               style={{
                 backgroundImage: `url(${pickVariant([
-                  '/images/items/pot-1.png',
-                  '/images/items/pot-2.png',
-                  '/images/items/pot-3.png',
+                  assetUrl('/images/items/pot-1.png'),
+                  assetUrl('/images/items/pot-2.png'),
+                  assetUrl('/images/items/pot-3.png'),
                 ])})`,
                 ...(isSnakePot
                   ? ({ ['--snake-pot-delay' as string]: `${delayMs}s` } as React.CSSProperties)
@@ -871,8 +872,8 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
               backgroundImage: `url(${pickVariant([
-                '/images/items/rock-1.png',
-                '/images/items/rock-2.png',
+                assetUrl('/images/items/rock-1.png'),
+                assetUrl('/images/items/rock-2.png'),
               ])})`,
             }}
           />
@@ -898,9 +899,9 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.foodIcon}`}
             style={{
               backgroundImage: `url(${pickVariant([
-                '/images/items/food-1.png',
-                '/images/items/food-2.png',
-                '/images/items/food-3.png',
+                assetUrl('/images/items/food-1.png'),
+                assetUrl('/images/items/food-2.png'),
+                assetUrl('/images/items/food-3.png'),
               ])})`,
             }}
           />
@@ -911,7 +912,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.MED}`}
             className={`${styles.assetIcon} ${styles.medIcon}`}
             style={{
-              backgroundImage: `url('/images/items/meds-1.png')`,
+              backgroundImage: `url(${assetUrl('/images/items/meds-1.png')})`,
             }}
           />
         )}
@@ -926,7 +927,7 @@ export const Tile: React.FC<TileProps> = ({
               data-testid={`subtype-icon-${TileSubtype.RUNE}`}
               className={`${styles.assetIcon} ${styles.runeIcon}`}
               style={{
-                backgroundImage: `url('/images/items/rune1.png')`,
+                backgroundImage: `url(${assetUrl('/images/items/rune1.png')})`,
               }}
             />
             {/* One-shot portal-sparkle burst on reveal: this block mounts the
@@ -954,7 +955,7 @@ export const Tile: React.FC<TileProps> = ({
               data-testid={`subtype-icon-${TileSubtype.PINK_RING}`}
               className={`${styles.assetIcon} ${styles.runeIcon}`}
               style={{
-                backgroundImage: `url('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')`,
+                backgroundImage: `url(${assetUrl('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')})`,
               }}
             />
             {[0, 1, 2, 3, 4].map((i) => (
@@ -1003,7 +1004,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.TOWN_SIGN}`}
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url('/images/items/town-sign.png')`,
+              backgroundImage: `url(${assetUrl('/images/items/town-sign.png')})`,
             }}
           />
         )}
@@ -1027,7 +1028,7 @@ export const Tile: React.FC<TileProps> = ({
                 width: 24,
                 height: 24,
                 transform: 'translate(-50%, -50%)',
-                backgroundImage: `url('/images/enemies/fire-goblin/blue-ring-no-sparkle.png')`,
+                backgroundImage: `url(${assetUrl('/images/enemies/fire-goblin/blue-ring-no-sparkle.png')})`,
                 backgroundSize: 'contain',
                 backgroundRepeat: 'no-repeat',
                 backgroundPosition: 'center',
@@ -1059,7 +1060,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url('/images/items/snake-medalion.png')`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medalion.png')})`,
             }}
           />
         )}
@@ -1158,7 +1159,7 @@ export const Tile: React.FC<TileProps> = ({
         }
         // Lit torch uses the flameless base sprite; PixelFlame supplies the fire
         const variant = heroTorchLit ? '-noflame' : '-snuff';
-        return `/images/hero/hero-${dir}${equip()}${variant}-static.png`;
+        return assetUrl(`/images/hero/hero-${dir}${equip()}${variant}-static.png`);
       })()
     : '';
 
@@ -1301,7 +1302,7 @@ export const Tile: React.FC<TileProps> = ({
           width: 24,
           height: 24,
           transform: 'translate(-50%, -50%)',
-          backgroundImage: `url('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')`,
+          backgroundImage: `url(${assetUrl('/images/enemies/fire-goblin/pink-ring-no-sparkle.png')})`,
           backgroundSize: 'contain',
           backgroundRepeat: 'no-repeat',
           backgroundPosition: 'center',
@@ -1402,7 +1403,7 @@ export const Tile: React.FC<TileProps> = ({
           : enemyFacing === 'LEFT' || enemyFacing === 'RIGHT'
           ? 'right'
           : 'front';
-      const src = `/images/enemies/fire-goblin/white-goblins-${dir}-1.png`;
+      const src = assetUrl(`/images/enemies/fire-goblin/white-goblins-${dir}-1.png`);
       // Flip the whole cluster for LEFT so member offsets mirror consistently.
       const clusterBase = enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       const offsets: Array<[number, number]> = [
@@ -1536,7 +1537,7 @@ export const Tile: React.FC<TileProps> = ({
                 // for non-game UI (summaries, end screens).
                 if (kind === 'fire-goblin') {
                   const f = facing === 'left' ? 'right' : facing;
-                  return `/images/enemies/fire-goblin/fire-goblin-${f}-base.png`;
+                  return assetUrl(`/images/enemies/fire-goblin/fire-goblin-${f}-base.png`);
                 }
                 return getEnemyIcon(kind, facing);
               })()})`,
@@ -1642,7 +1643,7 @@ export const Tile: React.FC<TileProps> = ({
         }
       }
       const wallTopImage = getWallAsset(environment, wallPattern);
-      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
+      const roofBackOverhangImage = assetUrl('/images/roof/spanish-roof-back-overhang.png');
 
       return (
         <div
@@ -1676,7 +1677,7 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url('/images/items/checkpoint-unlit.png')`
+                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit.png')})`
                   }}
                   aria-label="checkpoint"
                 />
@@ -1793,7 +1794,7 @@ export const Tile: React.FC<TileProps> = ({
               style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundImage: "url(/images/items/bookshelf.png)",
+                backgroundImage: `url(${assetUrl("/images/items/bookshelf.png")})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",
@@ -1880,11 +1881,11 @@ export const Tile: React.FC<TileProps> = ({
 
       // Check if there's a roof tile behind (north of) this wall - for roof overhang
       const hasRoofBehind = neighbors.top === 4;
-      const roofFrontOverhangImage = '/images/roof/spanish-roof-front-overhang.png';
+      const roofFrontOverhangImage = assetUrl('/images/roof/spanish-roof-front-overhang.png');
       
       // Check if there's a roof tile below (south of) this wall - for roof back overhang
       const hasRoofBelow = neighbors.bottom === 4;
-      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
+      const roofBackOverhangImage = assetUrl('/images/roof/spanish-roof-back-overhang.png');
 
       // Forced perspective: if the tile below is a FLOOR (0), make the bottom border thicker/darker
       const isFloorBelow = neighbors.bottom === 0;
@@ -1977,7 +1978,7 @@ export const Tile: React.FC<TileProps> = ({
             (environment === "outdoor" || environment === "house") && (
               <div
                 className={styles.wallDoorOverlay}
-                style={{ backgroundImage: "url(/images/door/house-door.png)" }}
+                style={{ backgroundImage: `url(${assetUrl("/images/door/house-door.png")})` }}
                 aria-hidden="true"
               />
             )}
@@ -1985,7 +1986,7 @@ export const Tile: React.FC<TileProps> = ({
           {subtype.includes(TileSubtype.WINDOW) && (
             <div
               className={styles.wallWindowOverlay}
-              style={{ backgroundImage: "url(/images/window.png)" }}
+              style={{ backgroundImage: `url(${assetUrl("/images/window.png")})` }}
               aria-hidden="true"
             />
           )}
@@ -2037,7 +2038,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: "url(/images/hanging-signs/store.png)",
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/store.png")})`,
               }}
               data-testid="hanging-sign-store"
               aria-hidden="true"
@@ -2047,7 +2048,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: "url(/images/hanging-signs/library.png)",
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/library.png")})`,
               }}
               data-testid="hanging-sign-library"
               aria-hidden="true"
@@ -2057,7 +2058,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: "url(/images/hanging-signs/workshop.png)",
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/workshop.png")})`,
               }}
               data-testid="hanging-sign-smithy"
               aria-hidden="true"
@@ -2083,11 +2084,11 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 4) {
     if (isVisible) {
       const roofClasses = `${styles.tileContainer} ${styles.roof} ${tierClass}`;
-      const roofAsset = '/images/roof/spanish-roof-main.png';
+      const roofAsset = assetUrl('/images/roof/spanish-roof-main.png');
       
       // Check if there's a tree behind (north of) this roof - for roof overhang
       const hasTreeBehind = neighbors.top === 6;
-      const roofFrontOverhangImage = '/images/roof/spanish-roof-front-overhang.png';
+      const roofFrontOverhangImage = assetUrl('/images/roof/spanish-roof-front-overhang.png');
 
       return (
         <div
@@ -2143,12 +2144,12 @@ export const Tile: React.FC<TileProps> = ({
       const x = typeof col === 'number' ? col : 0;
       const seed = (y * 37 + x * 101);
       const flowerAssets = [
-        '/images/flowers/flowers-1.png',
-        '/images/flowers/flowers-2.png',
-        '/images/flowers/flowers-3.png',
-        '/images/flowers/flowers-4.png',
-        '/images/flowers/flowers-5.png',
-        '/images/flowers/bush.png',
+        assetUrl('/images/flowers/flowers-1.png'),
+        assetUrl('/images/flowers/flowers-2.png'),
+        assetUrl('/images/flowers/flowers-3.png'),
+        assetUrl('/images/flowers/flowers-4.png'),
+        assetUrl('/images/flowers/flowers-5.png'),
+        assetUrl('/images/flowers/bush.png'),
       ];
       const flowerAsset = flowerAssets[Math.abs(seed) % flowerAssets.length];
 
@@ -2184,7 +2185,7 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url('/images/items/checkpoint-unlit.png')`
+                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit.png')})`
                   }}
                   aria-label="checkpoint"
                 />
@@ -2305,7 +2306,7 @@ export const Tile: React.FC<TileProps> = ({
       
       // Check if bottom neighbor is a roof - if so, we'll render the roof back overhang
       const hasRoofBelow = neighbors.bottom === 4;
-      const roofBackOverhangImage = '/images/roof/spanish-roof-back-overhang.png';
+      const roofBackOverhangImage = assetUrl('/images/roof/spanish-roof-back-overhang.png');
       
       // Determine which wall image to use for the overlay based on neighboring walls
       let wallPattern = '0111';
@@ -2336,10 +2337,10 @@ export const Tile: React.FC<TileProps> = ({
       const x = typeof col === 'number' ? col : 0;
       const seed = (y * 37 + x * 101);
       const treeAssets = [
-        '/images/trees/tree-1.png',
-        '/images/trees/tree-2.png',
-        '/images/trees/tree-3.png',
-        '/images/trees/tree-4.png',
+        assetUrl('/images/trees/tree-1.png'),
+        assetUrl('/images/trees/tree-2.png'),
+        assetUrl('/images/trees/tree-3.png'),
+        assetUrl('/images/trees/tree-4.png'),
       ];
       const treeAsset = treeAssets[Math.abs(seed) % treeAssets.length];
 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { assetUrl } from "../lib/asset_url";
 
 export interface MobileInventoryItem {
   key: string;
@@ -132,7 +133,14 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   // Check if screen width is less than 600px
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 600);
+      // Treat a coarse pointer (touch) as mobile too, not just narrow widths — otherwise
+      // tablets and the CrazyGames fullscreen app (wide but touch-only) get the desktop
+      // keyboard layout with no on-screen controls. Both portals require touch controls
+      // on tablets.
+      const coarsePointer =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(pointer: coarse)").matches;
+      setIsMobile(window.innerWidth < 600 || coarsePointer);
       setViewportWidth(window.innerWidth);
     };
 
@@ -261,7 +269,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rock',
       testId: 'mobile-action-rock',
-      icon: '/images/items/rock-1.png',
+      icon: assetUrl('/images/items/rock-1.png'),
       count: rockCount ?? 0,
       onUse: onThrowRock,
       label: 'Throw Rock',
@@ -270,7 +278,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rune',
       testId: 'mobile-action-rune',
-      icon: '/images/items/rune1.png',
+      icon: assetUrl('/images/items/rune1.png'),
       count: runeCount ?? 0,
       onUse: onUseRune,
       label: 'Use Rune',
@@ -279,7 +287,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'bomb',
       testId: 'mobile-action-bomb',
-      icon: '/images/items/bomb-black.png',
+      icon: assetUrl('/images/items/bomb-black.png'),
       count: bombCount ?? 0,
       onUse: onThrowBomb,
       label: 'Throw Bomb',

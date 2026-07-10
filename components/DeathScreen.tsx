@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { deathCauseMessage, type DeathCause } from '../lib/death_message';
+import { assetUrl } from "../lib/asset_url";
 
 interface DeathScreenProps {
   deathCause?: DeathCause;
@@ -34,7 +35,7 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
         <div
           className="w-32 h-32 animate-float"
           style={{
-            backgroundImage: 'url(/images/items/spirit.png)',
+            backgroundImage: `url(${assetUrl("/images/items/spirit.png")})`,
             backgroundSize: 'contain',
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',

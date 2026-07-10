@@ -1,4 +1,5 @@
 import { Direction } from "./map";
+import { assetUrl } from "./asset_url";
 
 /**
  * Phase 1 of the smooth-movement port (prototyped at /test-animation):
@@ -97,7 +98,7 @@ export function heroSpritePath(
       : "";
   // Lit torch uses the flameless base sprite; PixelFlame supplies the fire
   const variant = torchLit ? "-noflame" : "-snuff";
-  return `/images/hero/hero-${dir}${equip}${variant}-static.png`;
+  return assetUrl(`/images/hero/hero-${dir}${equip}${variant}-static.png`);
 }
 
 export const smoothEaseInOut = (t: number): number =>

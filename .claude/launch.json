@@ -7,6 +7,27 @@
       "runtimeArgs": ["run", "dev"],
       "port": 4000,
       "autoPort": true
+    },
+    {
+      "name": "endless-standalone-spike",
+      "runtimeExecutable": "/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/.claude/worktrees/endless-standalone-html5-c1e9f1/standalone/node_modules/.bin/vite",
+      "runtimeArgs": [
+        "--config",
+        "/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/.claude/worktrees/endless-standalone-html5-c1e9f1/standalone/vite.config.ts",
+        "--port",
+        "4001",
+        "--host",
+        "--strictPort"
+      ],
+      "port": 4001
+    },
+    {
+      "name": "subpath-cdn-test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "/Users/chrisdoornink/Documents/GitHub/dungeon-tiler/.claude/worktrees/endless-standalone-html5-c1e9f1/standalone/serve-subpath.mjs"
+      ],
+      "port": 4002
     }
   ]
 }

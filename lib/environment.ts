@@ -1,3 +1,5 @@
+import { assetUrl } from "./asset_url";
+
 export type EnvironmentId = "cave" | "outdoor" | "house" | "pink_realm";
 
 export const DEFAULT_ENVIRONMENT: EnvironmentId = "cave";
@@ -13,30 +15,30 @@ interface EnvironmentConfig {
 const ENVIRONMENT_CONFIGS: Record<EnvironmentId, EnvironmentConfig> = {
   cave: {
     id: "cave",
-    floorDefault: "/images/floor/floor-try-1.png",
-    floorNorthEdge: "/images/floor/floor-1000.png",
-    wallPrefix: "/images/wall/wall-",
+    floorDefault: assetUrl("/images/floor/floor-try-1.png"),
+    floorNorthEdge: assetUrl("/images/floor/floor-1000.png"),
+    wallPrefix: assetUrl("/images/wall/wall-"),
     daylight: false,
   },
   outdoor: {
     id: "outdoor",
-    floorDefault: "/images/floor/outdoor-floor-0000.png",
-    floorNorthEdge: "/images/floor/outdoor-floor-0000.png", // leave this alone please.
-    wallPrefix: "/images/wall/outdoor-wall-",
+    floorDefault: assetUrl("/images/floor/outdoor-floor-0000.png"),
+    floorNorthEdge: assetUrl("/images/floor/outdoor-floor-0000.png"), // leave this alone please.
+    wallPrefix: assetUrl("/images/wall/outdoor-wall-"),
     daylight: true,
   },
   house: {
     id: "house",
-    floorDefault: "/images/floor/in-house-floor-0000.png",
-    floorNorthEdge: "/images/floor/in-house-floor-1000.png",
-    wallPrefix: "/images/wall/outdoor-wall-",
+    floorDefault: assetUrl("/images/floor/in-house-floor-0000.png"),
+    floorNorthEdge: assetUrl("/images/floor/in-house-floor-1000.png"),
+    wallPrefix: assetUrl("/images/wall/outdoor-wall-"),
     daylight: true,
   },
   pink_realm: {
     id: "pink_realm",
-    floorDefault: "/images/floor/pink-realm-floor.png",
-    floorNorthEdge: "/images/floor/pink-realm-floor-1000.png",
-    wallPrefix: "/images/wall/pink-realm-wall-",
+    floorDefault: assetUrl("/images/floor/pink-realm-floor.png"),
+    floorNorthEdge: assetUrl("/images/floor/pink-realm-floor-1000.png"),
+    wallPrefix: assetUrl("/images/wall/pink-realm-wall-"),
     daylight: false,
   },
 };

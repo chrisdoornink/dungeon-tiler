@@ -7,6 +7,7 @@
  */
 
 import { getOrCreateUserId as getUserId } from "./posthog_analytics";
+import { isStandalone } from "./standalone_env";
 import type { GameState } from "./map";
 
 export interface LeaderboardEntry {
@@ -69,6 +70,8 @@ function statsPayload(state: GameState) {
 
 /** Register a fresh run with the server; returns the runId or null on failure. */
 export async function startEndlessRun(): Promise<string | null> {
+  // Standalone (portal) builds have no server: skip the network, run local-best-only.
+  if (isStandalone()) return null;
   try {
     const res = await fetch("/api/endless-run", {
       method: "POST",
@@ -85,6 +88,7 @@ export async function startEndlessRun(): Promise<string | null> {
 
 /** Report entering `floor`; fire-and-forget from the floor transition. */
 export function reportEndlessCheckpoint(state: GameState, floor: number): void {
+  if (isStandalone()) return;
   if (!state.endlessRunId) return;
   try {
     void fetch("/api/endless-run", {
@@ -104,6 +108,7 @@ export function reportEndlessCheckpoint(state: GameState, floor: number): void {
 
 /** Submit the finished run. The server scores it from its own verified floor. */
 export async function submitEndlessRun(state: GameState): Promise<SubmitResult | null> {
+  if (isStandalone()) return null;
   try {
     const res = await fetch("/api/endless-run", {
       method: "POST",
@@ -125,6 +130,7 @@ export async function submitEndlessRun(state: GameState): Promise<SubmitResult |
 export async function fetchEndlessLeaderboard(
   limit?: number
 ): Promise<LeaderboardData | null> {
+  if (isStandalone()) return null;
   try {
     const params = new URLSearchParams({ playerId: getUserId() });
     if (limit) params.set("limit", String(limit));
@@ -138,6 +144,7 @@ export async function fetchEndlessLeaderboard(
 
 export async function saveEndlessPlayerName(name: string): Promise<void> {
   setEndlessPlayerName(name);
+  if (isStandalone()) return; // saved locally; no server board in the portal build
   try {
     await fetch("/api/endless-run", {
       method: "POST",

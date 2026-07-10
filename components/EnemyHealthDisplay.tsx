@@ -1,5 +1,6 @@
 import React from 'react';
 import Image from 'next/image';
+import { assetUrl } from "../lib/asset_url";
 
 interface EnemyHealthDisplayProps {
   health: number;
@@ -21,7 +22,7 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src="/images/presentational/heart-red.png"
+          src={assetUrl("/images/presentational/heart-red.png")}
           alt="❤️"
           width={12}
           height={12}
@@ -33,7 +34,7 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src="/images/presentational/heart-empty.png"
+          src={assetUrl("/images/presentational/heart-empty.png")}
           alt="🤍"
           width={12}
           height={12}

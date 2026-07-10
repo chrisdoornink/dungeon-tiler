@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>TorchBoy Endless — Standalone Spike</title>
+    <script>
+      // Provide a `process` shim BEFORE any ESM module evaluates. lib/map/constants.ts
+      // reads process.env.NEXT_PUBLIC_MAP_SIZE at module top level, and many components
+      // read process.env.NODE_ENV. Classic scripts run before deferred module scripts.
+      window.process = window.process || { env: { NODE_ENV: "production" } };
+      // Asset base for the shared engine's assetUrl(): make every "/images/..." path
+      // relative to the document so it resolves under a portal's CDN subpath. Set here
+      // (before modules) so import-time data (enemy registry, environment) sees it too.
+      window.__ASSET_BASE__ = "./";
+      // Standalone flag: shared code (e.g. the leaderboard client) checks this to skip
+      // server calls that don't exist in the portal build.
+      window.__STANDALONE__ = true;
+    </script>
+    <!-- Tailwind utilities + globals.css + self-hosted fonts are all bundled via
+         PostCSS/Vite from src/main.tsx now — no external CDN requests (portals block them). -->
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        background: #1c1830;
+      }
+    </style>
+  </head>
+  <body class="pixel-body">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

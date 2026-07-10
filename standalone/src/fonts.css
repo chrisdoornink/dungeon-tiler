@@ -1,0 +1,29 @@
+/* Self-hosted pixel fonts (latin subset). The real app loads these via next/font in
+   layout.tsx and exposes them as CSS vars that globals.css consumes; we replicate that
+   here. Vite bundles the woff2 files and rewrites these relative url()s for the deploy
+   base, so the result is fully self-contained (portals block external font requests). */
+@font-face {
+  font-family: "Press Start 2P";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/PressStart2P.woff2") format("woff2");
+}
+@font-face {
+  font-family: "VT323";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/VT323.woff2") format("woff2");
+}
+
+:root {
+  --font-press-start-2p: "Press Start 2P";
+  --font-vt323: "VT323";
+}
+
+/* Mirror layout.tsx applying pressStart2P.className to <body>. Class selector beats
+   globals.css's `body { font-family: Arial }` regardless of import order. */
+body.pixel-body {
+  font-family: "Press Start 2P", "VT323", monospace;
+}
