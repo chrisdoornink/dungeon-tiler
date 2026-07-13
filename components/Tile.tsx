@@ -2200,7 +2200,7 @@ export const Tile: React.FC<TileProps> = ({
         '/images/flowers/flowers-3.png',
         '/images/flowers/flowers-4.png',
         '/images/flowers/flowers-5.png',
-        '/images/flowers/bush.png',
+        '/images/flowers/bush-1.png',
       ];
       const flowerAsset = flowerAssets[Math.abs(seed) % flowerAssets.length];
 
