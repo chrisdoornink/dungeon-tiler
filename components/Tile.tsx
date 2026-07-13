@@ -97,6 +97,13 @@ interface TileProps {
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
+  // Per swarm member (same tile order as enemySwarmCount): its own facing and
+  // its own slide-in step, so two members converging on this tile each glide
+  // in from their real previous tile instead of sharing one direction.
+  enemySwarmMembers?: Array<{
+    facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+    step?: SmoothEntityStep;
+  }>;
   // Pink goblin whose teleport ring is NOT cast elsewhere: render the ring
   // (with sparkles) directly under the goblin.
   enemyRingUnder?: boolean;
@@ -152,6 +159,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyKind,
   enemyMoved,
   enemySwarmCount,
+  enemySwarmMembers,
   enemyAura,
   npc,
   npcVisible = undefined,
@@ -1398,15 +1406,18 @@ export const Tile: React.FC<TileProps> = ({
     // vertical offset so higher-up goblins sit behind lower ones.
     if (smoothMode && enemyKind === 'white-goblin') {
       const count = Math.max(1, Math.min(4, enemySwarmCount ?? 1));
-      const dir =
-        enemyFacing === 'UP'
-          ? 'back'
-          : enemyFacing === 'LEFT' || enemyFacing === 'RIGHT'
-          ? 'right'
-          : 'front';
-      const src = `/images/enemies/fire-goblin/white-goblins-${dir}-1.png`;
-      // Flip the whole cluster for LEFT so member offsets mirror consistently.
-      const clusterBase = enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
+      // Each member slides in from ITS OWN previous tile and keeps ITS OWN
+      // facing — two goblins converging on this tile arrive from different
+      // directions, and one that stood still doesn't slide at all. Falls back
+      // to the tile-level facing/step when per-member data isn't provided
+      // (legacy callers / tests).
+      const members =
+        enemySwarmMembers && enemySwarmMembers.length > 0
+          ? enemySwarmMembers.slice(0, 4)
+          : Array.from({ length: count }, () => ({
+              facing: enemyFacing,
+              step: enemyStep,
+            }));
       const offsets: Array<[number, number]> = [
         [-8, 2],
         [7, 3],
@@ -1420,35 +1431,50 @@ export const Tile: React.FC<TileProps> = ({
           )}
           {((enemyVisible ?? isVisible) === true) && (
             <div
-              key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
               className="absolute inset-0 pointer-events-none"
               style={{
                 zIndex: 10500, // above fog (10000), below wall tops (12000)
-                transform: clusterBase,
                 // Same cave dimming as the single-sprite path
                 filter: !environmentConfig.daylight
                   ? 'brightness(var(--enemy-dim, 0.80))'
                   : undefined,
-                ...smoothStepStyle(enemyStep, clusterBase),
               }}
               data-testid="enemy-sprite"
             >
-              {offsets.slice(0, count).map(([ox, oy], k) => (
-                <div
-                  key={k}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    transform: `translate(${ox}px, ${oy}px) scale(0.68)`,
-                    transformOrigin: '50% 100%',
-                    zIndex: 10 + oy, // painter's order by vertical offset
-                    backgroundImage: `url(${src})`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                  }}
-                />
-              ))}
+              {members.map((m, k) => {
+                const [ox, oy] = offsets[k];
+                const dir =
+                  m.facing === 'UP'
+                    ? 'back'
+                    : m.facing === 'LEFT' || m.facing === 'RIGHT'
+                    ? 'right'
+                    : 'front';
+                const src = `/images/enemies/fire-goblin/white-goblins-${dir}-1.png`;
+                // Side art faces RIGHT; flip the sprite (not the slot offset)
+                // for LEFT so members mirror independently.
+                const base = `translate(${ox}px, ${oy}px) scale(0.68)${
+                  m.facing === 'LEFT' ? ' scaleX(-1)' : ''
+                }`;
+                return (
+                  <div
+                    // A fresh step re-keys the member so its slide animation
+                    // restarts even when the node stays mounted.
+                    key={m.step ? `m${k}-step-${m.step.seq}` : `m${k}-static`}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      transform: base,
+                      transformOrigin: '50% 100%',
+                      zIndex: 10 + oy, // painter's order by vertical offset
+                      backgroundImage: `url(${src})`,
+                      backgroundSize: 'contain',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'center',
+                      ...smoothStepStyle(m.step, base),
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </>

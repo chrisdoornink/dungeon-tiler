@@ -1867,12 +1867,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     smoothEntitySeqRef.current += 1;
     const seq = smoothEntitySeqRef.current;
     const visit = (
-      id: string,
+      rawId: string,
       y: number,
       x: number,
       keyPrefix: "e" | "n",
       kind?: string
     ) => {
+      const id = `${keyPrefix}:${rawId}`;
       nextPos.set(id, [y, x]);
       const p = prev.get(id);
       if (!p) return;
@@ -1889,13 +1890,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         // and room warps snap.
         return;
       }
-      steps.set(`${keyPrefix}:${y},${x}`, { dy, dx, dur, ease, seq });
+      // White-goblin swarm members can share a destination tile, so a
+      // tile-keyed entry would collapse two arrivals into one slide (both
+      // gliding in from whichever member was diffed last). Key them by id
+      // instead; the tile looks up each member's own step (see
+      // enemySwarmMembers in renderTileGrid).
+      const key =
+        kind === "white-goblin" ? `eid:${rawId}` : `${keyPrefix}:${y},${x}`;
+      steps.set(key, { dy, dx, dur, ease, seq });
     };
     for (const e of gameState.enemies ?? []) {
-      if (typeof e.id === "string" && e.id) visit(`e:${e.id}`, e.y, e.x, "e", e.kind);
+      if (typeof e.id === "string" && e.id) visit(e.id, e.y, e.x, "e", e.kind);
     }
     for (const n of gameState.npcs ?? []) {
-      if (n?.id) visit(`n:${n.id}`, n.y, n.x, "n");
+      if (n?.id) visit(n.id, n.y, n.x, "n");
     }
     smoothEntityPrevRef.current = nextPos;
     cache.state = gameState;
@@ -5616,14 +5624,21 @@ function renderTileGrid(
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
-      // For white goblins: count ALL white goblins on this tile (asset reflects how many are present)
-      const swarmCountAtTile = (() => {
-        if (!enemyAtTile || enemyAtTile.kind !== 'white-goblin') return undefined;
-        if (!enemies) return 1;
-        return enemies.filter(
+      // For white goblins: gather ALL swarm members on this tile (the asset /
+      // overlaid singles reflect how many are present). Members keep the
+      // enemies-array order so their per-slot offsets stay stable across turns.
+      const swarmAtTile = (() => {
+        if (!enemyAtTile || enemyAtTile.kind !== 'white-goblin' || !enemies)
+          return undefined;
+        const members = enemies.filter(
           e => e.kind === 'white-goblin' && e.y === rowIndex && e.x === colIndex
-        ).length || 1;
+        );
+        return members.length > 0 ? members : undefined;
       })();
+      const swarmCountAtTile =
+        enemyAtTile?.kind === 'white-goblin'
+          ? swarmAtTile?.length ?? 1
+          : undefined;
       const npcAtTile = npcMap.get(`${rowIndex},${colIndex}`);
       const npcInteractable = (() => {
         if (!npcAtTile || !playerPosition) return false;
@@ -5697,6 +5712,13 @@ function renderTileGrid(
                 | undefined
             }
             enemySwarmCount={swarmCountAtTile}
+            enemySwarmMembers={swarmAtTile?.map((m) => ({
+              facing: m.facing,
+              step:
+                typeof m.id === "string"
+                  ? entitySteps?.get(`eid:${m.id}`)
+                  : undefined,
+            }))}
             enemyMoved={Boolean(
               (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.["moved"]
             )}
