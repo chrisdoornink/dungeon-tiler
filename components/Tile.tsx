@@ -984,7 +984,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               key="pink-heart"
               data-testid={`subtype-icon-${TileSubtype.PINK_HEART}`}
-              className={`${styles.assetIcon} ${styles.pinkHeartIcon}`}
+              className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.pinkHeartIcon}`}
             />
           </>
         )}
