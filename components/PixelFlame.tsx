@@ -16,8 +16,9 @@ export const FLAME_ROWS = 9;
 const CYCLE_S = 0.52;
 
 // "warm" matches the baked flames on the original sprites; "blue" is the cold
-// spirit fire shown when a wisp snuffs the hero's torch (see FlamePalette).
-export type FlamePalette = "warm" | "blue";
+// spirit fire shown when a wisp snuffs the hero's torch; "lava" is the hot
+// molten palette used by the tile-fire lava frames (see LAVA_FRAMES).
+export type FlamePalette = "warm" | "blue" | "lava";
 const PALETTES: Record<FlamePalette, Record<string, string>> = {
   warm: {
     Y: "#FFEFB4", // pale core
@@ -32,6 +33,13 @@ const PALETTES: Record<FlamePalette, Record<string, string>> = {
     O: "#5AA8FF", // blue
     o: "#3B78E0", // deep blue
     D: "#284F9E", // dark base
+  },
+  lava: {
+    Y: "#FFE8A6", // pale-yellow hottest core
+    G: "#FFC246", // gold
+    O: "#FF8A24", // orange
+    o: "#F0640F", // deep orange
+    D: "#B23C0A", // dark molten base
   },
 };
 
@@ -82,17 +90,37 @@ const FRAMES: string[][] = [
   ],
 ];
 
-// box-shadow strings are pure functions of (frame, cell); cache them since
-// many tiles render flames with the same cell size every frame.
+// Lava is a BUBBLING molten surface, not a tall flame. Reuses the torch's 4-frame
+// box-shadow cycle, but the frames are sparse bubbles spread across the whole
+// molten surface (three loose bands: top/middle/bottom) that swell and pop. Pass with palette="lava", frames={LAVA_FRAMES}, frameSetId="lava". A finer
+// 20x20 grid (cell=2 in Tile.tsx = 40px, filling the tile) keeps the resolution in line
+// with the rest of the game and the sparse frames keep the box-shadow cheap.
+export const LAVA_COLS = 20;
+export const LAVA_ROWS = 20;
+export const LAVA_FRAMES: string[][] = [
+  ["....................","..........O.........",".........GYG........",".........o.o........","...oOo..............","................o...","....................","....................","....................","..G.........oOo.....",".OGO..............O.","..o.....o........GYG",".................o.o","....................","...........O......G.","..........GYG....OGO","..........o.o.....o.","...o...G............","......OGO.....oOo...",".......o............"],
+  ["....................","....................","....................","....G.....o.........","...OGO..............","....o..........oOo..","....................","....................","..O..........G......",".GYG........OGO.....",".o.o.........o......",".......oOo..........","..................o.","..................O.",".................GYG",".................o.o",".......O...o........","..oOo.GYG......G....","......o.o.....OGO...","...............o...."],
+  ["....................","....................","....O...............","...GYG...oOo........","...o.o..........G...","...............OGO..","................o...",".............O......","............GYG.....","............o.o.....","..o.....G...........",".......OGO..........","........o........oOo","....................","....................","..................o.","...G......oOo..O....","..OGO.........GYG...","...o...o......o.o...","...................."],
+  ["....................","....................","..........G.........",".........OGO....O...","....o.....o....GYG..","...............o.o..","....................","....................","....................","........O....o......",".oOo...GYG..........",".......o.o........G.",".................OGO","..................o.","....................","...O.......G.....oOo","..GYG.....OGO.......","..o.o......o........","......oOo......o....","...................."],
+];
+
+// box-shadow strings are pure functions of (frameSet, frame, cell, palette); cache
+// them since many tiles render flames with the same cell size every frame.
 const shadowCache = new Map<string, string>();
 
-function frameShadow(frame: number, cell: number, palette: FlamePalette = "warm"): string {
-  const key = `${frame}|${cell}|${palette}`;
+function frameShadow(
+  frames: string[][],
+  frameSetId: string,
+  frame: number,
+  cell: number,
+  palette: FlamePalette = "warm"
+): string {
+  const key = `${frameSetId}|${frame}|${cell}|${palette}`;
   const cached = shadowCache.get(key);
   if (cached) return cached;
   const colors = PALETTES[palette];
   const parts: string[] = [];
-  FRAMES[frame].forEach((row, y) => {
+  frames[frame].forEach((row, y) => {
     for (let x = 0; x < row.length; x++) {
       const color = colors[row[x]];
       // Offsets start at +1 cell because outer box-shadows don't paint under
@@ -112,8 +140,15 @@ export type PixelFlameProps = {
   seed?: number;
   /** Adds a soft pulsing warm halo behind the flame */
   glow?: boolean;
-  /** Flame color palette; "blue" is the snuffed-spirit fire */
+  /** Flame color palette; "blue" is the snuffed-spirit fire, "lava" is molten */
   palette?: FlamePalette;
+  /** Frame set to animate (defaults to the tall torch flame) */
+  frames?: string[][];
+  /** Stable id for the frame set — keys the box-shadow cache */
+  frameSetId?: string;
+  /** Grid width/height in cells (defaults to the torch 7x9) */
+  cols?: number;
+  rows?: number;
   className?: string;
   style?: React.CSSProperties;
 };
@@ -123,6 +158,10 @@ export default function PixelFlame({
   seed = 0,
   glow = false,
   palette = "warm",
+  frames = FRAMES,
+  frameSetId = "torch",
+  cols = FLAME_COLS,
+  rows = FLAME_ROWS,
   className,
   style,
 }: PixelFlameProps) {
@@ -130,12 +169,12 @@ export default function PixelFlame({
   return (
     <div
       className={`${styles.flame}${className ? ` ${className}` : ""}`}
-      style={{ width: FLAME_COLS * cell, height: FLAME_ROWS * cell, ...style }}
+      style={{ width: cols * cell, height: rows * cell, ...style }}
       aria-hidden="true"
       data-testid="pixel-flame"
     >
       {glow && <div className={styles.glow} style={{ animationDelay: delay }} />}
-      {FRAMES.map((_, i) => (
+      {frames.map((_, i) => (
         <div
           key={i}
           className={`${styles.px} ${styles[`f${i}`]}`}
@@ -144,7 +183,7 @@ export default function PixelFlame({
             top: -cell,
             width: cell,
             height: cell,
-            boxShadow: frameShadow(i, cell, palette),
+            boxShadow: frameShadow(frames, frameSetId, i, cell, palette),
             animationDelay: delay,
           }}
         />

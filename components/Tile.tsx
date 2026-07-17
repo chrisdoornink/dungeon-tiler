@@ -8,6 +8,9 @@ import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
 import PixelFlame, {
   HERO_FLAME_ANCHOR,
   GOBLIN_FLAME_ANCHOR,
+  LAVA_FRAMES,
+  LAVA_COLS,
+  LAVA_ROWS,
 } from "./PixelFlame";
 import styles from "./Tile.module.css";
 import {
@@ -468,6 +471,13 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.OPEN_ABYSS) || false;
   };
 
+  const hasLava = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.LAVA) || false;
+  };
+  const hasObsidian = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.OBSIDIAN) || false;
+  };
+
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
   };
@@ -642,6 +652,8 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
+        subtype !== TileSubtype.LAVA &&
+        subtype !== TileSubtype.OBSIDIAN &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
@@ -1631,10 +1643,22 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
-      // Check if this floor tile has darkness (collapsed faulty floor) or open abyss
+      // Check if this floor tile has darkness (collapsed faulty floor), open abyss, or
+      // elemental terrain (glowing lava / cooled obsidian). Each swaps the base floor class.
       const isDarkness = hasDarkness(subtype);
       const isOpenAbyss = hasOpenAbyss(subtype);
-      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : isOpenAbyss ? styles.openAbyss : styles.floor} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
+      const isLava = hasLava(subtype);
+      const isObsidian = hasObsidian(subtype);
+      const floorVariantClass = isDarkness
+        ? styles.darkness
+        : isOpenAbyss
+        ? styles.openAbyss
+        : isLava
+        ? styles.lava
+        : isObsidian
+        ? styles.obsidian
+        : styles.floor;
+      const floorClasses = `${styles.tileContainer} ${floorVariantClass} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
 
       // Map floor variant to NESW asset filename based on neighbors
       const floorAsset =
@@ -1676,7 +1700,11 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            backgroundImage: `url(${floorAsset})`,
+            // Lava/obsidian supply their own pixel-art background via the CSS class;
+            // an inline floor-asset image here would override it (that override is why
+            // lava first rendered as a bare framed square). Leave it unset for those.
+            backgroundImage:
+              isLava || isObsidian ? undefined : `url(${floorAsset})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
@@ -1686,6 +1714,27 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Lava: a bubbling molten surface — a dark crust base (the .lava class) with
+              low bubbles that swell and pop (a sparse PixelFlame at cell=2 to match the
+              game's resolution). seed + per-tile horizontal flip break up uniformity. */}
+          {isLava && (
+            <PixelFlame
+              cell={2}
+              palette="lava"
+              frames={LAVA_FRAMES}
+              frameSetId="lava"
+              cols={LAVA_COLS}
+              rows={LAVA_ROWS}
+              seed={(row ?? 0) * 31 + (col ?? 0)}
+              className={styles.lavaFlame}
+              style={{
+                transform: `translateX(-50%)${
+                  (((row ?? 0) + (col ?? 0)) % 2 === 1) ? " scaleX(-1)" : ""
+                }`,
+              }}
+            />
+          )}
+
           {/* Render checkpoint asset if present (full-tile overlay) */}
           {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (() => {
             const isActive = Array.isArray(activeCheckpoint) &&

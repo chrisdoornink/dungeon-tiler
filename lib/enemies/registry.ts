@@ -189,7 +189,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const H = grid.length;
         const W = grid[0]?.length ?? 0;
         const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
-        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+        // This local isFloor drives pink-goblin pathing AND its teleport-ring placement /
+        // blink destinations. It previously checked only the base grid, so a pink could path
+        // or teleport onto an open abyss or lava (untelegraphed death). Exclude both hazards.
+        const isFloor = (y: number, x: number) => {
+          if (!(isIn(y, x) && grid[y][x] === 0)) return false;
+          const subs = ctx.subtypes?.[y]?.[x] ?? [];
+          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
+        };
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
         // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
@@ -674,7 +681,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS);
+          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
         };
 
         const swarmId = (e.memory as Record<string, unknown>).swarmId as string | undefined;
@@ -953,7 +960,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS);
+          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
         };
 
         // If can see player, decide each tick: 33% approach, 67% avoid (move away)

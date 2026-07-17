@@ -56,6 +56,7 @@ const EMOJI_MAP = {
   faulty_floor: "🕳️",
   bomb: "💣",
   darkness: "🌑",
+  lava: "🌋",
 
   // Streak indicators
   streak_fire: "🔥",
@@ -301,6 +302,12 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
           image: "/images/floor/crack3.png",
           alt: "Floor crack",
         };
+      case "lava":
+        return {
+          message: "You stepped into the molten lava",
+          image: "/images/floor/crack3.png",
+          alt: "Lava",
+        };
       case "poison":
         return {
           message: "You succumbed to poison from a snake bite",
@@ -363,6 +370,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
     if (!isWin && lastGame?.deathCause) {
       if (lastGame.deathCause.type === "faulty_floor") {
         deathEmojis.push(EMOJI_MAP.faulty_floor);
+      } else if (lastGame.deathCause.type === "lava") {
+        deathEmojis.push(EMOJI_MAP.lava);
       } else if (lastGame.deathCause.type === "bomb") {
         deathEmojis.push(EMOJI_MAP.bomb);
       } else if (lastGame.deathCause.type === "enemy") {
