@@ -47,6 +47,7 @@ import {
   isWithinBounds,
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
+import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
@@ -771,6 +772,26 @@ export function performThrowRock(gameState: GameState): GameState {
       // Early stop on wall/obstacle: consume a rock, no placement
       return { ...preTickState, rockCount: count - 1 };
     }
+    // A rock thrown into lava cools that tile into walkable OBSIDIAN — a stepping stone,
+    // the only way to bridge a lava field on foot. The rock is spent building the crossing;
+    // stop the throw here (it does not fly past the tile it just solidified).
+    {
+      const lavaSubs = newMapData.subtypes[ty][tx] || [];
+      if (lavaSubs.includes(TileSubtype.LAVA)) {
+        newMapData.subtypes[ty][tx] = lavaSubs
+          .filter((t) => t !== TileSubtype.LAVA)
+          .concat([TileSubtype.OBSIDIAN]);
+        return {
+          ...preTickState,
+          mapData: newMapData,
+          rockCount: count - 1,
+          stats: {
+            ...preTickState.stats,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          },
+        };
+      }
+    }
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
@@ -986,23 +1007,26 @@ export function performThrowRune(gameState: GameState): GameState {
       return finalState;
     }
 
-    // Wall/obstacle -> drop on last floor tile
-    if (newMapData.tiles[ty][tx] !== FLOOR) {
+    // Wall/obstacle -> drop on last floor tile. Lava counts as an obstacle here so a
+    // precious rune never lands in it: the rune drops on the last dry tile before the
+    // lava, where it can be retrieved.
+    const runeHitsLava = (newMapData.subtypes[ty]?.[tx] || []).includes(TileSubtype.LAVA);
+    if (newMapData.tiles[ty][tx] !== FLOOR || runeHitsLava) {
       if (
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
         const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
-        const hasImportantTile = lastSubs.some(s => 
-          s === TileSubtype.EXIT || 
-          s === TileSubtype.DOOR || 
+        const hasImportantTile = lastSubs.some(s =>
+          s === TileSubtype.EXIT ||
+          s === TileSubtype.DOOR ||
           s === TileSubtype.EXITKEY ||
           s === TileSubtype.KEY ||
           s === TileSubtype.LOCK ||
           s === TileSubtype.ROOM_TRANSITION ||
           s === TileSubtype.CHECKPOINT
         );
-        
+
         if (!hasImportantTile) {
           // A rune dropping back onto an open abyss falls into the pit and is
           // gone — nothing sits on a broken abyss — but it is still spent.
@@ -1408,8 +1432,13 @@ export function performThrowBomb(gameState: GameState): GameState {
   const restSubs = newMapData.subtypes[restY][restX] || [];
   // A bomb that comes to rest on an open abyss drops into the pit and is lost —
   // no fuse is armed and no blast follows (nothing sits on a broken abyss). The
-  // bomb is still consumed and counts as thrown.
-  if (!restSubs.includes(TileSubtype.OPEN_ABYSS)) {
+  // bomb is still consumed and counts as thrown. Lava behaves the same for v1: the
+  // bomb melts into it, no blast. (v2.5 will make lava detonate the bomb on impact
+  // and spray shrapnel — see the feature doc.)
+  if (
+    !restSubs.includes(TileSubtype.OPEN_ABYSS) &&
+    !restSubs.includes(TileSubtype.LAVA)
+  ) {
     const restBase = restSubs.filter((t) => t !== TileSubtype.BOMB_LIVE);
     newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
   }
@@ -1532,7 +1561,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -1746,6 +1775,7 @@ export function initializeGameState(): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: mapData.tiles,
+        subtypes: mapData.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
@@ -1828,6 +1858,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: mapData.tiles,
+        subtypes: mapData.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: enemyCountForFloor(floor),
         minDistanceFromPlayer: 8,
@@ -1838,6 +1869,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   if (ghostCount > 0 && playerPos) {
     const ghosts = placeEnemies({
       grid: mapData.tiles,
+      subtypes: mapData.subtypes,
       player: { y: playerPos[0], x: playerPos[1] },
       count: ghostCount,
       minDistanceFromPlayer: 6,
@@ -1849,6 +1881,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     const swarmCount = Math.floor(whiteGoblinCount / 4);
     const swarmLocations = placeEnemies({
       grid: mapData.tiles,
+      subtypes: mapData.subtypes,
       player: { y: playerPos[0], x: playerPos[1] },
       count: swarmCount,
       minDistanceFromPlayer: 6,
@@ -1922,6 +1955,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: ensured.tiles,
+        subtypes: ensured.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
@@ -1983,14 +2017,18 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Get the pre-computed chest/key allocation for this floor
   const allocation = currentState.floorChestAllocation?.[nextFloor];
   
+  // Daily floors 2 and 3 carry instant-death lava pools (v1 of the elemental terrain
+  // feature). Floor 1 is built elsewhere and stays lava-free as the teaching floor.
+  const includeLava = nextFloor === 2 || nextFloor === 3;
+
   // Generate new map with floor-specific seed
   const newMapData = withPatchedMathRandom(rng, () => {
     let mapData: MapData;
     if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
-      mapData = generateCompleteMapForFloor(allocation, nextFloor);
+      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava });
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
-      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor);
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava });
     }
     return mapData;
   });
@@ -2001,6 +2039,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     ? withPatchedMathRandom(rng, () => {
         const placed = placeEnemies({
           grid: newMapData.tiles,
+          subtypes: newMapData.subtypes,
           player: { y: playerPos[0], x: playerPos[1] },
           count: enemyCountForFloor(nextFloor),
           minDistanceFromPlayer: 8,
@@ -2009,6 +2048,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         if (gc > 0) {
           const ghosts = placeEnemies({
             grid: newMapData.tiles,
+            subtypes: newMapData.subtypes,
             player: { y: playerPos[0], x: playerPos[1] },
             count: gc,
             minDistanceFromPlayer: 6,
@@ -2020,6 +2060,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           const swarmCount = Math.floor(wgc / 4);
           const swarmLocations = placeEnemies({
             grid: newMapData.tiles,
+            subtypes: newMapData.subtypes,
             player: { y: playerPos[0], x: playerPos[1] },
             count: swarmCount,
             minDistanceFromPlayer: 6,
@@ -3469,6 +3510,18 @@ function movePlayerCore(
       }
     }
 
+    // Lava is instant death on entry — a glowing wall, not a survivable toll. This check
+    // sits AFTER the combat branch above (gotcha: the FAULTY_FLOOR block runs BEFORE combat):
+    // attacking a stone goblin standing on lava must resolve melee in place, and the hero never
+    // actually enters an enemy-occupied tile, so combat returns first and we only reach here when
+    // the destination lava tile is empty. OBSIDIAN (a rock-cooled lava tile) is safe and does not
+    // trigger this. The tile keeps its LAVA tag (kept alive by the coexist whitelist below) so the
+    // hero is rendered sinking on the glowing tile.
+    if (subtype.includes(TileSubtype.LAVA) && !subtype.includes(TileSubtype.OBSIDIAN)) {
+      newGameState.heroHealth = 0;
+      if (!newGameState.deathCause) newGameState.deathCause = { type: "lava" };
+    }
+
     // If it's a key, pick it up
     if (subtype.includes(TileSubtype.KEY)) {
       const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
@@ -3575,7 +3628,11 @@ function movePlayerCore(
       // Bomb scorch + outer-wall breaches are floor overlays the player stands on.
       destSubtypes.includes(TileSubtype.SINGED) ||
       destSubtypes.includes(TileSubtype.BREACH) ||
-      destSubtypes.includes(TileSubtype.OPEN_ABYSS)
+      destSubtypes.includes(TileSubtype.OPEN_ABYSS) ||
+      // Lava (the hero dies on it but is rendered on the glowing tile) and obsidian
+      // (a walkable rock-cooled crossing) are floor overlays the player stands on.
+      destSubtypes.includes(TileSubtype.LAVA) ||
+      destSubtypes.includes(TileSubtype.OBSIDIAN)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
@@ -3633,6 +3690,21 @@ function movePlayerCore(
       ) {
         newGameState.heroTorchLit = true;
         break;
+      }
+    }
+
+    // Relight from lava: ending a move anywhere inside a lava tile's glow is close
+    // enough to bend over and dip the torch in. The glow octagon (lib/torch_glow.ts —
+    // the same area the render layer lights) is symmetric, so "hero inside a lava
+    // tile's glow" is equivalent to "a lava tile inside the octagon around the hero".
+    if (!newGameState.heroTorchLit) {
+      const glowArea = computeTorchGlow(newY, newX, newMapData.tiles);
+      for (const key of glowArea.keys()) {
+        const [ly, lx] = key.split(",").map(Number);
+        if (newMapData.subtypes[ly]?.[lx]?.includes(TileSubtype.LAVA)) {
+          newGameState.heroTorchLit = true;
+          break;
+        }
       }
     }
   }

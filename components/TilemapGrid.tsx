@@ -2062,7 +2062,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           phase: heroDeathPhase,
           orientation: heroDeathOrientation,
           variant:
-            gameState.deathCause?.type === "faulty_floor" ? "abyss" : "topple",
+            gameState.deathCause?.type === "faulty_floor" ||
+            gameState.deathCause?.type === "lava"
+              ? "abyss"
+              : "topple",
         }
       : undefined;
 
@@ -5533,7 +5536,10 @@ function renderTileGrid(
       for (let y = 0; y < subtypes.length; y++) {
         for (let x = 0; x < subtypes[y].length; x++) {
           const st = subtypes[y][x];
-          if (st && st.includes(TileSubtype.WALL_TORCH)) {
+          // Wall torches AND lava pools cast light — lava glows, so it lights dark caves
+          // and reads as a beacon (and a warning) from across a floor. computeTorchGlow is
+          // position-agnostic, so lava reuses it verbatim.
+          if (st && (st.includes(TileSubtype.WALL_TORCH) || st.includes(TileSubtype.LAVA))) {
             const m = computeTorchGlow(y, x, grid);
             for (const [k, v] of m.entries()) {
               const prev = glowMap.get(k) ?? 0;
@@ -5590,7 +5596,8 @@ function renderTileGrid(
       const glowKey = `${rowIndex},${colIndex}`;
       const g = glowMap.get(glowKey);
       const isSelfTorch =
-        Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
+        Array.isArray(subtype) &&
+        (subtype.includes(TileSubtype.WALL_TORCH) || subtype.includes(TileSubtype.LAVA));
       const isTorchCarrier = torchCarrierPositions.has(`${rowIndex},${colIndex}`);
       if (isSelfTorch || isTorchCarrier) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength

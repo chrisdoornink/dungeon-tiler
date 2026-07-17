@@ -245,7 +245,15 @@ function canPlaceFaultyFloorSafely(
   const testGrid = mapData.tiles.map((row) => [...row]);
   for (let yy = 0; yy < mapData.subtypes.length; yy++) {
     for (let xx = 0; xx < mapData.subtypes[yy].length; xx++) {
-      if (mapData.subtypes[yy][xx].includes(TileSubtype.FAULTY_FLOOR)) {
+      const subs = mapData.subtypes[yy][xx];
+      // Wall off every impassable hazard already on the map — faulty floors AND lava
+      // (lava is placed earlier in the pipeline). A faulty tile and a lava pool that
+      // each passed their own connectivity check can still JOINTLY sever the dry path,
+      // so the faulty check must account for lava too.
+      if (
+        subs.includes(TileSubtype.FAULTY_FLOOR) ||
+        subs.includes(TileSubtype.LAVA)
+      ) {
         testGrid[yy][xx] = WALL;
       }
     }
@@ -253,6 +261,121 @@ function canPlaceFaultyFloorSafely(
   testGrid[y][x] = WALL;
 
   return areAllFloorsConnected(testGrid);
+}
+
+/**
+ * Carve 1-2 organic lava pools into a floor. Lava is a walkable-but-instant-death
+ * overlay (a glowing wall): the connectivity guarantee treats every lava tile as a
+ * WALL and requires the whole floor to remain a single connected region, so a dry,
+ * lava-free path to the key/exit always exists — the lava lane is only ever a shortcut
+ * you can engineer across with rocks, never the sole route.
+ *
+ * Placement rules: interior only (never the perimeter ring, which the breach/outside-
+ * world flow assumes is solid WALL); only on empty FLOOR tiles (so exit/key/chest/pot/
+ * rock/spawn scans, which all require empty subtypes, naturally avoid pools); and never
+ * within Chebyshev radius 2 of the exit or exit key (so the floor-3 static guard, placed
+ * adjacent to the key later, still finds open floor). Pools grow by random 4-neighbour
+ * accretion; a candidate pool that would break connectivity is discarded whole.
+ *
+ * Must run inside the seeded withPatchedMathRandom block so daily maps stay deterministic.
+ */
+export function addLavaPoolsToMap(mapData: MapData, floor?: number): MapData {
+  const newMapData: MapData = JSON.parse(JSON.stringify(mapData));
+  const grid = newMapData.tiles;
+  const h = grid.length;
+  const w = grid[0]?.length ?? 0;
+
+  // Budget: keep small so early/small floors aren't choked. Pools x max size.
+  const poolCount = floor === 3 ? 2 : 2;
+  const maxPoolSize = floor === 3 ? 3 : 4;
+
+  // Tiles to keep clear: a Chebyshev radius-2 halo around the exit and exit key.
+  const protectedTiles = new Set<string>();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const subs = newMapData.subtypes[y]?.[x] ?? [];
+      if (subs.includes(TileSubtype.EXIT) || subs.includes(TileSubtype.EXITKEY)) {
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            protectedTiles.add(`${y + dy},${x + dx}`);
+          }
+        }
+      }
+    }
+  }
+
+  const placedLava = new Set<string>();
+  const isEligible = (y: number, x: number): boolean => {
+    if (y < 1 || y >= h - 1 || x < 1 || x >= w - 1) return false; // interior only
+    if (grid[y][x] !== FLOOR) return false;
+    const subs = newMapData.subtypes[y][x];
+    if (subs.length > 0 && !subs.includes(TileSubtype.NONE)) return false;
+    if (protectedTiles.has(`${y},${x}`)) return false;
+    if (placedLava.has(`${y},${x}`)) return false;
+    return true;
+  };
+
+  // Does the floor stay one connected region if `placedLava` ∪ `candidate` are all walls?
+  const keepsConnectivity = (candidate: Set<string>): boolean => {
+    const testGrid = grid.map((row) => [...row]);
+    for (const key of placedLava) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    for (const key of candidate) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    return areAllFloorsConnected(testGrid);
+  };
+
+  for (let p = 0; p < poolCount; p++) {
+    // Collect current seeds and pick one at random.
+    const seeds: Array<[number, number]> = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (isEligible(y, x)) seeds.push([y, x]);
+      }
+    }
+    if (seeds.length === 0) break;
+    const [sy, sx] = seeds[Math.floor(Math.random() * seeds.length)];
+
+    // Grow a candidate pool by random 4-neighbour accretion.
+    const targetSize = 2 + Math.floor(Math.random() * (maxPoolSize - 1)); // 2..maxPoolSize
+    const candidate = new Set<string>([`${sy},${sx}`]);
+    const frontier: Array<[number, number]> = [[sy, sx]];
+    while (candidate.size < targetSize && frontier.length > 0) {
+      const fi = Math.floor(Math.random() * frontier.length);
+      const [cy, cx] = frontier[fi];
+      const neighbors: Array<[number, number]> = [
+        [cy - 1, cx],
+        [cy + 1, cx],
+        [cy, cx - 1],
+        [cy, cx + 1],
+      ];
+      const open = neighbors.filter(
+        ([ny, nx]) => isEligible(ny, nx) && !candidate.has(`${ny},${nx}`)
+      );
+      if (open.length === 0) {
+        frontier.splice(fi, 1);
+        continue;
+      }
+      const [ny, nx] = open[Math.floor(Math.random() * open.length)];
+      candidate.add(`${ny},${nx}`);
+      frontier.push([ny, nx]);
+    }
+
+    // Commit only if the whole pool keeps the floor connected.
+    if (keepsConnectivity(candidate)) {
+      for (const key of candidate) {
+        const [yy, xx] = key.split(",").map(Number);
+        newMapData.subtypes[yy][xx] = [TileSubtype.LAVA];
+        placedLava.add(key);
+      }
+    }
+  }
+
+  return newMapData;
 }
 
 export function addRocksToMap(mapData: MapData, floor?: number): MapData {
@@ -636,6 +759,7 @@ export function generateCompleteMapForFloor(
     rocksFloor?: number; // which floor's rock-count rule to apply when `floor` is not passed
     wallTorches?: number; // override the default wall torch count (endless dark floor)
     includeFaultyFloors?: boolean; // set false to guarantee no abyss holes (endless dark floor)
+    includeLava?: boolean; // set true to carve instant-death lava pools (daily floors 2-3)
   },
 ): MapData {
   const [gridW, gridH] = opts?.gridSize ?? (floor !== undefined ? gridSizeForFloor(floor) : [GRID_SIZE, GRID_SIZE]);
@@ -647,7 +771,12 @@ export function generateCompleteMapForFloor(
   const withChests = addSpecificChestsToMap(withExitKey, floorAllocation.chestContents);
   const withKeys = addChestKeysToMap(withChests, floorAllocation.keys);
 
-  const withPots = addPotsToMap(withKeys);
+  // Lava pools go in AFTER exit/key/chest placement (so they can avoid those tiles and a
+  // halo around them) but BEFORE pots/rocks/faulty floors/spawns — every one of those
+  // scans for empty-subtype FLOOR tiles, so they automatically steer clear of lava.
+  const withLava = opts?.includeLava ? addLavaPoolsToMap(withKeys, floor) : withKeys;
+
+  const withPots = addPotsToMap(withLava);
   const withRocks = addRocksToMap(withPots, opts?.rocksFloor ?? floor);
   const withFaultyFloors =
     opts?.includeFaultyFloors === false ? withRocks : addFaultyFloorsToMap(withRocks);

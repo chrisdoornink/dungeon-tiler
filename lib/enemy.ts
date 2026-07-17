@@ -300,7 +300,20 @@ export type PlaceEnemiesArgs = {
   count: number;
   minDistanceFromPlayer?: number;
   rng?: () => number; // 0..1
+  // Per-tile subtype stacks. When provided, tiles carrying a lethal/blocking hazard
+  // (open abyss, faulty floor, lava) are excluded as spawn candidates. Long-standing
+  // bug: without this, enemies could spawn directly ON an abyss/faulty tile (rare at
+  // 2 faulty tiles/floor, common once lava adds 6-12 hazard tiles) — a free turn-1 kill
+  // or an enemy standing in instant-death terrain.
+  subtypes?: number[][][];
 };
+
+// Subtypes that make a floor tile an illegal spawn location (lethal or blocking).
+const SPAWN_BLOCKING_SUBTYPES = new Set<number>([
+  18, // FAULTY_FLOOR
+  51, // OPEN_ABYSS
+  60, // LAVA
+]);
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
   return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && (grid[y][x] === 0 || grid[y][x] === 5);
@@ -336,6 +349,7 @@ function isSafeFloorForEnemy(
   const tileSubs = subtypes[y]?.[x] || [];
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
+  const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
   const hasBlockingSubtype = tileSubs.includes(16) || // WALL_TORCH (used for floor torches too)
                               tileSubs.includes(37) || // TOWN_SIGN
@@ -344,7 +358,11 @@ function isSafeFloorForEnemy(
 
   // Always avoid open abysses
   if (isOpenAbyss) return false;
-  
+
+  // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
+  // into it (not even when chasing). Only the stone goblin crosses it freely.
+  if (isLava && kind !== 'stone-goblin') return false;
+
   // Goblins avoid faulty floors when patrolling, but can step on them when chasing
   const isGoblin = kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || 
                    kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'pink-goblin' || 
@@ -364,7 +382,7 @@ function isSafeFloorForEnemy(
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
-  const { grid, player, count, minDistanceFromPlayer = 2, rng = Math.random } = args;
+  const { grid, player, count, minDistanceFromPlayer = 2, rng = Math.random, subtypes } = args;
   const h = grid.length;
   const w = grid[0]?.length ?? 0;
 
@@ -372,6 +390,11 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (!isFloor(grid, y, x)) continue;
+      // Never spawn an enemy on a lethal/blocking hazard tile (abyss/faulty/lava).
+      if (subtypes) {
+        const subs = subtypes[y]?.[x];
+        if (subs && subs.some((s) => SPAWN_BLOCKING_SUBTYPES.has(s))) continue;
+      }
       const d = Math.hypot(y - player.y, x - player.x);
       if (d >= minDistanceFromPlayer) {
         candidates.push({ y, x });

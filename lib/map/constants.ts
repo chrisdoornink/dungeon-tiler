@@ -105,6 +105,13 @@ export enum TileSubtype {
   // use, or kept as an end-screen prize); BERRY is the belted berry (heals 2-3 on use).
   PINK_HEART = 56,
   BERRY = 57,
+  // Elemental terrain — see .claude/features/water-lava-elements/index.md. v1 ships lava only.
+  // LAVA is a walkable-but-instant-death floor overlay (a glowing wall): the player dies on
+  // entry, most enemies avoid it, stone goblins cross freely, and a thrown rock cools a lava
+  // tile into OBSIDIAN — a safe, walkable stepping stone (the only on-foot crossing).
+  // Reserved for v2 water (do not reuse): SHALLOW_WATER = 58, DEEP_WATER = 59, STEPPING_STONE = 62.
+  LAVA = 60,
+  OBSIDIAN = 61,
 }
 
 /**
