@@ -187,7 +187,7 @@ function GameViewInner({
     inPinkRealm: !!finalInitialState?.inPinkRealm,
   });
 
-  // Header title: "Torch Boy — Floor 2 out of 3" in the multi-floor daily,
+  // Header title: "Torch Boy — Floor 2/3" in the multi-floor daily,
   // "Torch Boy — Floor 7" in endless (no cap worth advertising), and the floor
   // word becomes "Pink Realm" while the hero is warped into the secret realm.
   const title = (() => {
@@ -199,7 +199,7 @@ function GameViewInner({
     const place = heroLocation.inPinkRealm ? "Pink Realm" : "Floor";
     return isEndless
       ? `Torch Boy — ${place} ${floor}`
-      : `Torch Boy — ${place} ${floor} out of ${maxFloors}`;
+      : `Torch Boy — ${place} ${floor}/${maxFloors}`;
   })();
 
   // Fire analytics for game start once we have an initial state
