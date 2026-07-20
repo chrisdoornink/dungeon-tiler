@@ -585,6 +585,11 @@ export function updateEnemies(
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
+  // The hero's tile is reserved too: no enemy may ever END its tick on the player
+  // (they attack from adjacent tiles instead). An enemy landing on the hero desyncs
+  // entity vs. tile state and can strand the run — the pink goblin's ring teleport
+  // once did exactly that.
+  occupied.add(`${player.y},${player.x}`);
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
   for (let i = 0; i < enemies.length; i++) {

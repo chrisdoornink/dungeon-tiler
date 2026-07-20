@@ -1690,7 +1690,17 @@ function cleanupPinkRing(enemy: Enemy, subtypes: number[][][]): void {
   // would also wipe other goblins' rings and any bomb-dropped portal we mean to keep.
   if (typeof mem.ringY === 'number' && typeof mem.ringX === 'number') {
     const orig = mem.ringOrigSubs ?? [];
-    subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+    const restored = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+    // The hero may be standing on the inert ring when its owner dies. The saved
+    // snapshot predates their arrival — keep the PLAYER marker or the hero gets
+    // erased from the map (unfindable, invisible, every input dead).
+    if (
+      subtypes[mem.ringY]?.[mem.ringX]?.includes(TileSubtype.PLAYER) &&
+      !restored.includes(TileSubtype.PLAYER)
+    ) {
+      restored.push(TileSubtype.PLAYER);
+    }
+    subtypes[mem.ringY][mem.ringX] = restored;
   }
 }
 

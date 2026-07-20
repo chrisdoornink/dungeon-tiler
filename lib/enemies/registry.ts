@@ -321,7 +321,18 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             typeof mem.ringX === "number"
           ) {
             const orig = mem.ringOrigSubs ?? [];
-            subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+            const restored = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+            // The hero may be STANDING on the ring — owned rings are inert, walkable
+            // floor. The saved snapshot predates their arrival, so restoring it
+            // verbatim erased the PLAYER marker from the map (hero unfindable and
+            // invisible, every input dead, and the corruption persisted via save).
+            if (
+              subtypes[mem.ringY]?.[mem.ringX]?.includes(TileSubtype.PLAYER) &&
+              !restored.includes(TileSubtype.PLAYER)
+            ) {
+              restored.push(TileSubtype.PLAYER);
+            }
+            subtypes[mem.ringY][mem.ringX] = restored;
           }
           delete mem.ringY;
           delete mem.ringX;
@@ -586,8 +597,20 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             // Ring exists — increment age
             mem.ringAge = (mem.ringAge ?? 0) + 1;
             if (mem.ringAge >= 2) {
+              // The hero (or another enemy) may be standing on the ring tile — owned
+              // rings are inert, walkable floor. Teleporting there would stack the
+              // goblin onto the occupant, so a blocked ring falls through to the
+              // ring-move branch and relocates instead.
+              const ringBlocked =
+                (mem.ringY === py && mem.ringX === px) ||
+                ctx.enemies.some(
+                  (other, k) =>
+                    k !== ctx.enemyIndex &&
+                    other.y === mem.ringY &&
+                    other.x === mem.ringX
+                );
               // Ring has been down for at least 2 turns — 50% teleport, else ring moves
-              if (rng() < 0.5) {
+              if (!ringBlocked && rng() < 0.5) {
                 // Teleport to ring
                 e.y = mem.ringY!;
                 e.x = mem.ringX!;
