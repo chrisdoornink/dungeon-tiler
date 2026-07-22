@@ -26,6 +26,7 @@ import { canSee, calculateDistance } from "../lib/line_of_sight";
 import {
   Tile,
   combatLungeStyle,
+  WATER_SUBMERSION_CLIP,
   type CombatLunge,
   type HeroDeathPhase,
   type HeroDeathState,
@@ -5018,6 +5019,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             backgroundPosition: "center",
                             backgroundRepeat: "no-repeat",
                             transformOrigin: "50% 100%",
+                            // Submersion: wading hides the hero below the waist,
+                            // swimming below the head. Keyed off the COMMITTED tile
+                            // (the rAF gait loop only writes `transform`, so this
+                            // clip survives the step animation).
+                            clipPath: (() => {
+                              const subs =
+                                gameState.mapData.subtypes[playerPosition[0]]?.[
+                                  playerPosition[1]
+                                ] ?? [];
+                              if (subs.includes(TileSubtype.DEEP_WATER))
+                                return WATER_SUBMERSION_CLIP.deep;
+                              if (subs.includes(TileSubtype.SHALLOW_WATER))
+                                return WATER_SUBMERSION_CLIP.shallow;
+                              return undefined;
+                            })(),
                           }}
                         >
                           {/* Torch flame rides inside the sprite div so the
@@ -5626,6 +5642,33 @@ function renderTileGrid(
         left: getTileAt(rowIndex, colIndex - 1),
       };
 
+      // Terrain-family neighbors for elemental tiles, so pools shade only their real
+      // edges instead of every tile seam (obsidian counts as lava-family, stepping
+      // stones as deep-family — crossings are part of the pool, not holes in it).
+      const terrainFamilyAt = (
+        y: number,
+        x: number
+      ): "lava" | "deep" | "shallow" | "land" => {
+        const s = subtypes?.[y]?.[x];
+        if (!s) return "land";
+        if (s.includes(TileSubtype.LAVA) || s.includes(TileSubtype.OBSIDIAN))
+          return "lava";
+        if (s.includes(TileSubtype.DEEP_WATER) || s.includes(TileSubtype.STEPPING_STONE))
+          return "deep";
+        if (s.includes(TileSubtype.SHALLOW_WATER)) return "shallow";
+        return "land";
+      };
+      const selfTerrain = terrainFamilyAt(rowIndex, colIndex);
+      const terrainNeighbors =
+        selfTerrain !== "land"
+          ? {
+              top: terrainFamilyAt(rowIndex - 1, colIndex),
+              right: terrainFamilyAt(rowIndex, colIndex + 1),
+              bottom: terrainFamilyAt(rowIndex + 1, colIndex),
+              left: terrainFamilyAt(rowIndex, colIndex - 1),
+            }
+          : undefined;
+
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
 
@@ -5697,6 +5740,7 @@ function renderTileGrid(
             torchAdjacentGlow={isTorchAdjacentGlow}
             torchSecondRingGlow={isTorchSecondRingGlow}
             neighbors={neighbors}
+            terrainNeighbors={terrainNeighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
             heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}

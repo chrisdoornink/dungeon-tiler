@@ -29,7 +29,7 @@ function buildFloor(seed: number, floor: number): GameState {
       : { chests: 0, keys: 0, chestContents: [] };
 
   const mapData = withPatchedMathRandom(rng, () =>
-    generateCompleteMapForFloor(allocation, floor, { includeLava: true })
+    generateCompleteMapForFloor(allocation, floor, { includeLava: true, includeWater: true })
   );
 
   return {
@@ -67,6 +67,9 @@ function MiniMap({ state }: { state: GameState }) {
     const subs = subtypes[y][x] ?? [];
     if (subs.includes(TileSubtype.LAVA)) return { bg: "#ff5a1e", title: "lava" };
     if (subs.includes(TileSubtype.OBSIDIAN)) return { bg: "#4a3040", title: "obsidian" };
+    if (subs.includes(TileSubtype.DEEP_WATER)) return { bg: "#1e4e7a", title: "deep water" };
+    if (subs.includes(TileSubtype.SHALLOW_WATER)) return { bg: "#4a7f9c", title: "shallow water" };
+    if (subs.includes(TileSubtype.STEPPING_STONE)) return { bg: "#8a8f94", title: "stepping stone" };
     if (subs.includes(TileSubtype.PLAYER)) return { bg: "#ffffff", title: "hero" };
     if (subs.includes(TileSubtype.EXIT)) return { bg: "#34d399", title: "exit" };
     if (subs.includes(TileSubtype.EXITKEY)) return { bg: "#fde047", title: "exit key" };

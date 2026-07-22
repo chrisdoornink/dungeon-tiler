@@ -15,7 +15,9 @@ export enum EnemyState {
 export type EnemyUpdateContext = {
   grid: number[][];
   subtypes?: number[][][];
-  player: { y: number; x: number };
+  // torchLit drives torch-snuff stealth: when false, most enemies cannot acquire
+  // the hero (see the vision check in Enemy.update).
+  player: { y: number; x: number; torchLit?: boolean };
   ghosts?: Array<{ y: number; x: number }>;
   // Optional RNG (0..1) used for unpredictable pursuit-axis selection. Defaults
   // to Math.random when omitted (matching runtime combat variance behavior).
@@ -119,7 +121,20 @@ export class Enemy {
     try { (this.behaviorMemory as Record<string, unknown>)["moved"] = false; } catch {}
     // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
     const distManhattan = Math.abs(player.y - this.y) + Math.abs(player.x - this.x);
-    const withinRange = distManhattan <= ENEMY_VISION_RADIUS;
+    // Torch-snuff stealth: a hero whose torch is out is invisible to most enemies —
+    // they can't ACQUIRE the hero (existing pursuit memory still plays out, so
+    // snuffing mid-chase means "break contact and slip away", not instant amnesia).
+    // Fire goblins carry their own light and still hunt, but one tile shorter since
+    // the hero's flame isn't there to spot. Ghosts sense the hero regardless (they
+    // are the torch-snuffers; hiding from them with their own trick would be free).
+    const torchLit = player.torchLit ?? true;
+    const visionRadius =
+      torchLit || this.kind === 'ghost'
+        ? ENEMY_VISION_RADIUS
+        : this.kind === 'fire-goblin'
+        ? ENEMY_VISION_RADIUS - 1
+        : 0;
+    const withinRange = distManhattan <= visionRadius;
     // Ghosts can see through walls (ignore LOS) but still obey range.
     const seesNow = withinRange && (this.kind === 'ghost' ? true : canSee(grid, [this.y, this.x], [player.y, player.x]));
 
@@ -308,10 +323,15 @@ export type PlaceEnemiesArgs = {
   subtypes?: number[][][];
 };
 
-// Subtypes that make a floor tile an illegal spawn location (lethal or blocking).
+// Subtypes that make a floor tile an illegal spawn location (lethal, blocking, or
+// terrain a randomly-assigned kind might not be able to leave/survive — enemy kinds
+// are assigned AFTER placement, so water tiles could hand a pink goblin an instant
+// death or strand a non-swimmer).
 const SPAWN_BLOCKING_SUBTYPES = new Set<number>([
   18, // FAULTY_FLOOR
   51, // OPEN_ABYSS
+  58, // SHALLOW_WATER
+  59, // DEEP_WATER
   60, // LAVA
 ]);
 
@@ -350,6 +370,8 @@ function isSafeFloorForEnemy(
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
   const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)
+  const isShallowWater = tileSubs.includes(58); // SHALLOW_WATER (wadeable shoreline)
+  const isDeepWater = tileSubs.includes(59); // DEEP_WATER (swimmers only)
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
   const hasBlockingSubtype = tileSubs.includes(16) || // WALL_TORCH (used for floor torches too)
                               tileSubs.includes(37) || // TOWN_SIGN
@@ -362,6 +384,34 @@ function isSafeFloorForEnemy(
   // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
   // into it (not even when chasing). Only the stone goblin crosses it freely.
   if (isLava && kind !== 'stone-goblin') return false;
+
+  // Shallow water is wadeable, but not by everyone: fire goblins won't risk their
+  // torch near water at all; knife-throwers keep their blades dry; white goblins
+  // stay on land and funnel around pools; pink goblins die on contact with any
+  // water (kryptonite — see applyEnemyHazardDeaths). Waders: water goblins (both
+  // kinds), the unencumbered earth goblin, snakes, and stone goblins.
+  if (isShallowWater) {
+    const wades =
+      kind === 'water-goblin' ||
+      kind === 'water-goblin-spear' ||
+      kind === 'earth-goblin' ||
+      kind === 'snake' ||
+      kind === 'stone-goblin';
+    if (!wades) return false;
+  }
+
+  // Deep water takes real swimmers: water goblins (both kinds, the spearman swims
+  // weapon and all) and the unencumbered earth goblin. Stone goblins sink (they
+  // only cross deep water on stepping stones — which then sink under their weight,
+  // see applyEnemyHazardDeaths); snakes won't swim; everyone else refuses.
+  // (Ghosts never reach here — they float over everything via the early return.)
+  if (isDeepWater) {
+    const swims =
+      kind === 'water-goblin' ||
+      kind === 'water-goblin-spear' ||
+      kind === 'earth-goblin';
+    if (!swims) return false;
+  }
 
   // Goblins avoid faulty floors when patrolling, but can step on them when chasing
   const isGoblin = kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || 
@@ -635,7 +685,13 @@ export function updateEnemies(
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
       }
     } else {
-      base = e.update({ grid, subtypes, player, ghosts: ghostPositions, rng });
+      base = e.update({
+        grid,
+        subtypes,
+        player: { y: player.y, x: player.x, torchLit: finalOpts?.playerTorchLit ?? true },
+        ghosts: ghostPositions,
+        rng,
+      });
     }
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;
