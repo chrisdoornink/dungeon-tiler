@@ -17,8 +17,12 @@ const WALL = 1;
 type GoblinKind =
   | "fire-goblin"
   | "water-goblin"
+  | "water-goblin-spear"
   | "earth-goblin"
-  | "stone-goblin";
+  | "earth-goblin-knives"
+  | "stone-goblin"
+  | "pink-goblin"
+  | "snake";
 
 function makeGoblin(y: number, x: number, kind: GoblinKind): Enemy {
   const g = new Enemy({ y, x });
@@ -47,6 +51,8 @@ function buildElementsRoom(opts?: {
   torchLit?: boolean;
   showFullMap?: boolean;
   includeEnemies?: boolean;
+  waterEnemies?: boolean;
+  heroAt?: [number, number];
 }): GameState {
   const height = ROOM_SIZE + 2; // +2 for walls
   const width = ROOM_SIZE + 2;
@@ -64,10 +70,11 @@ function buildElementsRoom(opts?: {
     }
   }
 
-  // Hero on the left side, with a lava band to the right between it and the goblins.
-  const py = 10;
-  const px = 4;
-  subtypes[py][px] = [TileSubtype.PLAYER];
+  // Default hero spawn (left side, lava band to the right); ?hero=y,x overrides it —
+  // e.g. drop him straight into the pond. Placed AFTER all terrain below so an
+  // override onto a water/lava tile stacks with the terrain tag instead of losing it.
+  const py = opts?.heroAt?.[0] ?? 10;
+  const px = opts?.heroAt?.[1] ?? 4;
 
   // A vertical lava band (a "river") a few tiles to the hero's right. Two tiles wide
   // so the standoff (can't melee across) actually holds and bridging takes 2 rocks.
@@ -78,17 +85,62 @@ function buildElementsRoom(opts?: {
 
   // A small isolated lava pool to test walking straight in (death), rock-cooling, and
   // the glow-relight (walk within 2 tiles of it with a snuffed torch — it catches).
-  // Kept Chebyshev 4 from spawn so a ?torch=0 start isn't relit by the first step.
-  subtypes[py + 4][px + 2] = [TileSubtype.LAVA];
-  subtypes[py + 5][px + 2] = [TileSubtype.LAVA];
+  // Kept Chebyshev 4 from the default spawn so ?torch=0 isn't relit by the first step.
+  subtypes[14][6] = [TileSubtype.LAVA];
+  subtypes[15][6] = [TileSubtype.LAVA];
+
+  // A pond in the upper-left: a 2x2 deep core with a shallow shore on the south,
+  // east, and west sides — the NORTH bank is a hard cutoff (dry floor straight into
+  // deep water), matching what generation can now produce. Wade the shallow shore
+  // freely; swim the deep core to snuff the torch (and vanish from most enemies'
+  // sight); throw a rock into the deep water to build a stepping stone.
+  for (let y = 4; y <= 5; y++) {
+    for (let x = 3; x <= 4; x++) {
+      subtypes[y][x] = [TileSubtype.DEEP_WATER];
+    }
+  }
+  for (let y = 4; y <= 6; y++) {
+    for (let x = 2; x <= 5; x++) {
+      if (subtypes[y][x].length === 0) subtypes[y][x] = [TileSubtype.SHALLOW_WATER];
+    }
+  }
+
+  // With the water-enemy set, pre-place a stepping stone at the pond's hard north
+  // bank so the stone-goblin drown is deterministic (stones are otherwise built at
+  // runtime by throwing rocks into deep water).
+  if (opts?.waterEnemies) {
+    subtypes[4][3] = [TileSubtype.STEPPING_STONE];
+  }
+
+  // Hero last, stacking with any terrain already on the spawn tile.
+  subtypes[py][px] = subtypes[py][px].concat([TileSubtype.PLAYER]);
 
   const enemies: Enemy[] = [];
   if (opts?.includeEnemies ?? true) {
-    // Stone goblin on the far side of the lava river: it will cross the lava to reach you.
-    enemies.push(makeGoblin(py, 14, "stone-goblin"));
-    // Earth + fire goblins on the far side: they must route AROUND the lava (top/bottom).
-    enemies.push(makeGoblin(8, 14, "earth-goblin"));
-    enemies.push(makeGoblin(12, 14, "fire-goblin"));
+    if (opts?.waterEnemies) {
+      // Water-behavior cast around the pond:
+      // Snake wading the south shore — rides low, top half of its body showing.
+      enemies.push(makeGoblin(6, 3, "snake"));
+      // Water goblin swimming the deep core — submerged to the head, swims out to chase.
+      enemies.push(makeGoblin(5, 4, "water-goblin"));
+      // Stone goblin directly north of the pre-placed stepping stone: its first chase
+      // step (straight down toward the hero) lands on the stone, which sinks under
+      // its weight — it drowns and the tile reverts to deep water.
+      enemies.push(makeGoblin(3, 3, "stone-goblin"));
+      // Fire goblin near the pond: avoids ALL water to protect its torch.
+      enemies.push(makeGoblin(8, 2, "fire-goblin"));
+      // Knife-thrower near the east shore: armed, stays out of the water.
+      enemies.push(makeGoblin(7, 6, "earth-goblin-knives"));
+      // Pink goblin standing in the shallows: water is its kryptonite — it dies on
+      // the first turn (the hazard-death safety net in action).
+      enemies.push(makeGoblin(6, 5, "pink-goblin"));
+    } else {
+      // Stone goblin on the far side of the lava river: it will cross the lava to reach you.
+      enemies.push(makeGoblin(py, 14, "stone-goblin"));
+      // Earth + fire goblins on the far side: they must route AROUND the lava (top/bottom).
+      enemies.push(makeGoblin(8, 14, "earth-goblin"));
+      enemies.push(makeGoblin(12, 14, "fire-goblin"));
+    }
   }
 
   // Wall torches for ambiance / relight sources.
@@ -150,12 +202,23 @@ function TestElementsInner() {
   // rendering (the only real mode with forceDaylight=false), where a lit torch gives an
   // FOV circle + vignette that mutes distant glow — don't use it for lava-light tests.
   const forceDaylight = params?.get("daylight") !== "0";
+  const heroParam = params?.get("hero")?.split(",").map(Number);
   const initialState = buildElementsRoom({
     torchLit: params?.get("torch") !== "0",
     showFullMap: params?.get("fullmap") !== "0",
     // ?enemies=0 clears the room — a clean stage for lighting observation (goblins
     // otherwise chase you down and a fire-goblin hit RELIGHTS the snuffed torch).
     includeEnemies: params?.get("enemies") !== "0",
+    // ?water=1 swaps in the water-behavior cast around the pond (snake wading,
+    // water goblin swimming, stone goblin drowning on the stepping stone, etc.)
+    // in place of the default lava trio.
+    waterEnemies: params?.get("water") === "1",
+    // ?hero=y,x spawns the hero anywhere (e.g. ?hero=6,4 = shallow shore, ?hero=4,3
+    // = deep water) — handy for screenshotting submersion states directly.
+    heroAt:
+      heroParam && heroParam.length === 2 && heroParam.every(Number.isFinite)
+        ? [heroParam[0], heroParam[1]]
+        : undefined,
   });
   return (
     <div
@@ -183,10 +246,19 @@ function TestElementsInner() {
               (close enough to dip the torch in).
             </p>
             <p>
+              The pond (upper-left): wade the light <b>shallow</b> ring freely; swim the
+              dark <b>deep</b> core and your torch snuffs — and most enemies lose sight
+              of you (fire goblins still hunt). Throw a rock into deep water for a
+              <b> stepping stone</b>; bombs evaporate shallow water and dud in deep.
+            </p>
+            <p>
               40 rocks, 5 runes, 5 bombs, 30 HP. URL knobs: <b>?torch=0&amp;fullmap=0</b>
               = the real-game dark scenario (snuffed torch, navigate by lava-light,
               walk into a pool&apos;s glow to relight); <b>&amp;enemies=0</b> for a clean
-              stage. (<b>?daylight=0</b> = story-mode rendering only.) Reload to reset.
+              stage; <b>?water=1</b> = the water-behavior cast (snake wading, water
+              goblin swimming, stone goblin drowning on the stepping stone, knife
+              thrower staying dry, pink goblin dying in the shallows).
+              (<b>?daylight=0</b> = story-mode rendering only.) Reload to reset.
             </p>
           </div>
         </div>

@@ -772,13 +772,15 @@ export function performThrowRock(gameState: GameState): GameState {
       // Early stop on wall/obstacle: consume a rock, no placement
       return { ...preTickState, rockCount: count - 1 };
     }
-    // A rock thrown into lava cools that tile into walkable OBSIDIAN — a stepping stone,
-    // the only way to bridge a lava field on foot. The rock is spent building the crossing;
-    // stop the throw here (it does not fly past the tile it just solidified).
+    // A rock thrown into lava MELTS into the first lava tile it touches, cooling it
+    // into walkable OBSIDIAN — the rock is spent on contact and the throw stops here.
+    // Water is different (deliberately not a mirror of lava): rocks sail OVER both
+    // water tiers mid-flight and only become a STEPPING_STONE if they come to rest
+    // on a deep tile at the end of their range — see the landing block below.
     {
-      const lavaSubs = newMapData.subtypes[ty][tx] || [];
-      if (lavaSubs.includes(TileSubtype.LAVA)) {
-        newMapData.subtypes[ty][tx] = lavaSubs
+      const terrainSubs = newMapData.subtypes[ty][tx] || [];
+      if (terrainSubs.includes(TileSubtype.LAVA)) {
+        newMapData.subtypes[ty][tx] = terrainSubs
           .filter((t) => t !== TileSubtype.LAVA)
           .concat([TileSubtype.OBSIDIAN]);
         return {
@@ -824,9 +826,17 @@ export function performThrowRock(gameState: GameState): GameState {
   // Land the rock on the 4th tile, preserving existing overlays (e.g., ROAD).
   // A rock that comes to rest on an open abyss falls straight into the pit —
   // nothing can sit on a broken abyss — so it is consumed without being placed.
+  // A rock that comes to rest on DEEP water sinks just below the surface and
+  // becomes a STEPPING_STONE: a dry crossing exactly where the throw ended.
+  // (Only the landing tile converts — mid-flight deep tiles are flown over, so
+  // building a bridge means aiming each throw, not machine-gunning the near edge.)
   {
     const landing = newMapData.subtypes[ty][tx] || [];
-    if (!landing.includes(TileSubtype.OPEN_ABYSS)) {
+    if (landing.includes(TileSubtype.DEEP_WATER)) {
+      newMapData.subtypes[ty][tx] = landing
+        .filter((t) => t !== TileSubtype.DEEP_WATER)
+        .concat([TileSubtype.STEPPING_STONE]);
+    } else if (!landing.includes(TileSubtype.OPEN_ABYSS)) {
       const base = landing.filter((t) => t !== TileSubtype.ROCK);
       newMapData.subtypes[ty][tx] = base.concat([TileSubtype.ROCK]);
     }
@@ -1007,10 +1017,12 @@ export function performThrowRune(gameState: GameState): GameState {
       return finalState;
     }
 
-    // Wall/obstacle -> drop on last floor tile. Lava counts as an obstacle here so a
-    // precious rune never lands in it: the rune drops on the last dry tile before the
-    // lava, where it can be retrieved.
-    const runeHitsLava = (newMapData.subtypes[ty]?.[tx] || []).includes(TileSubtype.LAVA);
+    // Wall/obstacle -> drop on last floor tile. Lava and deep water count as obstacles
+    // here so a precious rune never lands in them: the rune drops on the last dry tile
+    // before the hazard, where it can be retrieved. (Shallow water is fine to land on.)
+    const runeSubs = newMapData.subtypes[ty]?.[tx] || [];
+    const runeHitsLava =
+      runeSubs.includes(TileSubtype.LAVA) || runeSubs.includes(TileSubtype.DEEP_WATER);
     if (newMapData.tiles[ty][tx] !== FLOOR || runeHitsLava) {
       if (
         !(lastFloorY === py && lastFloorX === px) &&
@@ -1151,6 +1163,12 @@ const BOMB_PRESERVED_SUBTYPES = new Set<TileSubtype>([
   TileSubtype.SINGED,
   // A pink goblin killed by the blast drops a teleport ring; keep it through the blast.
   TileSubtype.PINK_RING,
+  // Molten rock and the dry crossings built on hazards survive a blast — a bomb must
+  // never erase a pool or strand someone mid-crossing. Water tiers are deliberately
+  // NOT preserved: the blast transforms them (shallow evaporates, deep -> shallow).
+  TileSubtype.LAVA,
+  TileSubtype.OBSIDIAN,
+  TileSubtype.STEPPING_STONE,
 ]);
 
 /**
@@ -1275,9 +1293,23 @@ export function detonateLiveBombs(state: GameState): GameState {
         const becomesAbyss =
           subs.includes(TileSubtype.FAULTY_FLOOR) ||
           subs.includes(TileSubtype.OPEN_ABYSS);
+        // Water flashes to steam instead of scorching: shallow water evaporates to dry
+        // floor (the tag was already stripped above — it isn't preserved) and deep
+        // water is blasted down to shallow. Neither takes a SINGED scorch, and molten
+        // lava can't be scorched either.
+        const hadShallowWater = subs.includes(TileSubtype.SHALLOW_WATER);
+        const hadDeepWater = subs.includes(TileSubtype.DEEP_WATER);
+        if (hadDeepWater && !kept.includes(TileSubtype.SHALLOW_WATER)) {
+          kept.push(TileSubtype.SHALLOW_WATER);
+        }
         if (becomesAbyss) {
           if (!kept.includes(TileSubtype.OPEN_ABYSS)) kept.push(TileSubtype.OPEN_ABYSS);
-        } else if (!kept.includes(TileSubtype.SINGED)) {
+        } else if (
+          !hadShallowWater &&
+          !hadDeepWater &&
+          !kept.includes(TileSubtype.LAVA) &&
+          !kept.includes(TileSubtype.SINGED)
+        ) {
           kept.push(TileSubtype.SINGED);
         }
         if (openedWall) {
@@ -1432,12 +1464,13 @@ export function performThrowBomb(gameState: GameState): GameState {
   const restSubs = newMapData.subtypes[restY][restX] || [];
   // A bomb that comes to rest on an open abyss drops into the pit and is lost —
   // no fuse is armed and no blast follows (nothing sits on a broken abyss). The
-  // bomb is still consumed and counts as thrown. Lava behaves the same for v1: the
-  // bomb melts into it, no blast. (v2.5 will make lava detonate the bomb on impact
-  // and spray shrapnel — see the feature doc.)
+  // bomb is still consumed and counts as thrown. Lava behaves the same for v1 (the
+  // bomb melts into it; v2.5 will detonate on impact and spray shrapnel), and DEEP
+  // water douses the fuse — a soaked dud sinks. Shallow water is fine to rest on.
   if (
     !restSubs.includes(TileSubtype.OPEN_ABYSS) &&
-    !restSubs.includes(TileSubtype.LAVA)
+    !restSubs.includes(TileSubtype.LAVA) &&
+    !restSubs.includes(TileSubtype.DEEP_WATER)
   ) {
     const restBase = restSubs.filter((t) => t !== TileSubtype.BOMB_LIVE);
     newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
@@ -1739,6 +1772,19 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const row = subtypes[enemy.y];
     const tileSubs = row ? row[enemy.x] || [] : [];
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
+    // Water is kryptonite to pink goblins: touching either tier destroys them. Their
+    // pathing and teleports refuse water tiles, so this is the safety net for any
+    // path that still lands one there (the tile stays water — no conversion).
+    const pinkOnWater =
+      enemy.kind === "pink-goblin" &&
+      (tileSubs.includes(TileSubtype.SHALLOW_WATER) ||
+        tileSubs.includes(TileSubtype.DEEP_WATER));
+    // A stone goblin is too heavy for a player-built stepping stone: the stone
+    // sinks under its weight (tile reverts to deep water) and the goblin drowns.
+    // For everyone else the stone is a safe crossing; for him it's an abyss.
+    const stoneGoblinOnSteppingStone =
+      enemy.kind === "stone-goblin" &&
+      tileSubs.includes(TileSubtype.STEPPING_STONE);
 
     if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
       // Convert faulty floor to open abyss when enemy steps on it
@@ -1746,7 +1792,37 @@ function applyEnemyHazardDeaths(state: GameState): void {
         (type) => type !== TileSubtype.FAULTY_FLOOR
       );
       subtypes[enemy.y][enemy.x].push(TileSubtype.OPEN_ABYSS);
-      
+
+      cleanupPinkRing(enemy, subtypes);
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else if (pinkOnWater) {
+      cleanupPinkRing(enemy, subtypes);
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else if (stoneGoblinOnSteppingStone) {
+      // The stone gives way: revert the crossing to deep water and drown him.
+      subtypes[enemy.y][enemy.x] = subtypes[enemy.y][enemy.x].filter(
+        (type) => type !== TileSubtype.STEPPING_STONE
+      );
+      subtypes[enemy.y][enemy.x].push(TileSubtype.DEEP_WATER);
+
       cleanupPinkRing(enemy, subtypes);
       defeated.push(enemy);
 
@@ -2027,18 +2103,20 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Get the pre-computed chest/key allocation for this floor
   const allocation = currentState.floorChestAllocation?.[nextFloor];
   
-  // Daily floors 2 and 3 carry instant-death lava pools (v1 of the elemental terrain
-  // feature). Floor 1 is built elsewhere and stays lava-free as the teaching floor.
+  // Daily floors 2 and 3 carry elemental terrain: instant-death lava pools and a
+  // deep-water pool with a shallow shoreline. Floor 1 is built elsewhere and stays
+  // element-free as the teaching floor.
   const includeLava = nextFloor === 2 || nextFloor === 3;
+  const includeWater = nextFloor === 2 || nextFloor === 3;
 
   // Generate new map with floor-specific seed
   const newMapData = withPatchedMathRandom(rng, () => {
     let mapData: MapData;
     if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
-      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava });
+      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava, includeWater });
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
-      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava });
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava, includeWater });
     }
     return mapData;
   });
@@ -3479,8 +3557,16 @@ function movePlayerCore(
 
         // Flame transfer: striking a torch-carrying enemy at melee range relights
         // the hero's snuffed torch, same as brushing a wall torch. Applies whether
-        // the blow kills or not — the flame is caught in the exchange.
-        if (!newGameState.heroTorchLit && EnemyRegistry[enemy.kind]?.carriesTorch) {
+        // the blow kills or not — the flame is caught in the exchange. Exception:
+        // a hero swimming in deep water can't catch a flame (melee resolves in
+        // place, so the hero is still in the water).
+        if (
+          !newGameState.heroTorchLit &&
+          EnemyRegistry[enemy.kind]?.carriesTorch &&
+          !(newGameState.mapData.subtypes[currentY]?.[currentX] ?? []).includes(
+            TileSubtype.DEEP_WATER
+          )
+        ) {
           newGameState.heroTorchLit = true;
         }
 
@@ -3642,7 +3728,12 @@ function movePlayerCore(
       // Lava (the hero dies on it but is rendered on the glowing tile) and obsidian
       // (a walkable rock-cooled crossing) are floor overlays the player stands on.
       destSubtypes.includes(TileSubtype.LAVA) ||
-      destSubtypes.includes(TileSubtype.OBSIDIAN)
+      destSubtypes.includes(TileSubtype.OBSIDIAN) ||
+      // Water tiers (wade shallow, swim deep) and stepping stones (a rock dropped
+      // into deep water) are floor overlays the player stands on.
+      destSubtypes.includes(TileSubtype.SHALLOW_WATER) ||
+      destSubtypes.includes(TileSubtype.DEEP_WATER) ||
+      destSubtypes.includes(TileSubtype.STEPPING_STONE)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
@@ -3716,6 +3807,13 @@ function movePlayerCore(
           break;
         }
       }
+    }
+
+    // The torch cannot burn while swimming: ending a move in DEEP water snuffs it and
+    // overrides every relight source above (wall torches, lava glow) until the hero is
+    // back on land. Stepping stones and shallow water are dry enough — no snuff.
+    if (newMapData.subtypes[newY]?.[newX]?.includes(TileSubtype.DEEP_WATER)) {
+      newGameState.heroTorchLit = false;
     }
   }
 

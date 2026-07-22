@@ -11,7 +11,115 @@ import PixelFlame, {
   LAVA_FRAMES,
   LAVA_COLS,
   LAVA_ROWS,
+  WATER_FRAMES,
+  SHALLOW_WATER_FRAMES,
+  WATER_COLS,
+  WATER_ROWS,
 } from "./PixelFlame";
+
+// Seconds per wave cycle for water tiles — slower than fire so pools read calm.
+const WATER_CYCLE_S = 1.4;
+// Seconds per bubble cycle for lava — a slow simmer (one swell-and-pop per cycle),
+// not the torch's quick 0.52s flicker.
+const LAVA_CYCLE_S = 1.8;
+
+// Submersion: standing in water hides the lower part of the hero sprite — waist-deep
+// in shallow water, up to the head in deep water. Pure CSS clip (no separate wading
+// assets); shared with the smooth-movement hero overlay in TilemapGrid.
+export const WATER_SUBMERSION_CLIP = {
+  shallow: "inset(0 0 38% 0)",
+  deep: "inset(0 0 62% 0)",
+} as const;
+
+// Enemies get the same submersion treatment as the hero when they stand in water:
+// waist-deep in shallow, head-deep in deep. The snake rides lower in the water —
+// only the top half of its body shows even in the shallows. (Applied on the single-
+// sprite enemy render path; pink/ghost hover and white swarms never enter water.)
+export const ENEMY_WATER_SUBMERSION_CLIP = {
+  shallow: "inset(0 0 38% 0)",
+  shallowSnake: "inset(0 0 50% 0)",
+  deep: "inset(0 0 62% 0)",
+} as const;
+
+// Neighbor-aware terrain edges: elemental tiles shade only the sides where the pool
+// actually ends, so adjacent water/lava tiles merge into one body instead of showing
+// per-tile seams. Family classification (computed in TilemapGrid): obsidian counts as
+// lava, stepping stones as deep — crossings are part of the pool.
+export type TerrainFamily = "lava" | "deep" | "shallow" | "land";
+export type TerrainNeighbors = {
+  top: TerrainFamily;
+  right: TerrainFamily;
+  bottom: TerrainFamily;
+  left: TerrainFamily;
+};
+
+// Edge colors per (self, neighbor): null = no edge (same body, stay flat).
+// - Lava: a faint WARM glow on its outer border — a smooth fade (not a stepped band),
+//   dim enough to only hint that the rim is hot.
+// - Deep: every edge is LIGHTER than the deep base (water gets shallower toward any
+//   boundary, never darker): a soft light lift toward shallow, and a slightly weaker
+//   version of the same lift toward land/lava. Flat toward other deep.
+// - Shallow: a subtle brightening toward the land shore, flat toward other shallow,
+//   and NOTHING toward deep — the deep side's light lift alone marks the drop-off
+//   (both tiers shading the same boundary produced an ugly double band).
+function terrainEdgeColors(
+  self: Exclude<TerrainFamily, "land">,
+  neighbor: TerrainFamily
+): [string, string] | null {
+  if (self === "lava") {
+    return neighbor === "lava"
+      ? null
+      : ["rgba(255, 185, 80, 0.22)", "rgba(255, 185, 80, 0)"];
+  }
+  if (self === "deep") {
+    if (neighbor === "deep") return null;
+    if (neighbor === "shallow")
+      return ["rgba(74, 127, 156, 0.35)", "rgba(74, 127, 156, 0.16)"];
+    return ["rgba(74, 127, 156, 0.28)", "rgba(74, 127, 156, 0.12)"];
+  }
+  // shallow
+  if (neighbor === "shallow" || neighbor === "deep") return null;
+  return ["rgba(150, 195, 215, 0.22)", "rgba(150, 195, 215, 0.1)"];
+}
+
+// One strip per edge, above the crust + wave/bubble overlays (1020), below items
+// (1030). Water edges are stepped two-band strips (crisp, pixel-aesthetic); lava's
+// edge is a SMOOTH fade — a soft heat glow rather than a drawn rim (fire visuals
+// already use gradients: torch glow, flame halos).
+const TERRAIN_EDGE_PX = 5;
+function renderTerrainEdges(
+  self: Exclude<TerrainFamily, "land">,
+  tn: TerrainNeighbors
+): React.ReactNode {
+  const sides = [
+    { key: "top", dir: "to bottom", box: { top: 0, left: 0, right: 0, height: TERRAIN_EDGE_PX } },
+    { key: "bottom", dir: "to top", box: { bottom: 0, left: 0, right: 0, height: TERRAIN_EDGE_PX } },
+    { key: "left", dir: "to right", box: { left: 0, top: 0, bottom: 0, width: TERRAIN_EDGE_PX } },
+    { key: "right", dir: "to left", box: { right: 0, top: 0, bottom: 0, width: TERRAIN_EDGE_PX } },
+  ] as const;
+  return sides.map(({ key, dir, box }) => {
+    const colors = terrainEdgeColors(self, tn[key]);
+    if (!colors) return null;
+    const [strong, weak] = colors;
+    const background =
+      self === "lava"
+        ? `linear-gradient(${dir}, ${strong} 0%, ${weak} 100%)`
+        : `linear-gradient(${dir}, ${strong} 0%, ${strong} 50%, ${weak} 50%, ${weak} 100%)`;
+    return (
+      <div
+        key={`terrain-edge-${key}`}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          ...box,
+          background,
+          pointerEvents: "none",
+          zIndex: 1021,
+        }}
+      />
+    );
+  });
+}
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -49,6 +157,9 @@ interface TileProps {
   subtype?: number[];
   row?: number; // grid row (y)
   col?: number; // grid col (x)
+  // Terrain families of the four orthogonal neighbors — provided only for elemental
+  // tiles (water/lava). Drives neighbor-aware edge shading so pools read as one body.
+  terrainNeighbors?: TerrainNeighbors;
   isVisible?: boolean; // Whether this tile is in the player's field of view
   visibilityTier?: number; // 0-3 for FOV fade tiers
   // True when this tile is diagonally adjacent to a wall torch / torch-carrier
@@ -146,6 +257,7 @@ export const Tile: React.FC<TileProps> = ({
   subtype = [],
   row,
   col,
+  terrainNeighbors,
   isVisible = true,
   visibilityTier = 3,
   torchDiagonalGlow = false,
@@ -477,6 +589,15 @@ export const Tile: React.FC<TileProps> = ({
   const hasObsidian = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.OBSIDIAN) || false;
   };
+  const hasShallowWater = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SHALLOW_WATER) || false;
+  };
+  const hasDeepWater = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.DEEP_WATER) || false;
+  };
+  const hasSteppingStone = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.STEPPING_STONE) || false;
+  };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
@@ -654,6 +775,9 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.OPEN_ABYSS &&
         subtype !== TileSubtype.LAVA &&
         subtype !== TileSubtype.OBSIDIAN &&
+        subtype !== TileSubtype.SHALLOW_WATER &&
+        subtype !== TileSubtype.DEEP_WATER &&
+        subtype !== TileSubtype.STEPPING_STONE &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
@@ -1589,6 +1713,17 @@ export const Tile: React.FC<TileProps> = ({
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
                 : undefined,
+              // Submersion: an enemy standing in water is clipped like the hero —
+              // waist-deep in shallow (snakes ride lower: top half only), head-deep
+              // in deep water. Keyed off this tile's own subtypes; the slide
+              // animation only drives `transform`, so the clip survives it.
+              clipPath: hasDeepWater(subtype)
+                ? ENEMY_WATER_SUBMERSION_CLIP.deep
+                : hasShallowWater(subtype)
+                ? enemyKind === 'snake'
+                  ? ENEMY_WATER_SUBMERSION_CLIP.shallowSnake
+                  : ENEMY_WATER_SUBMERSION_CLIP.shallow
+                : undefined,
               // Combat lunge (standalone `translate`) — spread before the
               // slide styles so a live slide's `animation` wins if both fire
               // on the same turn.
@@ -1644,11 +1779,15 @@ export const Tile: React.FC<TileProps> = ({
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
       // Check if this floor tile has darkness (collapsed faulty floor), open abyss, or
-      // elemental terrain (glowing lava / cooled obsidian). Each swaps the base floor class.
+      // elemental terrain (lava/obsidian, water tiers, stepping stones). Each swaps the
+      // base floor class.
       const isDarkness = hasDarkness(subtype);
       const isOpenAbyss = hasOpenAbyss(subtype);
       const isLava = hasLava(subtype);
       const isObsidian = hasObsidian(subtype);
+      const isShallowWater = hasShallowWater(subtype);
+      const isDeepWater = hasDeepWater(subtype);
+      const isSteppingStone = hasSteppingStone(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
@@ -1657,6 +1796,12 @@ export const Tile: React.FC<TileProps> = ({
         ? styles.lava
         : isObsidian
         ? styles.obsidian
+        : isDeepWater
+        ? styles.deepWater
+        : isSteppingStone
+        ? styles.steppingStone
+        : isShallowWater
+        ? styles.shallowWater
         : styles.floor;
       const floorClasses = `${styles.tileContainer} ${floorVariantClass} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
 
@@ -1700,11 +1845,13 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            // Lava/obsidian supply their own pixel-art background via the CSS class;
-            // an inline floor-asset image here would override it (that override is why
-            // lava first rendered as a bare framed square). Leave it unset for those.
+            // Elemental terrain supplies its own pixel-art background via the CSS
+            // class; an inline floor-asset image here would override it (that override
+            // is why lava first rendered as a bare framed square). Leave it unset.
             backgroundImage:
-              isLava || isObsidian ? undefined : `url(${floorAsset})`,
+              isLava || isObsidian || isShallowWater || isDeepWater || isSteppingStone
+                ? undefined
+                : `url(${floorAsset})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
@@ -1719,12 +1866,13 @@ export const Tile: React.FC<TileProps> = ({
               game's resolution). seed + per-tile horizontal flip break up uniformity. */}
           {isLava && (
             <PixelFlame
-              cell={2}
+              cell={1.25}
               palette="lava"
               frames={LAVA_FRAMES}
               frameSetId="lava"
               cols={LAVA_COLS}
               rows={LAVA_ROWS}
+              cycleS={LAVA_CYCLE_S}
               seed={(row ?? 0) * 31 + (col ?? 0)}
               className={styles.lavaFlame}
               style={{
@@ -1734,6 +1882,40 @@ export const Tile: React.FC<TileProps> = ({
               }}
             />
           )}
+
+          {/* Water: low-contrast drifting wave lines over the water base — the same
+              tile-filling PixelFlame machinery as lava's bubbles, but a slower cycle.
+              Deep water gets fuller waves + a rare single-pixel glint; shallow gets
+              shorter, dimmer wave shadows so both tiers read as one body of water. */}
+          {(isDeepWater || isShallowWater) && (
+            <PixelFlame
+              cell={1.25}
+              palette="water"
+              frames={isDeepWater ? WATER_FRAMES : SHALLOW_WATER_FRAMES}
+              frameSetId={isDeepWater ? "water" : "shallow-water"}
+              cols={WATER_COLS}
+              rows={WATER_ROWS}
+              cycleS={WATER_CYCLE_S}
+              seed={(row ?? 0) * 31 + (col ?? 0)}
+              className={styles.waterRipple}
+              style={{
+                transform: `translateX(-50%)${
+                  (((row ?? 0) + (col ?? 0)) % 2 === 1) ? " scaleX(-1)" : ""
+                }`,
+              }}
+            />
+          )}
+
+          {/* Neighbor-aware terrain edges: shade only where the pool actually ends
+              (dark outer rims; deep lightens toward shallow; shallow lightens toward
+              shore and darkens toward the deep drop-off). Adjacent same-body tiles
+              stay seamless. */}
+          {terrainNeighbors &&
+            (isLava || isDeepWater || isShallowWater) &&
+            renderTerrainEdges(
+              isLava ? "lava" : isDeepWater ? "deep" : "shallow",
+              terrainNeighbors
+            )}
 
           {/* Render checkpoint asset if present (full-tile overlay) */}
           {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (() => {
@@ -1804,6 +1986,15 @@ export const Tile: React.FC<TileProps> = ({
                     .filter(Boolean)
                     .join(', ') || undefined,
                 visibility: suppressHeroSprite ? 'hidden' : undefined,
+                // Submersion: wading hides the hero below the waist, swimming below
+                // the head. Suppressed while dying so death transforms play whole.
+                clipPath: heroDeathState
+                  ? undefined
+                  : isDeepWater
+                  ? WATER_SUBMERSION_CLIP.deep
+                  : isShallowWater
+                  ? WATER_SUBMERSION_CLIP.shallow
+                  : undefined,
               }}
             >
               {/* Torch flame rides inside the hero div so facing flips, warp

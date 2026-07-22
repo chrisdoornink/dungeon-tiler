@@ -195,9 +195,22 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!(isIn(y, x) && grid[y][x] === 0)) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
+          // Water in either tier is lethal to pink goblins (kryptonite) — never
+          // path onto it and never place a ring / blink onto it.
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SHALLOW_WATER) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
         };
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
+
+        // Torch-snuff stealth: with the hero's torch out the pink goblin can't sense
+        // them at all — it drops back to unaware (no laser, no rings, no pursuit).
+        if (ctx.player.torchLit === false) {
+          (e.memory as { aware?: boolean }).aware = false;
+        }
 
         // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
         const mem = e.memory as {
@@ -260,9 +273,11 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           }
         }
 
-        // Becomes aware when player is within range 8 (regardless of LOS — it can sense nearby presence)
-        // LOS is only required for ranged attacks, not for awareness/teleport logic
-        const withinSenseRange = manhattan <= 8;
+        // Becomes aware when player is within range 8 (regardless of LOS — it can sense
+        // nearby presence). LOS is only required for ranged attacks, not for
+        // awareness/teleport logic. A hero with a snuffed torch cannot be sensed at all
+        // (aware was force-cleared above, and it never re-arms while hidden).
+        const withinSenseRange = manhattan <= 8 && ctx.player.torchLit !== false;
         const playerSees = withinSenseRange && canSee(grid, [e.y, e.x], [py, px]);
         if (withinSenseRange && !mem.aware) {
           mem.aware = true;
@@ -704,7 +719,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
+          // White goblins stay out of ALL water — the swarm holds the land and
+          // funnels onto crossings instead of surrounding through a pool.
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SHALLOW_WATER) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
         };
 
         const swarmId = (e.memory as Record<string, unknown>).swarmId as string | undefined;
@@ -744,8 +766,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // Manhattan distance to player
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
+        // Torch-snuff stealth: a hidden hero can't be seen OR bitten — the swarm falls
+        // back to regrouping behavior until the torch relights.
+        const heroHidden = ctx.player.torchLit === false;
+
         // Attack if adjacent to player
-        if (manhattan === 1) {
+        if (manhattan === 1 && !heroHidden) {
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
           } else {
@@ -770,9 +796,9 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return baseBite + Math.min(flankers, 2);
         }
 
-        // Vision check
+        // Vision check (a hidden hero is never seen)
         const withinRange = manhattan <= 8;
-        const seesPlayer = withinRange && canSee(grid, [e.y, e.x], [py, px]);
+        const seesPlayer = !heroHidden && withinRange && canSee(grid, [e.y, e.x], [py, px]);
 
         // Helper: face toward a target
         const faceToward = (ty: number, tx: number) => {
@@ -964,9 +990,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // alternating coiled <-> moving each turn.
         e.memory.moved = false;
 
+        // Torch-snuff stealth: a hidden hero is neither seen nor bitten.
+        const heroHidden = ctx.player.torchLit === false;
+
         // If adjacent, attack
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
-        if (manhattan === 1) {
+        if (manhattan === 1 && !heroHidden) {
           // Face the player
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
@@ -983,11 +1012,16 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS) && !subs.includes(TileSubtype.LAVA);
+          // Snakes won't swim: deep water is off-limits (shallow is fine to slither).
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
         };
 
         // If can see player, decide each tick: 33% approach, 67% avoid (move away)
-        const sees = canSee(grid, [e.y, e.x], [py, px]);
+        const sees = !heroHidden && canSee(grid, [e.y, e.x], [py, px]);
         if (sees) {
           const dy = py - e.y;
           const dx = px - e.x;
