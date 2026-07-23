@@ -48,7 +48,7 @@ import {
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { computeTorchGlow } from "../torch_glow";
-import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
+import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
@@ -2103,20 +2103,23 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Get the pre-computed chest/key allocation for this floor
   const allocation = currentState.floorChestAllocation?.[nextFloor];
   
-  // Daily floors 2 and 3 carry elemental terrain: instant-death lava pools and a
-  // deep-water pool with a shallow shoreline. Floor 1 is built elsewhere and stays
-  // element-free as the teaching floor.
+  // Daily floors 2 and 3 carry elemental terrain. Lava is always present on those
+  // floors; water is SEMI-RANDOM — each floor independently rolls whether it gets a
+  // pool and how big (rollWaterPlan: ~1/2 per candidate floor, weighted size tiers,
+  // ~50%-coverage flood is rare). Lava and water can coexist on the same floor. Floor 1
+  // is built elsewhere and stays element-free as the teaching floor.
   const includeLava = nextFloor === 2 || nextFloor === 3;
-  const includeWater = nextFloor === 2 || nextFloor === 3;
 
-  // Generate new map with floor-specific seed
+  // Generate new map with floor-specific seed. The water roll MUST happen inside this
+  // seeded block (before map generation) so daily maps stay deterministic.
   const newMapData = withPatchedMathRandom(rng, () => {
+    const waterPlan = rollWaterPlan(nextFloor) ?? undefined;
     let mapData: MapData;
     if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
-      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava, includeWater });
+      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava, waterPlan });
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
-      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava, includeWater });
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava, waterPlan });
     }
     return mapData;
   });

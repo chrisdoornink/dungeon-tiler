@@ -7,8 +7,15 @@ import {
   detonateLiveBombs,
 } from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
-import { generateCompleteMapForFloor } from "../../lib/map/map-features";
+import {
+  generateCompleteMapForFloor,
+  addWaterPoolsToMap,
+  rollWaterPlan,
+  WATER_FLOOR_CHANCE,
+  type WaterPlan,
+} from "../../lib/map/map-features";
 import { areAllFloorsConnected } from "../../lib/map/map-generation";
+import { mulberry32, withPatchedMathRandom } from "../../lib/rng";
 
 function baseState(
   tiles: number[][],
@@ -360,5 +367,179 @@ describe("Water terrain (v2)", () => {
     // Pools cut their shore on 0-2 sides, so a rare pool can be all hard banks —
     // but the majority should still carry some shallow shoreline.
     expect(sawShallow).toBeGreaterThanOrEqual(Math.floor(sawDeep * 0.6));
+  });
+});
+
+describe("Water terrain — sized daily generation", () => {
+  type Map = { tiles: number[][]; subtypes: number[][][] };
+
+  // Mirror advanceToNextFloor's seeded path: floorSeed = seed + floor, one mulberry32
+  // stream, generation inside withPatchedMathRandom.
+  function buildSeededFloor(
+    seed: number,
+    floor: number,
+    opts: { includeLava?: boolean; waterPlan?: WaterPlan }
+  ): Map {
+    const alloc =
+      floor === 2
+        ? {
+            chests: 2,
+            keys: 2,
+            chestContents: [TileSubtype.SWORD, TileSubtype.SHIELD],
+          }
+        : { chests: 0, keys: 0, chestContents: [] };
+    return withPatchedMathRandom(mulberry32(seed + floor), () =>
+      generateCompleteMapForFloor(alloc, floor, opts)
+    );
+  }
+
+  const countSub = (map: Map, sub: TileSubtype): number =>
+    map.subtypes.flat().filter((s) => s.includes(sub)).length;
+
+  // The dry-path guarantee: with every hazard (deep water, lava, faulty, abyss) walled,
+  // the remaining dry floor must still be one connected region reaching the key/exit.
+  const dryPathHolds = (map: Map): boolean => {
+    const testGrid = map.tiles.map((row) => [...row]);
+    for (let y = 0; y < map.tiles.length; y++) {
+      for (let x = 0; x < map.tiles[0].length; x++) {
+        const subs = map.subtypes[y][x];
+        if (
+          subs.includes(TileSubtype.DEEP_WATER) ||
+          subs.includes(TileSubtype.LAVA) ||
+          subs.includes(TileSubtype.FAULTY_FLOOR) ||
+          subs.includes(TileSubtype.OPEN_ABYSS)
+        ) {
+          testGrid[y][x] = 1; // WALL
+        }
+      }
+    }
+    return areAllFloorsConnected(testGrid);
+  };
+
+  test("largest (flood ~50%) water + lava never strands the key/exit — 25 seeds, F2 and F3", () => {
+    for (const floor of [2, 3]) {
+      const plan: WaterPlan = { tier: "flood", poolCount: 1, coverage: 0.5 };
+      let sawSizablePool = 0;
+      for (let seed = 0; seed < 25; seed++) {
+        const map = buildSeededFloor(seed, floor, {
+          includeLava: true,
+          waterPlan: plan,
+        });
+        // HARD invariant: a dry, swim-free, lava-free route always survives.
+        expect(dryPathHolds(map)).toBe(true);
+        // Water never overwrites objectives or lava.
+        for (let y = 0; y < map.tiles.length; y++) {
+          for (let x = 0; x < map.tiles[0].length; x++) {
+            const subs = map.subtypes[y][x];
+            if (
+              subs.includes(TileSubtype.DEEP_WATER) ||
+              subs.includes(TileSubtype.SHALLOW_WATER)
+            ) {
+              expect(subs).not.toContain(TileSubtype.EXIT);
+              expect(subs).not.toContain(TileSubtype.EXITKEY);
+              expect(subs).not.toContain(TileSubtype.LAVA);
+            }
+          }
+        }
+        if (countSub(map, TileSubtype.DEEP_WATER) >= 8) sawSizablePool++;
+      }
+      // Flood coverage should usually grow a large pool (connectivity may cap it, so
+      // allow a couple of tightly-roomed seeds to fall short).
+      expect(sawSizablePool).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  test("higher coverage produces more deep water on average", () => {
+    const meanDeep = (coverage: number): number => {
+      let total = 0;
+      const N = 15;
+      for (let s = 0; s < N; s++) {
+        const map = buildSeededFloor(s, 2, {
+          waterPlan: { tier: "pond", poolCount: 1, coverage },
+        });
+        total += countSub(map, TileSubtype.DEEP_WATER);
+      }
+      return total / N;
+    };
+    // A big-lake coverage should clearly out-fill a puddle coverage.
+    expect(meanDeep(0.4)).toBeGreaterThan(meanDeep(0.04) + 5);
+  });
+
+  test("rock count scales up when a floor carries deep water", () => {
+    const meanRocks = (waterPlan?: WaterPlan): number => {
+      let total = 0;
+      const N = 15;
+      for (let s = 0; s < N; s++) {
+        const map = buildSeededFloor(s, 2, waterPlan ? { waterPlan } : {});
+        total += countSub(map, TileSubtype.ROCK);
+      }
+      return total / N;
+    };
+    const dry = meanRocks();
+    const flooded = meanRocks({ tier: "flood", poolCount: 1, coverage: 0.4 });
+    // Rocks are the only dry-crossing tool, so a big pool should hand out clearly more.
+    expect(flooded).toBeGreaterThan(dry + 3);
+  });
+
+  test("rollWaterPlan: F1 never rolls, candidate floors enable ~half the time, flood is rare", () => {
+    expect(WATER_FLOOR_CHANCE).toBeCloseTo(0.5);
+
+    const N = 4000;
+
+    // Floor 1 (and 4+) are never water candidates, whatever the stream.
+    let f1Null = 0;
+    let f4Null = 0;
+    withPatchedMathRandom(mulberry32(4242), () => {
+      for (let i = 0; i < N; i++) {
+        if (rollWaterPlan(1) === null) f1Null++;
+        if (rollWaterPlan(4) === null) f4Null++;
+      }
+    });
+    expect(f1Null).toBe(N);
+    expect(f4Null).toBe(N);
+
+    // Candidate floors: ~half enable; enabled plans are weighted toward small pools.
+    let enabled = 0;
+    const tierCounts: Record<string, number> = {};
+    withPatchedMathRandom(mulberry32(1337), () => {
+      for (let i = 0; i < N; i++) {
+        const p = rollWaterPlan(2);
+        if (!p) continue;
+        enabled++;
+        tierCounts[p.tier] = (tierCounts[p.tier] ?? 0) + 1;
+        expect(p.coverage).toBeGreaterThan(0);
+        expect(p.poolCount).toBeGreaterThanOrEqual(1);
+        if (p.tier === "flood") {
+          expect(p.coverage).toBeGreaterThanOrEqual(0.4);
+          expect(p.coverage).toBeLessThanOrEqual(0.5);
+        }
+      }
+    });
+    const enableRate = enabled / N;
+    expect(enableRate).toBeGreaterThan(0.44);
+    expect(enableRate).toBeLessThan(0.56);
+
+    // Puddles are the plurality; flood is genuinely rare (~5% of watered floors).
+    expect(tierCounts.puddles).toBeGreaterThan(tierCounts.flood);
+    const floodFrac = (tierCounts.flood ?? 0) / enabled;
+    expect(floodFrac).toBeGreaterThan(0.01);
+    expect(floodFrac).toBeLessThan(0.12);
+  });
+
+  test("addWaterPoolsToMap with no opts keeps the legacy small pool", () => {
+    // Back-compat: the includeWater boolean path (test-lava-gen, older callers) should
+    // still yield a modest 2-4 tile deep core.
+    let maxDeep = 0;
+    for (let s = 0; s < 20; s++) {
+      const map = withPatchedMathRandom(mulberry32(s + 2), () =>
+        generateCompleteMapForFloor(
+          { chests: 2, keys: 2, chestContents: [TileSubtype.SWORD, TileSubtype.SHIELD] },
+          2,
+          { includeWater: true }
+        )
+      );
+      maxDeep = Math.max(maxDeep, countSub(map, TileSubtype.DEEP_WATER));
+    }
+    expect(maxDeep).toBeLessThanOrEqual(4);
   });
 });
