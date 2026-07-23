@@ -251,6 +251,15 @@ export const combatLungeStyle = (
   };
 };
 
+// Lava submersion: a stone goblin (the only enemy that crosses lava) sinks
+// knee-deep into the molten floor instead of floating on top of it. Pure CSS
+// clip of the sprite's bottom edge — the goblin art's legs split ~12% up from
+// the tile floor and the knees sit ~17% up, so clipping the bottom 18% hides
+// the feet and lower legs, reading as "standing in it." Keyed off the tile's
+// own LAVA subtype (cooled OBSIDIAN crossings drop LAVA, so they don't clip);
+// the slide-in tween only drives `transform`, so the clip survives it.
+export const ENEMY_LAVA_SUBMERSION_CLIP = "inset(0 0 18% 0)";
+
 export const Tile: React.FC<TileProps> = ({
   tileId,
   // We don't need tileType for now, but it's in the props interface for future use
@@ -1713,16 +1722,19 @@ export const Tile: React.FC<TileProps> = ({
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
                 : undefined,
-              // Submersion: an enemy standing in water is clipped like the hero —
-              // waist-deep in shallow (snakes ride lower: top half only), head-deep
-              // in deep water. Keyed off this tile's own subtypes; the slide
-              // animation only drives `transform`, so the clip survives it.
+              // Submersion: an enemy standing in water or lava is clipped like
+              // the hero — waist-deep in shallow water (snakes ride lower: top
+              // half only), head-deep in deep water, and knee-deep in lava (only
+              // stone goblins cross it). Keyed off this tile's own subtypes; the
+              // slide animation only drives `transform`, so the clip survives it.
               clipPath: hasDeepWater(subtype)
                 ? ENEMY_WATER_SUBMERSION_CLIP.deep
                 : hasShallowWater(subtype)
                 ? enemyKind === 'snake'
                   ? ENEMY_WATER_SUBMERSION_CLIP.shallowSnake
                   : ENEMY_WATER_SUBMERSION_CLIP.shallow
+                : hasLava(subtype)
+                ? ENEMY_LAVA_SUBMERSION_CLIP
                 : undefined,
               // Combat lunge (standalone `translate`) — spread before the
               // slide styles so a live slide's `animation` wins if both fire
