@@ -1557,6 +1557,10 @@ export interface GameState {
     enemiesKilledByRock?: number;
     enemiesKilledByRune?: number;
     chestsOpened?: number;
+    // Item keys revealed from chests and actually picked up, in pickup order
+    // (e.g. ["sword","shield","extra_heart"]). Lets analytics report exactly
+    // which variable Level 2 items a run collected, not just a count.
+    chestItemsCollected?: string[];
     itemsCollected?: number; // Total items picked up
     maxHealth?: number; // Highest health reached
     poisonSteps?: number; // Steps taken while poisoned
@@ -3484,6 +3488,20 @@ function movePlayerCore(
         subtype.includes(TileSubtype.BOMB)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
+      // Record exactly which chest item this was (in pickup order) for analytics.
+      const collectedNow: string[] = [];
+      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
+      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
+      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
+      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
+      if (collectedNow.length > 0) {
+        newGameState.stats.chestItemsCollected = [
+          ...(newGameState.stats.chestItemsCollected ?? []),
+          ...collectedNow,
+        ];
+      }
       if (subtype.includes(TileSubtype.BOMB)) {
         newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
