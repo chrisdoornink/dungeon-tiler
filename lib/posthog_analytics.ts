@@ -124,6 +124,8 @@ export function trackGameComplete(params: {
   wallsDestroyed?: number;
   reachedOutsideWorld?: boolean;
   reachedPinkRealm?: boolean;
+  // Exact chest items collected this run (e.g. ["sword","shield","extra_heart"]).
+  collectedChestItems?: string[];
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -152,6 +154,7 @@ export function trackGameComplete(params: {
     walls_destroyed: params.wallsDestroyed,
     reached_outside_world: params.reachedOutsideWorld,
     reached_pink_realm: params.reachedPinkRealm,
+    collected_chest_items: params.collectedChestItems,
   });
 }
 

@@ -204,6 +204,7 @@ function runProgressProps(gs: GameState) {
     wallsDestroyed: gs.stats?.wallsDestroyed ?? 0,
     reachedOutsideWorld: !!gs.reachedOutsideWorld,
     reachedPinkRealm: !!gs.reachedPinkRealm,
+    collectedChestItems: gs.stats?.chestItemsCollected ?? [],
   };
 }
 
@@ -2885,6 +2886,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         deathCause: gameState.deathCause?.type,
         deathCauseEnemyKind: gameState.deathCause?.enemyKind,
         currentFloor: gameState.currentFloor,
+        ...runProgressProps(gameState),
       });
     } catch {}
 
