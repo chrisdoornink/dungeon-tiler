@@ -11,6 +11,12 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   // We track gameplay with explicit events, so autocapture only adds noise.
   autocapture: false,
   rageclick: false, // repeated same-spot taps are normal gameplay, not rage
+  // Session replay is disabled: a constantly-animating game (torch flames,
+  // camera, sprites) makes rrweb emit a massive $snapshot stream that drained
+  // posthog-js's client rate limiter and dropped real events (game_complete),
+  // while producing heavy, low-value replays that burn recording quota. We rely
+  // on explicit gameplay events instead. (Overrides the project-level setting.)
+  disable_session_recording: true,
   debug: process.env.NODE_ENV === "development",
 });
 
