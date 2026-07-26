@@ -74,12 +74,23 @@ export function markNewPlayer(opts?: { enteredViaTutorial?: boolean }) {
 // Safe PostHog event capture
 function captureEvent(eventName: string, properties?: EventParams) {
   if (typeof window === 'undefined') return;
-  
+
   try {
-    posthog.capture(eventName, {
-      ...properties,
-      timestamp: new Date().toISOString()
-    });
+    posthog.capture(
+      eventName,
+      {
+        ...properties,
+        timestamp: new Date().toISOString(),
+      },
+      // Bypass posthog-js's client-side rate limiter (default 10/sec, 100 burst)
+      // for our events. These are all deliberate, low-volume gameplay signals —
+      // but session replay's $snapshot stream (heavy for a constantly-animating
+      // game) drains the shared token bucket, after which captures get dropped,
+      // silently losing game_complete and other runs. skip_client_rate_limiting
+      // guarantees these always send; it does not weaken the limiter for
+      // autocapture/replay, which stay governed.
+      { skip_client_rate_limiting: true }
+    );
   } catch (error) {
     console.warn('PostHog capture failed:', error);
   }
