@@ -766,6 +766,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.EXIT &&
         subtype !== TileSubtype.CAVE_OPENING &&
+        // Boss entrances render their own cave/portal art (and the dark portal is
+        // intentionally invisible while lit) — never fall back to a "?" glyph.
+        subtype !== TileSubtype.BOSS_ENTRANCE &&
+        subtype !== TileSubtype.DARK_PORTAL &&
         // Exclude pots/rocks and revealed items from generic rendering
         subtype !== TileSubtype.POT &&
         subtype !== TileSubtype.ROCK &&
@@ -991,6 +995,39 @@ export const Tile: React.FC<TileProps> = ({
             }}
           />
         )}
+
+        {/* Boss-room entrance: a lockless cave mouth (same art as CAVE_OPENING).
+            Always visible; stepping onto it warps into the boss arena. */}
+        {subtypes?.includes(TileSubtype.BOSS_ENTRANCE) && (
+          <div
+            key="boss-entrance"
+            data-testid={`subtype-icon-${TileSubtype.BOSS_ENTRANCE}`}
+            className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+            style={{
+              backgroundImage: `url('/images/door/exit-dark.png')`,
+            }}
+          />
+        )}
+
+        {/* Douse-to-see portal: a glowing entrance that only appears once the
+            hero's torch is OUT (true darkness). Invisible + inert in the light. */}
+        {subtypes?.includes(TileSubtype.DARK_PORTAL) &&
+          isVisible &&
+          !heroTorchLit &&
+          !suppressDarknessOverlay && (
+            <div
+              key="dark-portal"
+              data-testid={`subtype-icon-${TileSubtype.DARK_PORTAL}`}
+              className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+              style={{
+                backgroundImage: `url('/images/door/exit-dark.png')`,
+                filter: "brightness(1.7)",
+                boxShadow:
+                  "0 0 14px 5px rgba(120, 200, 255, 0.9), inset 0 0 10px rgba(170, 225, 255, 0.7)",
+                borderRadius: "6px",
+              }}
+            />
+          )}
 
         {/* Render POT/ROCK/FOOD/MED with assets if present */}
         {hasPot(subtypes) && (() => {
