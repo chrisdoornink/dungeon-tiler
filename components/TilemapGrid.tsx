@@ -5812,7 +5812,14 @@ function renderTileGrid(
         Array.isArray(subtype) &&
         (subtype.includes(TileSubtype.WALL_TORCH) || subtype.includes(TileSubtype.LAVA));
       const isTorchCarrier = torchCarrierPositions.has(`${rowIndex},${colIndex}`);
-      if (isSelfTorch || isTorchCarrier) tier = Math.max(tier, 3);
+      // The douse-to-see portal is its own light source while the torch is OUT: it
+      // stays lit as a beacon no matter how far away, so it can actually be found on
+      // a full-size dark level (adjacency-only would be near impossible to discover).
+      const isDarkPortalBeacon =
+        Array.isArray(subtype) &&
+        subtype.includes(TileSubtype.DARK_PORTAL) &&
+        !heroTorchLit;
+      if (isSelfTorch || isTorchCarrier || isDarkPortalBeacon) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength
       if (g === ADJACENT_GLOW) {
         tier = Math.max(tier, 2);
@@ -5901,7 +5908,7 @@ function renderTileGrid(
           style={(() => {
             const wrapperStyle: React.CSSProperties = {};
             // Raise z-index so lit tiles appear above the dark vignette overlay
-            if (g != null || isSelfTorch) {
+            if (g != null || isSelfTorch || isDarkPortalBeacon) {
               wrapperStyle.zIndex = 10050;
             }
             // Desync each torch tile's flicker so neighbors don't pulse in

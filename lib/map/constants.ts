@@ -118,6 +118,15 @@ export enum TileSubtype {
   LAVA = 60,
   OBSIDIAN = 61,
   STEPPING_STONE = 62,
+  // Boss-room entrances (see .claude/features/boss-daily-entrances/index.md).
+  // BOSS_ENTRANCE is a lockless cave mouth (renders like CAVE_OPENING) that warps
+  // the hero into the boss arena when stepped on — used behind a moat and in the
+  // outside world. DARK_PORTAL is the "douse-to-see" variant: it is invisible and
+  // inert while the hero's torch is lit, and only appears + warps once the torch is
+  // out (snuffed by deep water). Kept distinct from CAVE_OPENING so story-mode cave
+  // visuals never accidentally trigger a boss warp.
+  BOSS_ENTRANCE = 63,
+  DARK_PORTAL = 64,
 }
 
 /**

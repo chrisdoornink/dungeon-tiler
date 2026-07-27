@@ -52,6 +52,7 @@ import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapFo
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
+import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
@@ -1640,6 +1641,16 @@ export interface GameState {
   // wall and steps into the outdoor grassland. Persists across returns/floors so
   // analytics can record that the hidden outside world was found.
   reachedOutsideWorld?: boolean;
+  // Boss-room entrances (see .claude/features/boss-daily-entrances/index.md).
+  // inBossRoom: transient, true while the hero is inside a boss arena.
+  // reachedBossRoom: run-level latch, true once a boss arena was entered this run.
+  // bossArenaSeed: which elemental Shaper arena to build on entry (defaults lava).
+  // outsideHasBossEntrance: when true, the outside world built from this floor
+  // carves a hidden boss entrance in its far tree wall (a boss-day marker).
+  inBossRoom?: boolean;
+  reachedBossRoom?: boolean;
+  bossArenaSeed?: "water" | "lava";
+  outsideHasBossEntrance?: boolean;
   // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
   // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
   // in it are blinded. Undefined / absent outside the realm.
@@ -2497,7 +2508,8 @@ function enterOutsideWorld(
   const { mapData: outsideMap, enemies: outsideEnemies, entry } = buildOutsideWorld(
     direction,
     width,
-    height
+    height,
+    { bossEntrance: state.outsideHasBossEntrance }
   );
   const dungeonReturn = {
     mapData: removePlayerFromMapData(state.mapData),
@@ -2706,6 +2718,48 @@ function returnFromPinkRealm(
   };
 }
 
+// Map the hero's step direction to the arena edge they arrive at (walking DOWN into
+// the mouth drops them in at the north edge, and so on).
+const BOSS_ENTRY_BY_DIRECTION: Record<Direction, ShaperEntry> = {
+  [Direction.DOWN]: "north",
+  [Direction.UP]: "south",
+  [Direction.RIGHT]: "west",
+  [Direction.LEFT]: "east",
+};
+
+/**
+ * Step onto a boss-room entrance (a lockless cave mouth, or a dark portal while the
+ * torch is out) -> warp into the boss arena. Mirrors enterPinkRealm: swap in the
+ * freshly built arena map + enemies, carry the run's vitals/inventory, and latch the
+ * reachedBossRoom secret flag. For now every entrance leads to the Shaper; the
+ * elemental variant is chosen by bossArenaSeed (default lava).
+ */
+function enterBossRoom(state: GameState, direction: Direction): GameState {
+  const seed: "water" | "lava" = state.bossArenaSeed === "water" ? "water" : "lava";
+  const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
+  const arena = buildShaperArena({ name: "boss", seed }, entry);
+  return {
+    ...arena,
+    // Carry the run's vitals + inventory into the fight (arena provides defaults).
+    heroHealth: state.heroHealth ?? arena.heroHealth,
+    heroMaxHealth: state.heroMaxHealth ?? arena.heroMaxHealth,
+    heroAttack: state.heroAttack ?? arena.heroAttack,
+    hasSword: state.hasSword ?? arena.hasSword,
+    hasShield: state.hasShield ?? false,
+    rockCount: state.rockCount ?? arena.rockCount,
+    runeCount: state.runeCount ?? arena.runeCount,
+    bombCount: state.bombCount ?? 0,
+    // Preserve run-level secret flags discovered before the boss.
+    reachedPinkRealm: state.reachedPinkRealm,
+    reachedOutsideWorld: state.reachedOutsideWorld,
+    inBossRoom: true,
+    reachedBossRoom: true,
+    playerDirection: direction,
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
 // A "chase hit": the hero lands a clipping melee blow on a pink goblin that just fled
 // from point-blank range. Pink goblins retreat when you're adjacent (see their behavior),
 // vacating the tile before the hero's strike resolves — so a melee-only hero could chase
@@ -2883,6 +2937,26 @@ function movePlayerCore(
       } else if (!pinkRingClaimedByLiving(gameState, newY, newX)) {
         return enterPinkRealm(gameState, [newY, newX], direction);
       }
+    }
+  }
+
+  // Stepping onto a boss-room entrance warps into the boss arena. A BOSS_ENTRANCE
+  // (lockless cave mouth) always triggers; a DARK_PORTAL only triggers while the
+  // hero's torch is OUT (it is invisible and inert in the light). Never re-triggers
+  // once already inside a boss room.
+  if (!gameState.inBossRoom) {
+    const destTile = gameState.mapData.tiles[newY]?.[newX];
+    const destSubs = gameState.mapData.subtypes[newY]?.[newX] ?? [];
+    const onFloor = destTile === FLOOR || destTile === FLOWERS;
+    if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
+      return enterBossRoom(gameState, direction);
+    }
+    if (
+      onFloor &&
+      destSubs.includes(TileSubtype.DARK_PORTAL) &&
+      gameState.heroTorchLit === false
+    ) {
+      return enterBossRoom(gameState, direction);
     }
   }
 
@@ -3771,7 +3845,12 @@ function movePlayerCore(
       // into deep water) are floor overlays the player stands on.
       destSubtypes.includes(TileSubtype.SHALLOW_WATER) ||
       destSubtypes.includes(TileSubtype.DEEP_WATER) ||
-      destSubtypes.includes(TileSubtype.STEPPING_STONE)
+      destSubtypes.includes(TileSubtype.STEPPING_STONE) ||
+      // Boss entrances are floor overlays: a BOSS_ENTRANCE always warps before we
+      // get here, but a DARK_PORTAL walked over in the light is inert and must be
+      // preserved (not wiped) so it still works once the torch goes out.
+      destSubtypes.includes(TileSubtype.BOSS_ENTRANCE) ||
+      destSubtypes.includes(TileSubtype.DARK_PORTAL)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
