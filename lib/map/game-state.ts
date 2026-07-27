@@ -2750,6 +2750,23 @@ function applyHeroChaseHit(
   }
 }
 
+// Lava that appears UNDER the hero (e.g. the Shaper's fire raining down onto the
+// tile they're standing on) is lethal even without a step. Stepping onto lava is
+// already fatal in the movement resolver; this catches lava that materialized
+// beneath a hero who didn't move. A living hero can only be on a lava tile if it
+// spawned under them, so this never false-fires.
+function killIfStandingOnLava(state: GameState): GameState {
+  if (state.heroHealth <= 0) return state;
+  const pos = findPlayerPosition(state.mapData);
+  if (!pos) return state;
+  const subs = state.mapData.subtypes[pos[0]]?.[pos[1]] ?? [];
+  if (subs.includes(TileSubtype.LAVA) && !subs.includes(TileSubtype.OBSIDIAN)) {
+    state.heroHealth = 0;
+    if (!state.deathCause) state.deathCause = { type: "lava" };
+  }
+  return state;
+}
+
 export function movePlayer(
   gameState: GameState,
   direction: Direction
@@ -2782,7 +2799,7 @@ export function movePlayer(
       }
     }
   }
-  const detonated = detonateLiveBombs(result);
+  const detonated = killIfStandingOnLava(detonateLiveBombs(result));
   // Drift the pink mist one turn as the hero MOVES through the realm — only while already
   // in the realm (not the entry/exit turn) so the freshly-seeded cloud holds for a beat.
   // Standing actions (throwing, using items) blind mist-covered enemies but deliberately

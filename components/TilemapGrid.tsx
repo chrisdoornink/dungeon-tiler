@@ -37,6 +37,12 @@ import {
   EnemyRegistry,
   type EnemyKind,
 } from "../lib/enemies/registry";
+import {
+  shaperRevealTiles,
+  shaperPendingFire,
+  shaperFireLaunch,
+  shaperWallReveal,
+} from "../lib/bosses/shaper";
 import MobileControls from "./MobileControls";
 import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
@@ -161,6 +167,7 @@ const ENEMY_NUMBER_COLOR: Record<string, string> = {
   "white-goblin": "#eaeaea",
   snake: "#74e06f",
   ghost: "#c3eeff",
+  shaper: "#b07bff",
 };
 const HERO_DAMAGE_COLOR = "#f1c27d"; // hero skin tone — clearly "the hero lost HP"
 const HERO_HEAL_COLOR = "#6afc7a"; // green = healing
@@ -223,6 +230,12 @@ interface TilemapGridProps {
    * uses this to hand off to /daily-new floor 2 with carried inventory).
    */
   onWin?: (finalState: GameState) => void;
+  /**
+   * Non-daily death hook (mirror of onWin). Fires once when the hero dies with
+   * no checkpoint to revive from. When provided, suppresses the death-screen /
+   * `/end` redirect so a sandbox page can offer its own in-place reset.
+   */
+  onDeath?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
   // Notify parent where the hero is (floor number + pink realm status) so it
   // can render a location title. Fires on mount and whenever either changes.
@@ -238,6 +251,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   isDailyChallenge = false,
   onDailyComplete,
   onWin,
+  onDeath,
   storageSlot,
   onLocationChange,
 }) => {
@@ -338,6 +352,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Screen shake state
   const [isShaking, setIsShaking] = useState(false);
+  // Per-shake intensity (px). Most shakes use the default 4; the Shaper's
+  // terrain reshape requests a bigger jolt so the no-telegraph attack is felt.
+  const [shakeIntensity, setShakeIntensity] = useState(4);
 
   // Item pickup animation state
   const [itemPickupAnimations, setItemPickupAnimations] = useState<Array<{
@@ -2677,7 +2694,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   };
 
   // Helper function to trigger screen shake
-  const triggerScreenShake = (duration = 200) => {
+  const triggerScreenShake = (duration = 200, intensity = 4) => {
+    setShakeIntensity(intensity);
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), duration);
   };
@@ -2695,6 +2713,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     lastBombBlastKeyRef.current = key;
     triggerScreenShake(360);
   }, [gameState?.recentBombBlasts]);
+
+  // Shake the screen once per Shaper action: a terrain reshape (water flood /
+  // fire rain-down) OR a fire launch (lava rocketing up). Keyed on nonces so
+  // each fires exactly once.
+  const lastShaperAttackRef = useRef<number>(0);
+  const lastShaperLaunchRef = useRef<number>(0);
+  const lastShaperWallRef = useRef<number>(0);
+  useEffect(() => {
+    const shaper = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
+    const mem = shaper?.behaviorMemory as Record<string, unknown> | undefined;
+    const launch = shaperFireLaunch(mem);
+    if (launch != null && launch !== lastShaperLaunchRef.current) {
+      lastShaperLaunchRef.current = launch;
+      triggerScreenShake(300, 8); // the boss hurls fire skyward
+      return;
+    }
+    const wall = shaperWallReveal(mem);
+    if (wall && wall.nonce !== lastShaperWallRef.current) {
+      lastShaperWallRef.current = wall.nonce;
+      triggerScreenShake(240, 6); // a wall grinds up out of the ground
+      return;
+    }
+    const atk = shaperRevealTiles(mem);
+    if (!atk) return;
+    if (atk.nonce === lastShaperAttackRef.current) return;
+    lastShaperAttackRef.current = atk.nonce;
+    triggerScreenShake(360, 10); // terrain reshapes underfoot
+  }, [gameState]);
 
   useEffect(() => {
     try {
@@ -2802,6 +2848,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
 
     if (shouldAnimateHeroDeath && heroDeathPhase !== "complete") {
+      return;
+    }
+
+    // Sandbox/test hook: the parent owns the death (in-place reset). Skip the
+    // death screen, analytics, and every redirect; just clear our save slot.
+    if (onDeath && !isDailyChallenge && gameState.mode !== "story") {
+      setGameCompletionProcessed(true);
+      triggerScreenShake(400);
+      try {
+        if (typeof window !== "undefined") {
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
+        }
+      } catch {
+        // ignore storage errors
+      }
+      onDeath(gameState);
       return;
     }
 
@@ -3028,6 +3090,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.stats,
     isDailyChallenge,
     onDailyComplete,
+    onDeath,
     router,
     resolvedStorageSlot,
     heroDeathPhase,
@@ -3896,7 +3959,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           </div>
         </div>
       )}
-      <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
+      <ScreenShake isShaking={isShaking} intensity={shakeIntensity} duration={300}>
         <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
           {checkpointFlash && (
             <div className="absolute top-4 right-4 z-50">
@@ -4634,6 +4697,138 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       />
                     );
                   })()}
+                {/* Shaper attack reveal: NO telegraph — when the boss reshapes
+                    the ground, its tiles flash in outward (closest-first) over
+                    the freshly-placed lava/water, so the change reads as a fast
+                    real-time spread. Keyed on the attack nonce so it plays once
+                    per attack. The screen shake is fired from an effect below. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const atk = shaperRevealTiles(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!atk) return null;
+                  const tileSize = 40;
+                  const isLava = atk.element === "lava";
+                  const color = isLava ? "#ff5a2c" : "#3aa0ff";
+                  return atk.tiles.map(([ty, tx], i) => (
+                    <div
+                      key={`shaper-reveal-${atk.nonce}-${ty}-${tx}`}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize}px`,
+                        top: `${ty * tileSize}px`,
+                        width: `${tileSize}px`,
+                        height: `${tileSize}px`,
+                        backgroundColor: color,
+                        borderRadius: "3px",
+                        zIndex: 11000,
+                        opacity: 0,
+                        // fast outward sweep: ~45ms per ring-step, then fade to
+                        // reveal the real terrain underneath.
+                        animation: `shaperReveal 260ms ease-out ${i * 45}ms both`,
+                      }}
+                    />
+                  ));
+                })()}
+                {/* Shaper FIRE telegraph: a subtle warm glow on the tiles where
+                    fire will rain down NEXT turn — the fair warning to step off. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const pending = shaperPendingFire(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!pending) return null;
+                  const tileSize = 40;
+                  return pending.map(([ty, tx]) => (
+                    <div
+                      key={`shaper-fire-glow-${ty}-${tx}`}
+                      data-testid="shaper-fire-glow"
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize + 4}px`,
+                        top: `${ty * tileSize + 4}px`,
+                        width: `${tileSize - 8}px`,
+                        height: `${tileSize - 8}px`,
+                        borderRadius: "50%",
+                        background:
+                          "radial-gradient(circle, rgba(255,140,60,0.5) 0%, rgba(255,90,30,0.16) 65%, transparent 100%)",
+                        zIndex: 10800,
+                        animation: "shaperFireGlow 900ms ease-in-out infinite",
+                      }}
+                    />
+                  ));
+                })()}
+                {/* Shaper FIRE launch: a column of lava rockets up out of view
+                    from the boss the turn it hurls fire skyward. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const nonce = shaperFireLaunch(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (nonce == null) return null;
+                  const tileSize = 40;
+                  return (
+                    <div
+                      key={`shaper-fire-launch-${nonce}`}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${shaper.x * tileSize + tileSize / 2 - 9}px`,
+                        top: 0,
+                        width: "18px",
+                        height: `${shaper.y * tileSize + tileSize / 2}px`,
+                        background:
+                          "linear-gradient(to top, rgba(255,90,30,0.9), rgba(255,170,70,0.5) 45%, transparent)",
+                        zIndex: 12200,
+                        opacity: 0,
+                        animation: "shaperFireLaunch 520ms ease-out both",
+                      }}
+                    />
+                  );
+                })()}
+                {/* Shaper WALL raise: a quick stone flash as a fresh wall rises. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const wall = shaperWallReveal(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!wall) return null;
+                  const tileSize = 40;
+                  return wall.tiles.map(([ty, tx]) => (
+                    <div
+                      key={`shaper-wall-${wall.nonce}-${ty}-${tx}`}
+                      data-testid="shaper-wall-rise"
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize}px`,
+                        top: `${ty * tileSize}px`,
+                        width: `${tileSize}px`,
+                        height: `${tileSize}px`,
+                        borderRadius: "3px",
+                        backgroundColor: "#7c8288",
+                        zIndex: 12100,
+                        opacity: 0,
+                        animation: "shaperReveal 300ms ease-out both",
+                      }}
+                    />
+                  ));
+                })()}
                 {/* Bomb detonation: the three BAM frames layered and scaled up over the
                     3x3 blast, triggered in a staggered sequence for a big cartoon boom. */}
                 {(gameState.recentBombBlasts ?? []).length > 0 &&
@@ -5762,6 +5957,7 @@ function renderTileGrid(
                 | "stone-goblin"
                 | "snake"
                 | "white-goblin"
+                | "shaper"
                 | undefined
             }
             enemySwarmCount={swarmCountAtTile}

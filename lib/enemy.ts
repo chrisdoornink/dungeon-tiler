@@ -51,12 +51,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' = 'fire-goblin';
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -99,6 +99,12 @@ export class Enemy {
       // also updates maxHealth so the HUD reflects the buffed baseline.
       this.health = 1;
       this.attack = 1;
+    } else if (k === 'shaper') {
+      // The Shaper boss: low HP (reaching it is the challenge, not out-damaging
+      // it). attack 0 — it never deals contact damage; its weapon is the terrain
+      // it reshapes. Melee against it uses the standard formula (see registry).
+      this.health = 5;
+      this.attack = 0;
     }
     this.maxHealth = this.health;
   }
@@ -355,7 +361,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin',
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper',
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -483,8 +489,8 @@ export type PlainEnemy = {
   id?: string;
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -507,7 +513,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin') {
+    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects

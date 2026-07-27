@@ -2,7 +2,8 @@
 import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin";
+import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -1087,6 +1088,26 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         }
         return 0;
       },
+    },
+  },
+  "shaper": {
+    kind: "shaper",
+    displayName: "The Shaper",
+    assets: {
+      // Placeholder art: reuse the pink-goblin (magician) sprite, tinted via a
+      // kind filter in Tile.tsx until dedicated Shaper art exists.
+      front: "/images/enemies/fire-goblin/pink-goblin-ringless-front.png",
+      left: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
+      right: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
+      back: "/images/enemies/fire-goblin/pink-goblin-ringless-back.png",
+    },
+    base: { health: SHAPER_HP, attack: 0 },
+    // Standard melee: once you fight through its terrain and reach it, it dies
+    // like anything else (low HP). The challenge is the crossing, not the kill.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: shaperUpdate,
     },
   },
 };

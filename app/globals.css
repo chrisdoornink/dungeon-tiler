@@ -546,6 +546,52 @@ body {
   }
 }
 
+/* The Shaper's terrain reshape: each affected tile flashes in (staggered by
+   distance so the change sweeps outward), then fades to reveal the real
+   lava/water tile placed underneath. Fast, so it reads as a real-time spread. */
+@keyframes shaperReveal {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+  45% {
+    transform: scale(1.12);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+/* The Shaper's fire telegraph: a gentle warm pulse on tiles about to be hit. */
+@keyframes shaperFireGlow {
+  0%, 100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.04);
+  }
+}
+
+/* Lava rocketing up out of view the turn the Shaper launches fire. */
+@keyframes shaperFireLaunch {
+  0% {
+    opacity: 0;
+    transform: translateY(35%) scaleY(0.6);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(0) scaleY(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-25%) scaleY(1.1);
+  }
+}
+
 /* Item pickup animation - center screen scale up and fade */
 @keyframes itemPickupCenter {
   0% {
