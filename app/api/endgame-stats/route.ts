@@ -6,6 +6,7 @@ import {
   type StatsDayPayload,
 } from "../../../lib/stats/endgame_stats";
 import { level2ChestStatusForDate } from "../../../lib/stats/daily_chest";
+import { bossDayInfoForDate } from "../../../lib/stats/boss_day";
 
 // Reads historical daily runs out of PostHog for the endgame stats dashboard.
 // This is a read path (PostHog Query / HogQL) and needs a *personal* API key +
@@ -47,6 +48,10 @@ const ROW_COLUMNS = [
   "collected_chest_items",
   "death_cause",
   "death_cause_enemy_kind",
+  "reached_boss_room",
+  "boss_defeated",
+  "boss_entrance_kind",
+  "boss_kind",
 ] as const;
 
 // PostHog type-infers `date_seed` as a DateTime (it looks like a date), so
@@ -77,7 +82,11 @@ const ROW_SELECT = `
   properties.reached_pink_realm AS reached_pink_realm,
   properties.collected_chest_items AS collected_chest_items,
   properties.death_cause AS death_cause,
-  properties.death_cause_enemy_kind AS death_cause_enemy_kind
+  properties.death_cause_enemy_kind AS death_cause_enemy_kind,
+  properties.reached_boss_room AS reached_boss_room,
+  properties.boss_defeated AS boss_defeated,
+  properties.boss_entrance_kind AS boss_entrance_kind,
+  properties.boss_kind AS boss_kind
 `;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -193,10 +202,11 @@ export async function GET(req: NextRequest) {
     const groupedByDate = new Map(grouped.map((g) => [g.date, g]));
 
     // Preserve the newest-first order from query 1, and attach the deterministic
-    // Level 2 chest status for each day.
+    // Level 2 chest status + boss-entrance kind for each day.
     const payloadDays: StatsDayPayload[] = pageDays.map((date) => {
       const g = groupedByDate.get(date);
       const chestStatus = level2ChestStatusForDate(date);
+      const bossDay = bossDayInfoForDate(date);
       return {
         date,
         chests: {
@@ -207,6 +217,7 @@ export async function GET(req: NextRequest) {
           })),
           bombAvailable: chestStatus.bombAvailable,
         },
+        bossDay,
         summary: g?.summary ?? {
           total: 0,
           wins: 0,
@@ -216,6 +227,8 @@ export async function GET(req: NextRequest) {
           reachedOutsideWorld: 0,
           blewUpTree: 0,
           avgLevelReached: null,
+          reachedBossRoom: 0,
+          bossDefeated: 0,
         },
         games: g?.games ?? [],
       };

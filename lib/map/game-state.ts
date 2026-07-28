@@ -1658,6 +1658,14 @@ export interface GameState {
   // Latches when the Shaper dies (gold key dropped). Run-level, so the endgame can
   // report the boss kill even after the hero leaves the arena.
   bossDefeated?: boolean;
+  // Which of the four daily doors led here (bomb/douse/moat-lava/moat-water) — set
+  // once, the day the entrance was rolled, so analytics can report which kind of
+  // exit that day's boss room had (independent of whether the hero ever finds it).
+  bossEntranceKind?: BossEntranceKind;
+  // Which boss is in the room. Only "shaper" exists today, but this is set (rather
+  // than inferred from the live enemies array, which is empty after the kill or the
+  // hero leaving) so future boss variety is reportable per run from day one.
+  bossKind?: "shaper";
   bossArenaSeed?: "water" | "lava";
   outsideHasBossEntrance?: boolean;
   // The floor to restore when the hero walks back out of a boss arena. Kept
@@ -2275,6 +2283,9 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     win: false, // Reset win state
     // Boss room for the day: which elemental arena the entrance opens into, and (for
     // the bomb entrance) permission for the outside world to carve its hidden mouth.
+    // bossEntranceKind is persisted even if the hero never finds the entrance, so
+    // analytics can report what kind of door the day actually had.
+    bossEntranceKind: bossEntrance ?? undefined,
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
     outsideHasBossEntrance: bossEntrance === "bomb",
     recentDeaths: [],
@@ -2835,6 +2846,7 @@ function enterBossRoom(
     npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
+    bossKind: "shaper",
     playerDirection: direction,
     // Stash the floor exactly as it was (player lifted out) so the way back is a
     // faithful restore. Kept in its own field: dungeonReturn is already in use by

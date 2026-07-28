@@ -47,6 +47,15 @@ const LOOT_META: Record<string, { icon: string; label: string }> = {
   pink_heart: { icon: ICON.pinkHeart, label: "Pink Heart" },
 };
 
+// The four daily boss-entrance kinds (see boss_day.ts). Emoji only — no dedicated
+// art yet — matching the ice+skull+fire boss identity used in the casualty list.
+const BOSS_ENTRANCE_META: Record<string, { emoji: string; label: string }> = {
+  bomb: { emoji: "🧨", label: "Bomb wall" },
+  douse: { emoji: "🌑", label: "Douse portal" },
+  "moat-lava": { emoji: "🌋", label: "Lava moat" },
+  "moat-water": { emoji: "🌊", label: "Water moat" },
+};
+
 const DAYS_PER_PAGE = 3;
 
 function PixelImg({
@@ -293,6 +302,18 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
         {g.treesDestroyed > 0 ? (
           <PixelImg src={ICON.tree} alt="Blew up a tree" size={16} title={`Blew up ${g.treesDestroyed} tree(s)`} />
         ) : null}
+        {g.bossDefeated ? (
+          <span
+            title={`Slew the boss (${g.bossKind ?? "shaper"}) via ${g.bossEntranceKind ?? "unknown"} entrance`}
+            style={{ fontSize: 14 }}
+          >
+            ❄️💀🔥
+          </span>
+        ) : g.reachedBossRoom ? (
+          <span title="Found the boss room, but didn't defeat it" style={{ fontSize: 14, opacity: 0.5 }}>
+            ❄️💀🔥
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -390,6 +411,28 @@ function DayCard({ day }: { day: StatsDayPayload }) {
           >
             {day.chests.bombAvailable ? "BOMB DAY" : "NO BOMB"}
           </span>
+          {day.bossDay.entranceKind ? (
+            <span
+              className="pixel-text"
+              style={{
+                fontSize: 10,
+                padding: "3px 6px",
+                borderRadius: 3,
+                color: C.text,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+              title={`Today's boss room is reached via: ${
+                BOSS_ENTRANCE_META[day.bossDay.entranceKind]?.label ?? day.bossDay.entranceKind
+              } (computed from the date, independent of who played)`}
+            >
+              <span>{BOSS_ENTRANCE_META[day.bossDay.entranceKind]?.emoji ?? "❄️💀🔥"}</span>
+              {(BOSS_ENTRANCE_META[day.bossDay.entranceKind]?.label ?? day.bossDay.entranceKind).toUpperCase()}
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -404,6 +447,12 @@ function DayCard({ day }: { day: StatsDayPayload }) {
         <StatChip icon={ICON.pinkHeart} value={s.reachedPinkRealm} label="pink realm" accent={C.text} />
         <StatChip icon={ICON.portal} value={s.reachedOutsideWorld} label="outside" accent={C.text} />
         <StatChip icon={ICON.tree} value={s.blewUpTree} label="tree" accent={C.text} />
+        {day.bossDay.entranceKind ? (
+          <>
+            <StatChip emoji="❄️💀🔥" value={s.reachedBossRoom} label="found boss" accent={C.text} />
+            <StatChip emoji="❄️💀🔥" value={s.bossDefeated} label="boss slain" accent={C.win} />
+          </>
+        ) : null}
       </div>
 
       {/* per-game rows */}
