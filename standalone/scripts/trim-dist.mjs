@@ -13,13 +13,14 @@ const dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMAGES = path.resolve(dirname, "../dist/images");
 const MAX_DIM = 256;
 
-// Directories that are story/town-only — never rendered in endless mode.
+// Directories that are story/town/daily-only — never rendered in endless mode.
 const REMOVE = [
   "npcs",
   "dog-golden",
   "hanging-signs",
   "roof",
   "items/beds",
+  "enemies/bosses", // the Shaper puzzle boss is daily/test-only, not in endless
 ];
 
 function dirSize(dir) {
