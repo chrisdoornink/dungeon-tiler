@@ -2,6 +2,11 @@ import { Enemy } from "../../lib/enemy";
 import { movePlayer, Direction, TileSubtype } from "../../lib/map";
 import type { GameState } from "../../lib/map/game-state";
 import {
+  buildShaperArena,
+  SHAPER_LAYOUTS,
+  SHAPER_ENTRIES,
+} from "../../lib/bosses/shaper_arena";
+import {
   planShaperAttack,
   executeShaperAttack,
   fireTargets,
@@ -500,3 +505,53 @@ function findHero(s: GameState): [number, number] {
       if (subs[y][x].includes(TileSubtype.PLAYER)) return [y, x];
   throw new Error("hero not found");
 }
+
+describe("the Shaper can never wall ITSELF in (real keep)", () => {
+  test("across many full fights in the actual arena it always leaves a way to it", () => {
+    let sawWalls = 0;
+    for (let seed = 1; seed <= 30; seed++) {
+      let s = buildShaperArena(
+        SHAPER_LAYOUTS[seed % 2],
+        SHAPER_ENTRIES[seed % 4],
+        mulberryish(seed)
+      );
+      forceStrat(s, "wall"); // force the wall brain for every one of these fights
+      s.combatRng = mulberryish(seed * 7 + 3);
+      const wallsAtStart = countWalls(s);
+      for (let t = 0; t < 60; t++) {
+        if ((s.enemies ?? []).length === 0) break; // slain -> it was reachable
+        // The boss always has a tile you could stand on to hit it...
+        expect(bossHasStandableNeighbor(s)).toBe(true);
+        // ...and that tile is still reachable from wherever the hero is.
+        expect(canStillReachBoss(s)).toBe(true);
+        s = movePlayer(s, stepTowardBoss(s));
+        if (s.heroHealth <= 0) break;
+      }
+      if (countWalls(s) > wallsAtStart) sawWalls++;
+    }
+    // Confirm the fights actually exercised wall-building (not a vacuous pass).
+    expect(sawWalls).toBeGreaterThan(0);
+  });
+
+  test("it never entombs itself even when already boxed on three sides", () => {
+    for (let seed = 1; seed <= 12; seed++) {
+      const s = buildShaperArena(SHAPER_LAYOUTS[0], "south", mulberryish(seed));
+      const boss = s.enemies!.find((e) => e.kind === "shaper")!;
+      // Pre-wall three of its four neighbours; the last one must survive.
+      const around: Array<[number, number]> = [
+        [boss.y - 1, boss.x],
+        [boss.y + 1, boss.x],
+        [boss.y, boss.x - 1],
+      ];
+      for (const [wy, wx] of around) s.mapData.tiles[wy][wx] = 1;
+      forceStrat(s, "wall");
+      s.combatRng = seed === 1 ? () => 0.5 : mulberryish(seed);
+      let cur = s;
+      for (let t = 0; t < 15; t++) {
+        cur = movePlayer(cur, stepTowardBoss(cur));
+        if ((cur.enemies ?? []).length === 0 || cur.heroHealth <= 0) break;
+        expect(bossHasStandableNeighbor(cur)).toBe(true);
+      }
+    }
+  });
+});

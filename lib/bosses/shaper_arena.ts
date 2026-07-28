@@ -43,36 +43,74 @@ const ENTRY_HERO: Record<ShaperEntry, [number, number]> = {
   west: [12, 1],
 };
 
+// The keep's own way out, on the side OPPOSITE the hero's entry: fight in, kill the
+// Shaper for its gold key in the middle, then leave through the far side instead of
+// backtracking. It sits on the outermost FLOOR tile of that side (the mirror of the
+// entry tile) rather than in the border wall, so it reads as a doorway you walk onto.
+const ENTRY_EXIT: Record<ShaperEntry, [number, number]> = {
+  south: [1, 12],
+  north: [SIZE - 2, 12],
+  east: [12, 1],
+  west: [12, SIZE - 2],
+};
+
 type Grid = number[][];
 type Subs = number[][][];
 type Side = "N" | "S" | "E" | "W";
 const SIDES: Side[] = ["N", "S", "E", "W"];
 
-// Gap coords for a side of the ring at `dist`. Narrow = the single center tile;
-// wide = that tile plus its two neighbours along the wall.
-function gapCoords(dist: number, side: Side, wide: boolean): Array<[number, number]> {
+// Gap coords for a side of the ring at `dist`, centred `offset` tiles along that side
+// (0 = the side's midpoint, which is where the sightlines run). Narrow = one tile; wide
+// = that tile plus its two neighbours along the wall.
+function gapCoords(
+  dist: number,
+  side: Side,
+  wide: boolean,
+  offset = 0
+): Array<[number, number]> {
   const spread = wide ? [-1, 0, 1] : [0];
-  if (side === "N") return spread.map((d) => [CENTER - dist, CENTER + d] as [number, number]);
-  if (side === "S") return spread.map((d) => [CENTER + dist, CENTER + d] as [number, number]);
-  if (side === "W") return spread.map((d) => [CENTER + d, CENTER - dist] as [number, number]);
-  return spread.map((d) => [CENTER + d, CENTER + dist] as [number, number]); // E
+  return spread.map((d) => {
+    const o = offset + d;
+    if (side === "N") return [CENTER - dist, CENTER + o] as [number, number];
+    if (side === "S") return [CENTER + dist, CENTER + o] as [number, number];
+    if (side === "W") return [CENTER + o, CENTER - dist] as [number, number];
+    return [CENTER + o, CENTER + dist] as [number, number]; // E
+  });
 }
 
-function shuffle<T>(arr: T[], rng: () => number): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+// The hall loops run at the ODD distances, between the ring walls.
+const CORRIDORS = [5, 7, 9, 11];
+/**
+ * How far off the midline each hall loop is cut. Nonzero on purpose: severing exactly
+ * on the midline would also block the boss's cardinal sightlines out of the chamber.
+ */
+const SEVER_OFFSET = 2;
+
+/** Which way the keep is traversed, from the entry side to the exit side. */
+type Axis = "NS" | "EW";
+const AXIS_FOR_ENTRY: Record<ShaperEntry, Axis> = {
+  north: "NS",
+  south: "NS",
+  east: "EW",
+  west: "EW",
+};
+
+/**
+ * Cut every hall loop at two points on the axis PERPENDICULAR to the entry→exit run, so
+ * the loops stop being loops: each becomes an entry-side arc and an exit-side arc that
+ * only meet through the middle. This is what stops you strolling around the outer rim
+ * to the exit — the Shaper's chamber is the sole way across the keep.
+ */
+function severCorridors(tiles: Grid, axis: Axis): void {
+  for (const d of CORRIDORS) {
+    if (axis === "NS") {
+      tiles[CENTER + SEVER_OFFSET][CENTER - d] = WALL;
+      tiles[CENTER + SEVER_OFFSET][CENTER + d] = WALL;
+    } else {
+      tiles[CENTER - d][CENTER + SEVER_OFFSET] = WALL;
+      tiles[CENTER + d][CENTER + SEVER_OFFSET] = WALL;
+    }
   }
-  return a;
-}
-
-// 1-2 random sides, excluding the neighbouring ring's sides (so outer tiers
-// misalign and you must go around).
-function chooseSides(rng: () => number, exclude: Set<Side>): Side[] {
-  const avail = SIDES.filter((s) => !exclude.has(s));
-  const count = Math.min(avail.length, 1 + Math.floor(rng() * 2));
-  return shuffle(avail, rng).slice(0, count);
 }
 
 function drawRing(tiles: Grid, dist: number, gaps: Array<[number, number]>): void {
@@ -133,14 +171,34 @@ export function buildShaperArena(
   );
   for (let y = 1; y < SIZE - 1; y++) for (let x = 1; x < SIZE - 1; x++) tiles[y][x] = FLOOR;
 
-  // Outer maze tiers: narrow, random, misaligned.
-  const s10 = chooseSides(rng, new Set());
-  const s8 = chooseSides(rng, new Set(s10));
-  drawRing(tiles, 10, s10.flatMap((s) => gapCoords(10, s, false)));
-  drawRing(tiles, 8, s8.flatMap((s) => gapCoords(8, s, false)));
+  const axis = AXIS_FOR_ENTRY[entry];
+  // The two sides the traverse runs through: one faces the entry, the other the exit.
+  // Every outer ring MUST be gapped on both, or one half of the keep would be sealed.
+  const axisSides: Side[] = axis === "NS" ? ["N", "S"] : ["E", "W"];
+  const crossSides: Side[] = axis === "NS" ? ["E", "W"] : ["N", "S"];
+
+  // Outer maze tiers: narrow gaps, slid to a random offset along each side so the halls
+  // still wind (you walk the arc hunting the next opening) — plus an optional dead-end
+  // opening on a cross side for a red herring.
+  const outerGaps = (dist: number): Array<[number, number]> => {
+    const span = dist - 2; // keep the opening clear of the ring's corners
+    const gaps = axisSides.flatMap((s) =>
+      gapCoords(dist, s, false, Math.floor(rng() * (2 * span + 1)) - span)
+    );
+    if (rng() < 0.5) {
+      const decoy = crossSides[Math.floor(rng() * crossSides.length)];
+      gaps.push(...gapCoords(dist, decoy, false, Math.floor(rng() * (2 * span + 1)) - span));
+    }
+    return gaps;
+  };
+  drawRing(tiles, 10, outerGaps(10));
+  drawRing(tiles, 8, outerGaps(8));
   // Inner tiers: wide, aligned, all four sides -> the boss can see you coming.
   drawRing(tiles, 6, SIDES.flatMap((s) => gapCoords(6, s, true)));
   drawRing(tiles, 4, SIDES.flatMap((s) => gapCoords(4, s, true)));
+  // Cut the loops so the rim can't be walked around: entry side and exit side now only
+  // connect through the Shaper's chamber.
+  severCorridors(tiles, axis);
 
   seedChamberTerrain(subtypes, layout.seed);
   scatterLoot(tiles, subtypes);
@@ -153,6 +211,13 @@ export function buildShaperArena(
 
   const [hy, hx] = ENTRY_HERO[entry];
   subtypes[hy][hx] = [TileSubtype.PLAYER];
+
+  // The way out, on the FLOOR of the far side. Visible from the moment you walk in (a
+  // promise of an escape you can't use yet): without the gold key you can stand on it
+  // and nothing happens; with the key the Shaper drops on death, it ends the run.
+  const [ey, ex] = ENTRY_EXIT[entry];
+  tiles[ey][ex] = FLOOR;
+  subtypes[ey][ex] = [TileSubtype.EXIT];
 
   tiles[CENTER][CENTER] = FLOOR;
   subtypes[CENTER][CENTER] = [];
