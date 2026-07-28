@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { assetUrl } from "../lib/asset_url";
+import { isStandalone } from "../lib/standalone_env";
 
 export interface MobileInventoryItem {
   key: string;
@@ -133,11 +134,12 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   // Check if screen width is less than 600px
   useEffect(() => {
     const checkMobile = () => {
-      // Treat a coarse pointer (touch) as mobile too, not just narrow widths — otherwise
-      // tablets and the CrazyGames fullscreen app (wide but touch-only) get the desktop
-      // keyboard layout with no on-screen controls. Both portals require touch controls
-      // on tablets.
+      // In the STANDALONE portal build only, treat a coarse pointer (touch) as mobile
+      // too, not just narrow widths — tablets and the CrazyGames fullscreen app are wide
+      // but touch-only and need the on-screen d-pad. Gated to standalone so the Next app's
+      // behavior (width-only) is unchanged.
       const coarsePointer =
+        isStandalone() &&
         typeof window.matchMedia === "function" &&
         window.matchMedia("(pointer: coarse)").matches;
       setIsMobile(window.innerWidth < 600 || coarsePointer);
