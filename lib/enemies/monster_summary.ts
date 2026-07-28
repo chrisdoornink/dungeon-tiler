@@ -70,6 +70,16 @@ const GROUP_DEFS: GroupDef[] = [
   },
   { key: "snake", label: "Snake", emoji: "🐍", rep: "snake", kinds: ["snake"] },
   { key: "wisp", label: "Wisp", emoji: "👻", rep: "ghost", kinds: ["ghost"] },
+  // The boss goes last so it reads as the headline kill of the run. Three glyphs
+  // (ice + skull + fire) capture its whole essence — a skeleton that wields water and
+  // lava — and make it unmistakably a boss beside the single-emoji enemies.
+  {
+    key: "shaper",
+    label: "The Shaper",
+    emoji: "❄️💀🔥",
+    rep: "shaper",
+    kinds: ["shaper"],
+  },
 ];
 
 // Reverse lookup: enemy kind -> its group definition.

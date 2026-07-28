@@ -573,3 +573,82 @@ export function buildBombOutsideApproach(): GameState {
     }
   );
 }
+
+// --- Daily-mode rotation -----------------------------------------------------
+//
+// One entrance per boss day. The BOMB entrance is the common case (~half of days)
+// and is self-gating: it only pays off if that run actually finds a bomb. The three
+// non-bomb kinds split the rest, and they're the ones that make a boss reachable on
+// a bombless day. Rolled inside the daily's seeded RNG block so every player gets
+// the same day.
+
+export type BossEntranceKind = "bomb" | "douse" | "moat-lava" | "moat-water";
+
+/** Chance a given daily floor 3 carries a boss entrance at all. 1 = every day. */
+export const BOSS_DAY_CHANCE = 1;
+/** Share of boss days that use the bombable-wall entrance. */
+export const BOMB_ENTRANCE_SHARE = 0.5;
+
+/**
+ * Pick the day's entrance. MUST be called inside the daily seeded RNG block
+ * (withPatchedMathRandom) so the choice is identical for every player that day.
+ *
+ * `bombAvailable` is the load-bearing part: the bomb entrance needs a bomb, and bombs
+ * only come from the Level 2 optional-chest pool (2 of 3 items drawn per run), so ~1 day
+ * in 3 has none. On those days the bomb slice is reassigned to the other three kinds —
+ * otherwise a bombless day would roll "bomb" and end up with NO reachable boss at all.
+ * Always consumes exactly two draws, whichever branch it takes.
+ */
+export function rollBossEntranceKind(opts?: {
+  bombAvailable?: boolean;
+}): BossEntranceKind | null {
+  if (Math.random() >= BOSS_DAY_CHANCE) return null; // not a boss day
+  const r = Math.random();
+  const bombOk = opts?.bombAvailable !== false;
+  if (bombOk && r < BOMB_ENTRANCE_SHARE) return "bomb";
+  // Position within the non-bomb portion: rescaled when bomb was eligible, or the
+  // whole roll when it wasn't (so the three split a bombless day evenly).
+  const t = bombOk ? (r - BOMB_ENTRANCE_SHARE) / (1 - BOMB_ENTRANCE_SHARE) : r;
+  if (t < 1 / 3) return "douse";
+  if (t < 2 / 3) return "moat-lava";
+  return "moat-water";
+}
+
+/** Which elemental Shaper arena an entrance leads into (the way in sets the mood). */
+export function arenaSeedForEntrance(kind: BossEntranceKind): MoatElement {
+  return kind === "moat-water" || kind === "douse" ? "water" : "lava";
+}
+
+/**
+ * Stamp the day's entrance into an already-generated daily floor. Returns false if the
+ * floor had no safe spot for it (caller just leaves that day bossless rather than
+ * risking a broken floor). "bomb" touches nothing here — it's carved into the outside
+ * world later, gated on state.outsideHasBossEntrance.
+ */
+export function stampBossEntranceOnFloor(
+  map: MapData,
+  kind: BossEntranceKind
+): boolean {
+  if (kind === "bomb") return true;
+  const [hy, hx] = findPlayerPos(map);
+  if (kind === "moat-lava") {
+    // 4-6 rocks to cross, straight-line only, and only ever gates the secret.
+    return stampStraightLavaSpur(map, 4 + Math.floor(Math.random() * 3));
+  }
+  if (kind === "moat-water") {
+    const before = countSubtype(map, TileSubtype.BOSS_ENTRANCE);
+    stampCornerMoat(map, "water");
+    return countSubtype(map, TileSubtype.BOSS_ENTRANCE) > before;
+  }
+  // douse: a few deep-water tiles to snuff the torch, plus the dark portal itself.
+  stampCornerWaterPatch(map, hy, hx);
+  const before = countSubtype(map, TileSubtype.DARK_PORTAL);
+  placeDarkPortal(map, hy, hx);
+  return countSubtype(map, TileSubtype.DARK_PORTAL) > before;
+}
+
+function countSubtype(map: MapData, sub: number): number {
+  let n = 0;
+  for (const row of map.subtypes) for (const cell of row) if (cell.includes(sub)) n++;
+  return n;
+}

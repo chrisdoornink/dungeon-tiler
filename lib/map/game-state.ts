@@ -53,6 +53,12 @@ import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
+import {
+  rollBossEntranceKind,
+  stampBossEntranceOnFloor,
+  arenaSeedForEntrance,
+  type BossEntranceKind,
+} from "../bosses/boss_entrances";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
@@ -1649,8 +1655,19 @@ export interface GameState {
   // carves a hidden boss entrance in its far tree wall (a boss-day marker).
   inBossRoom?: boolean;
   reachedBossRoom?: boolean;
+  // Latches when the Shaper dies (gold key dropped). Run-level, so the endgame can
+  // report the boss kill even after the hero leaves the arena.
+  bossDefeated?: boolean;
   bossArenaSeed?: "water" | "lava";
   outsideHasBossEntrance?: boolean;
+  // The floor to restore when the hero walks back out of a boss arena. Kept
+  // separate from dungeonReturn/realmReturn (a boss room can be entered from the
+  // dungeon OR from inside another sub-area, so the stashes must nest).
+  bossReturn?: {
+    mapData: MapData;
+    enemies?: PlainEnemy[];
+    position: [number, number];
+  };
   // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
   // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
   // in it are blinded. Undefined / absent outside the realm.
@@ -2127,6 +2144,13 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
 
   // Generate new map with floor-specific seed. The water roll MUST happen inside this
   // seeded block (before map generation) so daily maps stay deterministic.
+  // The day's boss entrance (floor 3 only), rolled inside the seeded block below so
+  // every player gets the same one. Null on a bombless-unlucky roll or when the floor
+  // had no safe spot for it — that day is simply bossless.
+  let bossEntrance: BossEntranceKind | null = null;
+  // Ghosts guaranteed on a douse day (they're how you go dark, and the tell).
+  const DOUSE_DAY_MIN_GHOSTS = 3;
+
   const newMapData = withPatchedMathRandom(rng, () => {
     const waterPlan = rollWaterPlan(nextFloor) ?? undefined;
     let mapData: MapData;
@@ -2135,6 +2159,19 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
       mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava, waterPlan });
+    }
+    // Floor 3 is the escape floor and the only one that hides a boss room. Stamped
+    // BEFORE enemies are placed (below) so nothing spawns inside the moat/lava.
+    if (nextFloor === 3) {
+      // The bombable-wall entrance is only offered when the day actually hands out a
+      // bomb (they come from the Level 2 optional-chest pool, which skips bombs ~1 day
+      // in 3). Otherwise that day gets a douse/moat entrance instead of an unreachable
+      // one. Chest allocation is fixed at run start, so this is stable for the day.
+      const bombAvailable = Object.values(currentState.floorChestAllocation ?? {}).some(
+        (a) => (a.chestContents ?? []).includes(TileSubtype.BOMB)
+      );
+      const kind = rollBossEntranceKind({ bombAvailable });
+      if (kind && stampBossEntranceOnFloor(mapData, kind)) bossEntrance = kind;
     }
     return mapData;
   });
@@ -2183,6 +2220,28 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           
           assignWhiteGoblinSwarmIds(placed);
         }
+        // On a DOUSE day the ghosts are the mechanism AND the signpost: they snuff the
+        // torch on contact, which is what reveals the dark portal, and their presence is
+        // the hint that something is hidden here. The normal floor-3 roll can hand out
+        // zero ghosts, which would leave the portal effectively undiscoverable — so top
+        // the floor up to a guaranteed few.
+        if (bossEntrance === "douse") {
+          const have = placed.filter((e) => e.kind === "ghost").length;
+          const need = DOUSE_DAY_MIN_GHOSTS - have;
+          if (need > 0 && playerPos) {
+            const extra = placeEnemies({
+              grid: newMapData.tiles,
+              subtypes: newMapData.subtypes,
+              player: { y: playerPos[0], x: playerPos[1] },
+              count: need,
+              minDistanceFromPlayer: 6,
+            });
+            extra.forEach((g) => {
+              g.kind = "ghost";
+              placed.push(g);
+            });
+          }
+        }
         // Floor 3 (escape floor): station one static guard next to the exit key so
         // collecting it always requires a fight. Inside this seeded block so the
         // guard position is deterministic per daily seed, like the rest of floor 3.
@@ -2193,9 +2252,16 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
       })
     : [];
 
-  // Add rune pots and snakes
-  const withRunes = addRunePotsForStoneExciters(newMapData, enemies);
-  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor: nextFloor });
+  // Add rune pots and snakes. These MUST run inside the seeded block like every other
+  // generation step: unseeded, two players on the same daily got different rune pots
+  // and different snakes (snakes are lethal and runes one-shot stone goblins, so it was
+  // a real fairness gap, not cosmetic).
+  const withRunes = withPatchedMathRandom(rng, () =>
+    addRunePotsForStoneExciters(newMapData, enemies)
+  );
+  const snakesAdded = withPatchedMathRandom(rng, () =>
+    addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
+  );
 
   // Create new game state preserving hero stats and inventory
   return {
@@ -2207,6 +2273,10 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
+    // Boss room for the day: which elemental arena the entrance opens into, and (for
+    // the bomb entrance) permission for the outside world to carve its hidden mouth.
+    bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
+    outsideHasBossEntrance: bossEntrance === "bomb",
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -2734,27 +2804,87 @@ const BOSS_ENTRY_BY_DIRECTION: Record<Direction, ShaperEntry> = {
  * reachedBossRoom secret flag. For now every entrance leads to the Shaper; the
  * elemental variant is chosen by bossArenaSeed (default lava).
  */
-function enterBossRoom(state: GameState, direction: Direction): GameState {
+function enterBossRoom(
+  state: GameState,
+  entrancePos: [number, number],
+  direction: Direction
+): GameState {
   const seed: "water" | "lava" = state.bossArenaSeed === "water" ? "water" : "lava";
   const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
   const arena = buildShaperArena({ name: "boss", seed }, entry);
+
+  // The arena tile the hero arrives on becomes the way back out (same subtype both
+  // ways, exactly like the pink realm's ring): step off it, then back onto it, to
+  // return to the dungeon. Stepping onto it is only a RETURN while inBossRoom, so it
+  // can never re-trigger the entry warp.
+  const arenaMap = arena.mapData;
+  const arrival = findPlayerPosition(arenaMap);
+  if (arrival) {
+    const [ay, ax] = arrival;
+    const cell = arenaMap.subtypes[ay][ax];
+    if (!cell.includes(TileSubtype.BOSS_ENTRANCE)) cell.push(TileSubtype.BOSS_ENTRANCE);
+  }
+
+  // Take ONLY the arena's map + boss from the builder; every other field must come
+  // from the live run, or entering the fight would wipe the run (exit key, stats,
+  // floor, daily mode, fog) — the builder's literal is standalone-harness defaults.
   return {
-    ...arena,
-    // Carry the run's vitals + inventory into the fight (arena provides defaults).
-    heroHealth: state.heroHealth ?? arena.heroHealth,
-    heroMaxHealth: state.heroMaxHealth ?? arena.heroMaxHealth,
-    heroAttack: state.heroAttack ?? arena.heroAttack,
-    hasSword: state.hasSword ?? arena.hasSword,
-    hasShield: state.hasShield ?? false,
-    rockCount: state.rockCount ?? arena.rockCount,
-    runeCount: state.runeCount ?? arena.runeCount,
-    bombCount: state.bombCount ?? 0,
-    // Preserve run-level secret flags discovered before the boss.
-    reachedPinkRealm: state.reachedPinkRealm,
-    reachedOutsideWorld: state.reachedOutsideWorld,
+    ...state,
+    mapData: arenaMap,
+    enemies: arena.enemies,
+    npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
     playerDirection: direction,
+    // Stash the floor exactly as it was (player lifted out) so the way back is a
+    // faithful restore. Kept in its own field: dungeonReturn is already in use by
+    // the outside world / pink realm, and a boss room can be entered from either.
+    bossReturn: {
+      mapData: removePlayerFromMapData(state.mapData),
+      enemies: serializeEnemies(state.enemies),
+      position: entrancePos,
+    },
+    mist: undefined, // realm mist doesn't follow you into the arena
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
+/**
+ * The Shaper's death drops the gold key that opens the arena's exit — the alternate
+ * ending. Detected centrally (comparing the pre-move state to the resolved one) rather
+ * than hooked into each of the many kill paths, so melee, thrown rocks and bombs all
+ * work. Idempotent via bossDefeated.
+ */
+function dropBossKeyOnDefeat(
+  after: GameState,
+  bossPosBefore: [number, number] | null
+): void {
+  if (!after.inBossRoom || after.bossDefeated) return;
+  if (!bossPosBefore) return; // no Shaper was alive going into this turn
+  if ((after.enemies ?? []).some((e) => e.kind === "shaper")) return; // still standing
+  // Prefer the recorded death tile; fall back to where it stood before the killing blow.
+  const deaths = after.recentDeaths ?? [];
+  const [ky, kx] = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
+  const cell = after.mapData.subtypes[ky]?.[kx];
+  if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+  after.bossDefeated = true;
+}
+
+/** Step back onto the arrival tile inside a boss arena -> restore the saved floor. */
+function returnFromBossRoom(
+  state: GameState,
+  direction: Direction
+): GameState | null {
+  const ret = state.bossReturn;
+  if (!ret) return null;
+  return {
+    ...state,
+    mapData: placePlayerAt(ret.mapData, ret.position),
+    enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
+    playerDirection: direction,
+    inBossRoom: false,
+    bossReturn: undefined,
     recentDeaths: [],
     recentBombBlasts: [],
   };
@@ -2829,8 +2959,16 @@ export function movePlayer(
   // position so stepping out of the 3x3 blast keeps the hero safe. (movePlayer never
   // places a bomb, so every BOMB_LIVE present was armed on a previous turn.) Skip
   // detonation on a floor transition — that floor is being replaced.
+  // Snapshot the Shaper's position BEFORE resolving the turn: movePlayerCore mutates
+  // the enemies array in place, so after the call the pre-state no longer shows it.
+  const bossBefore = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
+  const bossPosBefore: [number, number] | null = bossBefore
+    ? [bossBefore.y, bossBefore.x]
+    : null;
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
+  // Killing the Shaper drops the gold key for the arena's exit (alternate ending).
+  dropBossKeyOnDefeat(result, bossPosBefore);
   // Nightmare darkness drains the hero the deeper they wander. Apply only when the hero
   // actually MOVED while staying in the nightmare (not the entry step, the step back out,
   // or bumping a wall).
@@ -2944,19 +3082,27 @@ function movePlayerCore(
   // (lockless cave mouth) always triggers; a DARK_PORTAL only triggers while the
   // hero's torch is OUT (it is invisible and inert in the light). Never re-triggers
   // once already inside a boss room.
-  if (!gameState.inBossRoom) {
+  {
     const destTile = gameState.mapData.tiles[newY]?.[newX];
     const destSubs = gameState.mapData.subtypes[newY]?.[newX] ?? [];
     const onFloor = destTile === FLOOR || destTile === FLOWERS;
-    if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
-      return enterBossRoom(gameState, direction);
-    }
-    if (
-      onFloor &&
-      destSubs.includes(TileSubtype.DARK_PORTAL) &&
-      gameState.heroTorchLit === false
-    ) {
-      return enterBossRoom(gameState, direction);
+    if (gameState.inBossRoom) {
+      // Inside the arena the arrival tile is the way back to the dungeon.
+      if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
+        const back = returnFromBossRoom(gameState, direction);
+        if (back) return back;
+      }
+    } else {
+      if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
+        return enterBossRoom(gameState, [newY, newX], direction);
+      }
+      if (
+        onFloor &&
+        destSubs.includes(TileSubtype.DARK_PORTAL) &&
+        gameState.heroTorchLit === false
+      ) {
+        return enterBossRoom(gameState, [newY, newX], direction);
+      }
     }
   }
 
@@ -3211,7 +3357,9 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        const isFinalFloor = currentFloor >= maxFloors;
+        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
+        // outright, never advances a floor (there is no floor after the boss).
+        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning
@@ -3549,7 +3697,9 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        const isFinalFloor = currentFloor >= maxFloors;
+        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
+        // outright, never advances a floor (there is no floor after the boss).
+        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning

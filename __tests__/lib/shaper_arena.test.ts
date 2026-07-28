@@ -118,3 +118,69 @@ describe("Shaper randomized labyrinth", () => {
     }
   });
 });
+
+// The chamber is rows/cols 9-15 (Chebyshev dist <= 3 from centre).
+const CENTER_LO = 9;
+const CENTER_HI = 15;
+const inChamber = (y: number, x: number) =>
+  y >= CENTER_LO && y <= CENTER_HI && x >= CENTER_LO && x <= CENTER_HI;
+
+function findSubtype(state: GameState, sub: number): [number, number] | null {
+  const S = state.mapData.subtypes;
+  for (let y = 0; y < S.length; y++)
+    for (let x = 0; x < S[y].length; x++) if (S[y][x].includes(sub)) return [y, x];
+  return null;
+}
+
+/** Reachable tiles, optionally treating the Shaper's chamber as impassable. */
+function reachableAvoiding(
+  state: GameState,
+  from: [number, number],
+  skipChamber: boolean
+): Set<string> {
+  const T = state.mapData.tiles;
+  const H = T.length;
+  const W = T[0].length;
+  const seen = new Set<string>([`${from[0]},${from[1]}`]);
+  const q: Array<[number, number]> = [from];
+  while (q.length) {
+    const [y, x] = q.shift()!;
+    for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+      const ny = y + dy;
+      const nx = x + dx;
+      if (ny < 0 || nx < 0 || ny >= H || nx >= W) continue;
+      if (T[ny][nx] !== 0) continue; // walls block
+      if (skipChamber && inChamber(ny, nx)) continue;
+      const k = `${ny},${nx}`;
+      if (seen.has(k)) continue;
+      seen.add(k);
+      q.push([ny, nx]);
+    }
+  }
+  return seen;
+}
+
+describe("Shaper keep: the chamber is the only way across", () => {
+  for (const entry of SHAPER_ENTRIES) {
+    test(`from the ${entry} entry you CANNOT reach the exit without crossing the chamber`, () => {
+      for (let seed = 1; seed <= 40; seed++) {
+        const state = buildShaperArena(SHAPER_LAYOUTS[seed % 2], entry, mulberry32(seed));
+        const hero = findPlayer(state);
+        const exit = findSubtype(state, TileSubtype.EXIT);
+        expect(exit).not.toBeNull();
+        const [ey, ex] = exit!;
+        // The exit is a doorway you walk ONTO, so it must be floor.
+        expect(state.mapData.tiles[ey][ex]).toBe(0);
+
+        // Rim walk blocked: with the chamber sealed off, the exit is unreachable.
+        const detour = reachableAvoiding(state, hero, true);
+        expect(detour.has(`${ey},${ex}`)).toBe(false);
+        // ...but with the chamber open, the exit IS reachable (the keep stays solvable).
+        const full = reachableAvoiding(state, hero, false);
+        expect(full.has(`${ey},${ex}`)).toBe(true);
+        // And the chamber itself is reachable, so the fight is always available.
+        expect(full.has(`12,12`) || bossReachable(state)).toBe(true);
+      }
+    });
+  }
+});
