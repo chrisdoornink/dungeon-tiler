@@ -23,6 +23,11 @@ const WATER_CYCLE_S = 1.4;
 // not the torch's quick 0.52s flicker.
 const LAVA_CYCLE_S = 1.8;
 
+// The Shaper boss renders larger than a normal enemy so it reads as big + ominous.
+// ~1.5x tall; anchored at the feet (transformOrigin 50% 100%) so it grows upward and
+// its head spills into the tile above rather than sinking through the floor.
+const SHAPER_RENDER_SCALE = 1.5;
+
 // Submersion: standing in water hides the lower part of the hero sprite — waist-deep
 // in shallow water, up to the head in deep water. Pure CSS clip (no separate wading
 // assets); shared with the smooth-movement hero overlay in TilemapGrid.
@@ -1672,6 +1677,11 @@ export const Tile: React.FC<TileProps> = ({
       if (enemyKind !== 'snake') {
         if (enemyKind === 'ghost') return 'none';
         if (enemyKind === 'white-goblin') return 'none';
+        // The Shaper has DISTINCT left/right art (water side vs fire side), so it must
+        // never be mirrored — each facing already draws the correctly-facing sprite.
+        // It's also a big, ominous boss: render it larger (feet planted via the
+        // transformOrigin on the sprite div; its head spills up into the tile above).
+        if (enemyKind === 'shaper') return `scale(${SHAPER_RENDER_SCALE})`;
         // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       }
@@ -1755,6 +1765,9 @@ export const Tile: React.FC<TileProps> = ({
               backgroundPosition: 'center',
               zIndex: 10500, // above fog (10000), below wall tops (12000)
               transform: enemyBaseTransform,
+              // The Shaper's up-scale pivots at its feet so it grows into the tile
+              // above; every other enemy keeps the default center origin.
+              transformOrigin: enemyKind === 'shaper' ? '50% 100%' : undefined,
               // Darken non-torch-carrying enemies in cave/underground environments
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
@@ -1783,8 +1796,11 @@ export const Tile: React.FC<TileProps> = ({
               // goblins (fire/water/earth family) get the bob+tilt variant so
               // their walk reads as a step rather than a flat glide.
               ...(enemySliding
-                ? REGULAR_GOBLIN_KINDS.has(enemyKind ?? '')
-                  ? smoothStepBobStyle(enemyStep, enemyBaseTransform)
+                ? (REGULAR_GOBLIN_KINDS.has(enemyKind ?? '') || enemyKind === 'shaper')
+                  ? // Shaper + regular goblins step (bob + tilt) so movement reads as a
+                    // heavy footfall, not the flat glide that made the Shaper look like
+                    // it was floating/sliding magically.
+                    smoothStepBobStyle(enemyStep, enemyBaseTransform)
                   : smoothStepStyle(enemyStep, enemyBaseTransform)
                 : null),
             }}

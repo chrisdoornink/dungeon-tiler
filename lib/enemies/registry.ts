@@ -1094,12 +1094,15 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "shaper",
     displayName: "The Shaper",
     assets: {
-      // Placeholder art: reuse the pink-goblin (magician) sprite, tinted via a
-      // kind filter in Tile.tsx until dedicated Shaper art exists.
-      front: "/images/enemies/fire-goblin/pink-goblin-ringless-front.png",
-      left: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
-      right: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
-      back: "/images/enemies/fire-goblin/pink-goblin-ringless-back.png",
+      // Dedicated Shaper art: a stone golem with a molten crown and an elemental
+      // core. The sides show its two halves (water on the left, fire on the right,
+      // matching the front core's split); the front has heterochromic glowing eyes
+      // (blue + red). Distinct left/right art means the sprite must NOT be mirrored
+      // by facing — see the no-flip case for 'shaper' in Tile.tsx.
+      front: "/images/enemies/bosses/shaper/shaper-front.png",
+      left: "/images/enemies/bosses/shaper/shaper-left.png",
+      right: "/images/enemies/bosses/shaper/shaper-right.png",
+      back: "/images/enemies/bosses/shaper/shaper-back.png",
     },
     base: { health: SHAPER_HP, attack: 0 },
     // Standard melee: once you fight through its terrain and reach it, it dies
