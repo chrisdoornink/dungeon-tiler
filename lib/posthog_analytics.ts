@@ -137,6 +137,15 @@ export function trackGameComplete(params: {
   reachedPinkRealm?: boolean;
   // Exact chest items collected this run (e.g. ["sword","shield","extra_heart"]).
   collectedChestItems?: string[];
+  // Boss room (see .claude/features/boss-daily-entrances/index.md). reachedBossRoom
+  // and bossDefeated answer "made it in" / "won the fight"; bossEntranceKind records
+  // which of the day's four doors it was (independent of whether it was ever found);
+  // bossKind identifies which boss (future-proofing once more than one exists — the
+  // per-kind kill is also already in byKind for today's single boss).
+  reachedBossRoom?: boolean;
+  bossDefeated?: boolean;
+  bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
+  bossKind?: string;
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -166,6 +175,10 @@ export function trackGameComplete(params: {
     reached_outside_world: params.reachedOutsideWorld,
     reached_pink_realm: params.reachedPinkRealm,
     collected_chest_items: params.collectedChestItems,
+    reached_boss_room: params.reachedBossRoom,
+    boss_defeated: params.bossDefeated,
+    boss_entrance_kind: params.bossEntranceKind,
+    boss_kind: params.bossKind,
   });
 }
 

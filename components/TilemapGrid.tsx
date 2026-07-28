@@ -212,6 +212,10 @@ function runProgressProps(gs: GameState) {
     reachedOutsideWorld: !!gs.reachedOutsideWorld,
     reachedPinkRealm: !!gs.reachedPinkRealm,
     collectedChestItems: gs.stats?.chestItemsCollected ?? [],
+    reachedBossRoom: !!gs.reachedBossRoom,
+    bossDefeated: !!gs.bossDefeated,
+    bossEntranceKind: gs.bossEntranceKind,
+    bossKind: gs.bossKind,
   };
 }
 

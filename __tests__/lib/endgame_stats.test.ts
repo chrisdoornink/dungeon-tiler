@@ -29,6 +29,10 @@ function makeRow(overrides: Partial<GameCompleteRow> = {}): GameCompleteRow {
     collectedChestItems: [],
     deathCause: null,
     deathCauseEnemyKind: null,
+    reachedBossRoom: false,
+    bossDefeated: false,
+    bossEntranceKind: null,
+    bossKind: null,
     ...overrides,
   };
 }
@@ -80,6 +84,26 @@ describe("toGameCompleteRow coercion", () => {
     expect(row.reachedPinkRealm).toBe(false);
     expect(row.levelReached).toBeNull();
     expect(row.collectedChestItems).toEqual([]);
+    // Boss fields default safe when the run never generated them (e.g. died on F1).
+    expect(row.reachedBossRoom).toBe(false);
+    expect(row.bossDefeated).toBe(false);
+    expect(row.bossEntranceKind).toBeNull();
+    expect(row.bossKind).toBeNull();
+  });
+
+  it("coerces boss-room fields: reached/defeated flags and the entrance/boss kind strings", () => {
+    const row = toGameCompleteRow({
+      day: "2026-07-24",
+      outcome: "win",
+      reached_boss_room: 1, // numeric truthy, like reached_outside_world above
+      boss_defeated: "true",
+      boss_entrance_kind: "douse",
+      boss_kind: "shaper",
+    });
+    expect(row.reachedBossRoom).toBe(true);
+    expect(row.bossDefeated).toBe(true);
+    expect(row.bossEntranceKind).toBe("douse");
+    expect(row.bossKind).toBe("shaper");
   });
 
   it("parses collected_chest_items as an array or a JSON string, else []", () => {
@@ -130,6 +154,20 @@ describe("summarizeDay", () => {
     expect(s.reachedOutsideWorld).toBe(2);
     expect(s.blewUpTree).toBe(1);
     expect(s.avgLevelReached).toBe(2.3); // (3+1+2+3)/4 = 2.25 -> 2.3
+  });
+
+  it("tallies reached/defeated boss counts across the day's games", () => {
+    const games = [
+      // Died on floor 1 -- never reached floor 3.
+      makeRow({ outcome: "dead", levelReached: 1 }),
+      // Reached floor 3 and found the boss room, but didn't kill it.
+      makeRow({ outcome: "dead", levelReached: 3, reachedBossRoom: true }),
+      // Reached floor 3, found it, and won by killing the boss.
+      makeRow({ outcome: "win", levelReached: 3, reachedBossRoom: true, bossDefeated: true }),
+    ];
+    const s = summarizeDay(games);
+    expect(s.reachedBossRoom).toBe(2);
+    expect(s.bossDefeated).toBe(1);
   });
 
   it("handles an empty day", () => {

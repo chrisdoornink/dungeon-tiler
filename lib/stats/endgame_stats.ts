@@ -2,16 +2,21 @@
 //
 // Source of truth is the `game_complete` PostHog event fired at the end of every
 // daily run (win or death). Each event carries the full run summary, so a single
-// event type answers all four reporting questions:
+// event type answers most reporting questions:
 //   1. Level 2 chest status  -> computed from `date_seed` (see daily_chest.ts)
 //   2. reached pink realm     -> reached_pink_realm
 //   3. reached outside world  -> reached_outside_world
 //   4. blew up the tree       -> trees_destroyed > 0
+//   5. reached/beat the boss  -> reached_boss_room / boss_defeated
+// The DAY's boss-entrance kind (bomb/douse/moat-lava/moat-water) is instead computed
+// deterministically from `date_seed` (see boss_day.ts) — analytics-independent,
+// exactly like the chest status, so it's known even if nobody reached floor 3 yet.
 //
 // These functions are pure (no network) so the route can stay thin and the
 // coercion / grouping logic is unit-testable against fixture rows.
 
 import type { ChestItemMeta } from "./daily_chest";
+import type { BossDayInfo } from "./boss_day";
 
 /** One completed daily game, normalized from a PostHog `game_complete` row. */
 export interface GameCompleteRow {
@@ -37,6 +42,12 @@ export interface GameCompleteRow {
   collectedChestItems: string[];
   deathCause: string | null;
   deathCauseEnemyKind: string | null;
+  /** Boss room (see boss-daily-entrances). Entrance kind/boss kind are recorded even
+   *  if the room was never found, so "what kind of boss day was it" is always known. */
+  reachedBossRoom: boolean;
+  bossDefeated: boolean;
+  bossEntranceKind: string | null;
+  bossKind: string | null;
 }
 
 export interface DaySummary {
@@ -48,6 +59,8 @@ export interface DaySummary {
   reachedOutsideWorld: number; // # of games that breached into the outside world
   blewUpTree: number; // # of games that destroyed >=1 tree
   avgLevelReached: number | null; // mean floor reached, 1 decimal
+  reachedBossRoom: number; // # of games that found the day's boss room
+  bossDefeated: number; // # of games that killed the boss
 }
 
 /** Level 2 chest status as sent to the client (icon paths + bomb flag). */
@@ -59,6 +72,11 @@ export interface ChestStatusPayload {
 export interface StatsDayPayload {
   date: string; // YYYY-MM-DD
   chests: ChestStatusPayload;
+  // The day's boss entrance, computed deterministically from the date (see
+  // boss_day.ts) — reliable even if nobody that day reached floor 3 to record it
+  // in analytics. Mirrors `chests` in spirit: a fact about the DAY, not a per-run
+  // aggregate.
+  bossDay: BossDayInfo;
   summary: DaySummary;
   games: GameCompleteRow[];
 }
@@ -143,6 +161,10 @@ export function toGameCompleteRow(rec: Record<string, unknown>): GameCompleteRow
     deathCause: rec.death_cause == null ? null : String(rec.death_cause),
     deathCauseEnemyKind:
       rec.death_cause_enemy_kind == null ? null : String(rec.death_cause_enemy_kind),
+    reachedBossRoom: toBool(rec.reached_boss_room),
+    bossDefeated: toBool(rec.boss_defeated),
+    bossEntranceKind: rec.boss_entrance_kind == null ? null : String(rec.boss_entrance_kind),
+    bossKind: rec.boss_kind == null ? null : String(rec.boss_kind),
   };
 }
 
@@ -184,6 +206,8 @@ export function summarizeDay(games: GameCompleteRow[]): DaySummary {
     reachedOutsideWorld: games.filter((g) => g.reachedOutsideWorld).length,
     blewUpTree: games.filter((g) => g.treesDestroyed > 0).length,
     avgLevelReached,
+    reachedBossRoom: games.filter((g) => g.reachedBossRoom).length,
+    bossDefeated: games.filter((g) => g.bossDefeated).length,
   };
 }
 
