@@ -74,12 +74,23 @@ export function markNewPlayer(opts?: { enteredViaTutorial?: boolean }) {
 // Safe PostHog event capture
 function captureEvent(eventName: string, properties?: EventParams) {
   if (typeof window === 'undefined') return;
-  
+
   try {
-    posthog.capture(eventName, {
-      ...properties,
-      timestamp: new Date().toISOString()
-    });
+    posthog.capture(
+      eventName,
+      {
+        ...properties,
+        timestamp: new Date().toISOString(),
+      },
+      // Bypass posthog-js's client-side rate limiter (default 10/sec, 100 burst)
+      // for our events. These are all deliberate, low-volume gameplay signals —
+      // but session replay's $snapshot stream (heavy for a constantly-animating
+      // game) drains the shared token bucket, after which captures get dropped,
+      // silently losing game_complete and other runs. skip_client_rate_limiting
+      // guarantees these always send; it does not weaken the limiter for
+      // autocapture/replay, which stay governed.
+      { skip_client_rate_limiting: true }
+    );
   } catch (error) {
     console.warn('PostHog capture failed:', error);
   }
@@ -124,6 +135,17 @@ export function trackGameComplete(params: {
   wallsDestroyed?: number;
   reachedOutsideWorld?: boolean;
   reachedPinkRealm?: boolean;
+  // Exact chest items collected this run (e.g. ["sword","shield","extra_heart"]).
+  collectedChestItems?: string[];
+  // Boss room (see .claude/features/boss-daily-entrances/index.md). reachedBossRoom
+  // and bossDefeated answer "made it in" / "won the fight"; bossEntranceKind records
+  // which of the day's four doors it was (independent of whether it was ever found);
+  // bossKind identifies which boss (future-proofing once more than one exists — the
+  // per-kind kill is also already in byKind for today's single boss).
+  reachedBossRoom?: boolean;
+  bossDefeated?: boolean;
+  bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
+  bossKind?: string;
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -152,6 +174,11 @@ export function trackGameComplete(params: {
     walls_destroyed: params.wallsDestroyed,
     reached_outside_world: params.reachedOutsideWorld,
     reached_pink_realm: params.reachedPinkRealm,
+    collected_chest_items: params.collectedChestItems,
+    reached_boss_room: params.reachedBossRoom,
+    boss_defeated: params.bossDefeated,
+    boss_entrance_kind: params.bossEntranceKind,
+    boss_kind: params.bossKind,
   });
 }
 
@@ -249,6 +276,22 @@ export function trackShare(params: {
     level_reached: params.levelReached != null ? String(params.levelReached) : undefined,
     date_seed: params.dateSeed,
     method: params.method,
+  });
+}
+
+/**
+ * Fire when a player taps the "Try Endless Mode" prompt on the daily completion
+ * screen. Pairs with `game_start` (game_mode=endless) to measure how many
+ * finishers cross over into Endless from the endgame CTA — i.e. is the prompt
+ * actually driving people into the mode.
+ */
+export function trackEndlessPromptClick(params?: {
+  surface?: "daily_completed";
+  outcome?: "win" | "dead";
+}) {
+  captureEvent('endless_prompt_clicked', {
+    surface: params?.surface ?? "daily_completed",
+    outcome: params?.outcome,
   });
 }
 

@@ -722,6 +722,103 @@
   }
 }
 
+/* Lava base: a finer, MUTED molten-rock crust (16x16 SVG, scales crisp) so the tile
+   reads as dark glowing rock at the game's resolution. The motion/accent comes from a
+   separate bubbling PixelFlame overlay mounted in Tile.tsx — this base stays still and
+   low-key so the lava doesn't glare. */
+.lava {
+  position: relative;
+  background-color: #5a1e08;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAA8klEQVR42u2VsQ0CMRAENyQgICb4AhAhHdACEUVQACVQCaVQFiuNtbJM8hb+zNLp3rfe1+3Z9396nPa21+Vge1+Ptud5b/vclvuyqw1mL195B6j2Q/CSwEJI64W1IAoEsU0F6/lixQv2pE2N/+MlAfmDOoTKcVujQy9S+3q+ah6l4UfhymE5RheNwTa9kdrr+1zJ128zjPVyTgIkcD9W1IActMFevnhQbOOH4Epy8jeKaAZ20d7L1xa9X+MlAXv0QNqDMmnndEUvX8SpKzYKLwmsJR9q7ifdxoeK9l6+6l/YFqY5D+Y8mPNgzoM5D+Y8sH0BfMymP9OWrKUAAAAASUVORK5CYII=");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  /* No inset vignette: it painted a dark ring on every tile, which read as seams
+     inside a pool. Edge shading is neighbor-aware instead (terrain edges in Tile.tsx)
+     so only the pool's real border darkens. */
+}
+
+/* Obsidian: a lava tile cooled by a thrown rock — safe, walkable, faintly warm. Same
+   chunky pixel-art idiom, dark volcanic glass with a few embers still glowing in the
+   cracks. This is the only on-foot crossing of a lava field. */
+.obsidian {
+  position: relative;
+  background-color: #141014;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAA40lEQVR42u2VUQrCQAxEc4QKi4j6JT2FR/H+B3HgLWNofxrc/i2E7WZ22kza0cR6vyke7Uq8X8/bpSk+69KWtgnIJX74HvK8DsGDnbRQU4qkBVEgKPUjqvxeQDzYPMIN/o/3AtQ3qtQatZFG3aONOzjOj8yDZOoQPPyylKOLDcf2Br3n73mQH3szjF1DNUmQQGUpyiArYJUfXGh2sw7Bw8WpjMP2pub9clTixxnez3jY3faA7WGDm415SvxewH05RuG9gLTkMytCrFL/Mqv837/pSRFzHsx5MOfBnAdzHsx5oPgCZ4Mk8GrHAXcAAAAASUVORK5CYII=");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 8px 2px rgba(255, 90, 20, 0.14);
+}
+
+/* Positions the bubbling lava overlay (a PixelFlame with LAVA_FRAMES). The 20x20 grid
+   at cell=2 is 40px square — it fills the tile exactly, bottom-anchored, so the bubbles
+   sit low on the molten surface and stay within the tile. The horizontal transform is
+   set inline (per-tile flip for variance). Reduced-motion is handled by PixelFlame's own
+   CSS (the bubble frames freeze to frame 0). */
+.lavaFlame {
+  left: 50%;
+  bottom: 0;
+  z-index: 1020; /* above the crust base; below items/enemies/hero */
+}
+
+
+/* Shallow water: the wadeable tier — dark slate-blue base with LIGHT animated wave
+   lines (a PixelFlame, SHALLOW_WATER_FRAMES; colors swapped per Chris), one hue family
+   with the deep navy so both tiers read as the same cave pool. */
+.shallowWater {
+  position: relative;
+  background-color: #417391;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAq0lEQVR42mPQia5DQ6YZPUCEKU4eYhgAC/AjTOuRRTDZA2EBsiL9xBYgomEcUM0CXN6kPPLpZQEkKFQC8oEI0yCIOEVBREMLqBsgA2EBfmnkZEqMUzDV09cC4rMV8QFLXwswkymVyyKaWwAxGn8CJb64HggLaFjYDYAFkOjF9D7+aCehyqSyBcjFNbUaLDjrA5pYQEnjBX+ioJcFlBcJRMUBDS0gtVgeRBYAAOKvJ5Wchjf4AAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+
+/* Deep water: dark, swimmable — entering snuffs the torch. The animated ripple
+   glints are a PixelFlame (WATER_FRAMES) mounted from Tile.tsx, like lava's bubbles. */
+.deepWater {
+  position: relative;
+  background-color: #173f66;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAq0lEQVR42mMQt09DQ7JepUCEKU4eYhgAC/AjTOuRRTDZA2EBsiIp1wIgomEcUM0CXN6kPPLpZQEkKIT0g4AI0yCIOEVBREMLqBsgA2EBfmnkZEqMUzDV09cC4rMV8QFLXwswkymVyyKaWwAxGn8CJb64HggLaFjYDYAFkOjF9D7+aCehyqSyBcjFNbUaLDjrA5pYQEnjBX+ioJcFlBcJRMUBDS0gtVgeRBYAAIE2AZaB3IyqAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  /* No inset vignette (see .lava) — edge shading is neighbor-aware via the terrain
+     edges rendered in Tile.tsx. */
+}
+
+/* Positions the deep-water ripple overlay (a PixelFlame with WATER_FRAMES); same
+   geometry as .lavaFlame. */
+.waterRipple {
+  left: 50%;
+  bottom: 0;
+  z-index: 1020; /* above the water base; below items/enemies/hero */
+}
+
+/* Stepping stone: a thrown rock resting in deep water — a dry, walkable crossing.
+   Grey stone slab inset on the deep-water backdrop. */
+.steppingStone {
+  position: relative;
+  background-color: #173f66;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAq0lEQVR42mMQt09DQ7JepUCEKU4eYhgAC/AjTOuRRTDZA2EBsiIp1wIgomEcUM0CXN6kPPLpZQEkKIT0g4AI0yCIOEVBREMLqBsgA2EBfmnkZEqMUzDV09cC4rMV8QFLXwswkymVyyKaWwAxGn8CJb64HggLaFjYDYAFkOjF9D7+aCehyqSyBcjFNbUaLDjrA5pYQEnjBX+ioJcFlBcJRMUBDS0gtVgeRBYAAIE2AZaB3IyqAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+}
+.steppingStone::after {
+  content: '';
+  position: absolute;
+  inset: 15%;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAAyklEQVR42u1VIQ7DMBDzX0dGSkdGhkdGioZG9s9FcmU514JEvbGTTqfEceNLauVwuz8U78+XcbkuLZ6vNYSTB/kQm3PPKTg4alVQU+UI8c80GOd3Ai1zTdTzeCcgNFTE6f4EI3w4z+8uC4f/Hx2wlcBlecNLnuJjb4bcDIkzU/kQ5LXO8jcBHi3kFBxuKV6reMFw3GKWj39433EETRnZK3Ljz/K7t+jwXTuJbwKygZfmrmBol3E+wgucHqh+UP2g+kH1g+oH1Q9a/ABFB0d7FN0AFgAAAABJRU5ErkJggg==");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  border-radius: 30%;
+  box-shadow: 0 0 0 2px rgba(10, 26, 46, 0.6);
+  z-index: 1;
+}
+
 @keyframes exitPulse {
   0% {
     transform: translate(-50%, -50%) scale(1);

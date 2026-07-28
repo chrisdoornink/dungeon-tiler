@@ -47,10 +47,18 @@ import {
   isWithinBounds,
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
-import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys } from "./map-features";
+import { computeTorchGlow } from "../torch_glow";
+import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
+import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
+import {
+  rollBossEntranceKind,
+  stampBossEntranceOnFloor,
+  arenaSeedForEntrance,
+  type BossEntranceKind,
+} from "../bosses/boss_entrances";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
 import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
@@ -771,6 +779,28 @@ export function performThrowRock(gameState: GameState): GameState {
       // Early stop on wall/obstacle: consume a rock, no placement
       return { ...preTickState, rockCount: count - 1 };
     }
+    // A rock thrown into lava MELTS into the first lava tile it touches, cooling it
+    // into walkable OBSIDIAN — the rock is spent on contact and the throw stops here.
+    // Water is different (deliberately not a mirror of lava): rocks sail OVER both
+    // water tiers mid-flight and only become a STEPPING_STONE if they come to rest
+    // on a deep tile at the end of their range — see the landing block below.
+    {
+      const terrainSubs = newMapData.subtypes[ty][tx] || [];
+      if (terrainSubs.includes(TileSubtype.LAVA)) {
+        newMapData.subtypes[ty][tx] = terrainSubs
+          .filter((t) => t !== TileSubtype.LAVA)
+          .concat([TileSubtype.OBSIDIAN]);
+        return {
+          ...preTickState,
+          mapData: newMapData,
+          rockCount: count - 1,
+          stats: {
+            ...preTickState.stats,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          },
+        };
+      }
+    }
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
@@ -803,9 +833,17 @@ export function performThrowRock(gameState: GameState): GameState {
   // Land the rock on the 4th tile, preserving existing overlays (e.g., ROAD).
   // A rock that comes to rest on an open abyss falls straight into the pit —
   // nothing can sit on a broken abyss — so it is consumed without being placed.
+  // A rock that comes to rest on DEEP water sinks just below the surface and
+  // becomes a STEPPING_STONE: a dry crossing exactly where the throw ended.
+  // (Only the landing tile converts — mid-flight deep tiles are flown over, so
+  // building a bridge means aiming each throw, not machine-gunning the near edge.)
   {
     const landing = newMapData.subtypes[ty][tx] || [];
-    if (!landing.includes(TileSubtype.OPEN_ABYSS)) {
+    if (landing.includes(TileSubtype.DEEP_WATER)) {
+      newMapData.subtypes[ty][tx] = landing
+        .filter((t) => t !== TileSubtype.DEEP_WATER)
+        .concat([TileSubtype.STEPPING_STONE]);
+    } else if (!landing.includes(TileSubtype.OPEN_ABYSS)) {
       const base = landing.filter((t) => t !== TileSubtype.ROCK);
       newMapData.subtypes[ty][tx] = base.concat([TileSubtype.ROCK]);
     }
@@ -986,23 +1024,28 @@ export function performThrowRune(gameState: GameState): GameState {
       return finalState;
     }
 
-    // Wall/obstacle -> drop on last floor tile
-    if (newMapData.tiles[ty][tx] !== FLOOR) {
+    // Wall/obstacle -> drop on last floor tile. Lava and deep water count as obstacles
+    // here so a precious rune never lands in them: the rune drops on the last dry tile
+    // before the hazard, where it can be retrieved. (Shallow water is fine to land on.)
+    const runeSubs = newMapData.subtypes[ty]?.[tx] || [];
+    const runeHitsLava =
+      runeSubs.includes(TileSubtype.LAVA) || runeSubs.includes(TileSubtype.DEEP_WATER);
+    if (newMapData.tiles[ty][tx] !== FLOOR || runeHitsLava) {
       if (
         !(lastFloorY === py && lastFloorX === px) &&
         newMapData.tiles[lastFloorY][lastFloorX] === FLOOR
       ) {
         const lastSubs = newMapData.subtypes[lastFloorY][lastFloorX] || [];
-        const hasImportantTile = lastSubs.some(s => 
-          s === TileSubtype.EXIT || 
-          s === TileSubtype.DOOR || 
+        const hasImportantTile = lastSubs.some(s =>
+          s === TileSubtype.EXIT ||
+          s === TileSubtype.DOOR ||
           s === TileSubtype.EXITKEY ||
           s === TileSubtype.KEY ||
           s === TileSubtype.LOCK ||
           s === TileSubtype.ROOM_TRANSITION ||
           s === TileSubtype.CHECKPOINT
         );
-        
+
         if (!hasImportantTile) {
           // A rune dropping back onto an open abyss falls into the pit and is
           // gone — nothing sits on a broken abyss — but it is still spent.
@@ -1127,6 +1170,12 @@ const BOMB_PRESERVED_SUBTYPES = new Set<TileSubtype>([
   TileSubtype.SINGED,
   // A pink goblin killed by the blast drops a teleport ring; keep it through the blast.
   TileSubtype.PINK_RING,
+  // Molten rock and the dry crossings built on hazards survive a blast — a bomb must
+  // never erase a pool or strand someone mid-crossing. Water tiers are deliberately
+  // NOT preserved: the blast transforms them (shallow evaporates, deep -> shallow).
+  TileSubtype.LAVA,
+  TileSubtype.OBSIDIAN,
+  TileSubtype.STEPPING_STONE,
 ]);
 
 /**
@@ -1251,9 +1300,23 @@ export function detonateLiveBombs(state: GameState): GameState {
         const becomesAbyss =
           subs.includes(TileSubtype.FAULTY_FLOOR) ||
           subs.includes(TileSubtype.OPEN_ABYSS);
+        // Water flashes to steam instead of scorching: shallow water evaporates to dry
+        // floor (the tag was already stripped above — it isn't preserved) and deep
+        // water is blasted down to shallow. Neither takes a SINGED scorch, and molten
+        // lava can't be scorched either.
+        const hadShallowWater = subs.includes(TileSubtype.SHALLOW_WATER);
+        const hadDeepWater = subs.includes(TileSubtype.DEEP_WATER);
+        if (hadDeepWater && !kept.includes(TileSubtype.SHALLOW_WATER)) {
+          kept.push(TileSubtype.SHALLOW_WATER);
+        }
         if (becomesAbyss) {
           if (!kept.includes(TileSubtype.OPEN_ABYSS)) kept.push(TileSubtype.OPEN_ABYSS);
-        } else if (!kept.includes(TileSubtype.SINGED)) {
+        } else if (
+          !hadShallowWater &&
+          !hadDeepWater &&
+          !kept.includes(TileSubtype.LAVA) &&
+          !kept.includes(TileSubtype.SINGED)
+        ) {
           kept.push(TileSubtype.SINGED);
         }
         if (openedWall) {
@@ -1408,8 +1471,14 @@ export function performThrowBomb(gameState: GameState): GameState {
   const restSubs = newMapData.subtypes[restY][restX] || [];
   // A bomb that comes to rest on an open abyss drops into the pit and is lost —
   // no fuse is armed and no blast follows (nothing sits on a broken abyss). The
-  // bomb is still consumed and counts as thrown.
-  if (!restSubs.includes(TileSubtype.OPEN_ABYSS)) {
+  // bomb is still consumed and counts as thrown. Lava behaves the same for v1 (the
+  // bomb melts into it; v2.5 will detonate on impact and spray shrapnel), and DEEP
+  // water douses the fuse — a soaked dud sinks. Shallow water is fine to rest on.
+  if (
+    !restSubs.includes(TileSubtype.OPEN_ABYSS) &&
+    !restSubs.includes(TileSubtype.LAVA) &&
+    !restSubs.includes(TileSubtype.DEEP_WATER)
+  ) {
     const restBase = restSubs.filter((t) => t !== TileSubtype.BOMB_LIVE);
     newMapData.subtypes[restY][restX] = restBase.concat([TileSubtype.BOMB_LIVE]);
   }
@@ -1495,6 +1564,10 @@ export interface GameState {
     enemiesKilledByRock?: number;
     enemiesKilledByRune?: number;
     chestsOpened?: number;
+    // Item keys revealed from chests and actually picked up, in pickup order
+    // (e.g. ["sword","shield","extra_heart"]). Lets analytics report exactly
+    // which variable Level 2 items a run collected, not just a count.
+    chestItemsCollected?: string[];
     itemsCollected?: number; // Total items picked up
     maxHealth?: number; // Highest health reached
     poisonSteps?: number; // Steps taken while poisoned
@@ -1532,7 +1605,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -1574,6 +1647,35 @@ export interface GameState {
   // wall and steps into the outdoor grassland. Persists across returns/floors so
   // analytics can record that the hidden outside world was found.
   reachedOutsideWorld?: boolean;
+  // Boss-room entrances (see .claude/features/boss-daily-entrances/index.md).
+  // inBossRoom: transient, true while the hero is inside a boss arena.
+  // reachedBossRoom: run-level latch, true once a boss arena was entered this run.
+  // bossArenaSeed: which elemental Shaper arena to build on entry (defaults lava).
+  // outsideHasBossEntrance: when true, the outside world built from this floor
+  // carves a hidden boss entrance in its far tree wall (a boss-day marker).
+  inBossRoom?: boolean;
+  reachedBossRoom?: boolean;
+  // Latches when the Shaper dies (gold key dropped). Run-level, so the endgame can
+  // report the boss kill even after the hero leaves the arena.
+  bossDefeated?: boolean;
+  // Which of the four daily doors led here (bomb/douse/moat-lava/moat-water) — set
+  // once, the day the entrance was rolled, so analytics can report which kind of
+  // exit that day's boss room had (independent of whether the hero ever finds it).
+  bossEntranceKind?: BossEntranceKind;
+  // Which boss is in the room. Only "shaper" exists today, but this is set (rather
+  // than inferred from the live enemies array, which is empty after the kill or the
+  // hero leaving) so future boss variety is reportable per run from day one.
+  bossKind?: "shaper";
+  bossArenaSeed?: "water" | "lava";
+  outsideHasBossEntrance?: boolean;
+  // The floor to restore when the hero walks back out of a boss arena. Kept
+  // separate from dungeonReturn/realmReturn (a boss room can be entered from the
+  // dungeon OR from inside another sub-area, so the stashes must nest).
+  bossReturn?: {
+    mapData: MapData;
+    enemies?: PlainEnemy[];
+    position: [number, number];
+  };
   // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
   // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
   // in it are blinded. Undefined / absent outside the realm.
@@ -1661,7 +1763,17 @@ function cleanupPinkRing(enemy: Enemy, subtypes: number[][][]): void {
   // would also wipe other goblins' rings and any bomb-dropped portal we mean to keep.
   if (typeof mem.ringY === 'number' && typeof mem.ringX === 'number') {
     const orig = mem.ringOrigSubs ?? [];
-    subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+    const restored = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+    // The hero may be standing on the inert ring when its owner dies. The saved
+    // snapshot predates their arrival — keep the PLAYER marker or the hero gets
+    // erased from the map (unfindable, invisible, every input dead).
+    if (
+      subtypes[mem.ringY]?.[mem.ringX]?.includes(TileSubtype.PLAYER) &&
+      !restored.includes(TileSubtype.PLAYER)
+    ) {
+      restored.push(TileSubtype.PLAYER);
+    }
+    subtypes[mem.ringY][mem.ringX] = restored;
   }
 }
 
@@ -1700,6 +1812,19 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const row = subtypes[enemy.y];
     const tileSubs = row ? row[enemy.x] || [] : [];
     const onFaulty = tileSubs.includes(TileSubtype.FAULTY_FLOOR);
+    // Water is kryptonite to pink goblins: touching either tier destroys them. Their
+    // pathing and teleports refuse water tiles, so this is the safety net for any
+    // path that still lands one there (the tile stays water — no conversion).
+    const pinkOnWater =
+      enemy.kind === "pink-goblin" &&
+      (tileSubs.includes(TileSubtype.SHALLOW_WATER) ||
+        tileSubs.includes(TileSubtype.DEEP_WATER));
+    // A stone goblin is too heavy for a player-built stepping stone: the stone
+    // sinks under its weight (tile reverts to deep water) and the goblin drowns.
+    // For everyone else the stone is a safe crossing; for him it's an abyss.
+    const stoneGoblinOnSteppingStone =
+      enemy.kind === "stone-goblin" &&
+      tileSubs.includes(TileSubtype.STEPPING_STONE);
 
     if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
       // Convert faulty floor to open abyss when enemy steps on it
@@ -1707,7 +1832,37 @@ function applyEnemyHazardDeaths(state: GameState): void {
         (type) => type !== TileSubtype.FAULTY_FLOOR
       );
       subtypes[enemy.y][enemy.x].push(TileSubtype.OPEN_ABYSS);
-      
+
+      cleanupPinkRing(enemy, subtypes);
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else if (pinkOnWater) {
+      cleanupPinkRing(enemy, subtypes);
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else if (stoneGoblinOnSteppingStone) {
+      // The stone gives way: revert the crossing to deep water and drown him.
+      subtypes[enemy.y][enemy.x] = subtypes[enemy.y][enemy.x].filter(
+        (type) => type !== TileSubtype.STEPPING_STONE
+      );
+      subtypes[enemy.y][enemy.x].push(TileSubtype.DEEP_WATER);
+
       cleanupPinkRing(enemy, subtypes);
       defeated.push(enemy);
 
@@ -1746,6 +1901,7 @@ export function initializeGameState(): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: mapData.tiles,
+        subtypes: mapData.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
@@ -1828,6 +1984,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: mapData.tiles,
+        subtypes: mapData.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: enemyCountForFloor(floor),
         minDistanceFromPlayer: 8,
@@ -1838,6 +1995,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   if (ghostCount > 0 && playerPos) {
     const ghosts = placeEnemies({
       grid: mapData.tiles,
+      subtypes: mapData.subtypes,
       player: { y: playerPos[0], x: playerPos[1] },
       count: ghostCount,
       minDistanceFromPlayer: 6,
@@ -1849,6 +2007,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     const swarmCount = Math.floor(whiteGoblinCount / 4);
     const swarmLocations = placeEnemies({
       grid: mapData.tiles,
+      subtypes: mapData.subtypes,
       player: { y: playerPos[0], x: playerPos[1] },
       count: swarmCount,
       minDistanceFromPlayer: 6,
@@ -1922,6 +2081,7 @@ export function initializeGameStateFromMap(mapData: MapData): GameState {
   const enemies = playerPos
     ? placeEnemies({
         grid: ensured.tiles,
+        subtypes: ensured.subtypes,
         player: { y: playerPos[0], x: playerPos[1] },
         count: Math.floor(Math.random() * 4) + 4, // 4–7 enemies
         minDistanceFromPlayer: 8,
@@ -1983,14 +2143,43 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Get the pre-computed chest/key allocation for this floor
   const allocation = currentState.floorChestAllocation?.[nextFloor];
   
-  // Generate new map with floor-specific seed
+  // Daily floors 2 and 3 carry elemental terrain. Lava is always present on those
+  // floors; water is SEMI-RANDOM — each floor independently rolls whether it gets a
+  // pool and how big (rollWaterPlan: ~1/2 per candidate floor, weighted size tiers,
+  // ~50%-coverage flood is rare). Lava and water can coexist on the same floor. Floor 1
+  // is built elsewhere and stays element-free as the teaching floor.
+  const includeLava = nextFloor === 2 || nextFloor === 3;
+
+  // Generate new map with floor-specific seed. The water roll MUST happen inside this
+  // seeded block (before map generation) so daily maps stay deterministic.
+  // The day's boss entrance (floor 3 only), rolled inside the seeded block below so
+  // every player gets the same one. Null on a bombless-unlucky roll or when the floor
+  // had no safe spot for it — that day is simply bossless.
+  let bossEntrance: BossEntranceKind | null = null;
+  // Ghosts guaranteed on a douse day (they're how you go dark, and the tell).
+  const DOUSE_DAY_MIN_GHOSTS = 3;
+
   const newMapData = withPatchedMathRandom(rng, () => {
+    const waterPlan = rollWaterPlan(nextFloor) ?? undefined;
     let mapData: MapData;
     if (allocation && (allocation.chests > 0 || allocation.keys > 0)) {
-      mapData = generateCompleteMapForFloor(allocation, nextFloor);
+      mapData = generateCompleteMapForFloor(allocation, nextFloor, { includeLava, waterPlan });
     } else {
       // Floors 5+: no chests or keys, just a standard map without chests/keys
-      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor);
+      mapData = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, nextFloor, { includeLava, waterPlan });
+    }
+    // Floor 3 is the escape floor and the only one that hides a boss room. Stamped
+    // BEFORE enemies are placed (below) so nothing spawns inside the moat/lava.
+    if (nextFloor === 3) {
+      // The bombable-wall entrance is only offered when the day actually hands out a
+      // bomb (they come from the Level 2 optional-chest pool, which skips bombs ~1 day
+      // in 3). Otherwise that day gets a douse/moat entrance instead of an unreachable
+      // one. Chest allocation is fixed at run start, so this is stable for the day.
+      const bombAvailable = Object.values(currentState.floorChestAllocation ?? {}).some(
+        (a) => (a.chestContents ?? []).includes(TileSubtype.BOMB)
+      );
+      const kind = rollBossEntranceKind({ bombAvailable });
+      if (kind && stampBossEntranceOnFloor(mapData, kind)) bossEntrance = kind;
     }
     return mapData;
   });
@@ -2001,6 +2190,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     ? withPatchedMathRandom(rng, () => {
         const placed = placeEnemies({
           grid: newMapData.tiles,
+          subtypes: newMapData.subtypes,
           player: { y: playerPos[0], x: playerPos[1] },
           count: enemyCountForFloor(nextFloor),
           minDistanceFromPlayer: 8,
@@ -2009,6 +2199,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         if (gc > 0) {
           const ghosts = placeEnemies({
             grid: newMapData.tiles,
+            subtypes: newMapData.subtypes,
             player: { y: playerPos[0], x: playerPos[1] },
             count: gc,
             minDistanceFromPlayer: 6,
@@ -2020,6 +2211,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           const swarmCount = Math.floor(wgc / 4);
           const swarmLocations = placeEnemies({
             grid: newMapData.tiles,
+            subtypes: newMapData.subtypes,
             player: { y: playerPos[0], x: playerPos[1] },
             count: swarmCount,
             minDistanceFromPlayer: 6,
@@ -2036,6 +2228,28 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
           
           assignWhiteGoblinSwarmIds(placed);
         }
+        // On a DOUSE day the ghosts are the mechanism AND the signpost: they snuff the
+        // torch on contact, which is what reveals the dark portal, and their presence is
+        // the hint that something is hidden here. The normal floor-3 roll can hand out
+        // zero ghosts, which would leave the portal effectively undiscoverable — so top
+        // the floor up to a guaranteed few.
+        if (bossEntrance === "douse") {
+          const have = placed.filter((e) => e.kind === "ghost").length;
+          const need = DOUSE_DAY_MIN_GHOSTS - have;
+          if (need > 0 && playerPos) {
+            const extra = placeEnemies({
+              grid: newMapData.tiles,
+              subtypes: newMapData.subtypes,
+              player: { y: playerPos[0], x: playerPos[1] },
+              count: need,
+              minDistanceFromPlayer: 6,
+            });
+            extra.forEach((g) => {
+              g.kind = "ghost";
+              placed.push(g);
+            });
+          }
+        }
         // Floor 3 (escape floor): station one static guard next to the exit key so
         // collecting it always requires a fight. Inside this seeded block so the
         // guard position is deterministic per daily seed, like the rest of floor 3.
@@ -2046,9 +2260,16 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
       })
     : [];
 
-  // Add rune pots and snakes
-  const withRunes = addRunePotsForStoneExciters(newMapData, enemies);
-  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor: nextFloor });
+  // Add rune pots and snakes. These MUST run inside the seeded block like every other
+  // generation step: unseeded, two players on the same daily got different rune pots
+  // and different snakes (snakes are lethal and runes one-shot stone goblins, so it was
+  // a real fairness gap, not cosmetic).
+  const withRunes = withPatchedMathRandom(rng, () =>
+    addRunePotsForStoneExciters(newMapData, enemies)
+  );
+  const snakesAdded = withPatchedMathRandom(rng, () =>
+    addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
+  );
 
   // Create new game state preserving hero stats and inventory
   return {
@@ -2060,6 +2281,13 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
+    // Boss room for the day: which elemental arena the entrance opens into, and (for
+    // the bomb entrance) permission for the outside world to carve its hidden mouth.
+    // bossEntranceKind is persisted even if the hero never finds the entrance, so
+    // analytics can report what kind of door the day actually had.
+    bossEntranceKind: bossEntrance ?? undefined,
+    bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
+    outsideHasBossEntrance: bossEntrance === "bomb",
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -2361,7 +2589,8 @@ function enterOutsideWorld(
   const { mapData: outsideMap, enemies: outsideEnemies, entry } = buildOutsideWorld(
     direction,
     width,
-    height
+    height,
+    { bossEntrance: state.outsideHasBossEntrance }
   );
   const dungeonReturn = {
     mapData: removePlayerFromMapData(state.mapData),
@@ -2570,6 +2799,109 @@ function returnFromPinkRealm(
   };
 }
 
+// Map the hero's step direction to the arena edge they arrive at (walking DOWN into
+// the mouth drops them in at the north edge, and so on).
+const BOSS_ENTRY_BY_DIRECTION: Record<Direction, ShaperEntry> = {
+  [Direction.DOWN]: "north",
+  [Direction.UP]: "south",
+  [Direction.RIGHT]: "west",
+  [Direction.LEFT]: "east",
+};
+
+/**
+ * Step onto a boss-room entrance (a lockless cave mouth, or a dark portal while the
+ * torch is out) -> warp into the boss arena. Mirrors enterPinkRealm: swap in the
+ * freshly built arena map + enemies, carry the run's vitals/inventory, and latch the
+ * reachedBossRoom secret flag. For now every entrance leads to the Shaper; the
+ * elemental variant is chosen by bossArenaSeed (default lava).
+ */
+function enterBossRoom(
+  state: GameState,
+  entrancePos: [number, number],
+  direction: Direction
+): GameState {
+  const seed: "water" | "lava" = state.bossArenaSeed === "water" ? "water" : "lava";
+  const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
+  const arena = buildShaperArena({ name: "boss", seed }, entry);
+
+  // The arena tile the hero arrives on becomes the way back out (same subtype both
+  // ways, exactly like the pink realm's ring): step off it, then back onto it, to
+  // return to the dungeon. Stepping onto it is only a RETURN while inBossRoom, so it
+  // can never re-trigger the entry warp.
+  const arenaMap = arena.mapData;
+  const arrival = findPlayerPosition(arenaMap);
+  if (arrival) {
+    const [ay, ax] = arrival;
+    const cell = arenaMap.subtypes[ay][ax];
+    if (!cell.includes(TileSubtype.BOSS_ENTRANCE)) cell.push(TileSubtype.BOSS_ENTRANCE);
+  }
+
+  // Take ONLY the arena's map + boss from the builder; every other field must come
+  // from the live run, or entering the fight would wipe the run (exit key, stats,
+  // floor, daily mode, fog) — the builder's literal is standalone-harness defaults.
+  return {
+    ...state,
+    mapData: arenaMap,
+    enemies: arena.enemies,
+    npcs: [],
+    inBossRoom: true,
+    reachedBossRoom: true,
+    bossKind: "shaper",
+    playerDirection: direction,
+    // Stash the floor exactly as it was (player lifted out) so the way back is a
+    // faithful restore. Kept in its own field: dungeonReturn is already in use by
+    // the outside world / pink realm, and a boss room can be entered from either.
+    bossReturn: {
+      mapData: removePlayerFromMapData(state.mapData),
+      enemies: serializeEnemies(state.enemies),
+      position: entrancePos,
+    },
+    mist: undefined, // realm mist doesn't follow you into the arena
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
+/**
+ * The Shaper's death drops the gold key that opens the arena's exit — the alternate
+ * ending. Detected centrally (comparing the pre-move state to the resolved one) rather
+ * than hooked into each of the many kill paths, so melee, thrown rocks and bombs all
+ * work. Idempotent via bossDefeated.
+ */
+function dropBossKeyOnDefeat(
+  after: GameState,
+  bossPosBefore: [number, number] | null
+): void {
+  if (!after.inBossRoom || after.bossDefeated) return;
+  if (!bossPosBefore) return; // no Shaper was alive going into this turn
+  if ((after.enemies ?? []).some((e) => e.kind === "shaper")) return; // still standing
+  // Prefer the recorded death tile; fall back to where it stood before the killing blow.
+  const deaths = after.recentDeaths ?? [];
+  const [ky, kx] = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
+  const cell = after.mapData.subtypes[ky]?.[kx];
+  if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+  after.bossDefeated = true;
+}
+
+/** Step back onto the arrival tile inside a boss arena -> restore the saved floor. */
+function returnFromBossRoom(
+  state: GameState,
+  direction: Direction
+): GameState | null {
+  const ret = state.bossReturn;
+  if (!ret) return null;
+  return {
+    ...state,
+    mapData: placePlayerAt(ret.mapData, ret.position),
+    enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
+    playerDirection: direction,
+    inBossRoom: false,
+    bossReturn: undefined,
+    recentDeaths: [],
+    recentBombBlasts: [],
+  };
+}
+
 // A "chase hit": the hero lands a clipping melee blow on a pink goblin that just fled
 // from point-blank range. Pink goblins retreat when you're adjacent (see their behavior),
 // vacating the tile before the hero's strike resolves — so a melee-only hero could chase
@@ -2614,6 +2946,23 @@ function applyHeroChaseHit(
   }
 }
 
+// Lava that appears UNDER the hero (e.g. the Shaper's fire raining down onto the
+// tile they're standing on) is lethal even without a step. Stepping onto lava is
+// already fatal in the movement resolver; this catches lava that materialized
+// beneath a hero who didn't move. A living hero can only be on a lava tile if it
+// spawned under them, so this never false-fires.
+function killIfStandingOnLava(state: GameState): GameState {
+  if (state.heroHealth <= 0) return state;
+  const pos = findPlayerPosition(state.mapData);
+  if (!pos) return state;
+  const subs = state.mapData.subtypes[pos[0]]?.[pos[1]] ?? [];
+  if (subs.includes(TileSubtype.LAVA) && !subs.includes(TileSubtype.OBSIDIAN)) {
+    state.heroHealth = 0;
+    if (!state.deathCause) state.deathCause = { type: "lava" };
+  }
+  return state;
+}
+
 export function movePlayer(
   gameState: GameState,
   direction: Direction
@@ -2622,8 +2971,16 @@ export function movePlayer(
   // position so stepping out of the 3x3 blast keeps the hero safe. (movePlayer never
   // places a bomb, so every BOMB_LIVE present was armed on a previous turn.) Skip
   // detonation on a floor transition — that floor is being replaced.
+  // Snapshot the Shaper's position BEFORE resolving the turn: movePlayerCore mutates
+  // the enemies array in place, so after the call the pre-state no longer shows it.
+  const bossBefore = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
+  const bossPosBefore: [number, number] | null = bossBefore
+    ? [bossBefore.y, bossBefore.x]
+    : null;
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
+  // Killing the Shaper drops the gold key for the arena's exit (alternate ending).
+  dropBossKeyOnDefeat(result, bossPosBefore);
   // Nightmare darkness drains the hero the deeper they wander. Apply only when the hero
   // actually MOVED while staying in the nightmare (not the entry step, the step back out,
   // or bumping a wall).
@@ -2646,7 +3003,7 @@ export function movePlayer(
       }
     }
   }
-  const detonated = detonateLiveBombs(result);
+  const detonated = killIfStandingOnLava(detonateLiveBombs(result));
   // Drift the pink mist one turn as the hero MOVES through the realm — only while already
   // in the realm (not the entry/exit turn) so the freshly-seeded cloud holds for a beat.
   // Standing actions (throwing, using items) blind mist-covered enemies but deliberately
@@ -2729,6 +3086,34 @@ function movePlayerCore(
         if (back) return back;
       } else if (!pinkRingClaimedByLiving(gameState, newY, newX)) {
         return enterPinkRealm(gameState, [newY, newX], direction);
+      }
+    }
+  }
+
+  // Stepping onto a boss-room entrance warps into the boss arena. A BOSS_ENTRANCE
+  // (lockless cave mouth) always triggers; a DARK_PORTAL only triggers while the
+  // hero's torch is OUT (it is invisible and inert in the light). Never re-triggers
+  // once already inside a boss room.
+  {
+    const destTile = gameState.mapData.tiles[newY]?.[newX];
+    const destSubs = gameState.mapData.subtypes[newY]?.[newX] ?? [];
+    const onFloor = destTile === FLOOR || destTile === FLOWERS;
+    if (gameState.inBossRoom) {
+      // Inside the arena the arrival tile is the way back to the dungeon.
+      if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
+        const back = returnFromBossRoom(gameState, direction);
+        if (back) return back;
+      }
+    } else {
+      if (onFloor && destSubs.includes(TileSubtype.BOSS_ENTRANCE)) {
+        return enterBossRoom(gameState, [newY, newX], direction);
+      }
+      if (
+        onFloor &&
+        destSubs.includes(TileSubtype.DARK_PORTAL) &&
+        gameState.heroTorchLit === false
+      ) {
+        return enterBossRoom(gameState, [newY, newX], direction);
       }
     }
   }
@@ -2984,7 +3369,9 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        const isFinalFloor = currentFloor >= maxFloors;
+        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
+        // outright, never advances a floor (there is no floor after the boss).
+        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning
@@ -3322,7 +3709,9 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        const isFinalFloor = currentFloor >= maxFloors;
+        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
+        // outright, never advances a floor (there is no floor after the boss).
+        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning
@@ -3352,6 +3741,20 @@ function movePlayerCore(
         subtype.includes(TileSubtype.BOMB)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
+      // Record exactly which chest item this was (in pickup order) for analytics.
+      const collectedNow: string[] = [];
+      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
+      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
+      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
+      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
+      if (collectedNow.length > 0) {
+        newGameState.stats.chestItemsCollected = [
+          ...(newGameState.stats.chestItemsCollected ?? []),
+          ...collectedNow,
+        ];
+      }
       if (subtype.includes(TileSubtype.BOMB)) {
         newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
@@ -3428,8 +3831,16 @@ function movePlayerCore(
 
         // Flame transfer: striking a torch-carrying enemy at melee range relights
         // the hero's snuffed torch, same as brushing a wall torch. Applies whether
-        // the blow kills or not — the flame is caught in the exchange.
-        if (!newGameState.heroTorchLit && EnemyRegistry[enemy.kind]?.carriesTorch) {
+        // the blow kills or not — the flame is caught in the exchange. Exception:
+        // a hero swimming in deep water can't catch a flame (melee resolves in
+        // place, so the hero is still in the water).
+        if (
+          !newGameState.heroTorchLit &&
+          EnemyRegistry[enemy.kind]?.carriesTorch &&
+          !(newGameState.mapData.subtypes[currentY]?.[currentX] ?? []).includes(
+            TileSubtype.DEEP_WATER
+          )
+        ) {
           newGameState.heroTorchLit = true;
         }
 
@@ -3467,6 +3878,18 @@ function movePlayerCore(
           return newGameState;
         }
       }
+    }
+
+    // Lava is instant death on entry — a glowing wall, not a survivable toll. This check
+    // sits AFTER the combat branch above (gotcha: the FAULTY_FLOOR block runs BEFORE combat):
+    // attacking a stone goblin standing on lava must resolve melee in place, and the hero never
+    // actually enters an enemy-occupied tile, so combat returns first and we only reach here when
+    // the destination lava tile is empty. OBSIDIAN (a rock-cooled lava tile) is safe and does not
+    // trigger this. The tile keeps its LAVA tag (kept alive by the coexist whitelist below) so the
+    // hero is rendered sinking on the glowing tile.
+    if (subtype.includes(TileSubtype.LAVA) && !subtype.includes(TileSubtype.OBSIDIAN)) {
+      newGameState.heroHealth = 0;
+      if (!newGameState.deathCause) newGameState.deathCause = { type: "lava" };
     }
 
     // If it's a key, pick it up
@@ -3575,7 +3998,21 @@ function movePlayerCore(
       // Bomb scorch + outer-wall breaches are floor overlays the player stands on.
       destSubtypes.includes(TileSubtype.SINGED) ||
       destSubtypes.includes(TileSubtype.BREACH) ||
-      destSubtypes.includes(TileSubtype.OPEN_ABYSS)
+      destSubtypes.includes(TileSubtype.OPEN_ABYSS) ||
+      // Lava (the hero dies on it but is rendered on the glowing tile) and obsidian
+      // (a walkable rock-cooled crossing) are floor overlays the player stands on.
+      destSubtypes.includes(TileSubtype.LAVA) ||
+      destSubtypes.includes(TileSubtype.OBSIDIAN) ||
+      // Water tiers (wade shallow, swim deep) and stepping stones (a rock dropped
+      // into deep water) are floor overlays the player stands on.
+      destSubtypes.includes(TileSubtype.SHALLOW_WATER) ||
+      destSubtypes.includes(TileSubtype.DEEP_WATER) ||
+      destSubtypes.includes(TileSubtype.STEPPING_STONE) ||
+      // Boss entrances are floor overlays: a BOSS_ENTRANCE always warps before we
+      // get here, but a DARK_PORTAL walked over in the light is inert and must be
+      // preserved (not wiped) so it still works once the torch goes out.
+      destSubtypes.includes(TileSubtype.BOSS_ENTRANCE) ||
+      destSubtypes.includes(TileSubtype.DARK_PORTAL)
     ) {
       if (!destSubtypes.includes(TileSubtype.PLAYER)) {
         destSubtypes.push(TileSubtype.PLAYER);
@@ -3634,6 +4071,28 @@ function movePlayerCore(
         newGameState.heroTorchLit = true;
         break;
       }
+    }
+
+    // Relight from lava: ending a move anywhere inside a lava tile's glow is close
+    // enough to bend over and dip the torch in. The glow octagon (lib/torch_glow.ts —
+    // the same area the render layer lights) is symmetric, so "hero inside a lava
+    // tile's glow" is equivalent to "a lava tile inside the octagon around the hero".
+    if (!newGameState.heroTorchLit) {
+      const glowArea = computeTorchGlow(newY, newX, newMapData.tiles);
+      for (const key of glowArea.keys()) {
+        const [ly, lx] = key.split(",").map(Number);
+        if (newMapData.subtypes[ly]?.[lx]?.includes(TileSubtype.LAVA)) {
+          newGameState.heroTorchLit = true;
+          break;
+        }
+      }
+    }
+
+    // The torch cannot burn while swimming: ending a move in DEEP water snuffs it and
+    // overrides every relight source above (wall torches, lava glow) until the hero is
+    // back on land. Stepping stones and shallow water are dry enough — no snuff.
+    if (newMapData.subtypes[newY]?.[newX]?.includes(TileSubtype.DEEP_WATER)) {
+      newGameState.heroTorchLit = false;
     }
   }
 

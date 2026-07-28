@@ -2,8 +2,9 @@
 import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
+import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
 import { assetUrl } from "../asset_url";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -190,8 +191,28 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const H = grid.length;
         const W = grid[0]?.length ?? 0;
         const isIn = (y: number, x: number) => y >= 0 && y < H && x >= 0 && x < W;
-        const isFloor = (y: number, x: number) => isIn(y, x) && grid[y][x] === 0;
+        // This local isFloor drives pink-goblin pathing AND its teleport-ring placement /
+        // blink destinations. It previously checked only the base grid, so a pink could path
+        // or teleport onto an open abyss or lava (untelegraphed death). Exclude both hazards.
+        const isFloor = (y: number, x: number) => {
+          if (!(isIn(y, x) && grid[y][x] === 0)) return false;
+          const subs = ctx.subtypes?.[y]?.[x] ?? [];
+          // Water in either tier is lethal to pink goblins (kryptonite) — never
+          // path onto it and never place a ring / blink onto it.
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SHALLOW_WATER) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
+        };
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
+
+        // Torch-snuff stealth: with the hero's torch out the pink goblin can't sense
+        // them at all — it drops back to unaware (no laser, no rings, no pursuit).
+        if (ctx.player.torchLit === false) {
+          (e.memory as { aware?: boolean }).aware = false;
+        }
 
         // Memory keys: aware, ringY, ringX, ringOrigSubs (saved subtypes), ringAge (turns since ring placed)
         const mem = e.memory as {
@@ -254,9 +275,11 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           }
         }
 
-        // Becomes aware when player is within range 8 (regardless of LOS — it can sense nearby presence)
-        // LOS is only required for ranged attacks, not for awareness/teleport logic
-        const withinSenseRange = manhattan <= 8;
+        // Becomes aware when player is within range 8 (regardless of LOS — it can sense
+        // nearby presence). LOS is only required for ranged attacks, not for
+        // awareness/teleport logic. A hero with a snuffed torch cannot be sensed at all
+        // (aware was force-cleared above, and it never re-arms while hidden).
+        const withinSenseRange = manhattan <= 8 && ctx.player.torchLit !== false;
         const playerSees = withinSenseRange && canSee(grid, [e.y, e.x], [py, px]);
         if (withinSenseRange && !mem.aware) {
           mem.aware = true;
@@ -315,7 +338,18 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             typeof mem.ringX === "number"
           ) {
             const orig = mem.ringOrigSubs ?? [];
-            subtypes[mem.ringY][mem.ringX] = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+            const restored = orig.length > 0 ? [...orig] : [TileSubtype.NONE];
+            // The hero may be STANDING on the ring — owned rings are inert, walkable
+            // floor. The saved snapshot predates their arrival, so restoring it
+            // verbatim erased the PLAYER marker from the map (hero unfindable and
+            // invisible, every input dead, and the corruption persisted via save).
+            if (
+              subtypes[mem.ringY]?.[mem.ringX]?.includes(TileSubtype.PLAYER) &&
+              !restored.includes(TileSubtype.PLAYER)
+            ) {
+              restored.push(TileSubtype.PLAYER);
+            }
+            subtypes[mem.ringY][mem.ringX] = restored;
           }
           delete mem.ringY;
           delete mem.ringX;
@@ -580,8 +614,20 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
             // Ring exists — increment age
             mem.ringAge = (mem.ringAge ?? 0) + 1;
             if (mem.ringAge >= 2) {
+              // The hero (or another enemy) may be standing on the ring tile — owned
+              // rings are inert, walkable floor. Teleporting there would stack the
+              // goblin onto the occupant, so a blocked ring falls through to the
+              // ring-move branch and relocates instead.
+              const ringBlocked =
+                (mem.ringY === py && mem.ringX === px) ||
+                ctx.enemies.some(
+                  (other, k) =>
+                    k !== ctx.enemyIndex &&
+                    other.y === mem.ringY &&
+                    other.x === mem.ringX
+                );
               // Ring has been down for at least 2 turns — 50% teleport, else ring moves
-              if (rng() < 0.5) {
+              if (!ringBlocked && rng() < 0.5) {
                 // Teleport to ring
                 e.y = mem.ringY!;
                 e.x = mem.ringX!;
@@ -675,7 +721,14 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS);
+          // White goblins stay out of ALL water — the swarm holds the land and
+          // funnels onto crossings instead of surrounding through a pool.
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SHALLOW_WATER) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
         };
 
         const swarmId = (e.memory as Record<string, unknown>).swarmId as string | undefined;
@@ -715,8 +768,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // Manhattan distance to player
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
+        // Torch-snuff stealth: a hidden hero can't be seen OR bitten — the swarm falls
+        // back to regrouping behavior until the torch relights.
+        const heroHidden = ctx.player.torchLit === false;
+
         // Attack if adjacent to player
-        if (manhattan === 1) {
+        if (manhattan === 1 && !heroHidden) {
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
           } else {
@@ -741,9 +798,9 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return baseBite + Math.min(flankers, 2);
         }
 
-        // Vision check
+        // Vision check (a hidden hero is never seen)
         const withinRange = manhattan <= 8;
-        const seesPlayer = withinRange && canSee(grid, [e.y, e.x], [py, px]);
+        const seesPlayer = !heroHidden && withinRange && canSee(grid, [e.y, e.x], [py, px]);
 
         // Helper: face toward a target
         const faceToward = (ty: number, tx: number) => {
@@ -935,9 +992,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // alternating coiled <-> moving each turn.
         e.memory.moved = false;
 
+        // Torch-snuff stealth: a hidden hero is neither seen nor bitten.
+        const heroHidden = ctx.player.torchLit === false;
+
         // If adjacent, attack
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
-        if (manhattan === 1) {
+        if (manhattan === 1 && !heroHidden) {
           // Face the player
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
@@ -954,11 +1014,16 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         const isFloor = (y: number, x: number) => {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
-          return !subs.includes(TileSubtype.OPEN_ABYSS);
+          // Snakes won't swim: deep water is off-limits (shallow is fine to slither).
+          return (
+            !subs.includes(TileSubtype.OPEN_ABYSS) &&
+            !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.DEEP_WATER)
+          );
         };
 
         // If can see player, decide each tick: 33% approach, 67% avoid (move away)
-        const sees = canSee(grid, [e.y, e.x], [py, px]);
+        const sees = !heroHidden && canSee(grid, [e.y, e.x], [py, px]);
         if (sees) {
           const dy = py - e.y;
           const dx = px - e.x;
@@ -1024,6 +1089,29 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         }
         return 0;
       },
+    },
+  },
+  "shaper": {
+    kind: "shaper",
+    displayName: "The Shaper",
+    assets: {
+      // Dedicated Shaper art: a stone golem with a molten crown and an elemental
+      // core. The sides show its two halves (water on the left, fire on the right,
+      // matching the front core's split); the front has heterochromic glowing eyes
+      // (blue + red). Distinct left/right art means the sprite must NOT be mirrored
+      // by facing — see the no-flip case for 'shaper' in Tile.tsx.
+      front: assetUrl("/images/enemies/bosses/shaper/shaper-front.png"),
+      left: assetUrl("/images/enemies/bosses/shaper/shaper-left.png"),
+      right: assetUrl("/images/enemies/bosses/shaper/shaper-right.png"),
+      back: assetUrl("/images/enemies/bosses/shaper/shaper-back.png"),
+    },
+    base: { health: SHAPER_HP, attack: 0 },
+    // Standard melee: once you fight through its terrain and reach it, it dies
+    // like anything else (low HP). The challenge is the crossing, not the kill.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: shaperUpdate,
     },
   },
 };

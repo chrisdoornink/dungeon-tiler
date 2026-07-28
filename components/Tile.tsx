@@ -1,5 +1,6 @@
 import React from "react";
 import { TileType, TileSubtype, Direction } from "../lib/map";
+import { assetUrl } from "../lib/asset_url";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { NPC } from "../lib/npc";
@@ -8,7 +9,123 @@ import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
 import PixelFlame, {
   HERO_FLAME_ANCHOR,
   GOBLIN_FLAME_ANCHOR,
+  LAVA_FRAMES,
+  LAVA_COLS,
+  LAVA_ROWS,
+  WATER_FRAMES,
+  SHALLOW_WATER_FRAMES,
+  WATER_COLS,
+  WATER_ROWS,
 } from "./PixelFlame";
+
+// Seconds per wave cycle for water tiles — slower than fire so pools read calm.
+const WATER_CYCLE_S = 1.4;
+// Seconds per bubble cycle for lava — a slow simmer (one swell-and-pop per cycle),
+// not the torch's quick 0.52s flicker.
+const LAVA_CYCLE_S = 1.8;
+
+// The Shaper boss renders larger than a normal enemy so it reads as big + ominous.
+// ~1.5x tall; anchored at the feet (transformOrigin 50% 100%) so it grows upward and
+// its head spills into the tile above rather than sinking through the floor.
+const SHAPER_RENDER_SCALE = 1.5;
+
+// Submersion: standing in water hides the lower part of the hero sprite — waist-deep
+// in shallow water, up to the head in deep water. Pure CSS clip (no separate wading
+// assets); shared with the smooth-movement hero overlay in TilemapGrid.
+export const WATER_SUBMERSION_CLIP = {
+  shallow: "inset(0 0 38% 0)",
+  deep: "inset(0 0 62% 0)",
+} as const;
+
+// Enemies get the same submersion treatment as the hero when they stand in water:
+// waist-deep in shallow, head-deep in deep. The snake rides lower in the water —
+// only the top half of its body shows even in the shallows. (Applied on the single-
+// sprite enemy render path; pink/ghost hover and white swarms never enter water.)
+export const ENEMY_WATER_SUBMERSION_CLIP = {
+  shallow: "inset(0 0 38% 0)",
+  shallowSnake: "inset(0 0 50% 0)",
+  deep: "inset(0 0 62% 0)",
+} as const;
+
+// Neighbor-aware terrain edges: elemental tiles shade only the sides where the pool
+// actually ends, so adjacent water/lava tiles merge into one body instead of showing
+// per-tile seams. Family classification (computed in TilemapGrid): obsidian counts as
+// lava, stepping stones as deep — crossings are part of the pool.
+export type TerrainFamily = "lava" | "deep" | "shallow" | "land";
+export type TerrainNeighbors = {
+  top: TerrainFamily;
+  right: TerrainFamily;
+  bottom: TerrainFamily;
+  left: TerrainFamily;
+};
+
+// Edge colors per (self, neighbor): null = no edge (same body, stay flat).
+// - Lava: a faint WARM glow on its outer border — a smooth fade (not a stepped band),
+//   dim enough to only hint that the rim is hot.
+// - Deep: every edge is LIGHTER than the deep base (water gets shallower toward any
+//   boundary, never darker): a soft light lift toward shallow, and a slightly weaker
+//   version of the same lift toward land/lava. Flat toward other deep.
+// - Shallow: a subtle brightening toward the land shore, flat toward other shallow,
+//   and NOTHING toward deep — the deep side's light lift alone marks the drop-off
+//   (both tiers shading the same boundary produced an ugly double band).
+function terrainEdgeColors(
+  self: Exclude<TerrainFamily, "land">,
+  neighbor: TerrainFamily
+): [string, string] | null {
+  if (self === "lava") {
+    return neighbor === "lava"
+      ? null
+      : ["rgba(255, 185, 80, 0.22)", "rgba(255, 185, 80, 0)"];
+  }
+  if (self === "deep") {
+    if (neighbor === "deep") return null;
+    if (neighbor === "shallow")
+      return ["rgba(74, 127, 156, 0.35)", "rgba(74, 127, 156, 0.16)"];
+    return ["rgba(74, 127, 156, 0.28)", "rgba(74, 127, 156, 0.12)"];
+  }
+  // shallow
+  if (neighbor === "shallow" || neighbor === "deep") return null;
+  return ["rgba(150, 195, 215, 0.22)", "rgba(150, 195, 215, 0.1)"];
+}
+
+// One strip per edge, above the crust + wave/bubble overlays (1020), below items
+// (1030). Water edges are stepped two-band strips (crisp, pixel-aesthetic); lava's
+// edge is a SMOOTH fade — a soft heat glow rather than a drawn rim (fire visuals
+// already use gradients: torch glow, flame halos).
+const TERRAIN_EDGE_PX = 5;
+function renderTerrainEdges(
+  self: Exclude<TerrainFamily, "land">,
+  tn: TerrainNeighbors
+): React.ReactNode {
+  const sides = [
+    { key: "top", dir: "to bottom", box: { top: 0, left: 0, right: 0, height: TERRAIN_EDGE_PX } },
+    { key: "bottom", dir: "to top", box: { bottom: 0, left: 0, right: 0, height: TERRAIN_EDGE_PX } },
+    { key: "left", dir: "to right", box: { left: 0, top: 0, bottom: 0, width: TERRAIN_EDGE_PX } },
+    { key: "right", dir: "to left", box: { right: 0, top: 0, bottom: 0, width: TERRAIN_EDGE_PX } },
+  ] as const;
+  return sides.map(({ key, dir, box }) => {
+    const colors = terrainEdgeColors(self, tn[key]);
+    if (!colors) return null;
+    const [strong, weak] = colors;
+    const background =
+      self === "lava"
+        ? `linear-gradient(${dir}, ${strong} 0%, ${weak} 100%)`
+        : `linear-gradient(${dir}, ${strong} 0%, ${strong} 50%, ${weak} 50%, ${weak} 100%)`;
+    return (
+      <div
+        key={`terrain-edge-${key}`}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          ...box,
+          background,
+          pointerEvents: "none",
+          zIndex: 1021,
+        }}
+      />
+    );
+  });
+}
 import styles from "./Tile.module.css";
 import {
   DEFAULT_ENVIRONMENT,
@@ -17,7 +134,6 @@ import {
   getFloorAsset,
   getWallAsset,
 } from "../lib/environment";
-import { assetUrl } from "../lib/asset_url";
 
 type NeighborInfo = {
   top: number | null;
@@ -47,6 +163,9 @@ interface TileProps {
   subtype?: number[];
   row?: number; // grid row (y)
   col?: number; // grid col (x)
+  // Terrain families of the four orthogonal neighbors — provided only for elemental
+  // tiles (water/lava). Drives neighbor-aware edge shading so pools read as one body.
+  terrainNeighbors?: TerrainNeighbors;
   isVisible?: boolean; // Whether this tile is in the player's field of view
   visibilityTier?: number; // 0-3 for FOV fade tiers
   // True when this tile is diagonally adjacent to a wall torch / torch-carrier
@@ -65,11 +184,12 @@ interface TileProps {
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
+  heroTorchSnuffing?: boolean; // brief window after a snuff: show the blue flame flutter-out
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
+  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemySwarmCount?: number; // for white-goblin: how many swarm members share this tile (1-4)
   enemyAura?: boolean; // show eerie green glow when close to hero
@@ -97,6 +217,13 @@ interface TileProps {
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
+  // Per swarm member (same tile order as enemySwarmCount): its own facing and
+  // its own slide-in step, so two members converging on this tile each glide
+  // in from their real previous tile instead of sharing one direction.
+  enemySwarmMembers?: Array<{
+    facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
+    step?: SmoothEntityStep;
+  }>;
   // Pink goblin whose teleport ring is NOT cast elsewhere: render the ring
   // (with sparkles) directly under the goblin.
   enemyRingUnder?: boolean;
@@ -130,12 +257,22 @@ export const combatLungeStyle = (
   };
 };
 
+// Lava submersion: a stone goblin (the only enemy that crosses lava) sinks
+// knee-deep into the molten floor instead of floating on top of it. Pure CSS
+// clip of the sprite's bottom edge — the goblin art's legs split ~12% up from
+// the tile floor and the knees sit ~17% up, so clipping the bottom 18% hides
+// the feet and lower legs, reading as "standing in it." Keyed off the tile's
+// own LAVA subtype (cooled OBSIDIAN crossings drop LAVA, so they don't clip);
+// the slide-in tween only drives `transform`, so the clip survives it.
+export const ENEMY_LAVA_SUBMERSION_CLIP = "inset(0 0 18% 0)";
+
 export const Tile: React.FC<TileProps> = ({
   tileId,
   // We don't need tileType for now, but it's in the props interface for future use
   subtype = [],
   row,
   col,
+  terrainNeighbors,
   isVisible = true,
   visibilityTier = 3,
   torchDiagonalGlow = false,
@@ -144,6 +281,7 @@ export const Tile: React.FC<TileProps> = ({
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
+  heroTorchSnuffing = false,
   heroPoisoned = false,
   hasEnemy = false,
   enemyVisible = undefined,
@@ -151,6 +289,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyKind,
   enemyMoved,
   enemySwarmCount,
+  enemySwarmMembers,
   enemyAura,
   npc,
   npcVisible = undefined,
@@ -459,6 +598,22 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.OPEN_ABYSS) || false;
   };
 
+  const hasLava = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.LAVA) || false;
+  };
+  const hasObsidian = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.OBSIDIAN) || false;
+  };
+  const hasShallowWater = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SHALLOW_WATER) || false;
+  };
+  const hasDeepWater = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.DEEP_WATER) || false;
+  };
+  const hasSteppingStone = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.STEPPING_STONE) || false;
+  };
+
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
   };
@@ -617,6 +772,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.EXIT &&
         subtype !== TileSubtype.CAVE_OPENING &&
+        // Boss entrances render their own cave/portal art (and the dark portal is
+        // intentionally invisible while lit) — never fall back to a "?" glyph.
+        subtype !== TileSubtype.BOSS_ENTRANCE &&
+        subtype !== TileSubtype.DARK_PORTAL &&
         // Exclude pots/rocks and revealed items from generic rendering
         subtype !== TileSubtype.POT &&
         subtype !== TileSubtype.ROCK &&
@@ -633,6 +792,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.CHECKPOINT &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
+        subtype !== TileSubtype.LAVA &&
+        subtype !== TileSubtype.OBSIDIAN &&
+        subtype !== TileSubtype.SHALLOW_WATER &&
+        subtype !== TileSubtype.DEEP_WATER &&
+        subtype !== TileSubtype.STEPPING_STONE &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
@@ -764,7 +928,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
               className={`${styles.assetIcon} ${styles.torchSprite}`}
-              style={{ backgroundImage: `url(${assetUrl('/images/items/wall-torch-2-base.png')})` }}
+              style={{ backgroundImage: `url(${assetUrl("/images/items/wall-torch-2-base.png")})` }}
             />
             <PixelFlame
               cell={1.5}
@@ -837,6 +1001,39 @@ export const Tile: React.FC<TileProps> = ({
             }}
           />
         )}
+
+        {/* Boss-room entrance: a lockless cave mouth (same art as CAVE_OPENING).
+            Always visible; stepping onto it warps into the boss arena. */}
+        {subtypes?.includes(TileSubtype.BOSS_ENTRANCE) && (
+          <div
+            key="boss-entrance"
+            data-testid={`subtype-icon-${TileSubtype.BOSS_ENTRANCE}`}
+            className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+            style={{
+              backgroundImage: `url(${assetUrl('/images/door/exit-dark.png')})`,
+            }}
+          />
+        )}
+
+        {/* Douse-to-see portal: a glowing entrance that only appears once the
+            hero's torch is OUT (true darkness). Invisible + inert in the light. */}
+        {subtypes?.includes(TileSubtype.DARK_PORTAL) &&
+          isVisible &&
+          !heroTorchLit &&
+          !suppressDarknessOverlay && (
+            <div
+              key="dark-portal"
+              data-testid={`subtype-icon-${TileSubtype.DARK_PORTAL}`}
+              className={`${styles.assetIcon} ${styles.fullHeightAssetIcon} ${styles.exitIcon}`}
+              style={{
+                backgroundImage: `url(${assetUrl('/images/door/exit-dark.png')})`,
+                filter: "brightness(1.7)",
+                boxShadow:
+                  "0 0 14px 5px rgba(120, 200, 255, 0.9), inset 0 0 10px rgba(170, 225, 255, 0.7)",
+                borderRadius: "6px",
+              }}
+            />
+          )}
 
         {/* Render POT/ROCK/FOOD/MED with assets if present */}
         {hasPot(subtypes) && (() => {
@@ -983,7 +1180,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               key="pink-heart"
               data-testid={`subtype-icon-${TileSubtype.PINK_HEART}`}
-              className={`${styles.assetIcon} ${styles.pinkHeartIcon}`}
+              className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.pinkHeartIcon}`}
             />
           </>
         )}
@@ -1397,15 +1594,18 @@ export const Tile: React.FC<TileProps> = ({
     // vertical offset so higher-up goblins sit behind lower ones.
     if (smoothMode && enemyKind === 'white-goblin') {
       const count = Math.max(1, Math.min(4, enemySwarmCount ?? 1));
-      const dir =
-        enemyFacing === 'UP'
-          ? 'back'
-          : enemyFacing === 'LEFT' || enemyFacing === 'RIGHT'
-          ? 'right'
-          : 'front';
-      const src = assetUrl(`/images/enemies/fire-goblin/white-goblins-${dir}-1.png`);
-      // Flip the whole cluster for LEFT so member offsets mirror consistently.
-      const clusterBase = enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
+      // Each member slides in from ITS OWN previous tile and keeps ITS OWN
+      // facing — two goblins converging on this tile arrive from different
+      // directions, and one that stood still doesn't slide at all. Falls back
+      // to the tile-level facing/step when per-member data isn't provided
+      // (legacy callers / tests).
+      const members =
+        enemySwarmMembers && enemySwarmMembers.length > 0
+          ? enemySwarmMembers.slice(0, 4)
+          : Array.from({ length: count }, () => ({
+              facing: enemyFacing,
+              step: enemyStep,
+            }));
       const offsets: Array<[number, number]> = [
         [-8, 2],
         [7, 3],
@@ -1419,35 +1619,50 @@ export const Tile: React.FC<TileProps> = ({
           )}
           {((enemyVisible ?? isVisible) === true) && (
             <div
-              key={enemyStep ? `enemy-step-${enemyStep.seq}` : 'enemy-static'}
               className="absolute inset-0 pointer-events-none"
               style={{
                 zIndex: 10500, // above fog (10000), below wall tops (12000)
-                transform: clusterBase,
                 // Same cave dimming as the single-sprite path
                 filter: !environmentConfig.daylight
                   ? 'brightness(var(--enemy-dim, 0.80))'
                   : undefined,
-                ...smoothStepStyle(enemyStep, clusterBase),
               }}
               data-testid="enemy-sprite"
             >
-              {offsets.slice(0, count).map(([ox, oy], k) => (
-                <div
-                  key={k}
-                  style={{
-                    position: 'absolute',
-                    inset: 0,
-                    transform: `translate(${ox}px, ${oy}px) scale(0.68)`,
-                    transformOrigin: '50% 100%',
-                    zIndex: 10 + oy, // painter's order by vertical offset
-                    backgroundImage: `url(${src})`,
-                    backgroundSize: 'contain',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'center',
-                  }}
-                />
-              ))}
+              {members.map((m, k) => {
+                const [ox, oy] = offsets[k];
+                const dir =
+                  m.facing === 'UP'
+                    ? 'back'
+                    : m.facing === 'LEFT' || m.facing === 'RIGHT'
+                    ? 'right'
+                    : 'front';
+                const src = assetUrl(`/images/enemies/fire-goblin/white-goblins-${dir}-1.png`);
+                // Side art faces RIGHT; flip the sprite (not the slot offset)
+                // for LEFT so members mirror independently.
+                const base = `translate(${ox}px, ${oy}px) scale(0.68)${
+                  m.facing === 'LEFT' ? ' scaleX(-1)' : ''
+                }`;
+                return (
+                  <div
+                    // A fresh step re-keys the member so its slide animation
+                    // restarts even when the node stays mounted.
+                    key={m.step ? `m${k}-step-${m.step.seq}` : `m${k}-static`}
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      transform: base,
+                      transformOrigin: '50% 100%',
+                      zIndex: 10 + oy, // painter's order by vertical offset
+                      backgroundImage: `url(${src})`,
+                      backgroundSize: 'contain',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'center',
+                      ...smoothStepStyle(m.step, base),
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </>
@@ -1463,6 +1678,11 @@ export const Tile: React.FC<TileProps> = ({
       if (enemyKind !== 'snake') {
         if (enemyKind === 'ghost') return 'none';
         if (enemyKind === 'white-goblin') return 'none';
+        // The Shaper has DISTINCT left/right art (water side vs fire side), so it must
+        // never be mirrored — each facing already draws the correctly-facing sprite.
+        // It's also a big, ominous boss: render it larger (feet planted via the
+        // transformOrigin on the sprite div; its head spills up into the tile above).
+        if (enemyKind === 'shaper') return `scale(${SHAPER_RENDER_SCALE})`;
         // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       }
@@ -1546,9 +1766,26 @@ export const Tile: React.FC<TileProps> = ({
               backgroundPosition: 'center',
               zIndex: 10500, // above fog (10000), below wall tops (12000)
               transform: enemyBaseTransform,
+              // The Shaper's up-scale pivots at its feet so it grows into the tile
+              // above; every other enemy keeps the default center origin.
+              transformOrigin: enemyKind === 'shaper' ? '50% 100%' : undefined,
               // Darken non-torch-carrying enemies in cave/underground environments
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
+                : undefined,
+              // Submersion: an enemy standing in water or lava is clipped like
+              // the hero — waist-deep in shallow water (snakes ride lower: top
+              // half only), head-deep in deep water, and knee-deep in lava (only
+              // stone goblins cross it). Keyed off this tile's own subtypes; the
+              // slide animation only drives `transform`, so the clip survives it.
+              clipPath: hasDeepWater(subtype)
+                ? ENEMY_WATER_SUBMERSION_CLIP.deep
+                : hasShallowWater(subtype)
+                ? enemyKind === 'snake'
+                  ? ENEMY_WATER_SUBMERSION_CLIP.shallowSnake
+                  : ENEMY_WATER_SUBMERSION_CLIP.shallow
+                : hasLava(subtype)
+                ? ENEMY_LAVA_SUBMERSION_CLIP
                 : undefined,
               // Combat lunge (standalone `translate`) — spread before the
               // slide styles so a live slide's `animation` wins if both fire
@@ -1560,8 +1797,11 @@ export const Tile: React.FC<TileProps> = ({
               // goblins (fire/water/earth family) get the bob+tilt variant so
               // their walk reads as a step rather than a flat glide.
               ...(enemySliding
-                ? REGULAR_GOBLIN_KINDS.has(enemyKind ?? '')
-                  ? smoothStepBobStyle(enemyStep, enemyBaseTransform)
+                ? (REGULAR_GOBLIN_KINDS.has(enemyKind ?? '') || enemyKind === 'shaper')
+                  ? // Shaper + regular goblins step (bob + tilt) so movement reads as a
+                    // heavy footfall, not the flat glide that made the Shaper look like
+                    // it was floating/sliding magically.
+                    smoothStepBobStyle(enemyStep, enemyBaseTransform)
                   : smoothStepStyle(enemyStep, enemyBaseTransform)
                 : null),
             }}
@@ -1604,10 +1844,32 @@ export const Tile: React.FC<TileProps> = ({
   if (tileId === 0) {
     // Floor tiles - only visible if within player's field of view
     if (isVisible) {
-      // Check if this floor tile has darkness (collapsed faulty floor) or open abyss
+      // Check if this floor tile has darkness (collapsed faulty floor), open abyss, or
+      // elemental terrain (lava/obsidian, water tiers, stepping stones). Each swaps the
+      // base floor class.
       const isDarkness = hasDarkness(subtype);
       const isOpenAbyss = hasOpenAbyss(subtype);
-      const floorClasses = `${styles.tileContainer} ${isDarkness ? styles.darkness : isOpenAbyss ? styles.openAbyss : styles.floor} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
+      const isLava = hasLava(subtype);
+      const isObsidian = hasObsidian(subtype);
+      const isShallowWater = hasShallowWater(subtype);
+      const isDeepWater = hasDeepWater(subtype);
+      const isSteppingStone = hasSteppingStone(subtype);
+      const floorVariantClass = isDarkness
+        ? styles.darkness
+        : isOpenAbyss
+        ? styles.openAbyss
+        : isLava
+        ? styles.lava
+        : isObsidian
+        ? styles.obsidian
+        : isDeepWater
+        ? styles.deepWater
+        : isSteppingStone
+        ? styles.steppingStone
+        : isShallowWater
+        ? styles.shallowWater
+        : styles.floor;
+      const floorClasses = `${styles.tileContainer} ${floorVariantClass} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
 
       // Map floor variant to NESW asset filename based on neighbors
       const floorAsset =
@@ -1649,7 +1911,13 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            backgroundImage: `url(${floorAsset})`,
+            // Elemental terrain supplies its own pixel-art background via the CSS
+            // class; an inline floor-asset image here would override it (that override
+            // is why lava first rendered as a bare framed square). Leave it unset.
+            backgroundImage:
+              isLava || isObsidian || isShallowWater || isDeepWater || isSteppingStone
+                ? undefined
+                : `url(${floorAsset})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
@@ -1659,6 +1927,62 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Lava: a bubbling molten surface — a dark crust base (the .lava class) with
+              low bubbles that swell and pop (a sparse PixelFlame at cell=2 to match the
+              game's resolution). seed + per-tile horizontal flip break up uniformity. */}
+          {isLava && (
+            <PixelFlame
+              cell={1.25}
+              palette="lava"
+              frames={LAVA_FRAMES}
+              frameSetId="lava"
+              cols={LAVA_COLS}
+              rows={LAVA_ROWS}
+              cycleS={LAVA_CYCLE_S}
+              seed={(row ?? 0) * 31 + (col ?? 0)}
+              className={styles.lavaFlame}
+              style={{
+                transform: `translateX(-50%)${
+                  (((row ?? 0) + (col ?? 0)) % 2 === 1) ? " scaleX(-1)" : ""
+                }`,
+              }}
+            />
+          )}
+
+          {/* Water: low-contrast drifting wave lines over the water base — the same
+              tile-filling PixelFlame machinery as lava's bubbles, but a slower cycle.
+              Deep water gets fuller waves + a rare single-pixel glint; shallow gets
+              shorter, dimmer wave shadows so both tiers read as one body of water. */}
+          {(isDeepWater || isShallowWater) && (
+            <PixelFlame
+              cell={1.25}
+              palette="water"
+              frames={isDeepWater ? WATER_FRAMES : SHALLOW_WATER_FRAMES}
+              frameSetId={isDeepWater ? "water" : "shallow-water"}
+              cols={WATER_COLS}
+              rows={WATER_ROWS}
+              cycleS={WATER_CYCLE_S}
+              seed={(row ?? 0) * 31 + (col ?? 0)}
+              className={styles.waterRipple}
+              style={{
+                transform: `translateX(-50%)${
+                  (((row ?? 0) + (col ?? 0)) % 2 === 1) ? " scaleX(-1)" : ""
+                }`,
+              }}
+            />
+          )}
+
+          {/* Neighbor-aware terrain edges: shade only where the pool actually ends
+              (dark outer rims; deep lightens toward shallow; shallow lightens toward
+              shore and darkens toward the deep drop-off). Adjacent same-body tiles
+              stay seamless. */}
+          {terrainNeighbors &&
+            (isLava || isDeepWater || isShallowWater) &&
+            renderTerrainEdges(
+              isLava ? "lava" : isDeepWater ? "deep" : "shallow",
+              terrainNeighbors
+            )}
+
           {/* Render checkpoint asset if present (full-tile overlay) */}
           {Array.isArray(subtype) && subtype.includes(TileSubtype.CHECKPOINT) && (() => {
             const isActive = Array.isArray(activeCheckpoint) &&
@@ -1728,6 +2052,15 @@ export const Tile: React.FC<TileProps> = ({
                     .filter(Boolean)
                     .join(', ') || undefined,
                 visibility: suppressHeroSprite ? 'hidden' : undefined,
+                // Submersion: wading hides the hero below the waist, swimming below
+                // the head. Suppressed while dying so death transforms play whole.
+                clipPath: heroDeathState
+                  ? undefined
+                  : isDeepWater
+                  ? WATER_SUBMERSION_CLIP.deep
+                  : isShallowWater
+                  ? WATER_SUBMERSION_CLIP.shallow
+                  : undefined,
               }}
             >
               {/* Torch flame rides inside the hero div so facing flips, warp
@@ -1746,6 +2079,30 @@ export const Tile: React.FC<TileProps> = ({
                     cell={1.4}
                     seed={5}
                     style={{ ...anchor, transform: 'translateX(-50%)' }}
+                  />
+                );
+              })()}
+              {!heroTorchLit && heroTorchSnuffing && (() => {
+                const dirKey =
+                  heroDirectionForSprite === Direction.UP
+                    ? 'back'
+                    : heroDirectionForSprite === Direction.RIGHT ||
+                      heroDirectionForSprite === Direction.LEFT
+                    ? 'right'
+                    : 'front';
+                const anchor = HERO_FLAME_ANCHOR[dirKey];
+                // Blue spirit flame fluttering up and fading as the wisp takes it.
+                // Same anchor + centering as the lit flame so it sits on the torch.
+                return (
+                  <PixelFlame
+                    cell={1.4}
+                    seed={5}
+                    palette="blue"
+                    style={{
+                      ...anchor,
+                      transform: 'translateX(-50%)',
+                      animation: 'flameSnuffAway 0.56s ease-out forwards',
+                    }}
                   />
                 );
               })()}
@@ -2149,7 +2506,7 @@ export const Tile: React.FC<TileProps> = ({
         assetUrl('/images/flowers/flowers-3.png'),
         assetUrl('/images/flowers/flowers-4.png'),
         assetUrl('/images/flowers/flowers-5.png'),
-        assetUrl('/images/flowers/bush.png'),
+        assetUrl('/images/flowers/bush-1.png'),
       ];
       const flowerAsset = flowerAssets[Math.abs(seed) % flowerAssets.length];
 

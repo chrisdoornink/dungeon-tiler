@@ -33,7 +33,7 @@ type LastGame = {
   };
   outcome?: "win" | "dead";
   deathCause?: {
-    type: 'enemy' | 'faulty_floor' | 'poison' | 'bomb';
+    type: 'enemy' | 'faulty_floor' | 'poison' | 'bomb' | 'darkness' | 'lava';
     enemyKind?: string;
   };
   stats?: {
@@ -118,6 +118,12 @@ export default function EndPage() {
           image: "/images/floor/crack3.png",
           alt: "Floor crack"
         };
+      case 'lava':
+        return {
+          message: "You stepped into the lava",
+          image: "/images/floor/crack3.png",
+          alt: "Lava"
+        };
       case 'bomb':
         return {
           message: "You were caught in your own bomb blast",
@@ -157,6 +163,8 @@ export default function EndPage() {
   const deathEmoji = last.outcome === 'dead' && last.deathCause
     ? (last.deathCause.type === 'faulty_floor'
         ? '🕳️'
+        : last.deathCause.type === 'lava'
+        ? '🌋'
         : last.deathCause.type === 'bomb'
         ? '💣'
         : last.deathCause.type === 'enemy'

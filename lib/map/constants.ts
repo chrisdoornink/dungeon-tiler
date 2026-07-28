@@ -105,6 +105,28 @@ export enum TileSubtype {
   // use, or kept as an end-screen prize); BERRY is the belted berry (heals 2-3 on use).
   PINK_HEART = 56,
   BERRY = 57,
+  // Elemental terrain — see .claude/features/water-lava-elements/index.md.
+  // LAVA is a walkable-but-instant-death floor overlay (a glowing wall): the player dies on
+  // entry, most enemies avoid it, stone goblins cross freely, and a thrown rock cools a lava
+  // tile into OBSIDIAN — a safe, walkable stepping stone (the only on-foot crossing).
+  // WATER comes in two tiers: SHALLOW_WATER is free to wade (torch stays lit) and rings
+  // DEEP_WATER, which the hero swims — the torch snuffs and stays out while swimming (and a
+  // snuffed torch hides the hero from most enemies). Only true swimmers cross deep water.
+  // A thrown rock landing in deep water becomes a STEPPING_STONE: a dry, walkable crossing.
+  SHALLOW_WATER = 58,
+  DEEP_WATER = 59,
+  LAVA = 60,
+  OBSIDIAN = 61,
+  STEPPING_STONE = 62,
+  // Boss-room entrances (see .claude/features/boss-daily-entrances/index.md).
+  // BOSS_ENTRANCE is a lockless cave mouth (renders like CAVE_OPENING) that warps
+  // the hero into the boss arena when stepped on — used behind a moat and in the
+  // outside world. DARK_PORTAL is the "douse-to-see" variant: it is invisible and
+  // inert while the hero's torch is lit, and only appears + warps once the torch is
+  // out (snuffed by deep water). Kept distinct from CAVE_OPENING so story-mode cave
+  // visuals never accidentally trigger a boss warp.
+  BOSS_ENTRANCE = 63,
+  DARK_PORTAL = 64,
 }
 
 /**

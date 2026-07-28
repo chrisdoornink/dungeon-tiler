@@ -26,6 +26,7 @@ import { canSee, calculateDistance } from "../lib/line_of_sight";
 import {
   Tile,
   combatLungeStyle,
+  WATER_SUBMERSION_CLIP,
   type CombatLunge,
   type HeroDeathPhase,
   type HeroDeathState,
@@ -36,6 +37,12 @@ import {
   EnemyRegistry,
   type EnemyKind,
 } from "../lib/enemies/registry";
+import {
+  shaperRevealTiles,
+  shaperPendingFire,
+  shaperFireLaunch,
+  shaperWallReveal,
+} from "../lib/bosses/shaper";
 import MobileControls from "./MobileControls";
 import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
@@ -161,6 +168,7 @@ const ENEMY_NUMBER_COLOR: Record<string, string> = {
   "white-goblin": "#eaeaea",
   snake: "#74e06f",
   ghost: "#c3eeff",
+  shaper: "#b07bff",
 };
 const HERO_DAMAGE_COLOR = "#f1c27d"; // hero skin tone — clearly "the hero lost HP"
 const HERO_HEAL_COLOR = "#6afc7a"; // green = healing
@@ -204,6 +212,11 @@ function runProgressProps(gs: GameState) {
     wallsDestroyed: gs.stats?.wallsDestroyed ?? 0,
     reachedOutsideWorld: !!gs.reachedOutsideWorld,
     reachedPinkRealm: !!gs.reachedPinkRealm,
+    collectedChestItems: gs.stats?.chestItemsCollected ?? [],
+    reachedBossRoom: !!gs.reachedBossRoom,
+    bossDefeated: !!gs.bossDefeated,
+    bossEntranceKind: gs.bossEntranceKind,
+    bossKind: gs.bossKind,
   };
 }
 
@@ -222,6 +235,12 @@ interface TilemapGridProps {
    * uses this to hand off to /daily-new floor 2 with carried inventory).
    */
   onWin?: (finalState: GameState) => void;
+  /**
+   * Non-daily death hook (mirror of onWin). Fires once when the hero dies with
+   * no checkpoint to revive from. When provided, suppresses the death-screen /
+   * `/end` redirect so a sandbox page can offer its own in-place reset.
+   */
+  onDeath?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
   // Notify parent where the hero is (floor number + pink realm status) so it
   // can render a location title. Fires on mount and whenever either changes.
@@ -237,6 +256,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   isDailyChallenge = false,
   onDailyComplete,
   onWin,
+  onDeath,
   storageSlot,
   onLocationChange,
 }) => {
@@ -337,6 +357,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Screen shake state
   const [isShaking, setIsShaking] = useState(false);
+  // Per-shake intensity (px). Most shakes use the default 4; the Shaper's
+  // terrain reshape requests a bigger jolt so the no-telegraph attack is felt.
+  const [shakeIntensity, setShakeIntensity] = useState(4);
 
   // Item pickup animation state
   const [itemPickupAnimations, setItemPickupAnimations] = useState<Array<{
@@ -1868,12 +1891,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     smoothEntitySeqRef.current += 1;
     const seq = smoothEntitySeqRef.current;
     const visit = (
-      id: string,
+      rawId: string,
       y: number,
       x: number,
       keyPrefix: "e" | "n",
       kind?: string
     ) => {
+      const id = `${keyPrefix}:${rawId}`;
       nextPos.set(id, [y, x]);
       const p = prev.get(id);
       if (!p) return;
@@ -1890,13 +1914,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         // and room warps snap.
         return;
       }
-      steps.set(`${keyPrefix}:${y},${x}`, { dy, dx, dur, ease, seq });
+      // White-goblin swarm members can share a destination tile, so a
+      // tile-keyed entry would collapse two arrivals into one slide (both
+      // gliding in from whichever member was diffed last). Key them by id
+      // instead; the tile looks up each member's own step (see
+      // enemySwarmMembers in renderTileGrid).
+      const key =
+        kind === "white-goblin" ? `eid:${rawId}` : `${keyPrefix}:${y},${x}`;
+      steps.set(key, { dy, dx, dur, ease, seq });
     };
     for (const e of gameState.enemies ?? []) {
-      if (typeof e.id === "string" && e.id) visit(`e:${e.id}`, e.y, e.x, "e", e.kind);
+      if (typeof e.id === "string" && e.id) visit(e.id, e.y, e.x, "e", e.kind);
     }
     for (const n of gameState.npcs ?? []) {
-      if (n?.id) visit(`n:${n.id}`, n.y, n.x, "n");
+      if (n?.id) visit(n.id, n.y, n.x, "n");
     }
     smoothEntityPrevRef.current = nextPos;
     cache.state = gameState;
@@ -2019,6 +2050,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environmentDaylight = environmentConfig.daylight;
   const autoPhaseVisibility = environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
+
+  // One-shot "flame guttering out" VFX: when the torch goes lit -> snuffed (a
+  // wisp reaching the hero), play a blue flame flutter-and-fade for ~560ms. The
+  // render sites below key their snuff flame off `torchSnuffing`.
+  const [torchSnuffing, setTorchSnuffing] = useState(false);
+  const prevTorchLitRef = useRef(heroTorchLitState);
+  const snuffTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const was = prevTorchLitRef.current;
+    prevTorchLitRef.current = heroTorchLitState;
+    if (was && !heroTorchLitState) {
+      setTorchSnuffing(true);
+      if (snuffTimerRef.current) clearTimeout(snuffTimerRef.current);
+      snuffTimerRef.current = setTimeout(() => setTorchSnuffing(false), 560);
+    }
+  }, [heroTorchLitState]);
+  useEffect(
+    () => () => {
+      if (snuffTimerRef.current) clearTimeout(snuffTimerRef.current);
+    },
+    []
+  );
+
   // The nightmare room is always pitch black: never suppress its darkness regardless of
   // environment, forceDaylight, or torch state, so it renders dark from the first frame.
   const inNightmare = !!gameState.inNightmare;
@@ -2032,7 +2086,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           phase: heroDeathPhase,
           orientation: heroDeathOrientation,
           variant:
-            gameState.deathCause?.type === "faulty_floor" ? "abyss" : "topple",
+            gameState.deathCause?.type === "faulty_floor" ||
+            gameState.deathCause?.type === "lava"
+              ? "abyss"
+              : "topple",
         }
       : undefined;
 
@@ -2642,7 +2699,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   };
 
   // Helper function to trigger screen shake
-  const triggerScreenShake = (duration = 200) => {
+  const triggerScreenShake = (duration = 200, intensity = 4) => {
+    setShakeIntensity(intensity);
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), duration);
   };
@@ -2660,6 +2718,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     lastBombBlastKeyRef.current = key;
     triggerScreenShake(360);
   }, [gameState?.recentBombBlasts]);
+
+  // Shake the screen once per Shaper action: a terrain reshape (water flood /
+  // fire rain-down) OR a fire launch (lava rocketing up). Keyed on nonces so
+  // each fires exactly once.
+  const lastShaperAttackRef = useRef<number>(0);
+  const lastShaperLaunchRef = useRef<number>(0);
+  const lastShaperWallRef = useRef<number>(0);
+  useEffect(() => {
+    const shaper = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
+    const mem = shaper?.behaviorMemory as Record<string, unknown> | undefined;
+    const launch = shaperFireLaunch(mem);
+    if (launch != null && launch !== lastShaperLaunchRef.current) {
+      lastShaperLaunchRef.current = launch;
+      triggerScreenShake(300, 8); // the boss hurls fire skyward
+      return;
+    }
+    const wall = shaperWallReveal(mem);
+    if (wall && wall.nonce !== lastShaperWallRef.current) {
+      lastShaperWallRef.current = wall.nonce;
+      triggerScreenShake(240, 6); // a wall grinds up out of the ground
+      return;
+    }
+    const atk = shaperRevealTiles(mem);
+    if (!atk) return;
+    if (atk.nonce === lastShaperAttackRef.current) return;
+    lastShaperAttackRef.current = atk.nonce;
+    triggerScreenShake(360, 10); // terrain reshapes underfoot
+  }, [gameState]);
 
   useEffect(() => {
     try {
@@ -2770,6 +2856,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return;
     }
 
+    // Sandbox/test hook: the parent owns the death (in-place reset). Skip the
+    // death screen, analytics, and every redirect; just clear our save slot.
+    if (onDeath && !isDailyChallenge && gameState.mode !== "story") {
+      setGameCompletionProcessed(true);
+      triggerScreenShake(400);
+      try {
+        if (typeof window !== "undefined") {
+          CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
+        }
+      } catch {
+        // ignore storage errors
+      }
+      onDeath(gameState);
+      return;
+    }
+
     // Check if there's a checkpoint to revive from
     const hasCheckpoint = !!gameState.lastCheckpoint;
 
@@ -2851,6 +2953,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         deathCause: gameState.deathCause?.type,
         deathCauseEnemyKind: gameState.deathCause?.enemyKind,
         currentFloor: gameState.currentFloor,
+        ...runProgressProps(gameState),
       });
     } catch {}
 
@@ -2992,6 +3095,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.stats,
     isDailyChallenge,
     onDailyComplete,
+    onDeath,
     router,
     resolvedStorageSlot,
     heroDeathPhase,
@@ -3211,7 +3315,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               return next;
             });
           };
-          if (process.env.NODE_ENV === "test") {
+          // A wisp isn't fought — it vanishes when you reach it — so it never
+          // shows a "miss". Two guards, because the kind can't always be
+          // resolved for a vanished enemy (hitKind falls back to a goblin):
+          //  - explicit ghost kind, and
+          //  - any 0-damage hit where the target is GONE (a vanish/death, not a
+          //    real swing-and-miss). A genuine miss only happens when the enemy
+          //    SURVIVES a 0-damage swing, i.e. enemyAtTargetPost is still there.
+          const targetVanished = dealt === 0 && !enemyAtTargetPost;
+          if (hitKind === "ghost" || targetVanished) {
+            /* no floating number: ghosts/vanishes are not misses */
+          } else if (process.env.NODE_ENV === "test") {
             spawn();
           } else {
             setTimeout(spawn, 120); // let the BAM flash land first
@@ -3850,7 +3964,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           </div>
         </div>
       )}
-      <ScreenShake isShaking={isShaking} intensity={4} duration={300}>
+      <ScreenShake isShaking={isShaking} intensity={shakeIntensity} duration={300}>
         <div className="relative flex justify-center" data-testid="tilemap-grid-wrapper">
           {checkpointFlash && (
             <div className="absolute top-4 right-4 z-50">
@@ -4588,6 +4702,138 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       />
                     );
                   })()}
+                {/* Shaper attack reveal: NO telegraph — when the boss reshapes
+                    the ground, its tiles flash in outward (closest-first) over
+                    the freshly-placed lava/water, so the change reads as a fast
+                    real-time spread. Keyed on the attack nonce so it plays once
+                    per attack. The screen shake is fired from an effect below. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const atk = shaperRevealTiles(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!atk) return null;
+                  const tileSize = 40;
+                  const isLava = atk.element === "lava";
+                  const color = isLava ? "#ff5a2c" : "#3aa0ff";
+                  return atk.tiles.map(([ty, tx], i) => (
+                    <div
+                      key={`shaper-reveal-${atk.nonce}-${ty}-${tx}`}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize}px`,
+                        top: `${ty * tileSize}px`,
+                        width: `${tileSize}px`,
+                        height: `${tileSize}px`,
+                        backgroundColor: color,
+                        borderRadius: "3px",
+                        zIndex: 11000,
+                        opacity: 0,
+                        // fast outward sweep: ~45ms per ring-step, then fade to
+                        // reveal the real terrain underneath.
+                        animation: `shaperReveal 260ms ease-out ${i * 45}ms both`,
+                      }}
+                    />
+                  ));
+                })()}
+                {/* Shaper FIRE telegraph: a subtle warm glow on the tiles where
+                    fire will rain down NEXT turn — the fair warning to step off. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const pending = shaperPendingFire(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!pending) return null;
+                  const tileSize = 40;
+                  return pending.map(([ty, tx]) => (
+                    <div
+                      key={`shaper-fire-glow-${ty}-${tx}`}
+                      data-testid="shaper-fire-glow"
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize + 4}px`,
+                        top: `${ty * tileSize + 4}px`,
+                        width: `${tileSize - 8}px`,
+                        height: `${tileSize - 8}px`,
+                        borderRadius: "50%",
+                        background:
+                          "radial-gradient(circle, rgba(255,140,60,0.5) 0%, rgba(255,90,30,0.16) 65%, transparent 100%)",
+                        zIndex: 10800,
+                        animation: "shaperFireGlow 900ms ease-in-out infinite",
+                      }}
+                    />
+                  ));
+                })()}
+                {/* Shaper FIRE launch: a column of lava rockets up out of view
+                    from the boss the turn it hurls fire skyward. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const nonce = shaperFireLaunch(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (nonce == null) return null;
+                  const tileSize = 40;
+                  return (
+                    <div
+                      key={`shaper-fire-launch-${nonce}`}
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${shaper.x * tileSize + tileSize / 2 - 9}px`,
+                        top: 0,
+                        width: "18px",
+                        height: `${shaper.y * tileSize + tileSize / 2}px`,
+                        background:
+                          "linear-gradient(to top, rgba(255,90,30,0.9), rgba(255,170,70,0.5) 45%, transparent)",
+                        zIndex: 12200,
+                        opacity: 0,
+                        animation: "shaperFireLaunch 520ms ease-out both",
+                      }}
+                    />
+                  );
+                })()}
+                {/* Shaper WALL raise: a quick stone flash as a fresh wall rises. */}
+                {(() => {
+                  const shaper = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "shaper"
+                  );
+                  if (!shaper) return null;
+                  const wall = shaperWallReveal(
+                    shaper.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!wall) return null;
+                  const tileSize = 40;
+                  return wall.tiles.map(([ty, tx]) => (
+                    <div
+                      key={`shaper-wall-${wall.nonce}-${ty}-${tx}`}
+                      data-testid="shaper-wall-rise"
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${tx * tileSize}px`,
+                        top: `${ty * tileSize}px`,
+                        width: `${tileSize}px`,
+                        height: `${tileSize}px`,
+                        borderRadius: "3px",
+                        backgroundColor: "#7c8288",
+                        zIndex: 12100,
+                        opacity: 0,
+                        animation: "shaperReveal 300ms ease-out both",
+                      }}
+                    />
+                  ));
+                })()}
                 {/* Bomb detonation: the three BAM frames layered and scaled up over the
                     3x3 blast, triggered in a staggered sequence for a big cartoon boom. */}
                 {(gameState.recentBombBlasts ?? []).length > 0 &&
@@ -4912,7 +5158,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothEnabled && heroDeathPhase === "idle" && !warpFlicker,
                     smoothEnabled,
                     smoothEntitySteps,
-                    combatLunges
+                    combatLunges,
+                    torchSnuffing
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -4974,6 +5221,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             backgroundPosition: "center",
                             backgroundRepeat: "no-repeat",
                             transformOrigin: "50% 100%",
+                            // Submersion: wading hides the hero below the waist,
+                            // swimming below the head. Keyed off the COMMITTED tile
+                            // (the rAF gait loop only writes `transform`, so this
+                            // clip survives the step animation).
+                            clipPath: (() => {
+                              const subs =
+                                gameState.mapData.subtypes[playerPosition[0]]?.[
+                                  playerPosition[1]
+                                ] ?? [];
+                              if (subs.includes(TileSubtype.DEEP_WATER))
+                                return WATER_SUBMERSION_CLIP.deep;
+                              if (subs.includes(TileSubtype.SHALLOW_WATER))
+                                return WATER_SUBMERSION_CLIP.shallow;
+                              return undefined;
+                            })(),
                           }}
                         >
                           {/* Torch flame rides inside the sprite div so the
@@ -4993,6 +5255,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                                 style={{
                                   ...anchor,
                                   transform: "translateX(-50%)",
+                                }}
+                              />
+                            );
+                          })()}
+                          {!heroTorchLitState && torchSnuffing && (() => {
+                            const dirKey =
+                              gameState.playerDirection === Direction.UP
+                                ? ("back" as const)
+                                : gameState.playerDirection === Direction.DOWN
+                                ? ("front" as const)
+                                : ("right" as const);
+                            const anchor = HERO_FLAME_ANCHOR[dirKey];
+                            // Blue spirit flame flutters up, shrinks, and fades. Same
+                            // anchor + centering as the lit flame so it sits on the
+                            // torch; the keyframe adds the rise/scale/fade.
+                            return (
+                              <PixelFlame
+                                cell={1.4}
+                                seed={5}
+                                palette="blue"
+                                style={{
+                                  ...anchor,
+                                  transform: "translateX(-50%)",
+                                  animation: "flameSnuffAway 0.56s ease-out forwards",
                                 }}
                               />
                             );
@@ -5429,7 +5715,9 @@ function renderTileGrid(
   // destination tile (see smoothEntitySteps in the component).
   entitySteps?: Map<string, SmoothEntityStep>,
   // Combat lunges keyed "hero" / "e:y,x" (see combatLunges in the component).
-  combatLunges?: Map<string, CombatLunge>
+  combatLunges?: Map<string, CombatLunge>,
+  // One-shot blue snuff-flame VFX window for the in-tile hero (?smooth=0).
+  heroTorchSnuffing: boolean = false
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -5466,7 +5754,10 @@ function renderTileGrid(
       for (let y = 0; y < subtypes.length; y++) {
         for (let x = 0; x < subtypes[y].length; x++) {
           const st = subtypes[y][x];
-          if (st && st.includes(TileSubtype.WALL_TORCH)) {
+          // Wall torches AND lava pools cast light — lava glows, so it lights dark caves
+          // and reads as a beacon (and a warning) from across a floor. computeTorchGlow is
+          // position-agnostic, so lava reuses it verbatim.
+          if (st && (st.includes(TileSubtype.WALL_TORCH) || st.includes(TileSubtype.LAVA))) {
             const m = computeTorchGlow(y, x, grid);
             for (const [k, v] of m.entries()) {
               const prev = glowMap.get(k) ?? 0;
@@ -5523,9 +5814,17 @@ function renderTileGrid(
       const glowKey = `${rowIndex},${colIndex}`;
       const g = glowMap.get(glowKey);
       const isSelfTorch =
-        Array.isArray(subtype) && subtype.includes(TileSubtype.WALL_TORCH);
+        Array.isArray(subtype) &&
+        (subtype.includes(TileSubtype.WALL_TORCH) || subtype.includes(TileSubtype.LAVA));
       const isTorchCarrier = torchCarrierPositions.has(`${rowIndex},${colIndex}`);
-      if (isSelfTorch || isTorchCarrier) tier = Math.max(tier, 3);
+      // The douse-to-see portal is its own light source while the torch is OUT: it
+      // stays lit as a beacon no matter how far away, so it can actually be found on
+      // a full-size dark level (adjacency-only would be near impossible to discover).
+      const isDarkPortalBeacon =
+        Array.isArray(subtype) &&
+        subtype.includes(TileSubtype.DARK_PORTAL) &&
+        !heroTorchLit;
+      if (isSelfTorch || isTorchCarrier || isDarkPortalBeacon) tier = Math.max(tier, 3);
       // Neighbor illumination based on glow strength
       if (g === ADJACENT_GLOW) {
         tier = Math.max(tier, 2);
@@ -5552,19 +5851,53 @@ function renderTileGrid(
         left: getTileAt(rowIndex, colIndex - 1),
       };
 
+      // Terrain-family neighbors for elemental tiles, so pools shade only their real
+      // edges instead of every tile seam (obsidian counts as lava-family, stepping
+      // stones as deep-family — crossings are part of the pool, not holes in it).
+      const terrainFamilyAt = (
+        y: number,
+        x: number
+      ): "lava" | "deep" | "shallow" | "land" => {
+        const s = subtypes?.[y]?.[x];
+        if (!s) return "land";
+        if (s.includes(TileSubtype.LAVA) || s.includes(TileSubtype.OBSIDIAN))
+          return "lava";
+        if (s.includes(TileSubtype.DEEP_WATER) || s.includes(TileSubtype.STEPPING_STONE))
+          return "deep";
+        if (s.includes(TileSubtype.SHALLOW_WATER)) return "shallow";
+        return "land";
+      };
+      const selfTerrain = terrainFamilyAt(rowIndex, colIndex);
+      const terrainNeighbors =
+        selfTerrain !== "land"
+          ? {
+              top: terrainFamilyAt(rowIndex - 1, colIndex),
+              right: terrainFamilyAt(rowIndex, colIndex + 1),
+              bottom: terrainFamilyAt(rowIndex + 1, colIndex),
+              left: terrainFamilyAt(rowIndex, colIndex - 1),
+            }
+          : undefined;
+
       // Check if this is the player tile to pass the playerDirection prop
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
       const hasEnemy = !!enemyAtTile;
-      // For white goblins: count ALL white goblins on this tile (asset reflects how many are present)
-      const swarmCountAtTile = (() => {
-        if (!enemyAtTile || enemyAtTile.kind !== 'white-goblin') return undefined;
-        if (!enemies) return 1;
-        return enemies.filter(
+      // For white goblins: gather ALL swarm members on this tile (the asset /
+      // overlaid singles reflect how many are present). Members keep the
+      // enemies-array order so their per-slot offsets stay stable across turns.
+      const swarmAtTile = (() => {
+        if (!enemyAtTile || enemyAtTile.kind !== 'white-goblin' || !enemies)
+          return undefined;
+        const members = enemies.filter(
           e => e.kind === 'white-goblin' && e.y === rowIndex && e.x === colIndex
-        ).length || 1;
+        );
+        return members.length > 0 ? members : undefined;
       })();
+      const swarmCountAtTile =
+        enemyAtTile?.kind === 'white-goblin'
+          ? swarmAtTile?.length ?? 1
+          : undefined;
       const npcAtTile = npcMap.get(`${rowIndex},${colIndex}`);
       const npcInteractable = (() => {
         if (!npcAtTile || !playerPosition) return false;
@@ -5580,7 +5913,7 @@ function renderTileGrid(
           style={(() => {
             const wrapperStyle: React.CSSProperties = {};
             // Raise z-index so lit tiles appear above the dark vignette overlay
-            if (g != null || isSelfTorch) {
+            if (g != null || isSelfTorch || isDarkPortalBeacon) {
               wrapperStyle.zIndex = 10050;
             }
             // Desync each torch tile's flicker so neighbors don't pulse in
@@ -5616,8 +5949,10 @@ function renderTileGrid(
             torchAdjacentGlow={isTorchAdjacentGlow}
             torchSecondRingGlow={isTorchSecondRingGlow}
             neighbors={neighbors}
+            terrainNeighbors={terrainNeighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
+            heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
@@ -5634,9 +5969,17 @@ function renderTileGrid(
                 | "stone-goblin"
                 | "snake"
                 | "white-goblin"
+                | "shaper"
                 | undefined
             }
             enemySwarmCount={swarmCountAtTile}
+            enemySwarmMembers={swarmAtTile?.map((m) => ({
+              facing: m.facing,
+              step:
+                typeof m.id === "string"
+                  ? entitySteps?.get(`eid:${m.id}`)
+                  : undefined,
+            }))}
             enemyMoved={Boolean(
               (enemyAtTile?.behaviorMemory as Record<string, unknown> | undefined)?.["moved"]
             )}

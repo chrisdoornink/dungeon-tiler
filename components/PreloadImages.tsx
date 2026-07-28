@@ -91,7 +91,7 @@ export default function PreloadImages() {
       "/images/flowers/flowers-3.png",
       "/images/flowers/flowers-4.png",
       "/images/flowers/flowers-5.png",
-      "/images/flowers/bush.png",
+      "/images/flowers/bush-1.png",
 
       // Hanging signs
       "/images/hanging-signs/store.png",

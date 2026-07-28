@@ -35,6 +35,7 @@ export function trackGameComplete(params: {
   wallsDestroyed?: number;
   reachedOutsideWorld?: boolean;
   reachedPinkRealm?: boolean;
+  collectedChestItems?: string[];
 }) {
   posthogAnalytics.trackGameComplete(params);
 }

@@ -245,7 +245,17 @@ function canPlaceFaultyFloorSafely(
   const testGrid = mapData.tiles.map((row) => [...row]);
   for (let yy = 0; yy < mapData.subtypes.length; yy++) {
     for (let xx = 0; xx < mapData.subtypes[yy].length; xx++) {
-      if (mapData.subtypes[yy][xx].includes(TileSubtype.FAULTY_FLOOR)) {
+      const subs = mapData.subtypes[yy][xx];
+      // Wall off every hazard already on the map — faulty floors, lava, AND deep water
+      // (both are placed earlier in the pipeline). Hazards that each passed their own
+      // connectivity check can still JOINTLY sever the dry path, so the faulty check
+      // must account for all of them. (Deep water is swimmable, but the dry-path
+      // guarantee must never depend on the player paying the snuff toll.)
+      if (
+        subs.includes(TileSubtype.FAULTY_FLOOR) ||
+        subs.includes(TileSubtype.LAVA) ||
+        subs.includes(TileSubtype.DEEP_WATER)
+      ) {
         testGrid[yy][xx] = WALL;
       }
     }
@@ -253,6 +263,408 @@ function canPlaceFaultyFloorSafely(
   testGrid[y][x] = WALL;
 
   return areAllFloorsConnected(testGrid);
+}
+
+/**
+ * Carve 1-2 organic lava pools into a floor. Lava is a walkable-but-instant-death
+ * overlay (a glowing wall): the connectivity guarantee treats every lava tile as a
+ * WALL and requires the whole floor to remain a single connected region, so a dry,
+ * lava-free path to the key/exit always exists — the lava lane is only ever a shortcut
+ * you can engineer across with rocks, never the sole route.
+ *
+ * Placement rules: interior only (never the perimeter ring, which the breach/outside-
+ * world flow assumes is solid WALL); only on empty FLOOR tiles (so exit/key/chest/pot/
+ * rock/spawn scans, which all require empty subtypes, naturally avoid pools); and never
+ * within Chebyshev radius 2 of the exit or exit key (so the floor-3 static guard, placed
+ * adjacent to the key later, still finds open floor). Pools grow by random 4-neighbour
+ * accretion; a candidate pool that would break connectivity is discarded whole.
+ *
+ * Must run inside the seeded withPatchedMathRandom block so daily maps stay deterministic.
+ */
+export function addLavaPoolsToMap(mapData: MapData, floor?: number): MapData {
+  const newMapData: MapData = JSON.parse(JSON.stringify(mapData));
+  const grid = newMapData.tiles;
+  const h = grid.length;
+  const w = grid[0]?.length ?? 0;
+
+  // Budget: keep small so early/small floors aren't choked. Pools x max size.
+  const poolCount = floor === 3 ? 2 : 2;
+  const maxPoolSize = floor === 3 ? 3 : 4;
+
+  // Tiles to keep clear: a Chebyshev radius-2 halo around the exit and exit key.
+  const protectedTiles = new Set<string>();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const subs = newMapData.subtypes[y]?.[x] ?? [];
+      if (subs.includes(TileSubtype.EXIT) || subs.includes(TileSubtype.EXITKEY)) {
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            protectedTiles.add(`${y + dy},${x + dx}`);
+          }
+        }
+      }
+    }
+  }
+
+  const placedLava = new Set<string>();
+  const isEligible = (y: number, x: number): boolean => {
+    if (y < 1 || y >= h - 1 || x < 1 || x >= w - 1) return false; // interior only
+    if (grid[y][x] !== FLOOR) return false;
+    const subs = newMapData.subtypes[y][x];
+    if (subs.length > 0 && !subs.includes(TileSubtype.NONE)) return false;
+    if (protectedTiles.has(`${y},${x}`)) return false;
+    if (placedLava.has(`${y},${x}`)) return false;
+    return true;
+  };
+
+  // Does the floor stay one connected region if `placedLava` ∪ `candidate` are all
+  // walls? Also walls any deep water already on the map, so lava + water placed by
+  // sibling passes can never jointly sever the dry path.
+  const keepsConnectivity = (candidate: Set<string>): boolean => {
+    const testGrid = grid.map((row) => [...row]);
+    for (let yy = 0; yy < h; yy++) {
+      for (let xx = 0; xx < w; xx++) {
+        if (newMapData.subtypes[yy][xx]?.includes(TileSubtype.DEEP_WATER)) {
+          testGrid[yy][xx] = WALL;
+        }
+      }
+    }
+    for (const key of placedLava) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    for (const key of candidate) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    return areAllFloorsConnected(testGrid);
+  };
+
+  for (let p = 0; p < poolCount; p++) {
+    // Collect current seeds and pick one at random.
+    const seeds: Array<[number, number]> = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (isEligible(y, x)) seeds.push([y, x]);
+      }
+    }
+    if (seeds.length === 0) break;
+    const [sy, sx] = seeds[Math.floor(Math.random() * seeds.length)];
+
+    // Grow a candidate pool by random 4-neighbour accretion.
+    const targetSize = 2 + Math.floor(Math.random() * (maxPoolSize - 1)); // 2..maxPoolSize
+    const candidate = new Set<string>([`${sy},${sx}`]);
+    const frontier: Array<[number, number]> = [[sy, sx]];
+    while (candidate.size < targetSize && frontier.length > 0) {
+      const fi = Math.floor(Math.random() * frontier.length);
+      const [cy, cx] = frontier[fi];
+      const neighbors: Array<[number, number]> = [
+        [cy - 1, cx],
+        [cy + 1, cx],
+        [cy, cx - 1],
+        [cy, cx + 1],
+      ];
+      const open = neighbors.filter(
+        ([ny, nx]) => isEligible(ny, nx) && !candidate.has(`${ny},${nx}`)
+      );
+      if (open.length === 0) {
+        frontier.splice(fi, 1);
+        continue;
+      }
+      const [ny, nx] = open[Math.floor(Math.random() * open.length)];
+      candidate.add(`${ny},${nx}`);
+      frontier.push([ny, nx]);
+    }
+
+    // Commit only if the whole pool keeps the floor connected.
+    if (keepsConnectivity(candidate)) {
+      for (const key of candidate) {
+        const [yy, xx] = key.split(",").map(Number);
+        newMapData.subtypes[yy][xx] = [TileSubtype.LAVA];
+        placedLava.add(key);
+      }
+    }
+  }
+
+  return newMapData;
+}
+
+/**
+ * A daily floor's water "size tier". Deep-water coverage is expressed as a fraction of
+ * the floor's eligible interior floor tiles, so it scales with grid size. Mostly small
+ * (puddles/pond); a lake is uncommon; a floor-flooding ~50% pool is genuinely rare.
+ */
+export type WaterTier = "puddles" | "pond" | "lake" | "flood";
+
+/**
+ * A resolved water plan for one floor: which size tier, how many separate pools, and
+ * the target deep-water coverage (fraction of eligible floor). Produced by rollWaterPlan
+ * (a seeded roll) and consumed by addWaterPoolsToMap.
+ */
+export type WaterPlan = {
+  tier: WaterTier;
+  poolCount: number;
+  coverage: number;
+};
+
+// Weighted size table. `coverage` is the fraction of eligible interior floor that
+// becomes DEEP water (the shallow shore is extra, on top). "Mostly small-to-medium,
+// rarely up to ~50%." Weights sum to 1.
+const WATER_TIERS: ReadonlyArray<{
+  tier: WaterTier;
+  weight: number;
+  poolCount: [number, number]; // inclusive range
+  coverage: [number, number]; // inclusive range, fraction of eligible floor
+}> = [
+  { tier: "puddles", weight: 0.45, poolCount: [3, 4], coverage: [0.02, 0.05] },
+  { tier: "pond", weight: 0.33, poolCount: [1, 1], coverage: [0.06, 0.11] },
+  { tier: "lake", weight: 0.17, poolCount: [1, 2], coverage: [0.16, 0.28] },
+  { tier: "flood", weight: 0.05, poolCount: [1, 1], coverage: [0.4, 0.5] },
+];
+
+/**
+ * Per-candidate-floor chance that the floor rolls any water at all. Only daily floors
+ * 2-3 are candidates (floor 1 stays element-free as the teaching floor), so two floors
+ * at 0.5 average one watered floor per three-floor day — "about 1 in 3 daily floors".
+ */
+export const WATER_FLOOR_CHANCE = 0.5;
+
+function pickWaterTier(): (typeof WATER_TIERS)[number] {
+  const r = Math.random();
+  let acc = 0;
+  for (const t of WATER_TIERS) {
+    acc += t.weight;
+    if (r < acc) return t;
+  }
+  return WATER_TIERS[WATER_TIERS.length - 1];
+}
+
+/**
+ * Seeded roll for a floor's water plan. Only daily floors 2-3 are candidates; every
+ * other floor (including the floor-1 teaching floor) returns null. A candidate floor
+ * rolls dry (null) at rate 1 - WATER_FLOOR_CHANCE; otherwise it draws a weighted size
+ * tier and a coverage/pool-count within that tier.
+ *
+ * MUST be called inside the seeded withPatchedMathRandom block so daily maps stay
+ * deterministic (see the daily-determinism gotcha: land generation shifts in one deploy).
+ */
+export function rollWaterPlan(floor: number): WaterPlan | null {
+  if (floor !== 2 && floor !== 3) return null;
+  if (Math.random() >= WATER_FLOOR_CHANCE) return null;
+  const t = pickWaterTier();
+  const [pcLo, pcHi] = t.poolCount;
+  const [covLo, covHi] = t.coverage;
+  const poolCount = pcLo + Math.floor(Math.random() * (pcHi - pcLo + 1));
+  const coverage = covLo + Math.random() * (covHi - covLo);
+  return { tier: t.tier, poolCount, coverage };
+}
+
+/**
+ * Carve one or more water pools into a floor: each a DEEP_WATER core with a
+ * SHALLOW_WATER shore on most — not necessarily all — sides (each pool cuts the shore
+ * on 0-2 sides, so some banks drop straight from dry floor into deep water).
+ * Shallow water is free to wade (torch stays lit); deep water is swum — the torch
+ * snuffs — or bridged with thrown rocks (STEPPING_STONE). Only the deep core counts
+ * against connectivity: it is walled in the test grid (together with any lava/faulty
+ * already placed) so a dry, swim-free path to the key/exit always exists. The shallow
+ * ring is ordinary walkable floor and needs no guarantee.
+ *
+ * Size/count come from `opts` (from a seeded rollWaterPlan): `coverage` is the fraction
+ * of eligible interior floor that becomes DEEP water, split across `poolCount` pools.
+ * With no opts it falls back to the legacy single 2-4 tile pool. Pools grow by
+ * INCREMENTAL connectivity-safe accretion — a candidate tile is added only if the floor
+ * stays one connected region with it (and all prior water/lava) walled — so a large
+ * target degrades gracefully to the biggest safe pool rather than being rejected whole.
+ *
+ * Same placement rules as lava: interior tiles only, empty FLOOR only (so downstream
+ * item/spawn scans avoid the water automatically), and never within Chebyshev radius 2
+ * of the exit or exit key. Must run inside the seeded withPatchedMathRandom block.
+ */
+export function addWaterPoolsToMap(
+  mapData: MapData,
+  opts?: { poolCount?: number; coverage?: number }
+): MapData {
+  const newMapData: MapData = JSON.parse(JSON.stringify(mapData));
+  const grid = newMapData.tiles;
+  const h = grid.length;
+  const w = grid[0]?.length ?? 0;
+
+  const protectedTiles = new Set<string>();
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const subs = newMapData.subtypes[y]?.[x] ?? [];
+      if (subs.includes(TileSubtype.EXIT) || subs.includes(TileSubtype.EXITKEY)) {
+        for (let dy = -2; dy <= 2; dy++) {
+          for (let dx = -2; dx <= 2; dx++) {
+            protectedTiles.add(`${y + dy},${x + dx}`);
+          }
+        }
+      }
+    }
+  }
+
+  // Eligible = interior, empty FLOOR, not in the exit/key halo, and not already water
+  // (deep or shallow, so pools placed earlier in this call are never overwritten).
+  const isEligible = (y: number, x: number): boolean => {
+    if (y < 1 || y >= h - 1 || x < 1 || x >= w - 1) return false; // interior only
+    if (grid[y][x] !== FLOOR) return false;
+    const subs = newMapData.subtypes[y][x];
+    if (subs.length > 0 && !subs.includes(TileSubtype.NONE)) return false;
+    if (protectedTiles.has(`${y},${x}`)) return false;
+    return true;
+  };
+
+  // Coverage denominator: eligible interior floor at placement time.
+  let eligibleCount = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (isEligible(y, x)) eligibleCount++;
+    }
+  }
+  if (eligibleCount === 0) return newMapData;
+
+  const poolCount = Math.max(1, opts?.poolCount ?? 1);
+  // Total deep-water budget across all pools. With a coverage fraction, scale to the
+  // floor; without, keep the legacy small 2-4 tile pool.
+  const deepBudget =
+    opts?.coverage !== undefined
+      ? Math.max(1, Math.round(opts.coverage * eligibleCount))
+      : 2 + Math.floor(Math.random() * 3);
+  const perPool = Math.max(1, Math.ceil(deepBudget / poolCount));
+
+  // Deep tiles committed so far (across all pools) — walled in every connectivity test.
+  const placedDeep = new Set<string>();
+  // Tiles that broke connectivity once. Walling more tiles only ever makes connectivity
+  // harder, and placedDeep only grows, so a rejection is permanent — cache it globally.
+  const rejected = new Set<string>();
+
+  // Does the floor stay one connected region if `placedDeep` ∪ `extra` (this pool's
+  // tentative tiles) ∪ every hazard already on the map are all walls?
+  const keepsConnectivity = (extra: Iterable<string>): boolean => {
+    const testGrid = grid.map((row) => [...row]);
+    for (let yy = 0; yy < h; yy++) {
+      for (let xx = 0; xx < w; xx++) {
+        const subs = newMapData.subtypes[yy][xx] ?? [];
+        if (
+          subs.includes(TileSubtype.LAVA) ||
+          subs.includes(TileSubtype.FAULTY_FLOOR)
+        ) {
+          testGrid[yy][xx] = WALL;
+        }
+      }
+    }
+    for (const key of placedDeep) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    for (const key of extra) {
+      const [yy, xx] = key.split(",").map(Number);
+      testGrid[yy][xx] = WALL;
+    }
+    return areAllFloorsConnected(testGrid);
+  };
+
+  for (let p = 0; p < poolCount; p++) {
+    // Fresh seed list each pool (previously placed water is no longer eligible).
+    const seeds: Array<[number, number]> = [];
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (isEligible(y, x) && !rejected.has(`${y},${x}`)) seeds.push([y, x]);
+      }
+    }
+    if (seeds.length === 0) break;
+
+    // Find a seed tile that is itself connectivity-safe.
+    let seed: [number, number] | null = null;
+    for (let tries = 0; tries < 8 && seeds.length > 0; tries++) {
+      const idx = Math.floor(Math.random() * seeds.length);
+      const [sy, sx] = seeds[idx];
+      const key = `${sy},${sx}`;
+      if (keepsConnectivity([key])) {
+        seed = [sy, sx];
+        break;
+      }
+      rejected.add(key);
+      seeds.splice(idx, 1);
+    }
+    if (!seed) continue;
+
+    // Grow the deep core by connectivity-safe 4-neighbour accretion: a tile joins only
+    // if the whole floor stays connected with it (and all prior water) walled.
+    const core = new Set<string>([`${seed[0]},${seed[1]}`]);
+    const frontier: Array<[number, number]> = [seed];
+    while (core.size < perPool && frontier.length > 0) {
+      const fi = Math.floor(Math.random() * frontier.length);
+      const [cy, cx] = frontier[fi];
+      const open = ([
+        [cy - 1, cx],
+        [cy + 1, cx],
+        [cy, cx - 1],
+        [cy, cx + 1],
+      ] as Array<[number, number]>).filter(
+        ([ny, nx]) =>
+          isEligible(ny, nx) &&
+          !core.has(`${ny},${nx}`) &&
+          !placedDeep.has(`${ny},${nx}`) &&
+          !rejected.has(`${ny},${nx}`)
+      );
+      if (open.length === 0) {
+        frontier.splice(fi, 1);
+        continue;
+      }
+      const [ny, nx] = open[Math.floor(Math.random() * open.length)];
+      const key = `${ny},${nx}`;
+      if (keepsConnectivity([...core, key])) {
+        core.add(key);
+        frontier.push([ny, nx]);
+      } else {
+        rejected.add(key);
+      }
+    }
+
+    // Commit the deep core.
+    for (const key of core) {
+      const [yy, xx] = key.split(",").map(Number);
+      newMapData.subtypes[yy][xx] = [TileSubtype.DEEP_WATER];
+      placedDeep.add(key);
+    }
+
+    // Ring it with a shallow shoreline — but not necessarily all the way around. Each
+    // pool cuts 0-2 sides (N/E/S/W) where the shore is omitted, so some banks drop
+    // straight from dry floor into deep water. A ring tile whose offset points into a
+    // cut side is skipped (diagonals skip if either component points at a cut).
+    const cutRoll = Math.random();
+    const cutCount = cutRoll < 0.25 ? 0 : cutRoll < 0.75 ? 1 : 2;
+    const sides: Array<[number, number]> = [
+      [-1, 0], // N
+      [1, 0], // S
+      [0, -1], // W
+      [0, 1], // E
+    ];
+    for (let i = sides.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [sides[i], sides[j]] = [sides[j], sides[i]];
+    }
+    const cutSides = sides.slice(0, cutCount);
+    const pointsIntoCut = (dy: number, dx: number): boolean =>
+      cutSides.some(([cy, cx]) => (cy !== 0 && dy === cy) || (cx !== 0 && dx === cx));
+    for (const key of core) {
+      const [yy, xx] = key.split(",").map(Number);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dy === 0 && dx === 0) continue;
+          if (pointsIntoCut(dy, dx)) continue;
+          const ny = yy + dy;
+          const nx = xx + dx;
+          if (isEligible(ny, nx)) {
+            newMapData.subtypes[ny][nx] = [TileSubtype.SHALLOW_WATER];
+          }
+        }
+      }
+    }
+  }
+
+  return newMapData;
 }
 
 export function addRocksToMap(mapData: MapData, floor?: number): MapData {
@@ -284,7 +696,21 @@ export function addRocksToMap(mapData: MapData, floor?: number): MapData {
   if (floor === 1) toPlace = 5;
   else if (floor === 2) toPlace = 4;
   else if (floor === 3) toPlace = 3;
-  
+
+  // Scale rocks up with deep water on this floor. Rocks are the ONLY way to build a
+  // dry stepping-stone crossing (they land at throw range and no longer convert on
+  // contact), so a big pool needs enough ammo to actually bridge it. Bonus is
+  // proportional to deep-water tiles, capped so a rare ~50% flood doesn't dump an
+  // absurd pile of rocks. Deterministic (reads the already-placed map, no new RNG).
+  let deepWaterTiles = 0;
+  for (let y = 0; y < gridHeight; y++) {
+    for (let x = 0; x < gridWidth; x++) {
+      if (newMapData.subtypes[y][x].includes(TileSubtype.DEEP_WATER)) deepWaterTiles++;
+    }
+  }
+  const waterRockBonus = Math.min(12, Math.floor(deepWaterTiles / 5));
+  toPlace += waterRockBonus;
+
   toPlace = Math.min(toPlace, eligible.length);
   for (let i = 0; i < toPlace; i++) {
     const [ry, rx] = eligible[i];
@@ -636,6 +1062,9 @@ export function generateCompleteMapForFloor(
     rocksFloor?: number; // which floor's rock-count rule to apply when `floor` is not passed
     wallTorches?: number; // override the default wall torch count (endless dark floor)
     includeFaultyFloors?: boolean; // set false to guarantee no abyss holes (endless dark floor)
+    includeLava?: boolean; // set true to carve instant-death lava pools (daily floors 2-3)
+    includeWater?: boolean; // legacy: carve one small default deep-water pool + shallow ring
+    waterPlan?: WaterPlan; // sized water plan from a seeded rollWaterPlan (daily floors 2-3)
   },
 ): MapData {
   const [gridW, gridH] = opts?.gridSize ?? (floor !== undefined ? gridSizeForFloor(floor) : [GRID_SIZE, GRID_SIZE]);
@@ -647,7 +1076,22 @@ export function generateCompleteMapForFloor(
   const withChests = addSpecificChestsToMap(withExitKey, floorAllocation.chestContents);
   const withKeys = addChestKeysToMap(withChests, floorAllocation.keys);
 
-  const withPots = addPotsToMap(withKeys);
+  // Elemental terrain goes in AFTER exit/key/chest placement (so it avoids those tiles
+  // and a halo around them) but BEFORE pots/rocks/faulty floors/spawns — every one of
+  // those scans for empty-subtype FLOOR tiles, so they automatically steer clear.
+  // Lava first, then water: each pass walls the other's hazard tiles in its
+  // connectivity test, so together they can never sever the dry path.
+  const withLava = opts?.includeLava ? addLavaPoolsToMap(withKeys, floor) : withKeys;
+  const withWater = opts?.waterPlan
+    ? addWaterPoolsToMap(withLava, {
+        poolCount: opts.waterPlan.poolCount,
+        coverage: opts.waterPlan.coverage,
+      })
+    : opts?.includeWater
+      ? addWaterPoolsToMap(withLava)
+      : withLava;
+
+  const withPots = addPotsToMap(withWater);
   const withRocks = addRocksToMap(withPots, opts?.rocksFloor ?? floor);
   const withFaultyFloors =
     opts?.includeFaultyFloors === false ? withRocks : addFaultyFloorsToMap(withRocks);

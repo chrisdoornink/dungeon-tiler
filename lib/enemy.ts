@@ -15,7 +15,9 @@ export enum EnemyState {
 export type EnemyUpdateContext = {
   grid: number[][];
   subtypes?: number[][][];
-  player: { y: number; x: number };
+  // torchLit drives torch-snuff stealth: when false, most enemies cannot acquire
+  // the hero (see the vision check in Enemy.update).
+  player: { y: number; x: number; torchLit?: boolean };
   ghosts?: Array<{ y: number; x: number }>;
   // Optional RNG (0..1) used for unpredictable pursuit-axis selection. Defaults
   // to Math.random when omitted (matching runtime combat variance behavior).
@@ -49,12 +51,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' = 'fire-goblin';
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -97,6 +99,12 @@ export class Enemy {
       // also updates maxHealth so the HUD reflects the buffed baseline.
       this.health = 1;
       this.attack = 1;
+    } else if (k === 'shaper') {
+      // The Shaper boss: low HP (reaching it is the challenge, not out-damaging
+      // it). attack 0 — it never deals contact damage; its weapon is the terrain
+      // it reshapes. Melee against it uses the standard formula (see registry).
+      this.health = 5;
+      this.attack = 0;
     }
     this.maxHealth = this.health;
   }
@@ -119,7 +127,20 @@ export class Enemy {
     try { (this.behaviorMemory as Record<string, unknown>)["moved"] = false; } catch {}
     // Vision check: limit by distance for all enemies; LOS required for non-ghosts.
     const distManhattan = Math.abs(player.y - this.y) + Math.abs(player.x - this.x);
-    const withinRange = distManhattan <= ENEMY_VISION_RADIUS;
+    // Torch-snuff stealth: a hero whose torch is out is invisible to most enemies —
+    // they can't ACQUIRE the hero (existing pursuit memory still plays out, so
+    // snuffing mid-chase means "break contact and slip away", not instant amnesia).
+    // Fire goblins carry their own light and still hunt, but one tile shorter since
+    // the hero's flame isn't there to spot. Ghosts sense the hero regardless (they
+    // are the torch-snuffers; hiding from them with their own trick would be free).
+    const torchLit = player.torchLit ?? true;
+    const visionRadius =
+      torchLit || this.kind === 'ghost'
+        ? ENEMY_VISION_RADIUS
+        : this.kind === 'fire-goblin'
+        ? ENEMY_VISION_RADIUS - 1
+        : 0;
+    const withinRange = distManhattan <= visionRadius;
     // Ghosts can see through walls (ignore LOS) but still obey range.
     const seesNow = withinRange && (this.kind === 'ghost' ? true : canSee(grid, [this.y, this.x], [player.y, player.x]));
 
@@ -300,7 +321,25 @@ export type PlaceEnemiesArgs = {
   count: number;
   minDistanceFromPlayer?: number;
   rng?: () => number; // 0..1
+  // Per-tile subtype stacks. When provided, tiles carrying a lethal/blocking hazard
+  // (open abyss, faulty floor, lava) are excluded as spawn candidates. Long-standing
+  // bug: without this, enemies could spawn directly ON an abyss/faulty tile (rare at
+  // 2 faulty tiles/floor, common once lava adds 6-12 hazard tiles) — a free turn-1 kill
+  // or an enemy standing in instant-death terrain.
+  subtypes?: number[][][];
 };
+
+// Subtypes that make a floor tile an illegal spawn location (lethal, blocking, or
+// terrain a randomly-assigned kind might not be able to leave/survive — enemy kinds
+// are assigned AFTER placement, so water tiles could hand a pink goblin an instant
+// death or strand a non-swimmer).
+const SPAWN_BLOCKING_SUBTYPES = new Set<number>([
+  18, // FAULTY_FLOOR
+  51, // OPEN_ABYSS
+  58, // SHALLOW_WATER
+  59, // DEEP_WATER
+  60, // LAVA
+]);
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
   return y >= 0 && y < grid.length && x >= 0 && x < grid[0].length && (grid[y][x] === 0 || grid[y][x] === 5);
@@ -322,7 +361,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin',
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper',
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -336,6 +375,9 @@ function isSafeFloorForEnemy(
   const tileSubs = subtypes[y]?.[x] || [];
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
+  const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)
+  const isShallowWater = tileSubs.includes(58); // SHALLOW_WATER (wadeable shoreline)
+  const isDeepWater = tileSubs.includes(59); // DEEP_WATER (swimmers only)
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
   const hasBlockingSubtype = tileSubs.includes(16) || // WALL_TORCH (used for floor torches too)
                               tileSubs.includes(37) || // TOWN_SIGN
@@ -344,7 +386,39 @@ function isSafeFloorForEnemy(
 
   // Always avoid open abysses
   if (isOpenAbyss) return false;
-  
+
+  // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
+  // into it (not even when chasing). Only the stone goblin crosses it freely.
+  if (isLava && kind !== 'stone-goblin') return false;
+
+  // Shallow water is wadeable, but not by everyone: fire goblins won't risk their
+  // torch near water at all; knife-throwers keep their blades dry; white goblins
+  // stay on land and funnel around pools; pink goblins die on contact with any
+  // water (kryptonite — see applyEnemyHazardDeaths). Waders: water goblins (both
+  // kinds), the unencumbered earth goblin, snakes, and stone goblins.
+  if (isShallowWater) {
+    const wades =
+      kind === 'water-goblin' ||
+      kind === 'water-goblin-spear' ||
+      kind === 'earth-goblin' ||
+      kind === 'snake' ||
+      kind === 'stone-goblin';
+    if (!wades) return false;
+  }
+
+  // Deep water takes real swimmers: water goblins (both kinds, the spearman swims
+  // weapon and all) and the unencumbered earth goblin. Stone goblins sink (they
+  // only cross deep water on stepping stones — which then sink under their weight,
+  // see applyEnemyHazardDeaths); snakes won't swim; everyone else refuses.
+  // (Ghosts never reach here — they float over everything via the early return.)
+  if (isDeepWater) {
+    const swims =
+      kind === 'water-goblin' ||
+      kind === 'water-goblin-spear' ||
+      kind === 'earth-goblin';
+    if (!swims) return false;
+  }
+
   // Goblins avoid faulty floors when patrolling, but can step on them when chasing
   const isGoblin = kind === 'fire-goblin' || kind === 'water-goblin' || kind === 'water-goblin-spear' || 
                    kind === 'earth-goblin' || kind === 'earth-goblin-knives' || kind === 'pink-goblin' || 
@@ -364,7 +438,7 @@ function isSafeFloorForEnemy(
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
-  const { grid, player, count, minDistanceFromPlayer = 2, rng = Math.random } = args;
+  const { grid, player, count, minDistanceFromPlayer = 2, rng = Math.random, subtypes } = args;
   const h = grid.length;
   const w = grid[0]?.length ?? 0;
 
@@ -372,6 +446,11 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (!isFloor(grid, y, x)) continue;
+      // Never spawn an enemy on a lethal/blocking hazard tile (abyss/faulty/lava).
+      if (subtypes) {
+        const subs = subtypes[y]?.[x];
+        if (subs && subs.some((s) => SPAWN_BLOCKING_SUBTYPES.has(s))) continue;
+      }
       const d = Math.hypot(y - player.y, x - player.x);
       if (d >= minDistanceFromPlayer) {
         candidates.push({ y, x });
@@ -410,8 +489,8 @@ export type PlainEnemy = {
   id?: string;
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -434,7 +513,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin') {
+    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects
@@ -562,6 +641,11 @@ export function updateEnemies(
   // Do not auto-relight the torch each tick; torch state persists unless changed by hooks
   // Track occupied tiles this tick to prevent overlaps; start with current positions
   const occupied = new Set<string>(enemies.map((e) => `${e.y},${e.x}`));
+  // The hero's tile is reserved too: no enemy may ever END its tick on the player
+  // (they attack from adjacent tiles instead). An enemy landing on the hero desyncs
+  // entity vs. tile state and can strand the run — the pink goblin's ring teleport
+  // once did exactly that.
+  occupied.add(`${player.y},${player.x}`);
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
   for (let i = 0; i < enemies.length; i++) {
@@ -612,7 +696,13 @@ export function updateEnemies(
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
       }
     } else {
-      base = e.update({ grid, subtypes, player, ghosts: ghostPositions, rng });
+      base = e.update({
+        grid,
+        subtypes,
+        player: { y: player.y, x: player.x, torchLit: finalOpts?.playerTorchLit ?? true },
+        ghosts: ghostPositions,
+        rng,
+      });
     }
     // If moved, validate occupancy (cannot occupy another enemy's tile)
     const newKey = `${e.y},${e.x}`;
