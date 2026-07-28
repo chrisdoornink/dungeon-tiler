@@ -89,15 +89,28 @@ npm run build
 ## Game Routes
 
 ### Production Routes (torchboy.com)
-- `/` - Daily challenge (only accessible route in production)
+- `/` - Daily challenge (the intended front door)
+- `/new` - Guided first run for new players
+- `/endless` - Endless mode
+- `/end` - Run results (redirects to `/` if reached cold in production)
+- `/privacy` - Privacy policy
 
-### Development/Test Routes (blocked in production)
-- `/test-room` - Basic test room
-- `/test-room-2` - Advanced test room  
-- `/test-room-3` - Combat test room
-- `/test-world` - Full test world with parameters
-- `/intro` - Game instructions
-- `/end` - Game completion screen
+### Unlisted Routes
+Reachable in production but not linked from anywhere. Left open on purpose —
+see `middleware.ts` — with traffic watched via the `surface` property in
+PostHog rather than gated.
+- `/story` - Story mode prototype (unfinished)
+- `/stats` - Internal endgame stats dashboard
+- `/tutorial` - Tutorial sandbox
+
+### Dev Harnesses
+Sandboxes for iterating on one system at a time. Short-lived by nature — add
+them freely, delete them once the feature ships.
+- `/test-elements` - Terrain/hazard + goblin-kind sandbox (`?water=1`, `?daylight=0`)
+- `/test-lava-gen` - Seed browser for daily lava placement (`?seed=`, `?floor=`)
+- `/test-water-daily` - Date-keyed browser for daily water generation
+- `/test-shaper` - Shaper boss arena
+- `/test-boss-entrances` - Boss approach layouts
 
 ## Architecture
 

@@ -11,7 +11,6 @@ import DailyCompleted from "../../components/daily/DailyCompleted";
 import GameView from "../../components/GameView";
 import BlockingPreloader from "../../components/BlockingPreloader";
 import {
-  trackPageView,
   markNewPlayer,
   trackTutorialLanded,
 } from "../../lib/posthog_analytics";
@@ -29,9 +28,11 @@ export default function DailyNewPage() {
   }, []);
 
   useEffect(() => {
-    // Track page view
-    trackPageView('daily_challenge_new');
-    
+    // No manual pageview here: posthog-js captures $pageview itself (now in
+    // `history_change` mode, so it covers the client-side push into this route
+    // too). The manual call this replaced fired a SECOND $pageview on every
+    // load of "/", roughly doubling the home page's numbers.
+
     // Load initial state
     const currentState = DailyChallengeFlow.getCurrentState();
     const stateData = DailyChallengeFlow.getStateData();
