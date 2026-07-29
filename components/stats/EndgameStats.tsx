@@ -533,14 +533,9 @@ export default function EndgameStats() {
   return (
     <div style={{ minHeight: "100vh", background: C.bg, color: C.text, padding: "24px 16px 80px" }}>
       <div style={{ maxWidth: 860, margin: "0 auto" }}>
-        <h1 className="pixel-text" style={{ color: C.gold, fontSize: 20, marginBottom: 6 }}>
+        <h1 className="pixel-text" style={{ color: C.gold, fontSize: 20, marginBottom: 22 }}>
           Endgame Stats
         </h1>
-        <p style={{ color: C.muted, fontSize: 13, marginBottom: 22, lineHeight: 1.5 }}>
-          Every completed daily run, grouped by day. Each day shows its Level 2 chest draw (the
-          bomb-gated slot) plus how many players reached the pink realm, breached the outside world,
-          and blew up a tree.
-        </p>
 
         {!configured && initialized ? (
           <div
