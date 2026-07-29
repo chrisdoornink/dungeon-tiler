@@ -302,12 +302,13 @@ export function trackDailyChallenge(action: 'intro_viewed' | 'started' | 'comple
   });
 }
 
-export function trackPageView(page: string) {
-  captureEvent('$pageview', { 
-    $current_url: window.location.href,
-    page 
-  });
-}
+// NOTE: there is deliberately no trackPageView() helper. posthog-js captures
+// $pageview on its own (`capture_pageview: 'history_change'` in
+// instrumentation-client.ts), which covers hard loads AND App Router
+// navigations. The helper that used to live here fired an extra manual
+// $pageview from a component's useEffect, so any route that called it
+// double-counted. Every event already carries `surface` (see
+// lib/analytics_surface.ts), which is what page-level traffic is sliced by.
 
 // Combat events
 export function trackCombat(params: {

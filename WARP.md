@@ -77,7 +77,7 @@ The codebase follows a strict TDD methodology:
 ```
 app/                    # Next.js App Router pages
 ├── daily/             # Main entry point (production)
-├── test-room*/        # Development test environments (blocked in production)
+├── test-*/            # Dev harnesses, one per system (see README)
 └── layout.tsx         # Global layout with fonts and preloading
 
 components/            # React components (one per file)
@@ -117,13 +117,17 @@ __tests__/            # Jest tests (mirrors source structure)
 
 ## Production Environment
 
-### Route Security (middleware.ts)
-Production blocks access to:
-- `/test-room*` - Development test environments
-- `/test-world` - Testing sandbox
-- `/intro` - Standalone intro (only through daily flow)
-- `/end` - Direct end page access
-- `/analytics*` - Analytics dashboard
+### Route Handling (middleware.ts)
+Production redirects `/end` to `/` — it renders a run held in local storage, so
+reaching it cold has nothing to show.
+
+Nothing else is gated. The dev harnesses, `/story` and `/stats` stay reachable
+on purpose; unexpected interest in them is meant to show up as data. Every
+PostHog event carries a `page_surface` property (`daily`, `story`, `stats`,
+`endless`, `test`, ...) from `lib/analytics_surface.ts` for exactly that.
+
+Note: the PostHog project is shared with other sites, so always filter by
+`site = torchboy` when reading traffic.
 
 ### Daily Challenge System
 - **Production Entry Point**: `/` redirects to `/daily`

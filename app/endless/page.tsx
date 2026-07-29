@@ -16,7 +16,7 @@ import {
 import { EndlessLeaderboard } from "../../components/endless/EndlessLeaderboard";
 import { LeaderboardPanel } from "../../components/endless/LeaderboardPanel";
 import { deathCauseMessage } from "../../lib/death_message";
-import { getOrCreateUserId, trackPageView } from "../../lib/posthog_analytics";
+import { getOrCreateUserId } from "../../lib/posthog_analytics";
 
 type Phase = "start" | "playing" | "gameover";
 
@@ -63,7 +63,8 @@ export default function EndlessPage() {
   }, []);
 
   useEffect(() => {
-    trackPageView("endless");
+    // See daily-new: $pageview is captured by posthog-js itself, so a manual
+    // call here only duplicated it.
     setRecords(EndlessStorage.load());
     const savedName = getEndlessPlayerName();
     setPlayerName(savedName);

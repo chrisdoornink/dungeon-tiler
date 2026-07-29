@@ -1,44 +1,28 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * The dev harnesses (/test-*), /story, /stats and /endless are deliberately NOT
+ * blocked here. They are not secret enough to be worth gating, and leaving them
+ * reachable is what makes the traffic numbers meaningful — a redirect would
+ * just hide whether anyone is actually finding them. Every request is tagged
+ * with a `page_surface` property in PostHog instead (see
+ * lib/analytics_surface.ts), so unexpected interest shows up as data rather
+ * than as silence.
+ */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  // In production, block access to test routes and non-daily game modes
-  if (process.env.NODE_ENV === 'production') {
-    // Block test routes
-    if (pathname.startsWith('/test-room') || 
-        pathname.startsWith('/test-world') ||
-        pathname.startsWith('/planned-daily')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    
-    // Block standalone intro page (should only be accessed through daily flow)
-    if (pathname === '/intro') {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    
-    // Block direct access to /end page without game data
-    if (pathname === '/end') {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
-    
-    // Block analytics dashboard in production
-    if (pathname.startsWith('/analytics')) {
-      return NextResponse.redirect(new URL('/', request.url));
-    }
+
+  // /end renders the results of a run that lives in local storage. Reaching it
+  // cold in production means there is nothing to show, so send those visitors
+  // to the daily instead.
+  if (process.env.NODE_ENV === 'production' && pathname === '/end') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
-  
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: [
-    '/test-room/:path*',
-    '/test-world/:path*', 
-    '/planned-daily/:path*',
-    '/intro',
-    '/end',
-    '/analytics/:path*'
-  ]
+  matcher: ['/end'],
 };
