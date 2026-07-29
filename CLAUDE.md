@@ -38,9 +38,20 @@ npm run lint      # ESLint
 
 Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `/ship` to commit and push.
 
+## Standalone HTML5 build (`standalone/`)
+
+`standalone/` is a separate Vite build of **endless mode** for web-game portals (CrazyGames/Poki). It reuses this repo's `lib/` + `components/` engine unchanged and ships as a static bundle served from a CDN subpath. Everything standalone-specific is a **no-op in the Next app** (gated on `window.__ASSET_BASE__` / `window.__STANDALONE__`, which only the standalone sets). When editing shared game/render code, keep it working:
+
+- **New `/images/...` paths in shared code MUST go through `assetUrl()`** (from `lib/asset_url`). Applies to `Tile.tsx`, `TilemapGrid.tsx`, `lib/enemies/registry.ts`, `lib/environment.ts`, and HUD/animation components — e.g. `` backgroundImage: `url(${assetUrl("/images/items/x.png")})` `` or `src={assetUrl("/images/x.png")}`. An unwrapped absolute path works on torchboy.com but 404s in the portal build (subpath hosting). CSS-module `url("/images/...")` backgrounds are auto-rewritten at build time — no action needed there.
+- **New endless enemies/items**: their sprites follow the same `assetUrl()` rule, and the asset trim keeps them automatically — `standalone/scripts/trim-dist.mjs` only *removes* a story/town/boss blocklist. Only add a directory to that blocklist if it is large and NOT reachable in endless.
+- **Do not add `next/*` imports** other than the shimmed `next/image` / `next/link` / `next/navigation`, nor server-only imports (`lib/redis`, `next/server`, node builtins), into the endless render path — they break the Vite build.
+- **Keep `--tile-size` and `.fov-tier-*` in `app/globals.css`** (the standalone depends on them for tile sizing/lighting), and **keep `standalone` in `tsconfig.json` `exclude`** (removing it fails the Vercel deploy on Vite imports).
+- After merging main into the standalone branch, re-verify: `npm --prefix standalone install && npm --prefix standalone run build && node standalone/scripts/trim-dist.mjs`.
+
 ## DO NOTs
 
 - Do not modify `lib/rng.ts` without understanding downstream effects on daily seeds
+- When adding `/images/...` paths or new enemies/items to shared code, keep the standalone build working — wrap paths in `assetUrl()` (see the Standalone HTML5 build section)
 - Do not add emojis to code or comments unless already present
 - Never commit or push unless explicitly asked to in that message
 - **Do not run `npm run build` while the dev server is running.** It overwrites `.next/` with production-hashed chunks, after which the dev server keeps serving HTML referencing dev-mode chunk paths that no longer exist → every refresh 404s. Use `npm run typecheck` for in-session verification; only run `npm run build` after the user has stopped dev (e.g. right before `/ship`).
