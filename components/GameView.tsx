@@ -8,6 +8,7 @@ import { DateUtils } from "../lib/date_utils";
 import { CurrentGameStorage } from "../lib/current_game_storage";
 import { trackGameStart } from "../lib/analytics";
 import { computeMapId } from "../lib/map";
+import { assetUrl } from "../lib/asset_url";
 import { TilemapGrid } from "./TilemapGrid";
 
 export interface GameViewProps {
@@ -217,7 +218,7 @@ function GameViewInner({
     <div
       className="min-h-screen flex flex-row items-start justify-center p-4 max-[600px]:p-2 gap-4 text-white relative"
       style={{
-        backgroundImage: "url(/images/presentational/wall-up-close.png)",
+        backgroundImage: `url(${assetUrl("/images/presentational/wall-up-close.png")})`,
         backgroundRepeat: "repeat",
         backgroundSize: "auto",
       }}

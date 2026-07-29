@@ -1,0 +1,19 @@
+{
+  "name": "torchboy-endless-standalone-spike",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Phase 0 feasibility spike: run the shared endless GameView engine as a static Vite app with no Next.js.",
+  "scripts": {
+    "dev": "vite --port 4001 --host --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 4001 --strictPort"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.5.2",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^3.4.19",
+    "vite": "^6.0.7"
+  }
+}

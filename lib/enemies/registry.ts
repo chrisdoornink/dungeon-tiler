@@ -3,6 +3,7 @@ import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
 import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
+import { assetUrl } from "../asset_url";
 export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper";
 
 export type Facing = "front" | "left" | "right" | "back";
@@ -86,10 +87,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "fire-goblin",
     displayName: "Fire Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/fire-goblin-front.png",
-      left: "/images/enemies/fire-goblin/fire-goblin-right.png", // mirror right for left
-      right: "/images/enemies/fire-goblin/fire-goblin-right.png",
-      back: "/images/enemies/fire-goblin/fire-goblin-back.png",
+      front: assetUrl("/images/enemies/fire-goblin/fire-goblin-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/fire-goblin-right.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/fire-goblin-right.png"),
+      back: assetUrl("/images/enemies/fire-goblin/fire-goblin-back.png"),
     },
     desiredMinCount: 2,
     desiredMaxCount: 3,
@@ -103,10 +104,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "water-goblin",
     displayName: "Water Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/blue-goblin-front.png",
-      left: "/images/enemies/fire-goblin/blue-goblin-right.png", // mirror right for left
-      right: "/images/enemies/fire-goblin/blue-goblin-right.png",
-      back: "/images/enemies/fire-goblin/blue-goblin-back.png",
+      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right.png"),
+      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back.png"),
     },
     desiredMinCount: 1,
     desiredMaxCount: 2,
@@ -119,10 +120,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "water-goblin-spear",
     displayName: "Water Goblin Spearman",
     assets: {
-      front: "/images/enemies/fire-goblin/blue-goblin-front-spear.png",
-      left: "/images/enemies/fire-goblin/blue-goblin-right-spear.png", // mirror right for left
-      right: "/images/enemies/fire-goblin/blue-goblin-right-spear.png",
-      back: "/images/enemies/fire-goblin/blue-goblin-back-spear.png",
+      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front-spear.png"),
+      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear.png"),
+      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back-spear.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -135,10 +136,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "earth-goblin",
     displayName: "Earth Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/brown-goblin-front.png",
-      left: "/images/enemies/fire-goblin/brown-goblin-right.png",
-      right: "/images/enemies/fire-goblin/brown-goblin-right.png",
-      back: "/images/enemies/fire-goblin/brown-goblin-back.png",
+      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right.png"),
+      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right.png"),
+      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back.png"),
     },
     desiredMinCount: 1,
     desiredMaxCount: 2,
@@ -151,10 +152,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "earth-goblin-knives",
     displayName: "Earth Goblin Knifesman",
     assets: {
-      front: "/images/enemies/fire-goblin/brown-goblin-front-knives.png",
-      left: "/images/enemies/fire-goblin/brown-goblin-right-knives.png",
-      right: "/images/enemies/fire-goblin/brown-goblin-right-knives.png",
-      back: "/images/enemies/fire-goblin/brown-goblin-back-knives.png",
+      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front-knives.png"),
+      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives.png"),
+      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives.png"),
+      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back-knives.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -169,10 +170,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     assets: {
       // Ringless art: the goblin and its teleport ring are separate entities
       // now — the ring renders as its own tile subtype with CSS sparkles.
-      front: "/images/enemies/fire-goblin/pink-goblin-ringless-front.png",
-      left: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
-      right: "/images/enemies/fire-goblin/pink-goblin-ringless-left.png",
-      back: "/images/enemies/fire-goblin/pink-goblin-ringless-back.png",
+      front: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left.png"),
+      right: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left.png"),
+      back: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-back.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -656,10 +657,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "ghost",
     displayName: "Lantern Wisp",
     assets: {
-      front: "/images/enemies/lantern-wisp.png",
-      left: "/images/enemies/lantern-wisp.png", // placeholder
-      right: "/images/enemies/lantern-wisp.png", // placeholder
-      back: "/images/enemies/lantern-wisp.png", // placeholder
+      front: assetUrl("/images/enemies/lantern-wisp.png"),
+      left: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
+      right: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
+      back: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
     },
     desiredMinCount: 0,
     desiredMaxCount: 2,
@@ -681,10 +682,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "stone-goblin",
     displayName: "Stone Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/green-goblin-front.png",
-      left: "/images/enemies/fire-goblin/green-goblin-right.png",
-      right: "/images/enemies/fire-goblin/green-goblin-right.png",
-      back: "/images/enemies/fire-goblin/green-goblin-back.png",
+      front: assetUrl("/images/enemies/fire-goblin/green-goblin-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
+      right: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
+      back: assetUrl("/images/enemies/fire-goblin/green-goblin-back.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -696,10 +697,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "white-goblin",
     displayName: "White Goblin",
     assets: {
-      front: "/images/enemies/fire-goblin/white-goblins-front-1.png",
-      back: "/images/enemies/fire-goblin/white-goblins-back-1.png",
-      left: "/images/enemies/fire-goblin/white-goblins-right-1.png", // mirror right for left
-      right: "/images/enemies/fire-goblin/white-goblins-right-1.png",
+      front: assetUrl("/images/enemies/fire-goblin/white-goblins-front-1.png"),
+      back: assetUrl("/images/enemies/fire-goblin/white-goblins-back-1.png"),
+      left: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 0, // spawned as groups of 4 by assignment logic
@@ -968,10 +969,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "snake",
     displayName: "Snake",
     assets: {
-      front: "/images/enemies/snake-coiled-right.png", // coiled when not moving
-      left: "/images/enemies/snake-moving-left.png", // moving asset
-      right: "/images/enemies/snake-coiled-right.png", // coiled when not moving
-      back: "/images/enemies/snake-coiled-right.png", // coiled when not moving
+      front: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
+      left: assetUrl("/images/enemies/snake-moving-left.png"), // moving asset
+      right: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
+      back: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -1099,10 +1100,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       // matching the front core's split); the front has heterochromic glowing eyes
       // (blue + red). Distinct left/right art means the sprite must NOT be mirrored
       // by facing — see the no-flip case for 'shaper' in Tile.tsx.
-      front: "/images/enemies/bosses/shaper/shaper-front.png",
-      left: "/images/enemies/bosses/shaper/shaper-left.png",
-      right: "/images/enemies/bosses/shaper/shaper-right.png",
-      back: "/images/enemies/bosses/shaper/shaper-back.png",
+      front: assetUrl("/images/enemies/bosses/shaper/shaper-front.png"),
+      left: assetUrl("/images/enemies/bosses/shaper/shaper-left.png"),
+      right: assetUrl("/images/enemies/bosses/shaper/shaper-right.png"),
+      back: assetUrl("/images/enemies/bosses/shaper/shaper-back.png"),
     },
     base: { health: SHAPER_HP, attack: 0 },
     // Standard melee: once you fight through its terrain and reach it, it dies
@@ -1127,7 +1128,7 @@ export function getEnemyIcon(
     const count = Math.min(4, Math.max(1, swarmCount ?? 1));
     const useFront = facing === "front" || facing === "left" || facing === "right";
     const side = useFront ? "front" : "back";
-    return `/images/enemies/fire-goblin/white-goblins-${side}-${count}.png`;
+    return assetUrl(`/images/enemies/fire-goblin/white-goblins-${side}-${count}.png`);
   }
   return cfg.assets[facing] || cfg.assets.front;
 }

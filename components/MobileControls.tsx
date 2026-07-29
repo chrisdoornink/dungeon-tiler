@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { assetUrl } from "../lib/asset_url";
+import { isStandalone } from "../lib/standalone_env";
 
 export interface MobileInventoryItem {
   key: string;
@@ -132,7 +134,15 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   // Check if screen width is less than 600px
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobile(window.innerWidth < 600);
+      // In the STANDALONE portal build only, treat a coarse pointer (touch) as mobile
+      // too, not just narrow widths — tablets and the CrazyGames fullscreen app are wide
+      // but touch-only and need the on-screen d-pad. Gated to standalone so the Next app's
+      // behavior (width-only) is unchanged.
+      const coarsePointer =
+        isStandalone() &&
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(pointer: coarse)").matches;
+      setIsMobile(window.innerWidth < 600 || coarsePointer);
       setViewportWidth(window.innerWidth);
     };
 
@@ -261,7 +271,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rock',
       testId: 'mobile-action-rock',
-      icon: '/images/items/rock-1.png',
+      icon: assetUrl('/images/items/rock-1.png'),
       count: rockCount ?? 0,
       onUse: onThrowRock,
       label: 'Throw Rock',
@@ -270,7 +280,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rune',
       testId: 'mobile-action-rune',
-      icon: '/images/items/rune1.png',
+      icon: assetUrl('/images/items/rune1.png'),
       count: runeCount ?? 0,
       onUse: onUseRune,
       label: 'Use Rune',
@@ -279,7 +289,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'bomb',
       testId: 'mobile-action-bomb',
-      icon: '/images/items/bomb-black.png',
+      icon: assetUrl('/images/items/bomb-black.png'),
       count: bombCount ?? 0,
       onUse: onThrowBomb,
       label: 'Throw Bomb',

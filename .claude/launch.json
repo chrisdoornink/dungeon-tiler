@@ -7,6 +7,18 @@
       "runtimeArgs": ["run", "dev"],
       "port": 4000,
       "autoPort": true
+    },
+    {
+      "name": "endless-standalone-spike",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["--prefix", "standalone", "run", "dev"],
+      "port": 4001
+    },
+    {
+      "name": "subpath-cdn-test",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["standalone/serve-subpath.mjs"],
+      "port": 4002
     }
   ]
 }

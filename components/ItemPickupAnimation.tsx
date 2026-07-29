@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
+import { assetUrl } from "../lib/asset_url";
 
 interface ItemPickupAnimationProps {
   isTriggered: boolean;
@@ -32,27 +33,27 @@ const ItemPickupAnimation: React.FC<ItemPickupAnimationProps> = ({
   const getItemImage = (type: string) => {
     switch (type) {
       case "key":
-        return "/images/items/key.png";
+        return assetUrl("/images/items/key.png");
       case "exitKey":
-        return "/images/items/exit-key.png";
+        return assetUrl("/images/items/exit-key.png");
       case "sword":
-        return "/images/items/sword.png";
+        return assetUrl("/images/items/sword.png");
       case "shield":
-        return "/images/items/shield.png";
+        return assetUrl("/images/items/shield.png");
       case "rock":
-        return "/images/items/rock-1.png";
+        return assetUrl("/images/items/rock-1.png");
       case 'rune':
-        return '/images/items/rune1.png';
+        return assetUrl('/images/items/rune1.png');
       case 'bomb':
-        return '/images/items/bomb-black.png';
+        return assetUrl('/images/items/bomb-black.png');
       case 'food':
-        return '/images/items/food-1.png';
+        return assetUrl('/images/items/food-1.png');
       case 'pinkHeart':
-        return '/images/items/pink-heart.png';
+        return assetUrl('/images/items/pink-heart.png');
       case 'berry':
-        return '/images/items/berry.png';
+        return assetUrl('/images/items/berry.png');
       default:
-        return '/images/items/key.png';
+        return assetUrl('/images/items/key.png');
     }
   };
 

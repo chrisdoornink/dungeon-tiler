@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import Image from 'next/image';
+import { assetUrl } from "../lib/asset_url";
 
 interface HeartPopAnimationProps {
   isTriggered: boolean;
@@ -33,7 +34,7 @@ const HeartPopAnimation: React.FC<HeartPopAnimationProps> = ({
   return (
     <div className={`absolute pointer-events-none ${className}`} style={style}>
       <Image
-        src="/images/presentational/heart-red.png"
+        src={assetUrl("/images/presentational/heart-red.png")}
         alt="❤️"
         width={16}
         height={16}

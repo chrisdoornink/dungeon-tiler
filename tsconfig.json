@@ -23,5 +23,6 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  "//exclude": "standalone/ is a self-contained Vite sub-project with its own tsconfig/deps; excluding it keeps the Next production build (and Vercel, which has no standalone/node_modules) from typechecking its vite imports.",
+  "exclude": ["node_modules", "standalone"]
 }
