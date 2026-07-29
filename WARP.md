@@ -123,7 +123,7 @@ reaching it cold has nothing to show.
 
 Nothing else is gated. The dev harnesses, `/story` and `/stats` stay reachable
 on purpose; unexpected interest in them is meant to show up as data. Every
-PostHog event carries a `surface` property (`daily`, `story`, `stats`,
+PostHog event carries a `page_surface` property (`daily`, `story`, `stats`,
 `endless`, `test`, ...) from `lib/analytics_surface.ts` for exactly that.
 
 Note: the PostHog project is shared with other sites, so always filter by

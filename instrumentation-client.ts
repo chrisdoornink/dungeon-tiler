@@ -13,12 +13,17 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
   capture_pageview: "history_change",
   // Tag every event with the app area it came from and which of Chris's sites
   // sent it. Both are needed to read the numbers at all:
-  //   - `surface` turns "who is hitting /story or the test harnesses" into a
-  //     one-property breakdown instead of a pile of path filters.
+  //   - `page_surface` turns "who is hitting /story or the test harnesses" into
+  //     a one-property breakdown instead of a pile of path filters.
   //   - `site` is load-bearing because this PostHog project is SHARED with
   //     thelegendof.band and crsswrdl.com. Their paths (/listen, /lyrics,
   //     /about, ...) land in the same event stream, so any unfiltered
   //     path-based insight silently mixes three different websites together.
+  //
+  // NOT named `surface`: `share_clicked` and `endless_cta_clicked` already send
+  // their own `surface` ("end_screen" / "daily_completed") to say WHICH BUTTON
+  // was tapped. Reusing the name here would overwrite theirs on every event and
+  // quietly destroy the share-rate reporting.
   before_send: (event) => {
     if (!event) return event;
     const pathname =
@@ -27,7 +32,7 @@ posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
     event.properties = {
       ...event.properties,
       site: "torchboy",
-      surface: surfaceForPath(pathname),
+      page_surface: surfaceForPath(pathname),
     };
     return event;
   },

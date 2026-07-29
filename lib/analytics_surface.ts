@@ -1,11 +1,15 @@
 /**
  * Maps a URL path to the coarse "surface" of the app it belongs to.
  *
- * Every event we send carries this as a `surface` property (attached in
+ * Every event we send carries this as a `page_surface` property (attached in
  * `instrumentation-client.ts` via PostHog's `before_send` hook), so traffic can
  * be broken down in PostHog by area of the app without writing path regexes
  * into every insight — and without a new insight breaking each time a route is
  * added or renamed.
+ *
+ * The property is `page_surface`, NOT `surface`: `share_clicked` and
+ * `endless_cta_clicked` already use `surface` for which button was tapped
+ * ("end_screen" / "daily_completed"). See instrumentation-client.ts.
  *
  * The surfaces that matter for keeping an eye on unintended traffic:
  *   - `story`  — unfinished prototype. A trickle of testers is fine; a spike is

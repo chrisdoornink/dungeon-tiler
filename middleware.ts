@@ -6,8 +6,9 @@ import type { NextRequest } from 'next/server';
  * blocked here. They are not secret enough to be worth gating, and leaving them
  * reachable is what makes the traffic numbers meaningful — a redirect would
  * just hide whether anyone is actually finding them. Every request is tagged
- * with a `surface` property in PostHog instead (see lib/analytics_surface.ts),
- * so unexpected interest shows up as data rather than as silence.
+ * with a `page_surface` property in PostHog instead (see
+ * lib/analytics_surface.ts), so unexpected interest shows up as data rather
+ * than as silence.
  */
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
