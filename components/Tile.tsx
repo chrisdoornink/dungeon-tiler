@@ -206,7 +206,7 @@ interface TileProps {
   //   'stalk'   - hunched and advancing.
   // The pose art is drawn facing RIGHT, so unlike the facing sprites these are mirrored
   // when it faces left (see enemyBaseTransform).
-  enemyPose?: 'cocked' | 'pickup' | 'stalk';
+  enemyPose?: 'cocked' | 'pickup' | 'stalk' | 'summon';
   enemySwarmCount?: number; // for white-goblin: how many swarm members share this tile (1-4)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
@@ -1880,6 +1880,12 @@ export const Tile: React.FC<TileProps> = ({
                 // cocked wind-up, which is the only warning the player gets before a spear.
                 if (kind === 'fisher' && enemyPose) {
                   return assetUrl(`/images/enemies/bosses/fisher/fisher-${enemyPose}.png`);
+                }
+                // The Quarrymaster throws his arms up on the turn he calls a wave. It is his
+                // only tell, and the reason a separate pose was drawn — the raised-arm
+                // silhouette is the one thing that still reads at 40px.
+                if (kind === 'quarrymaster' && enemyPose === 'summon') {
+                  return assetUrl('/images/enemies/bosses/quarrymaster/quarry-summon-front.png');
                 }
                 const facing: Facing = toFacing(enemyFacing);
                 // Fire goblins carry an animated torch (see PixelFlame below):

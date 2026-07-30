@@ -1297,14 +1297,20 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "quarrymaster",
     displayName: "The Quarrymaster",
     assets: {
-      // PLACEHOLDER ART: the stone goblin's sprite set, which is the green-goblin art
-      // (the filenames don't match the kind — there are no stone-goblin-*.png files).
-      // Reused because it reads as a heavy earth-coloured brute, i.e. plausibly the thing
-      // breaking the floor. Needs its own sprite; see the feature doc's deferred list.
-      front: assetUrl("/images/enemies/fire-goblin/green-goblin-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
-      right: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
-      back: assetUrl("/images/enemies/fire-goblin/green-goblin-back.png"),
+      // Chained rock taskmaster with ember-lit cracks. Prepared from a single contact sheet
+      // by scripts/prep-quarrymaster-sprites.js, which slices the poses, keys the paper,
+      // strips the baked shadow and de-halos the smoothed edges, then plants every pose on a
+      // common baseline at one shared scale so he does not change size as he turns or raises
+      // his arms.
+      //
+      // Only a RIGHT profile exists; it is mirrored for left (same as the Fisher, unlike the
+      // Shaper whose two halves differ). The `quarry-` prefix is deliberate: these names have
+      // never been served before, because dropping real art onto a placeholder's filenames is
+      // how the Fisher ended up with browsers serving cached placeholders.
+      front: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-front.png"),
+      left: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
+      right: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
+      back: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-back.png"),
     },
     base: { health: QUARRYMASTER_HP, attack: QUARRYMASTER_ATTACK },
     // Ordinary melee, ordinary HP. Reaching him past the cage gates is the whole fight;

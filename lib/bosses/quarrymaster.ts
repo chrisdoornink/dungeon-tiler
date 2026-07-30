@@ -116,6 +116,8 @@ export interface QuarrymasterMemory {
   waveCount?: number;
   /** One-shot render nonce: bumped on the turn a pod disgorges a monster. */
   podSpawnNonce?: number;
+  /** The turn he last called a wave. Drives the arms-raised sprite for exactly that turn. */
+  lastSummonTurn?: number;
   /** Chamber pacing box (set by the arena builder), mirroring the Shaper's roam box. */
   roamMinY?: number;
   roamMaxY?: number;
@@ -256,6 +258,7 @@ export function quarrymasterUpdate(ctx: BehaviorContext): number {
       if (ctx.spawnEnemy({ y: spot.y, x: spot.x, kind, memory: { podId: `pod${i}` } })) {
         budget -= 1;
         mem.podSpawnNonce = (mem.podSpawnNonce ?? 0) + 1;
+        mem.lastSummonTurn = turn;
         taken.push(spot);
       }
     }
@@ -276,6 +279,18 @@ export function quarrymasterUpdate(ctx: BehaviorContext): number {
 }
 
 // --- Render hooks ----------------------------------------------------------------
+
+/**
+ * Is he mid-call this turn? Drives the arms-raised sprite, which is his one visible tell —
+ * the reason a summon pose was drawn at all.
+ */
+export function quarrymasterIsSummoning(
+  mem: QuarrymasterMemory | undefined
+): boolean {
+  return (
+    typeof mem?.lastSummonTurn === "number" && mem.lastSummonTurn === mem.turn
+  );
+}
 
 /** One-shot nonce: bumped the turn a pod disgorges a monster (for a spawn flash/shake). */
 export function quarrymasterPodSpawnNonce(
