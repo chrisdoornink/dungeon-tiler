@@ -649,6 +649,9 @@ export const Tile: React.FC<TileProps> = ({
   const hasPinkHeart = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.PINK_HEART) || false;
   };
+  const hasWallSeal = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.WALL_SEAL) || false;
+  };
   const hasBerry = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.BERRY) || false;
   };
@@ -831,7 +834,9 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BREACH &&
         // Pink realm prizes have custom rendering (heart gets a glow overlay)
         subtype !== TileSubtype.PINK_HEART &&
-        subtype !== TileSubtype.BERRY
+        subtype !== TileSubtype.BERRY &&
+        // Sealed doorway: a crack decal on the wall face
+        subtype !== TileSubtype.WALL_SEAL
     );
   };
 
@@ -918,6 +923,21 @@ export const Tile: React.FC<TileProps> = ({
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Sealed doorway: a crack decal low on the wall's face, where the forced
+            perspective actually shows stone (see isFloorBelow in the wall branch). Sits
+            below the torch flames so a bracketed seal reads as one motif. Deterministic
+            rotation + variant per tile so no two seals on a floor look stamped. */}
+        {hasWallSeal(subtypes) && (
+          <div
+            key="wall-seal"
+            data-testid={`subtype-icon-${TileSubtype.WALL_SEAL}`}
+            className={`${styles.wallSealIcon} ${
+              pickVariant([styles.wallSealVariantA, styles.wallSealVariantB])
+            }`}
+            style={{ transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg)` }}
           />
         )}
 

@@ -6,7 +6,7 @@ import { tileTypes } from "../../lib/map";
 import {
   buildMoatApproach,
   buildDousePortalApproach,
-  buildBombOutsideApproach,
+  buildBombSealApproach,
 } from "../../lib/bosses/boss_entrances";
 import type { GameState } from "../../lib/map/game-state";
 
@@ -59,14 +59,16 @@ const SCENARIOS: Scenario[] = [
   },
   {
     key: "bomb",
-    label: "Bomb → Outside",
-    build: buildBombOutsideApproach,
+    label: "Bomb: Sealed Door",
+    build: buildBombSealApproach,
     blurb: (
       <>
-        A sealed room with three bombs. <b>Throw a bomb at an outer wall</b> to blow a
-        breach, step out into the grassland, then push past the stone goblins to the
-        <b> opening carved in the far tree wall</b> &mdash; a path down into the boss
-        room. (In the real daily this appears only for the first wall you breach.)
+        Three bombs and a walled-up doorway hidden somewhere on the floor. Look for a{" "}
+        <b>cracked wall tile bracketed by two wall torches</b> &mdash; stand below it,
+        face up, and <b>throw a bomb</b>. The seal blows open into the cave mouth down to
+        the boss. Two lone cracked tiles with <i>no</i> torches are decoys: bombing one
+        leaves a pot holding pink-realm fruit or food, so it isn&rsquo;t a wasted bomb
+        &mdash; but you only carry three.
       </>
     ),
   },

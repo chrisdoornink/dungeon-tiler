@@ -118,25 +118,24 @@ describe("Bomb detonation - 3x3 blast", () => {
     expect(blown.recentBombBlasts).toContainEqual([5, 7]);
   });
 
-  it("removes a mounted wall torch when its wall is blasted to floor", () => {
+  it("leaves a torch-bearing wall standing — set stone shrugs off the blast", () => {
+    // A torch wall is blast-proof. This is what keeps a sealed doorway's two bracketing
+    // torches intact: the bomb rests directly below the seal, so its 3x3 covers them, and
+    // without this rule the motif would blow into one anonymous 3-wide hole.
     const map = makeArena(12, 5, 5);
     map.tiles[5][8] = WALL;
     map.subtypes[5][8] = [TileSubtype.WALL_TORCH];
     const thrown = performThrowBomb(baseState(map, { playerDirection: Direction.RIGHT }));
     const blown = detonateLiveBombs(thrown);
 
-    expect(blown.mapData.tiles[5][8]).toBe(FLOOR); // wall destroyed
-    // The mounted torch must not linger on the now-open floor tile.
-    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.WALL_TORCH);
-    // Hero can now walk onto the tile (a lingering torch would block it).
-    const stepped = movePlayer(
-      { ...blown, playerDirection: Direction.RIGHT },
-      Direction.RIGHT
-    );
-    // Player started at (5,5); after three rightward steps they should reach (5,8).
-    let s = stepped;
-    for (let i = 0; i < 2; i++) s = movePlayer(s, Direction.RIGHT);
-    expect(findPlayer(s.mapData)).toEqual([5, 8]);
+    expect(blown.mapData.tiles[5][8]).toBe(WALL); // still a wall
+    expect(blown.mapData.subtypes[5][8]).toContain(TileSubtype.WALL_TORCH);
+    expect(blown.mapData.subtypes[5][8]).not.toContain(TileSubtype.SINGED);
+    expect(blown.stats.wallsDestroyed ?? 0).toBe(0);
+    // And it still blocks: three steps right can only reach (5,7).
+    let s: GameState = { ...blown, playerDirection: Direction.RIGHT };
+    for (let i = 0; i < 3; i++) s = movePlayer(s, Direction.RIGHT);
+    expect(findPlayer(s.mapData)).toEqual([5, 7]);
   });
 
   it("detonates automatically on the player's next turn", () => {
