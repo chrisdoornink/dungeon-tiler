@@ -9,13 +9,15 @@
 //                  A lockless BOSS_ENTRANCE waits on the far side.
 //   2. DOUSE     — a dark cave. A deep-water channel snuffs your torch; only in the
 //                  dark does the DARK_PORTAL beyond it appear (invisible in the light).
-//   3. BOMB      — a walled room; bomb the outer wall and step into the outside world,
-//                  where a hidden BOSS_ENTRANCE is carved into the far tree wall.
+//   3. BOMB      — a walled-up doorway somewhere on the floor: a cracked wall tile
+//                  bracketed by two wall torches. Bomb it open and the cleared tile is
+//                  a BOSS_ENTRANCE. Bare cracked tiles (no torches) are decoys that
+//                  open onto a reward pot instead.
 //
 // Stepping onto either entrance subtype warps into the Shaper arena (enterBossRoom
 // in game-state.ts).
 import { FLOOR, WALL, FLOWERS, Direction, TileSubtype } from "../map/constants";
-import type { MapData } from "../map/types";
+import type { MapData, SealPayload, SealPayloads } from "../map/types";
 import type { GameState } from "../map/game-state";
 import { generateCompleteMapForFloor } from "../map/map-features";
 import { Enemy } from "../enemy";
@@ -51,21 +53,6 @@ function placeGhosts(map: MapData, count: number, hy: number, hx: number): Enemy
     g.maxHealth = 2;
     return g;
   });
-}
-
-/** A rectangular room: WALL border, FLOOR interior. */
-function room(width: number, height: number): { tiles: number[][]; subtypes: number[][][] } {
-  const tiles: number[][] = [];
-  const subtypes: number[][][] = [];
-  for (let y = 0; y < height; y++) {
-    tiles.push(
-      Array.from({ length: width }, (_, x) =>
-        y === 0 || x === 0 || y === height - 1 || x === width - 1 ? WALL : FLOOR
-      )
-    );
-    subtypes.push(Array.from({ length: width }, () => [] as number[]));
-  }
-  return { tiles, subtypes };
 }
 
 /** Common GameState scaffold for an approach level. */
@@ -551,26 +538,235 @@ export function buildDousePortalApproach(): GameState {
 }
 
 /**
- * BOMB approach. A walled room. Throw a bomb at the outer wall to breach it, step
- * through into the outside world (built with outsideHasBossEntrance), then walk to
- * the hidden cave mouth carved into the far tree wall.
+ * BOMB approach, in a REAL Level-3-sized room. Somewhere on the floor a walled-up
+ * doorway waits: a cracked wall tile bracketed by two wall torches. Stand below it,
+ * face up, throw a bomb — the seal blows open into a BOSS_ENTRANCE cave mouth. Two
+ * lone cracked tiles elsewhere are decoys that open onto a reward pot instead, and the
+ * hero carries exactly three bombs, so opening all three seals is the whole supply.
  */
-export function buildBombOutsideApproach(): GameState {
-  const W = 13;
-  const H = 11;
-  const { tiles, subtypes } = room(W, H);
-  subtypes[Math.floor(H / 2)][Math.floor(W / 2)] = [TileSubtype.PLAYER];
+export function buildBombSealApproach(): GameState {
+  let map = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, 3);
+  let payloads = stampSealedDoorway(map);
+  for (let attempt = 0; attempt < 12 && !payloads; attempt++) {
+    map = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, 3);
+    payloads = stampSealedDoorway(map);
+  }
+  // The harness always shows the full picture: doorway plus the max decoys, so both
+  // halves of the tell can be compared side by side.
+  if (payloads) {
+    payloads = {
+      ...payloads,
+      ...stampDecoySeals(map, MAX_DECOY_SEALS, sealCoords(payloads)),
+    };
+  }
+  const [hy, hx] = findPlayerPos(map);
+  const ghosts = placeGhosts(map, GHOST_COUNT, hy, hx);
 
   return approachState(
-    { tiles, subtypes, environment: "cave" },
+    { tiles: map.tiles, subtypes: map.subtypes, environment: "cave" },
     {
+      // Fog on (real L3 feel) so you have to explore into the doorway to spot it.
       showFullMap: false,
       bombCount: 3,
       rockCount: 0,
-      outsideHasBossEntrance: true,
+      sealPayloads: payloads ?? undefined,
       bossArenaSeed: "lava",
       playerDirection: Direction.UP,
+      enemies: ghosts,
     }
+  );
+}
+
+// --- Sealed doorway (the BOMB entrance) --------------------------------------
+
+/** Hard ceiling on decoy seals per floor. */
+export const MAX_DECOY_SEALS = 2;
+/** Chebyshev spacing between seals, so two of them never read as one motif. */
+const SEAL_SPACING = 4;
+/** How far from any wall torch a decoy must sit, so a torch PAIR stays the only tell. */
+const DECOY_TORCH_CLEARANCE = 2;
+
+/**
+ * How many decoy cracks this floor gets: 0, 1, or 2, rolled per floor on EVERY daily
+ * floor — not just floor 3, and not just bomb days. Cracks you can do nothing about are
+ * the point: seeing one on floor 1 with no bombs yet teaches the vocabulary, and a floor
+ * that rolls zero keeps the motif from becoming furniture.
+ * Must be called inside the daily seeded RNG block.
+ */
+export function rollDecoySealCount(): number {
+  const r = Math.random();
+  if (r < 0.3) return 0;
+  if (r < 0.75) return 1;
+  return MAX_DECOY_SEALS;
+}
+
+/** Terrain that would stop the hero standing below a seal to throw at it. */
+const UNSTANDABLE_SUBS = [
+  TileSubtype.LAVA,
+  TileSubtype.DEEP_WATER,
+  TileSubtype.OPEN_ABYSS,
+  TileSubtype.FAULTY_FLOOR,
+];
+
+/**
+ * Wall tiles the renderer gives a camera-facing face to: a WALL with FLOOR directly
+ * below it (Tile.tsx's isFloorBelow adds the forced-perspective front face there).
+ * Side and bottom walls are drawn as caps seen from above, so a crack decal on one
+ * would be unreadable — those can never hold a seal. Same predicate
+ * addWallTorchesToMap uses, which is why a torch and a seal always agree on which
+ * walls can carry art.
+ */
+function isFacedWall(map: MapData, y: number, x: number): boolean {
+  const H = map.tiles.length;
+  const W = map.tiles[0].length;
+  if (y < 0 || x < 0 || y >= H - 1 || x >= W) return false;
+  if (map.tiles[y][x] !== WALL) return false;
+  return map.tiles[y + 1][x] === FLOOR;
+}
+
+/** A faced wall with nothing already on it (no torch, no other overlay). */
+function isBareFacedWall(map: MapData, y: number, x: number): boolean {
+  return isFacedWall(map, y, x) && (map.subtypes[y]?.[x]?.length ?? 0) === 0;
+}
+
+/** Can the hero stand on the tile below (y,x) and throw upward at it? */
+function approachIsStandable(map: MapData, y: number, x: number, reachable: Set<string>): boolean {
+  const ay = y + 1;
+  if (!reachable.has(`${ay},${x}`)) return false;
+  const subs = map.subtypes[ay]?.[x] ?? [];
+  return !subs.some((s) => UNSTANDABLE_SUBS.includes(s));
+}
+
+function isNearTorch(map: MapData, y: number, x: number, radius: number): boolean {
+  for (let dy = -radius; dy <= radius; dy++)
+    for (let dx = -radius; dx <= radius; dx++) {
+      const subs = map.subtypes[y + dy]?.[x + dx] ?? [];
+      if (subs.includes(TileSubtype.WALL_TORCH)) return true;
+    }
+  return false;
+}
+
+function farEnough(taken: Array<[number, number]>, y: number, x: number): boolean {
+  return taken.every(
+    ([ty, tx]) => Math.max(Math.abs(ty - y), Math.abs(tx - x)) >= SEAL_SPACING
+  );
+}
+
+/**
+ * Stamp up to `count` decoy cracks — lone WALL_SEAL tiles with no wall torch within
+ * DECOY_TORCH_CLEARANCE, so a bracketing torch PAIR stays the only tell for the real
+ * doorway. Each opens onto a pot: the first holds pink-realm fruit, any further one flips
+ * a coin between fruit and ordinary food, so a decoy is never a wasted bomb.
+ *
+ * Runs on EVERY daily floor, so cracks show up on floors 1 and 2 where the hero has no
+ * bombs yet and simply can't act on them. Spaced ≥SEAL_SPACING from `avoid` (the real
+ * doorway, when there is one) and from each other.
+ *
+ * Must be called inside the daily seeded RNG block.
+ */
+export function stampDecoySeals(
+  map: MapData,
+  count: number,
+  avoid: Array<[number, number]> = []
+): SealPayloads {
+  const payloads: SealPayloads = {};
+  if (count <= 0) return payloads;
+  const H = map.tiles.length;
+  const W = map.tiles[0].length;
+  const [hy, hx] = findPlayerPos(map);
+  const reachable = floodReachable(map, hy, hx, { wadeable: true });
+
+  const cands: Array<[number, number]> = [];
+  for (let y = 0; y < H - 1; y++) {
+    for (let x = 0; x < W; x++) {
+      if (!isBareFacedWall(map, y, x)) continue;
+      if (isNearTorch(map, y, x, DECOY_TORCH_CLEARANCE)) continue;
+      if (!approachIsStandable(map, y, x, reachable)) continue;
+      cands.push([y, x]);
+    }
+  }
+  for (let i = cands.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [cands[i], cands[j]] = [cands[j], cands[i]];
+  }
+
+  const taken = avoid.slice();
+  let placed = 0;
+  for (const [y, x] of cands) {
+    if (placed >= count) break;
+    if (!farEnough(taken, y, x)) continue;
+    map.subtypes[y][x] = [TileSubtype.WALL_SEAL];
+    const payload: SealPayload =
+      placed === 0 ? "berry" : Math.random() < 0.5 ? "berry" : "food";
+    payloads[`${y},${x}`] = payload;
+    taken.push([y, x]);
+    placed++;
+  }
+  return payloads;
+}
+
+/**
+ * Stamp the day's real sealed doorway and return what it hides (always exactly one
+ * "boss" entry). Decoys are NOT placed here — they are an independent per-floor roll
+ * (see stampDecoySeals / rollDecoySealCount), so a floor can carry cracks with no
+ * doorway at all, and a bomb day can roll zero decoys.
+ *
+ * The doorway is three consecutive faced wall tiles — torch, cracked seal, torch — so it
+ * reads as a walled-up entrance someone once honored. Interior wall runs are strongly
+ * preferred over the map's top boundary: a 3-wide motif fits an interior run in ~92% of
+ * generated floor 3s, which is the whole reason the motif is 3 wide and not 5 (a 5-wide
+ * one only ever fits the top boundary row, making it findable by rote).
+ *
+ * Returns null (and leaves the map untouched) when the floor has no site at all —
+ * the caller then treats the day as bossless rather than shipping a broken floor.
+ * Must be called inside the daily seeded RNG block.
+ */
+export function stampSealedDoorway(map: MapData): SealPayloads | null {
+  const H = map.tiles.length;
+  const W = map.tiles[0].length;
+  const [hy, hx] = findPlayerPos(map);
+  const reachable = floodReachable(map, hy, hx, { wadeable: true });
+
+  // Every 3-wide window of bare faced wall whose middle tile the hero can reach.
+  const sites: Array<{ y: number; x: number; interior: boolean; dist: number }> = [];
+  for (let y = 0; y < H - 1; y++) {
+    for (let x = 0; x + 2 < W; x++) {
+      if (!isBareFacedWall(map, y, x)) continue;
+      if (!isBareFacedWall(map, y, x + 1)) continue;
+      if (!isBareFacedWall(map, y, x + 2)) continue;
+      if (!approachIsStandable(map, y, x + 1, reachable)) continue;
+      sites.push({
+        y,
+        x,
+        interior: y > 0,
+        dist: Math.abs(y - hy) + Math.abs(x + 1 - hx),
+      });
+    }
+  }
+  if (sites.length === 0) return null;
+
+  // Interior walls first (a seal on the top boundary is the predictable fallback), then
+  // farthest from the hero so the doorway is something you travel to, not spawn beside.
+  sites.sort((a, b) => {
+    if (a.interior !== b.interior) return a.interior ? -1 : 1;
+    return b.dist - a.dist;
+  });
+  // Break ties randomly among the best few so the same layout doesn't always pick the
+  // same wall (seeded, so still identical for every player on a given day).
+  const interiorSites = sites.filter((s) => s.interior);
+  const pool = (interiorSites.length > 0 ? interiorSites : sites).slice(0, 5);
+  const site = pool[Math.floor(Math.random() * pool.length)];
+
+  map.subtypes[site.y][site.x] = [TileSubtype.WALL_TORCH];
+  map.subtypes[site.y][site.x + 1] = [TileSubtype.WALL_SEAL];
+  map.subtypes[site.y][site.x + 2] = [TileSubtype.WALL_TORCH];
+  return { [`${site.y},${site.x + 1}`]: "boss" };
+}
+
+/** The coordinates of every WALL_SEAL recorded in a payload map. */
+export function sealCoords(payloads: SealPayloads): Array<[number, number]> {
+  return Object.keys(payloads).map(
+    (k) => k.split(",").map(Number) as [number, number]
   );
 }
 
@@ -620,31 +816,34 @@ export function arenaSeedForEntrance(kind: BossEntranceKind): MoatElement {
 }
 
 /**
- * Stamp the day's entrance into an already-generated daily floor. Returns false if the
- * floor had no safe spot for it (caller just leaves that day bossless rather than
- * risking a broken floor). "bomb" touches nothing here — it's carved into the outside
- * world later, gated on state.outsideHasBossEntrance.
+ * Stamp the day's entrance into an already-generated daily floor. `placed` is false if
+ * the floor had no safe spot for it (caller just leaves that day bossless rather than
+ * risking a broken floor). "bomb" returns the seal payload map, which the caller must
+ * carry onto the GameState — without it the sealed doorway opens onto nothing.
  */
 export function stampBossEntranceOnFloor(
   map: MapData,
   kind: BossEntranceKind
-): boolean {
-  if (kind === "bomb") return true;
+): { placed: boolean; sealPayloads?: SealPayloads } {
   const [hy, hx] = findPlayerPos(map);
+  if (kind === "bomb") {
+    const sealPayloads = stampSealedDoorway(map);
+    return sealPayloads ? { placed: true, sealPayloads } : { placed: false };
+  }
   if (kind === "moat-lava") {
     // 4-6 rocks to cross, straight-line only, and only ever gates the secret.
-    return stampStraightLavaSpur(map, 4 + Math.floor(Math.random() * 3));
+    return { placed: stampStraightLavaSpur(map, 4 + Math.floor(Math.random() * 3)) };
   }
   if (kind === "moat-water") {
     const before = countSubtype(map, TileSubtype.BOSS_ENTRANCE);
     stampCornerMoat(map, "water");
-    return countSubtype(map, TileSubtype.BOSS_ENTRANCE) > before;
+    return { placed: countSubtype(map, TileSubtype.BOSS_ENTRANCE) > before };
   }
   // douse: a few deep-water tiles to snuff the torch, plus the dark portal itself.
   stampCornerWaterPatch(map, hy, hx);
   const before = countSubtype(map, TileSubtype.DARK_PORTAL);
   placeDarkPortal(map, hy, hx);
-  return countSubtype(map, TileSubtype.DARK_PORTAL) > before;
+  return { placed: countSubtype(map, TileSubtype.DARK_PORTAL) > before };
 }
 
 function countSubtype(map: MapData, sub: number): number {

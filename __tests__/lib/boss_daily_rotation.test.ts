@@ -31,7 +31,11 @@ function dayHasBomb(f1: GameState): boolean {
 }
 
 function entranceOf(f3: GameState): string {
-  if (f3.outsideHasBossEntrance) return "bomb";
+  // A bomb day stamps a bracketed WALL_SEAL and records "boss" as its payload; the
+  // BOSS_ENTRANCE itself doesn't exist on the map until the seal is blown open. Counting
+  // WALL_SEAL tiles would NOT work — decoy cracks are rolled on every floor regardless of
+  // the entrance kind, so a douse or moat day can carry cracks too.
+  if (Object.values(f3.sealPayloads ?? {}).includes("boss")) return "bomb";
   if (count(f3, TileSubtype.DARK_PORTAL) > 0) return "douse";
   if (count(f3, TileSubtype.BOSS_ENTRANCE) > 0) return `moat-${f3.bossArenaSeed}`;
   return "none";

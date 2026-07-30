@@ -127,6 +127,14 @@ export enum TileSubtype {
   // visuals never accidentally trigger a boss warp.
   BOSS_ENTRANCE = 63,
   DARK_PORTAL = 64,
+  // WALL_SEAL is a walled-up doorway: a WALL tile wearing a crack decal. Bomb it and
+  // it opens into whatever the day stashed behind it (a BOSS_ENTRANCE on the real one,
+  // a reward POT on a decoy) — see sealPayloads in game-state.ts. Only ever placed on
+  // a wall tile with FLOOR directly below it, because that is the only wall the
+  // renderer gives a camera-facing face to (see Tile.tsx's isFloorBelow), so the crack
+  // is always readable. The real seal is bracketed left and right by WALL_TORCHes;
+  // decoys are bare. That torch-pair grammar is the whole tell.
+  WALL_SEAL = 65,
 }
 
 /**

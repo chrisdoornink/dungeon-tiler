@@ -1,7 +1,6 @@
 import type { PlainEnemy } from "../enemy";
 import { Enemy, EnemyState } from "../enemy";
-import type { MapData } from "./types";
-import { TileSubtype } from "./constants";
+import type { MapData, PotOverrides } from "./types";
 import {
   clonePlainNPCs as clonePlainNPCsUtil,
   type PlainNPC,
@@ -63,8 +62,8 @@ export function clonePlainNPCs(
 }
 
 export function clonePotOverrides(
-  overrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>
-): Record<string, TileSubtype.FOOD | TileSubtype.MED> | undefined {
+  overrides?: PotOverrides
+): PotOverrides | undefined {
   if (!overrides) return undefined;
   return { ...overrides };
 }

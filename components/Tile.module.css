@@ -633,6 +633,35 @@
   opacity: 1;
 }
 
+/* Sealed doorway (WALL_SEAL): the abyss crack decal reused on a wall's face to read as
+   a walled-up entrance. Anchored to the lower 60% of the tile because the forced
+   perspective in the wall branch puts the visible stone face there — a centered decal
+   would sit on the wall's top cap and read as floor damage instead of masonry. Kept
+   subtle (screen blend at partial opacity) so the two bracketing wall torches remain
+   the thing that catches the eye at fog-of-war distance, not the crack itself. */
+.wallSealIcon {
+  position: absolute;
+  left: 15%;
+  bottom: 4%;
+  width: 70%;
+  height: 58%;
+  z-index: 2;
+  background-size: contain;
+  background-position: center bottom;
+  background-repeat: no-repeat;
+  opacity: 0.72;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.wallSealVariantA {
+  background-image: url("/images/floor/cracks-1.png");
+}
+
+.wallSealVariantB {
+  background-image: url("/images/floor/cracks-2.png");
+}
+
 /* Darkness tile: dark pit when faulty floor collapses */
 .darkness {
   background-color: #0a0a0a;

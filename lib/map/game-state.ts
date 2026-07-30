@@ -34,7 +34,13 @@ import {
   WALL,
   type RoomId,
 } from "./constants";
-import type { MapData, RoomSnapshot, RoomTransition } from "./types";
+import type {
+  MapData,
+  PotOverrides,
+  RoomSnapshot,
+  RoomTransition,
+  SealPayloads,
+} from "./types";
 import {
   cloneMapData,
   clonePlainEnemies,
@@ -55,7 +61,10 @@ import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
 import {
   rollBossEntranceKind,
+  rollDecoySealCount,
+  sealCoords,
   stampBossEntranceOnFloor,
+  stampDecoySeals,
   arenaSeedForEntrance,
   type BossEntranceKind,
 } from "../bosses/boss_entrances";
@@ -138,6 +147,11 @@ function breakPotReleasingContents(
     .filter((s) => s !== TileSubtype.POT)
     .concat([reveal]);
   return { spawnedSnake: null, potOverrides };
+}
+
+/** Drop an empty seal-payload map to undefined, so state stays clean when nothing rolled. */
+function orUndefined(payloads: SealPayloads): SealPayloads | undefined {
+  return Object.keys(payloads).length > 0 ? payloads : undefined;
 }
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
@@ -1220,6 +1234,10 @@ export function detonateLiveBombs(state: GameState): GameState {
   // enemy kills) to avoid re-processing a stale, previously-defeated enemy.
   let snakePotKills = 0;
   let playerHit = false;
+  // Sealed doorways opened by this blast. Their payloads are stamped AFTER the
+  // destruction pass below, so the same blast that clears the wall can't also wipe the
+  // pot or cave mouth it just uncovered.
+  const openedSeals: Array<[number, number]> = [];
 
   for (const [cy, cx] of liveCenters) {
     blastCenters.push([cy, cx]);
@@ -1237,12 +1255,21 @@ export function detonateLiveBombs(state: GameState): GameState {
         const wasTree = newMapData.tiles[y][x] === TREE;
         const wasWall =
           newMapData.tiles[y][x] === WALL || wasTree;
-        const openedWall = wasWall && !isProtected;
+        // A torch-bearing wall is set stone and shrugs the blast off. This is what keeps
+        // a sealed doorway's two bracketing torches standing: the bomb rests directly
+        // below the seal, so its 3x3 covers them, and without this the whole motif would
+        // blow into one anonymous 3-wide hole instead of an unsealed door between torches.
+        const isTorchWall =
+          newMapData.tiles[y][x] === WALL && subs.includes(TileSubtype.WALL_TORCH);
+        const openedWall = wasWall && !isProtected && !isTorchWall;
         if (openedWall) {
           newMapData.tiles[y][x] = FLOOR;
           wallsDestroyed += 1;
           if (wasTree) treesDestroyed += 1;
+          if (subs.includes(TileSubtype.WALL_SEAL)) openedSeals.push([y, x]);
         }
+        // A torch wall survives intact — no scorch, no stripped overlays.
+        if (isTorchWall) continue;
 
         // Damage enemies caught in the blast. Most die; tough enemies (stone goblin,
         // 8 HP) can survive a single bomb.
@@ -1335,6 +1362,35 @@ export function detonateLiveBombs(state: GameState): GameState {
   stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
   stats.treesDestroyed = (stats.treesDestroyed ?? 0) + treesDestroyed;
 
+  // Unseal any doorway this blast opened. Done after the destruction pass so what the
+  // seal was hiding lands on already-cleared floor: the real doorway becomes a lockless
+  // BOSS_ENTRANCE cave mouth, a decoy becomes a pot holding pink-realm fruit or food.
+  // SINGED is dropped so the reward reads cleanly, and BREACH with it: a seal on the
+  // fallback boundary row would otherwise be tagged as a hole in the dungeon's shell and
+  // walk the hero out to the grassland instead of into what was walled up behind it.
+  let sealPayloads = state.sealPayloads;
+  let potOverrides = state.potOverrides;
+  for (const [y, x] of openedSeals) {
+    const key = `${y},${x}`;
+    const payload = sealPayloads?.[key];
+    if (!payload) continue;
+    const kept = (newMapData.subtypes[y][x] || []).filter(
+      (s) => s !== TileSubtype.SINGED && s !== TileSubtype.BREACH
+    );
+    if (payload === "boss") {
+      newMapData.subtypes[y][x] = kept.concat([TileSubtype.BOSS_ENTRANCE]);
+    } else {
+      newMapData.subtypes[y][x] = kept.concat([TileSubtype.POT]);
+      potOverrides = {
+        ...(potOverrides ?? {}),
+        [key]: payload === "berry" ? TileSubtype.BERRY : TileSubtype.FOOD,
+      };
+    }
+    const next = { ...(sealPayloads ?? {}) };
+    delete next[key];
+    sealPayloads = Object.keys(next).length ? next : undefined;
+  }
+
   let heroHealth = state.heroHealth;
   let bonusHearts = state.bonusHearts;
   let deathCause = state.deathCause;
@@ -1361,6 +1417,8 @@ export function detonateLiveBombs(state: GameState): GameState {
     bonusHearts,
     deathCause,
     recentBombBlasts: blastCenters,
+    sealPayloads,
+    potOverrides,
   };
 
   // Process story events for ONLY the enemies this blast defeated (no-op outside story
@@ -1622,7 +1680,11 @@ export interface GameState {
   rooms?: Record<RoomId, RoomSnapshot>;
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
-  potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
+  potOverrides?: PotOverrides;
+  // What each WALL_SEAL on this floor hides, keyed by `${y},${x}`. Deliberately held
+  // here instead of on the tile so every seal looks identical until it is blown open
+  // (see SealPayload). Consumed by detonateLiveBombs and reset on each new floor.
+  sealPayloads?: SealPayloads;
   lastCheckpoint?: CheckpointSnapshot;
   // Portal state for snake medallion
   portalLocation?: {
@@ -1651,8 +1713,6 @@ export interface GameState {
   // inBossRoom: transient, true while the hero is inside a boss arena.
   // reachedBossRoom: run-level latch, true once a boss arena was entered this run.
   // bossArenaSeed: which elemental Shaper arena to build on entry (defaults lava).
-  // outsideHasBossEntrance: when true, the outside world built from this floor
-  // carves a hidden boss entrance in its far tree wall (a boss-day marker).
   inBossRoom?: boolean;
   reachedBossRoom?: boolean;
   // Latches when the Shaper dies (gold key dropped). Run-level, so the endgame can
@@ -1667,7 +1727,6 @@ export interface GameState {
   // hero leaving) so future boss variety is reportable per run from day one.
   bossKind?: "shaper";
   bossArenaSeed?: "water" | "lava";
-  outsideHasBossEntrance?: boolean;
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -1980,6 +2039,13 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
   const mapData = generateCompleteMapForFloor(floorAlloc, floor);
 
+  // Decoy cracks, 0-2, on every floor including this one. On floor 1 the hero has no
+  // bombs at all, so a crack here is pure intrigue — it teaches the motif before it can
+  // ever be used. (The real sealed doorway is floor 3 only; see advanceToNextFloor.)
+  const sealPayloads = orUndefined(
+    stampDecoySeals(mapData, rollDecoySealCount())
+  );
+
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
     ? placeEnemies({
@@ -2040,6 +2106,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     currentFloor: floor,
     maxFloors: 3,
     mapData: withRunes,
+    sealPayloads,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN,
@@ -2156,6 +2223,8 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // every player gets the same one. Null on a bombless-unlucky roll or when the floor
   // had no safe spot for it — that day is simply bossless.
   let bossEntrance: BossEntranceKind | null = null;
+  // What each WALL_SEAL on a bomb day hides (empty on the other entrance kinds).
+  let sealPayloads: SealPayloads | undefined;
   // Ghosts guaranteed on a douse day (they're how you go dark, and the tell).
   const DOUSE_DAY_MIN_GHOSTS = 3;
 
@@ -2179,8 +2248,23 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         (a) => (a.chestContents ?? []).includes(TileSubtype.BOMB)
       );
       const kind = rollBossEntranceKind({ bombAvailable });
-      if (kind && stampBossEntranceOnFloor(mapData, kind)) bossEntrance = kind;
+      if (kind) {
+        const stamped = stampBossEntranceOnFloor(mapData, kind);
+        if (stamped.placed) {
+          bossEntrance = kind;
+          sealPayloads = stamped.sealPayloads;
+        }
+      }
     }
+    // Decoy cracks, 0-2, on EVERY floor — independent of the boss roll, so a floor can
+    // carry cracks with no doorway behind any of them and a bomb day can roll none at
+    // all. Placed after the doorway so they keep their distance from it.
+    const decoys = stampDecoySeals(
+      mapData,
+      rollDecoySealCount(),
+      sealPayloads ? sealCoords(sealPayloads) : []
+    );
+    sealPayloads = orUndefined({ ...(sealPayloads ?? {}), ...decoys });
     return mapData;
   });
 
@@ -2281,13 +2365,13 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
-    // Boss room for the day: which elemental arena the entrance opens into, and (for
-    // the bomb entrance) permission for the outside world to carve its hidden mouth.
-    // bossEntranceKind is persisted even if the hero never finds the entrance, so
-    // analytics can report what kind of door the day actually had.
+    // Boss room for the day: which elemental arena the entrance opens into, and (on a
+    // bomb day) what each sealed wall tile hides. bossEntranceKind is persisted even if
+    // the hero never finds the entrance, so analytics can report what kind of door the
+    // day actually had.
     bossEntranceKind: bossEntrance ?? undefined,
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
-    outsideHasBossEntrance: bossEntrance === "bomb",
+    sealPayloads,
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -2589,8 +2673,7 @@ function enterOutsideWorld(
   const { mapData: outsideMap, enemies: outsideEnemies, entry } = buildOutsideWorld(
     direction,
     width,
-    height,
-    { bossEntrance: state.outsideHasBossEntrance }
+    height
   );
   const dungeonReturn = {
     mapData: removePlayerFromMapData(state.mapData),
