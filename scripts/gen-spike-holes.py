@@ -40,8 +40,12 @@ SOCKET_SHADE = (26, 20, 14)  # the far inside wall, catching a little light
 # brightness is simply gone at the brightness the player sees it — the first pass used a
 # collar around (96,79,56) and read as a flat black rectangle on screen. Judge this art
 # DIMMED, not at 100%.
-SOCKET_RIM_LIT = (186, 160, 118)
-SOCKET_RIM_DIM = (104, 86, 62)
+# Dulled deliberately. The first version that was actually visible was also the first one that
+# looked wrong — a bright warm tan that read as yellow jewellery sitting on the floor. These
+# are still ~4x the pit's luminance at the dimmest FOV tier, which is all the contrast the
+# rings need, but they now read as lit stone rather than as gold.
+SOCKET_RIM_LIT = (128, 112, 88)
+SOCKET_RIM_DIM = (82, 70, 54)
 
 
 def sat(c):
@@ -107,18 +111,26 @@ def main():
 
     # Merge sockets that sit on top of each other. At 32px, nine sockets of any useful size
     # cannot all be distinct, and overlapping ones used to destroy each other's collars.
-    MIN_SEP = 3.2
+    # Separation is measured with x weighted DOWN, because the ovals are wide and flat: two
+    # sockets side by side collide long before two stacked ones do.
+    MIN_SEP = 3.4
     kept = []
     for cx, cy, wd in sorted(sockets, key=lambda t: -t[2]):  # widest foot wins its spot
-        if all((cx - kx) ** 2 + (cy - ky) ** 2 >= MIN_SEP ** 2 for kx, ky, _ in kept):
+        if all(
+            ((cx - kx) / 1.6) ** 2 + (cy - ky) ** 2 >= (MIN_SEP / 1.6) ** 2
+            for kx, ky, _ in kept
+        ):
             kept.append((cx, cy, wd))
     sockets = kept
 
+    # SQUASHED, not round. The camera looks at the floor from a shallow angle, so a circular
+    # socket presents as a horizontally-stretched oval — near enough 2:1. Drawing them round
+    # made them read as beads sitting on top of the ground rather than holes in it.
     # TWO PASSES, and this is the crux. Painting each socket completely before starting the
     # next let a later socket's dark interior overwrite an earlier one's bright collar, so the
     # tile ended up with 20 stray bright pixels instead of rings — invisible in game. Interiors
     # go down first; collars go on top and always win, so every ring stays unbroken.
-    RX, RY = 2.1, 1.6
+    RX, RY = 2.6, 1.3
 
     def ellipse(cx, cy, scale):
         for y in range(h):

@@ -862,6 +862,11 @@
    iron pixel with bare ground directly beneath — and stamps a socket at each. Regenerate with
    `python3 scripts/gen-spike-holes.py` if .spikes is ever retouched.
 
+   The sockets are SQUASHED ovals, roughly 2:1. The camera looks at the floor from a shallow
+   angle, so a round hole presents as a horizontally-stretched one; drawn circular they read as
+   beads sitting on the ground rather than holes in it. The collar is likewise duller than the
+   first legible version, which was a bright warm tan and read as gold jewellery.
+
    Four things were wrong on the first attempts and are worth not repeating: sizing each socket
    to the spike that made it produced 9px holes that merged into one wavy trench; near-black
    sockets on the unmodified pit colour were invisible, so legibility comes from a lit COLLAR
@@ -873,7 +878,7 @@
 .spikeHoles {
   position: relative;
   background-color: #211a14;
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAB8klEQVR42uVWMWvCQBQ+Q7AIgiLYDhlKHQuBDp3EqUs7SMGltJsEpE4dRCj4AwJd3AqK4Fro4uKge3BKp4CjksGhpQgnocEMpcOzx/GSXKOYqY8Ml9x937v33vcul6jflEicJhNCTMuOif1cPZZhNFss985eUHKbCMAy6dQe2anjwkAiMdu/ckAdl2V2O5lGtN1UIEVRQlwpirhlto+urnV1bZcaBCIZbyad6ura2vOqzU612Vl73mXpNNiBPycCJIrvk36xJ7TIPIY6LrwiAJrdXUViPJq9b/WVfBbiGxvTsTEVOYBEAYUAyS8D42dFDvx7D0QGhoi8mpYt7/dgYNRsEPtZJPNaZhXbigKAYSiZLao2OzC+vjhDSQ/zDahAIEBaTy8y/C/LtTaD9QcTJZ9FLGG+/V2CvErw8xz2GmyFVinygHKtzVq0P5hESRrf1ZsU3T48M160x2GvweLTKkV+VtAlzBL1m5Jp2bPFUtC67AgKpAjsAICY1jxSHwh4w/rudfSGry1RZBNRsjxQDlwkkM2fqmVA05rjGqhSkhAyev/gYVdHh4QQ69sTu6eO67hrHphOHRSUnMRXyVhRY0WRZOEjdVxVSqpSEqkWPkKFERBqsInAd2k9+T0O52hKf7zjVYsW+IGJba/vpmUL3PvtB1y4QfN1hEnvAAAAAElFTkSuQmCC");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABwUlEQVR42mPMCLNhoCVgYWBgOHP5IY1MN9GVZ4Gw7j19R3XTlaSFoD6AAH4eTiqa/vHLdwiDiYHGYERZ8PHLd3jIkpZMiQTkpQImYlICrYKISCfjdwcTqekaU4SfhzM+zOXnr19wZKijhN0CTFPgOjnYmNF0wv0XH+bSNnXNm4/f4GjL/nMOFtpYLEAOk49fvmPVCbED2SkLV+2pyg5BNsfH0ejAiasEgoifhxOrzvNX7mFGz8JVe6RFBeAIogZnMoW4DmIERCdcClknsjLS8gGRiQerMjRbz1x+yELdggFuNJxBr7KIupUBugU+7tbIOcVQRwk5veMBePIXeiS3TV0DF9qy/5yPoxHcCAYGhllLtkG4FkYa8LQEySXIZkE06mkpQdQ/e/0LEURwE9HYELuRMxr+/KWnpYSWNxkzwmzOXH547+k7rNEQH+Zy6do9uLkQu5FzA1YtyD4jYAGptTzckI9fvqO3KqiVA+hUJ8PtY8EMQVzJhmCSxdT46PFzFB/oMrFhTTYQcYgpeHIM1vTGhBxLRz59xJpkj3z6+PHLdzzWQ2IYa1qHpiIiQ9bH3Roz1T56/ByPFkZSm++kNsUBPodNiIEX8JEAAAAASUVORK5CYII=");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
