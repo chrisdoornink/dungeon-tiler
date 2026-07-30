@@ -2054,9 +2054,18 @@ export const Tile: React.FC<TileProps> = ({
           style={{
             // Elemental terrain supplies its own pixel-art background via the CSS
             // class; an inline floor-asset image here would override it (that override
-            // is why lava first rendered as a bare framed square). Leave it unset.
+            // is why lava first rendered as a bare framed square, and later why retracted
+            // spike beds rendered as plain floor). Leave it unset. ANY new terrain that
+            // paints itself from a CSS class must be added here or it will silently lose
+            // to this inline style — the class is not the thing that wins.
             backgroundImage:
-              isLava || isObsidian || isShallowWater || isDeepWater || isSteppingStone || isSpikes
+              isLava ||
+              isObsidian ||
+              isShallowWater ||
+              isDeepWater ||
+              isSteppingStone ||
+              isSpikes ||
+              isSpikeHoles
                 ? undefined
                 : `url(${floorAsset})`,
             backgroundSize: "cover",
