@@ -105,21 +105,39 @@ def main():
     for x, y in metal:
         dst[x, y] = PIT_FILL
 
-    # Deliberately SMALL and fixed-size. Scaling the socket to the spike that made it looked
-    # right in the arithmetic and wrong on screen: at 32px a 5px-wide spike produced a 9px
-    # socket, six of those touched, and the row read as one continuous wavy trench instead of
-    # discrete holes. A hole wants to be a couple of pixels across and clearly separate.
-    RX, RY = 2.0, 1.5
-    for cx, cy, _width in sockets:
+    # Merge sockets that sit on top of each other. At 32px, nine sockets of any useful size
+    # cannot all be distinct, and overlapping ones used to destroy each other's collars.
+    MIN_SEP = 3.2
+    kept = []
+    for cx, cy, wd in sorted(sockets, key=lambda t: -t[2]):  # widest foot wins its spot
+        if all((cx - kx) ** 2 + (cy - ky) ** 2 >= MIN_SEP ** 2 for kx, ky, _ in kept):
+            kept.append((cx, cy, wd))
+    sockets = kept
+
+    # TWO PASSES, and this is the crux. Painting each socket completely before starting the
+    # next let a later socket's dark interior overwrite an earlier one's bright collar, so the
+    # tile ended up with 20 stray bright pixels instead of rings — invisible in game. Interiors
+    # go down first; collars go on top and always win, so every ring stays unbroken.
+    RX, RY = 2.1, 1.6
+
+    def ellipse(cx, cy, scale):
         for y in range(h):
             for x in range(w):
-                nx, ny = (x - cx) / RX, (y - cy) / RY
+                nx, ny = (x - cx) / (RX * scale), (y - cy) / (RY * scale)
                 d = nx * nx + ny * ny
                 if d <= 1.0:
-                    dst[x, y] = SOCKET_DARK if ny > -0.4 else SOCKET_SHADE
-                elif d <= 1.75:
-                    # Collar all the way round, lit from the upper left.
-                    dst[x, y] = SOCKET_RIM_LIT if (ny + nx) < 0 else SOCKET_RIM_DIM
+                    yield x, y, nx, ny
+
+    for cx, cy, _wd in sockets:
+        for x, y, _nx, ny in ellipse(cx, cy, 1.0):
+            dst[x, y] = SOCKET_DARK if ny > -0.35 else SOCKET_SHADE
+
+    for cx, cy, _wd in sockets:
+        inner = {(x, y) for x, y, _, _ in ellipse(cx, cy, 1.0)}
+        for x, y, nx, ny in ellipse(cx, cy, 1.42):
+            if (x, y) in inner:
+                continue
+            dst[x, y] = SOCKET_RIM_LIT if (ny + nx) < 0 else SOCKET_RIM_DIM
 
     buf = io.BytesIO()
     out.save(buf, format="PNG", optimize=True)
