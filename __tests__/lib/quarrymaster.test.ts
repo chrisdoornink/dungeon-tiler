@@ -371,6 +371,26 @@ describe("switches and cage gates", () => {
     expect(after.gateGroups?.[1].open).toBe(false);
   });
 
+  test("walking over a retracted bed does not wipe its sockets", () => {
+    // Regression: SPIKE_HOLES was missing from the step-on preserve list in movePlayerCore,
+    // so standing on a retracted bed replaced the tile's subtypes with just PLAYER. The mark
+    // recording a thrown switch was erased the first time anyone walked the lane it opened —
+    // i.e. always, since opening the lane is the whole reason to walk there.
+    const { grid, subs } = openRoom(5);
+    subs[1][1].push(TileSubtype.PLAYER);
+    subs[1][2].push(TileSubtype.SPIKE_HOLES);
+    const state = baseState({ tiles: grid, subtypes: subs });
+
+    const onIt = movePlayer(state, Direction.RIGHT);
+    expect(onIt.mapData.subtypes[1][2]).toContain(TileSubtype.SPIKE_HOLES);
+    expect(onIt.mapData.subtypes[1][2]).toContain(TileSubtype.PLAYER);
+
+    // ...and it is still there once the hero walks off again.
+    const offIt = movePlayer(onIt, Direction.RIGHT);
+    expect(offIt.mapData.subtypes[1][2]).toContain(TileSubtype.SPIKE_HOLES);
+    expect(offIt.mapData.subtypes[1][2]).not.toContain(TileSubtype.PLAYER);
+  });
+
   test("pressing a switch does not mutate the pre-move state's gate groups", () => {
     const { grid, subs } = openRoom(5);
     subs[1][1].push(TileSubtype.PLAYER);

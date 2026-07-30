@@ -4262,6 +4262,11 @@ function movePlayerCore(
       // Pressure plates are floor switches the hero stands ON to hold/throw them.
       destSubtypes.includes(TileSubtype.PRESSURE_PLATE) ||
       destSubtypes.includes(TileSubtype.PRESSURE_PLATE_PRESSED) ||
+      // Retracted spike beds are walkable floor decals. Without this the hero standing on
+      // one replaces the tile's subtypes with just PLAYER, so the sockets are erased for
+      // good the first time anyone walks the opened lane — the mark that records a thrown
+      // switch would vanish exactly when the player used it.
+      destSubtypes.includes(TileSubtype.SPIKE_HOLES) ||
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
       destSubtypes.includes(TileSubtype.CHEST) ||
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||

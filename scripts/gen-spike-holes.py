@@ -31,13 +31,17 @@ if len(sys.argv) > 1:
 # so the tile read as a stain rather than as clean ground. Contrast comes from the socket
 # collars instead, which are far brighter than anything else in the tile.
 PIT_FILL = (33, 26, 20)
-SOCKET_DARK = (8, 6, 4)      # the void
-SOCKET_SHADE = (22, 17, 12)  # the far inside wall, catching a little light
-# A full collar around each socket, brighter on the lit (upper-left) arc. At this scale the
-# eye reads a hole by its rim rather than by the darkness inside it, so the collar is what
-# actually makes these legible — an upper-arc-only lip was far too subtle.
-SOCKET_RIM_LIT = (96, 79, 56)
-SOCKET_RIM_DIM = (58, 47, 34)
+SOCKET_DARK = (6, 5, 4)      # the void
+SOCKET_SHADE = (26, 20, 14)  # the far inside wall, catching a little light
+# A full collar around each socket, brighter on the lit (upper-left) arc.
+#
+# These are FAR brighter than the pit they sit in, and that is the point. In game these tiles
+# are dimmed by the field-of-view filter to 55-80% brightness, so anything subtle at full
+# brightness is simply gone at the brightness the player sees it — the first pass used a
+# collar around (96,79,56) and read as a flat black rectangle on screen. Judge this art
+# DIMMED, not at 100%.
+SOCKET_RIM_LIT = (186, 160, 118)
+SOCKET_RIM_DIM = (104, 86, 62)
 
 
 def sat(c):
@@ -105,7 +109,7 @@ def main():
     # right in the arithmetic and wrong on screen: at 32px a 5px-wide spike produced a 9px
     # socket, six of those touched, and the row read as one continuous wavy trench instead of
     # discrete holes. A hole wants to be a couple of pixels across and clearly separate.
-    RX, RY = 1.45, 1.05
+    RX, RY = 2.0, 1.5
     for cx, cy, _width in sockets:
         for y in range(h):
             for x in range(w):
@@ -113,7 +117,7 @@ def main():
                 d = nx * nx + ny * ny
                 if d <= 1.0:
                     dst[x, y] = SOCKET_DARK if ny > -0.4 else SOCKET_SHADE
-                elif d <= 1.85:
+                elif d <= 1.75:
                     # Collar all the way round, lit from the upper left.
                     dst[x, y] = SOCKET_RIM_LIT if (ny + nx) < 0 else SOCKET_RIM_DIM
 
