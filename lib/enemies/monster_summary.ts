@@ -80,6 +80,17 @@ const GROUP_DEFS: GroupDef[] = [
     rep: "shaper",
     kinds: ["shaper"],
   },
+  // Registered ahead of use: the Quarrymaster is prototype-only for now (/test-quarrymaster,
+  // not in the daily rotation), and a kind with no group here is silently dropped from the
+  // kill tally rather than erroring — exactly the sort of gap that would go unnoticed on
+  // the day he joins the rotation. Pick + hammer for the thing that quarries the floor.
+  {
+    key: "quarrymaster",
+    label: "The Quarrymaster",
+    emoji: "⛏️💀🪨",
+    rep: "quarrymaster",
+    kinds: ["quarrymaster"],
+  },
 ];
 
 // Reverse lookup: enemy kind -> its group definition.

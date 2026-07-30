@@ -4,8 +4,13 @@ import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
 import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
 import { fisherUpdate, FISHER_HP, FISHER_ATTACK } from "../bosses/fisher";
+import {
+  quarrymasterUpdate,
+  QUARRYMASTER_HP,
+  QUARRYMASTER_ATTACK,
+} from "../bosses/quarrymaster";
 import { assetUrl } from "../asset_url";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher" | "quarrymaster";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -33,6 +38,19 @@ export interface BehaviorContext {
   rng?: () => number;
   // actions
   setPlayerTorchLit?: (lit: boolean) => void;
+  /**
+   * Summon an enemy — the boss-adds channel. Returns false when the tile is taken (the
+   * hero, a live enemy, or another newborn from this same tick), so a summoner can try
+   * its next candidate tile. Newborns are buffered by the engine and appended after every
+   * existing enemy has ticked, so a summon never acts on the turn it appears.
+   * Absent when a behavior is driven outside `updateEnemies` (tests, tooling).
+   */
+  spawnEnemy?: (spec: {
+    y: number;
+    x: number;
+    kind: EnemyKind;
+    memory?: Record<string, unknown>;
+  }) => boolean;
   // current enemy snapshot with a mutable memory bag persisted by engine
   enemy: {
     y: number;
@@ -1273,6 +1291,28 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
       customUpdate: fisherUpdate,
+    },
+  },
+  "quarrymaster": {
+    kind: "quarrymaster",
+    displayName: "The Quarrymaster",
+    assets: {
+      // PLACEHOLDER ART: the stone goblin's sprite set, which is the green-goblin art
+      // (the filenames don't match the kind — there are no stone-goblin-*.png files).
+      // Reused because it reads as a heavy earth-coloured brute, i.e. plausibly the thing
+      // breaking the floor. Needs its own sprite; see the feature doc's deferred list.
+      front: assetUrl("/images/enemies/fire-goblin/green-goblin-front.png"),
+      left: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
+      right: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
+      back: assetUrl("/images/enemies/fire-goblin/green-goblin-back.png"),
+    },
+    base: { health: QUARRYMASTER_HP, attack: QUARRYMASTER_ATTACK },
+    // Ordinary melee, ordinary HP. Reaching him past the cage gates is the whole fight;
+    // two or three swings and he is done.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: quarrymasterUpdate,
     },
   },
 };

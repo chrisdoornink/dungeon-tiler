@@ -197,7 +197,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
+  enemyKind?: EnemyKind;
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   // Fisher only: which pose sprite to draw instead of the facing sprite.
   //   'cocked'  - spear drawn back, throw lands next turn. The fight's ONLY tell, since
@@ -446,6 +446,12 @@ export const Tile: React.FC<TileProps> = ({
         return "ROAD_ROTATE_270";
       case TileSubtype.OPEN_ABYSS:
         return "OPEN_ABYSS";
+      case TileSubtype.PRESSURE_PLATE:
+        return "PRESSURE_PLATE";
+      case TileSubtype.PRESSURE_PLATE_PRESSED:
+        return "PRESSURE_PLATE_PRESSED";
+      case TileSubtype.SPIKE_HOLES:
+        return "SPIKE_HOLES";
       default:
         return String(s);
     }
@@ -555,6 +561,16 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
   };
 
+  // Switch-and-gate puzzle pieces. PLACEHOLDER ART for both: the plate reuses the
+  // existing switch sprite (tinted, and dimmed once thrown) and the cage gate is drawn
+  // in CSS as bars over the wall face — no sprite yet. See the feature doc's deferred list.
+  const hasPressurePlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE) || false;
+  };
+  const hasPressedPlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE_PRESSED) || false;
+  };
+
   // Check if a tile has a key subtype
   const hasKey = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.KEY) || false;
@@ -632,6 +648,10 @@ export const Tile: React.FC<TileProps> = ({
   };
   const hasSpikes = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SPIKES) || false;
+  };
+  // Retracted spikes: walkable, and the standing record that a switch was thrown.
+  const hasSpikeHoles = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SPIKE_HOLES) || false;
   };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
@@ -813,6 +833,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.PINK_RING &&
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
+        // Plates and cage gates have their own overlays above/in the wall branch.
+        subtype !== TileSubtype.PRESSURE_PLATE &&
+        subtype !== TileSubtype.PRESSURE_PLATE_PRESSED &&
+        subtype !== TileSubtype.SPIKE_HOLES &&
+        subtype !== TileSubtype.SPAWN_POD &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
         subtype !== TileSubtype.LAVA &&
@@ -944,6 +969,34 @@ export const Tile: React.FC<TileProps> = ({
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Floor switch. Unthrown reads bright and pulses (it is the objective); thrown
+            goes flat and dark so a glance across the room counts your progress. */}
+        {hasPressurePlate(subtypes) && (
+          <div
+            key="pressure-plate"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE}`}
+            className={`${styles.assetIcon} ${styles.switchIcon} ${styles.plateArmed}`}
+          />
+        )}
+        {hasPressedPlate(subtypes) && (
+          <div
+            key="pressure-plate-pressed"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
+            className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Spawn pod: the mouth summons climb out of. PLACEHOLDER — drawn in CSS as a dark
+            ringed hole so its position is legible while the real asset is undecided. */}
+        {subtypes?.includes(TileSubtype.SPAWN_POD) && (
+          <div
+            key="spawn-pod"
+            data-testid={`subtype-icon-${TileSubtype.SPAWN_POD}`}
+            className={styles.spawnPod}
+            aria-hidden="true"
           />
         )}
 
@@ -1937,12 +1990,15 @@ export const Tile: React.FC<TileProps> = ({
       const isDeepWater = hasDeepWater(subtype);
       const isSteppingStone = hasSteppingStone(subtype);
       const isSpikes = hasSpikes(subtype);
+      const isSpikeHoles = hasSpikeHoles(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
         ? styles.openAbyss
         : isSpikes
         ? styles.spikes
+        : isSpikeHoles
+        ? styles.spikeHoles
         : isLava
         ? styles.lava
         : isObsidian
@@ -1998,9 +2054,18 @@ export const Tile: React.FC<TileProps> = ({
           style={{
             // Elemental terrain supplies its own pixel-art background via the CSS
             // class; an inline floor-asset image here would override it (that override
-            // is why lava first rendered as a bare framed square). Leave it unset.
+            // is why lava first rendered as a bare framed square, and later why retracted
+            // spike beds rendered as plain floor). Leave it unset. ANY new terrain that
+            // paints itself from a CSS class must be added here or it will silently lose
+            // to this inline style — the class is not the thing that wins.
             backgroundImage:
-              isLava || isObsidian || isShallowWater || isDeepWater || isSteppingStone || isSpikes
+              isLava ||
+              isObsidian ||
+              isShallowWater ||
+              isDeepWater ||
+              isSteppingStone ||
+              isSpikes ||
+              isSpikeHoles
                 ? undefined
                 : `url(${floorAsset})`,
             backgroundSize: "cover",
@@ -2432,6 +2497,7 @@ export const Tile: React.FC<TileProps> = ({
               aria-hidden="true"
             />
           )}
+
 
           {/* Exaggerated base shadow when standing in front of floor */}
           {isFloorBelow && (

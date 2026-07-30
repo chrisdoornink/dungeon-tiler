@@ -1,6 +1,7 @@
 import { canSee } from "./line_of_sight";
-import { EnemyRegistry, BehaviorContext } from "./enemies/registry";
+import { EnemyRegistry, BehaviorContext, EnemyKind } from "./enemies/registry";
 import { orderPursuitSteps } from "./enemies/pursuit";
+import { QUARRYMASTER_HP, QUARRYMASTER_ATTACK } from "./bosses/quarrymaster";
 
 export const ENEMY_PURSUIT_TTL = 5;
 // Maximum vision radius for enemies, measured in Manhattan distance.
@@ -51,12 +52,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher' = 'fire-goblin';
+  private _kind: EnemyKind = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher') {
+  get kind(): EnemyKind { return this._kind; }
+  set kind(k: EnemyKind) {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -111,6 +112,12 @@ export class Enemy {
       // which only lands on a telegraphed lane you failed to step out of.
       this.health = 8;
       this.attack = 2;
+    } else if (k === 'quarrymaster') {
+      // The Quarrymaster boss: deliberately no tougher than a spear goblin. The fight
+      // is his summons and his crumbling floor, not his statline — once you are through
+      // the cage gates and standing next to him he goes down in a few swings.
+      this.health = QUARRYMASTER_HP;
+      this.attack = QUARRYMASTER_ATTACK;
     }
     this.maxHealth = this.health;
   }
@@ -368,7 +375,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher',
+  kind: EnemyKind,
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -392,7 +399,9 @@ function isSafeFloorForEnemy(
                               tileSubs.includes(22) || // CHECKPOINT
                               tileSubs.includes(36);   // BOOKSHELF
 
-  // Always avoid open abysses
+  // Always avoid open abysses. A crack that has already given way is a visible hole, and
+  // nothing walks into one on purpose — falling in is what FAULTY_FLOOR is for (a chasing
+  // goblin steps on the hidden crack, it opens, and thereafter everyone routes around it).
   if (isOpenAbyss) return false;
 
   // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
@@ -504,8 +513,8 @@ export type PlainEnemy = {
   id?: string;
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
+  kind?: EnemyKind;
+  _kind?: EnemyKind;
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -528,8 +537,12 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper' || k === 'fisher') {
-      e.kind = k;
+    // Validate against the registry rather than a hand-written list. The list version
+    // silently dropped any kind nobody remembered to add to it — a rehydrated enemy would
+    // come back as a default fire-goblin — and it needed editing for every new boss, which
+    // is exactly what conflicted when the Fisher and the Quarrymaster landed together.
+    if (k && Object.prototype.hasOwnProperty.call(EnemyRegistry, k)) {
+      e.kind = k as EnemyKind;
     }
     // Preserve health/attack if present after kind effects
     if (typeof d?.health === 'number') e.health = d.health;
@@ -663,7 +676,24 @@ export function updateEnemies(
   occupied.add(`${player.y},${player.x}`);
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
-  for (let i = 0; i < enemies.length; i++) {
+  // Boss adds. Buffered rather than pushed straight onto `enemies` so a newborn never
+  // acts on the turn it appears (the loop bound is captured below) and so it can't be
+  // spawned into a tile another enemy is still about to vacate. Appended after the tick.
+  const spawned: Enemy[] = [];
+  const spawnEnemy: NonNullable<BehaviorContext['spawnEnemy']> = (spec) => {
+    const key = `${spec.y},${spec.x}`;
+    // A summon may NOT land on the hero, on a live enemy, or on another newborn.
+    if (occupied.has(key)) return false;
+    if (spawned.some((s) => s.y === spec.y && s.x === spec.x)) return false;
+    const born = new Enemy({ y: spec.y, x: spec.x });
+    born.kind = spec.kind;
+    if (spec.memory) Object.assign(born.behaviorMemory, spec.memory);
+    spawned.push(born);
+    occupied.add(key);
+    return true;
+  };
+  const initialCount = enemies.length;
+  for (let i = 0; i < initialCount; i++) {
     const e = enemies[i];
     // Skip enemies marked for skip (e.g., about to die to a player's projectile this turn).
     // Skipped enemies do not move, attack, or trigger proximity hooks.
@@ -705,6 +735,7 @@ export function updateEnemies(
         rng,
         setPlayerTorchLit: finalOpts?.setPlayerTorchLit,
         mist: finalOpts?.mist,
+        spawnEnemy,
         enemy: enemyCtx,
       });
       // Write back any mutations from customUpdate
@@ -758,7 +789,10 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin') {
+        // The Quarrymaster is in this bucket on purpose: he is meant to hit like a spear
+        // goblin, and the 'other' branch below hands out a 25% +2 crit that would make
+        // him spikier than his whole design brief allows.
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'quarrymaster') {
           // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
           variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
         } else {
@@ -810,6 +844,9 @@ export function updateEnemies(
       finalOpts.setPlayerTorchLit(false);
     }
   }
+
+  // Newborns join the roster now that every existing enemy has taken its tick.
+  if (spawned.length > 0) enemies.push(...spawned);
 
   // Backward-compatible return: if called with old signature, return the damage number
   if (usingOldSignature) {

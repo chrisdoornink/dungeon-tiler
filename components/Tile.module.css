@@ -296,6 +296,61 @@
   background-image: url("/images/items/switch.png");
 }
 
+/* Floor switch, PLACEHOLDER art (the lightswitch sprite). Armed pulses amber so an
+   unthrown switch is findable across a wide room; thrown goes dark and flat, so the
+   room itself is the progress readout. */
+.plateArmed {
+  filter: drop-shadow(0 0 4px rgba(255, 191, 71, 0.9)) saturate(1.4);
+  animation: plateArmedPulse 1.6s ease-in-out infinite;
+}
+
+.platePressed {
+  filter: grayscale(1) brightness(0.5);
+  transform: scale(0.8);
+}
+
+@keyframes plateArmedPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Spawn pod, PLACEHOLDER art: a dark ringed hole with a slow pulse, so you can see where
+   the monsters will come from. Walkable, so it sits under the hero rather than blocking. */
+.spawnPod {
+  position: absolute;
+  inset: 18%;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #05060a 0%,
+    #14101c 55%,
+    rgba(120, 90, 160, 0.5) 78%,
+    transparent 100%
+  );
+  box-shadow: inset 0 0 8px 3px rgba(0, 0, 0, 0.9), 0 0 6px 2px rgba(150, 110, 200, 0.35);
+  animation: spawnPodPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes spawnPodPulse {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+}
+
+
 .keyIcon {
   background-image: url("/images/items/key.png");
 }
@@ -795,6 +850,41 @@
   background-repeat: no-repeat;
   image-rendering: pixelated;
   box-shadow: inset 0 0 6px 2px rgba(0, 0, 0, 0.55);
+}
+
+/* Retracted spikes (TileSubtype.SPIKE_HOLES): the bed after its switch was thrown. Walkable,
+   and deliberately still conspicuous — it is how a player counts thrown switches from across
+   the room.
+
+   GENERATED FROM .spikes, not drawn by hand, so the sockets land exactly where the spikes
+   stood. The generator masks the iron by saturation (the bed's palette splits cleanly: iron is
+   grey, the pit is brown), erases it back to the pit colour, then finds every spike FOOT — an
+   iron pixel with bare ground directly beneath — and stamps a socket at each. Regenerate with
+   `python3 scripts/gen-spike-holes.py` if .spikes is ever retouched.
+
+   The sockets are SQUASHED ovals, roughly 2:1. The camera looks at the floor from a shallow
+   angle, so a round hole presents as a horizontally-stretched one; drawn circular they read as
+   beads sitting on the ground rather than holes in it. The collar is likewise duller than the
+   first legible version, which was a bright warm tan and read as gold jewellery.
+
+   Four things were wrong on the first attempts and are worth not repeating: sizing each socket
+   to the spike that made it produced 9px holes that merged into one wavy trench; near-black
+   sockets on the unmodified pit colour were invisible, so legibility comes from a lit COLLAR
+   around each hole rather than from the dark inside; lightening the vacated ground to boost
+   that contrast made every erased spike show through as a pale silhouette; and the collar was
+   still tuned at 100% brightness, which is not what anyone sees — the FOV filter dims these
+   tiles to 55-80%, so a collar that looked fine in isolation went flat black in game. JUDGE
+   THIS ART DIMMED. The generator's preview path is the place to do that. */
+.spikeHoles {
+  position: relative;
+  background-color: #211a14;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABwUlEQVR42mPMCLNhoCVgYWBgOHP5IY1MN9GVZ4Gw7j19R3XTlaSFoD6AAH4eTiqa/vHLdwiDiYHGYERZ8PHLd3jIkpZMiQTkpQImYlICrYKISCfjdwcTqekaU4SfhzM+zOXnr19wZKijhN0CTFPgOjnYmNF0wv0XH+bSNnXNm4/f4GjL/nMOFtpYLEAOk49fvmPVCbED2SkLV+2pyg5BNsfH0ejAiasEgoifhxOrzvNX7mFGz8JVe6RFBeAIogZnMoW4DmIERCdcClknsjLS8gGRiQerMjRbz1x+yELdggFuNJxBr7KIupUBugU+7tbIOcVQRwk5veMBePIXeiS3TV0DF9qy/5yPoxHcCAYGhllLtkG4FkYa8LQEySXIZkE06mkpQdQ/e/0LEURwE9HYELuRMxr+/KWnpYSWNxkzwmzOXH547+k7rNEQH+Zy6do9uLkQu5FzA1YtyD4jYAGptTzckI9fvqO3KqiVA+hUJ8PtY8EMQVzJhmCSxdT46PFzFB/oMrFhTTYQcYgpeHIM1vTGhBxLRz59xJpkj3z6+PHLdzzWQ2IYa1qHpiIiQ9bH3Roz1T56/ByPFkZSm++kNsUBPodNiIEX8JEAAAAASUVORK5CYII=");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  /* Lighter than .spikes' inset on purpose. A deeper vignette darkened the tile's edges
+     enough to swallow the outer sockets once the field-of-view filter dimmed the tile too. */
+  box-shadow: inset 0 0 5px 1px rgba(0, 0, 0, 0.45);
 }
 
 /* Positions the bubbling lava overlay (a PixelFlame with LAVA_FRAMES). The 20x20 grid
