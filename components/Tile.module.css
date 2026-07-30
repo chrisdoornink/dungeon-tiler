@@ -852,31 +852,31 @@
   box-shadow: inset 0 0 6px 2px rgba(0, 0, 0, 0.55);
 }
 
-/* Retracted spikes (TileSubtype.SPIKE_HOLES): the bed after its switch was thrown. Same
-   sunken, shadowed depression as .spikes so the two read as one object in two states — but
-   emptied, leaving a grid of dark sockets the spikes withdrew into. Walkable, and deliberately
-   still conspicuous: it is how a player counts thrown switches from across the room.
+/* Retracted spikes (TileSubtype.SPIKE_HOLES): the bed after its switch was thrown. Walkable,
+   and deliberately still conspicuous — it is how a player counts thrown switches from across
+   the room.
 
-   Drawn in CSS rather than as an asset because it is only the .spikes pit minus its spikes;
-   a separate sprite would have to be kept in sync with that one by hand. */
+   GENERATED FROM .spikes, not drawn by hand, so the sockets land exactly where the spikes
+   stood. The generator masks the iron by saturation (the bed's palette splits cleanly: iron is
+   grey, the pit is brown), erases it back to the pit colour, then finds every spike FOOT — an
+   iron pixel with bare ground directly beneath — and stamps a socket at each. Regenerate with
+   `python3 scripts/gen-spike-holes.py` if .spikes is ever retouched.
+
+   Three things were wrong on the first attempts and are worth not repeating: sizing each
+   socket to the spike that made it produced 9px holes that merged into one wavy trench;
+   near-black sockets on the unmodified pit colour were invisible, so legibility comes from a
+   lit COLLAR around each hole rather than from the dark inside; and lightening the vacated
+   ground to boost that contrast made every erased spike show through as a pale silhouette. */
 .spikeHoles {
   position: relative;
   background-color: #211a14;
-  background-image: radial-gradient(
-      circle at 25% 28%,
-      #070605 0 14%,
-      rgba(7, 6, 5, 0) 16%
-    ),
-    radial-gradient(circle at 72% 24%, #070605 0 13%, rgba(7, 6, 5, 0) 15%),
-    radial-gradient(circle at 38% 62%, #070605 0 13%, rgba(7, 6, 5, 0) 15%),
-    radial-gradient(circle at 80% 70%, #070605 0 12%, rgba(7, 6, 5, 0) 14%),
-    radial-gradient(circle at 14% 82%, #070605 0 11%, rgba(7, 6, 5, 0) 13%),
-    linear-gradient(160deg, #4a3d2e 0%, #2a2118 55%, #1b150f 100%);
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAB3ElEQVR42uVWTWvCQBBd0yharClFU0SItIhUWi+iNyG3/gR/gz/Ncy9CL0XozdBLDvUgSgoa/MA2aTQaS+lhZI1mzYdNeungYRh35s3uvpfZUL1WRUEajRASRCmg6uVilgavN5j5Xv06c7HZARgTj/lYXdF0cCgUsP0rAEXT8cl6o6lLO44FlBsmBHVELlu274PyymtrBPfBV3J8JWd3B4qmE7uGtFa7a7M/vpJrNAWEUKnAdfojMoA5B4OZM+WJeqiVhyexVOAQQvJEZeIxvD/a8QJa7S7OtLkeJh4zL7CjKYCbSxAzrcvc6sAleYjL9lAFUaL9/TDg0tj5q2+Rv8OALDS+kpvrS6tSHI2orx0AmJeNpqDOl0B5a4lD2KCSRlNIpxJ78bt8BiEUqteqgij1BrObq8uX1zezmrY0nX6Ak06eWzGgtDxRido8Kd9yw7Hy/qmvv77PTqPaYmUtkc+y8lQpFTjiv9piBfFoJAwRaTjLZ9l0ijGMtSsWyRM1nTwnyu3QOOr0R4ax9jZwjhtHQenAQWi/oexe4g5AkYrAD1MWRxzh4QLMXAf2b2lqXo0pax4d1QQDzuN4DM49y4LzrCrWRHg6bgA8nUMkEoYqwBN7C3l9vnt9iv8AwbP+TBDU/m0AAAAASUVORK5CYII=");
+  background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
-  /* Same inset as .spikes, a touch deeper: the pit is empty now, so nothing catches light
-     inside it. */
-  box-shadow: inset 0 0 7px 3px rgba(0, 0, 0, 0.62);
+  /* Same inset as .spikes, a shade deeper: the pit is empty now, so nothing inside it
+     catches light. */
+  box-shadow: inset 0 0 7px 3px rgba(0, 0, 0, 0.6);
 }
 
 /* Positions the bubbling lava overlay (a PixelFlame with LAVA_FRAMES). The 20x20 grid
