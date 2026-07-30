@@ -50,7 +50,10 @@ import {
   fisherIsPanicking,
   fisherHurl,
 } from "../lib/bosses/fisher";
-import { quarrymasterPodSpawnNonce } from "../lib/bosses/quarrymaster";
+import {
+  quarrymasterIsSummoning,
+  quarrymasterPodSpawnNonce,
+} from "../lib/bosses/quarrymaster";
 import MobileControls from "./MobileControls";
 import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
@@ -6154,6 +6157,7 @@ function renderTileGrid(
                 | "white-goblin"
                 | "shaper"
                 | "fisher"
+                | "quarrymaster"
                 | undefined
             }
             enemyPose={
@@ -6174,6 +6178,11 @@ function renderTileGrid(
                     if (fisherIsPanicking(mem)) return "stalk" as const;
                     return undefined;
                   })()
+                : enemyAtTile?.kind === "quarrymaster" &&
+                  quarrymasterIsSummoning(
+                    enemyAtTile.behaviorMemory as Record<string, unknown> | undefined
+                  )
+                ? ("summon" as const)
                 : undefined
             }
             enemySwarmCount={swarmCountAtTile}

@@ -3083,6 +3083,15 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     const [ky, kx] = deathTile(before.quarrymaster);
     const cell = after.mapData.subtypes[ky]?.[kx];
     if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    // His pods close with him — he is what held them open. Leaving them glowing after he
+    // dies reads as "more is coming" during the walk back to the exit, which is the exact
+    // opposite of what killing him should feel like.
+    for (const row of after.mapData.subtypes) {
+      for (let x = 0; x < row.length; x++) {
+        const i = row[x].indexOf(TileSubtype.SPAWN_POD);
+        if (i >= 0) row[x].splice(i, 1);
+      }
+    }
     after.bossDefeated = true;
   }
 }

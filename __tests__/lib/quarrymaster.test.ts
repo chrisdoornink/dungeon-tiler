@@ -666,3 +666,43 @@ describe("the boss himself", () => {
     }
   });
 });
+
+describe("his death", () => {
+  test("closes the spawn pods", () => {
+    // He is what holds them open, so leaving them lit during the walk back to the exit would
+    // read as "more is coming" right when the opposite should be true.
+    const arena = buildQuarrymasterArena({ layoutIndex: 0 });
+    const st = arena.state;
+    const boss = (st.enemies ?? []).find((e) => e.kind === "quarrymaster")!;
+    boss.health = 1;
+
+    const podsBefore = st.mapData.subtypes
+      .flat()
+      .filter((c) => c.includes(TileSubtype.SPAWN_POD)).length;
+    expect(podsBefore).toBe(2);
+
+    // Stand next to him and swing. He is walled in, so place the hero directly beside him.
+    const [by, bx] = arena.boss;
+    for (const row of st.mapData.subtypes) {
+      for (let x = 0; x < row.length; x++) {
+        const i = row[x].indexOf(TileSubtype.PLAYER);
+        if (i >= 0) row[x].splice(i, 1);
+      }
+    }
+    st.mapData.subtypes[by][bx - 1] = [TileSubtype.PLAYER];
+    st.hasSword = true;
+    st.heroHealth = 30;
+    st.heroMaxHealth = 30;
+
+    let after = st;
+    for (let swing = 0; swing < 6 && !after.bossDefeated; swing++) {
+      after = movePlayer(after, Direction.RIGHT) as typeof after;
+    }
+
+    expect(after.bossDefeated).toBe(true);
+    const podsAfter = after.mapData.subtypes
+      .flat()
+      .filter((c) => c.includes(TileSubtype.SPAWN_POD)).length;
+    expect(podsAfter).toBe(0);
+  });
+});
