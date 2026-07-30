@@ -197,7 +197,7 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
+  enemyKind?: EnemyKind;
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   // Fisher only: which pose sprite to draw instead of the facing sprite.
   //   'cocked'  - spear drawn back, throw lands next turn. The fight's ONLY tell, since
@@ -446,6 +446,12 @@ export const Tile: React.FC<TileProps> = ({
         return "ROAD_ROTATE_270";
       case TileSubtype.OPEN_ABYSS:
         return "OPEN_ABYSS";
+      case TileSubtype.PRESSURE_PLATE:
+        return "PRESSURE_PLATE";
+      case TileSubtype.PRESSURE_PLATE_PRESSED:
+        return "PRESSURE_PLATE_PRESSED";
+      case TileSubtype.CAGE_GATE:
+        return "CAGE_GATE";
       default:
         return String(s);
     }
@@ -553,6 +559,16 @@ export const Tile: React.FC<TileProps> = ({
   // Check if a tile has a lightswitch subtype
   const hasLightswitch = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
+  };
+
+  // Switch-and-gate puzzle pieces. PLACEHOLDER ART for both: the plate reuses the
+  // existing switch sprite (tinted, and dimmed once thrown) and the cage gate is drawn
+  // in CSS as bars over the wall face — no sprite yet. See the feature doc's deferred list.
+  const hasPressurePlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE) || false;
+  };
+  const hasPressedPlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE_PRESSED) || false;
   };
 
   // Check if a tile has a key subtype
@@ -813,6 +829,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.PINK_RING &&
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
+        // Plates and cage gates have their own overlays above/in the wall branch.
+        subtype !== TileSubtype.PRESSURE_PLATE &&
+        subtype !== TileSubtype.PRESSURE_PLATE_PRESSED &&
+        subtype !== TileSubtype.CAGE_GATE &&
+        subtype !== TileSubtype.SPAWN_POD &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
         subtype !== TileSubtype.LAVA &&
@@ -944,6 +965,34 @@ export const Tile: React.FC<TileProps> = ({
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Floor switch. Unthrown reads bright and pulses (it is the objective); thrown
+            goes flat and dark so a glance across the room counts your progress. */}
+        {hasPressurePlate(subtypes) && (
+          <div
+            key="pressure-plate"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE}`}
+            className={`${styles.assetIcon} ${styles.switchIcon} ${styles.plateArmed}`}
+          />
+        )}
+        {hasPressedPlate(subtypes) && (
+          <div
+            key="pressure-plate-pressed"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
+            className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Spawn pod: the mouth summons climb out of. PLACEHOLDER — drawn in CSS as a dark
+            ringed hole so its position is legible while the real asset is undecided. */}
+        {subtypes?.includes(TileSubtype.SPAWN_POD) && (
+          <div
+            key="spawn-pod"
+            data-testid={`subtype-icon-${TileSubtype.SPAWN_POD}`}
+            className={styles.spawnPod}
+            aria-hidden="true"
           />
         )}
 
@@ -2429,6 +2478,17 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.wallWindowOverlay}
               style={{ backgroundImage: `url(${assetUrl("/images/window.png")})` }}
+              aria-hidden="true"
+            />
+          )}
+
+          {/* Cage gate: a portcullis of bars across the wall face. Drawn in CSS (no
+              sprite yet) so the prototype reads correctly — vertical bars plus two
+              cross-braces, which is unmistakably "a cage that can drop". */}
+          {subtype.includes(TileSubtype.CAGE_GATE) && (
+            <div
+              data-testid={`subtype-icon-${TileSubtype.CAGE_GATE}`}
+              className={styles.cageGateOverlay}
               aria-hidden="true"
             />
           )}

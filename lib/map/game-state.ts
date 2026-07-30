@@ -35,6 +35,7 @@ import {
   type RoomId,
 } from "./constants";
 import type {
+  GateGroup,
   MapData,
   PotOverrides,
   RoomSnapshot,
@@ -1767,6 +1768,13 @@ export interface GameState {
   // every floor-3 run look like it met a boss.
   dailyBossKind?: BossKind;
   bossArenaSeed?: "water" | "lava";
+  /**
+   * Switch-and-gate wiring for the current map: each entry is one PRESSURE_PLATE and
+   * the CAGE_GATE tiles it drops. Held here rather than on the tiles so one arena can
+   * run several independent sets (the Quarrymaster's three cages). Absent on maps
+   * without the puzzle.
+   */
+  gateGroups?: GateGroup[];
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -3021,6 +3029,7 @@ function enterBossRoom(
 export interface BossSnapshot {
   shaper: [number, number] | null;
   fisher: [number, number] | null;
+  quarrymaster: [number, number] | null;
 }
 
 export function snapshotBosses(state: GameState): BossSnapshot {
@@ -3028,7 +3037,11 @@ export function snapshotBosses(state: GameState): BossSnapshot {
     const e = (state.enemies ?? []).find((en) => en.kind === kind);
     return e ? [e.y, e.x] : null;
   };
-  return { shaper: find("shaper"), fisher: find("fisher") };
+  return {
+    shaper: find("shaper"),
+    fisher: find("fisher"),
+    quarrymaster: find("quarrymaster"),
+  };
 }
 
 /**
@@ -3039,6 +3052,8 @@ export function snapshotBosses(state: GameState): BossSnapshot {
  *   Shaper -> drops the gold key that opens the arena's exit (the alternate ending).
  *   Fisher -> topples forward across the spikes; its body IS the crossing, and the key
  *             comes with it. There is no other way anyone reaches the far bank.
+ *   Quarrymaster -> drops the gold key like the Shaper. Reaching the exit still needs the
+ *             chamber switch thrown, which is a separate gate (see gateGroups).
  */
 function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
   if (!after.inBossRoom || after.bossDefeated) return;
@@ -3061,6 +3076,55 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     const [, kx] = deathTile(before.fisher);
     collapseFisherIntoBridge(after, kx);
     after.bossDefeated = true;
+    return;
+  }
+
+  if (before.quarrymaster && !alive.some((e) => e.kind === "quarrymaster")) {
+    const [ky, kx] = deathTile(before.quarrymaster);
+    const cell = after.mapData.subtypes[ky]?.[kx];
+    if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    after.bossDefeated = true;
+  }
+}
+
+/**
+ * Throw the pressure plate the hero just stepped onto: latch the switch and drop every
+ * cage gate wired to it.
+ *
+ * Gates go from WALL to bare FLOOR — a portcullis falling into the ground, not a door
+ * swinging — so the opening is permanently walkable by hero and enemies alike. The plate
+ * itself latches (PRESSURE_PLATE -> PRESSURE_PLATE_PRESSED) and is never re-armed: the
+ * whole point of the mechanic is visible, banked progress toward the boss.
+ *
+ * Mutates in place; safe to call on a tile with no group wired to it (no-op).
+ */
+function pressPlate(
+  state: GameState,
+  mapData: MapData,
+  y: number,
+  x: number
+): void {
+  const cell = mapData.subtypes[y]?.[x];
+  if (cell) {
+    const i = cell.indexOf(TileSubtype.PRESSURE_PLATE);
+    if (i >= 0) cell[i] = TileSubtype.PRESSURE_PLATE_PRESSED;
+  }
+  const group = state.gateGroups?.find(
+    (g) => g.plate[0] === y && g.plate[1] === x && !g.open
+  );
+  if (!group) return;
+  // Replace the array rather than flipping `open` in place: gateGroups is shared by
+  // reference with the pre-move state (and with any checkpoint snapshot holding it), and
+  // a mutated group would retroactively "un-press" nothing but would corrupt a restore.
+  state.gateGroups = (state.gateGroups ?? []).map((g) =>
+    g === group ? { ...g, open: true } : g
+  );
+  for (const [gy, gx] of group.gates) {
+    if (mapData.tiles[gy]?.[gx] === undefined) continue;
+    mapData.tiles[gy][gx] = FLOOR;
+    mapData.subtypes[gy][gx] = (mapData.subtypes[gy][gx] ?? []).filter(
+      (s) => s !== TileSubtype.CAGE_GATE
+    );
   }
 }
 
@@ -4127,6 +4191,13 @@ function movePlayerCore(
       // Player and lightswitch will coexist on the same tile
     }
 
+    // If it's a pressure plate, throw it: the switch latches down for good and every
+    // cage gate in its group drops to bare floor. Like the lightswitch, the plate stays
+    // on the tile and coexists with the player (it just changes to the pressed art).
+    if (subtype.includes(TileSubtype.PRESSURE_PLATE)) {
+      pressPlate(newGameState, newMapData, newY, newX);
+    }
+
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
@@ -4186,6 +4257,9 @@ function movePlayerCore(
     const destSubtypes = newMapData.subtypes[newY][newX];
     if (
       destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
+      // Pressure plates are floor switches the hero stands ON to hold/throw them.
+      destSubtypes.includes(TileSubtype.PRESSURE_PLATE) ||
+      destSubtypes.includes(TileSubtype.PRESSURE_PLATE_PRESSED) ||
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
       destSubtypes.includes(TileSubtype.CHEST) ||
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||

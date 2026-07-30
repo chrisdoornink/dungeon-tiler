@@ -47,6 +47,20 @@ export type SealPayload = "boss" | "berry" | "food";
 /** Keyed by `${y},${x}` of the sealed wall tile. */
 export type SealPayloads = Record<string, SealPayload>;
 
+/**
+ * One switch and the cage gates it raises. Stepping on `plate` sets `open` and drops
+ * every tile in `gates` from WALL to FLOOR, permanently.
+ *
+ * The wiring lives here rather than in the tile subtypes so an arena can run any number
+ * of independent plate/gate sets — the Quarrymaster's three cages each answer to their
+ * own switch, and a player watching one cage drop learns the rule from one press.
+ */
+export interface GateGroup {
+  plate: [number, number];
+  gates: Array<[number, number]>;
+  open: boolean;
+}
+
 export interface RoomTransition {
   from: RoomId;
   to: RoomId;

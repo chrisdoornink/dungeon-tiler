@@ -49,8 +49,8 @@ import {
   fisherStrike,
   fisherIsPanicking,
   fisherHurl,
-
 } from "../lib/bosses/fisher";
+import { quarrymasterPodSpawnNonce } from "../lib/bosses/quarrymaster";
 import MobileControls from "./MobileControls";
 import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
@@ -2796,6 +2796,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     if (atk.nonce === lastShaperAttackRef.current) return;
     lastShaperAttackRef.current = atk.nonce;
     triggerScreenShake(360, 10); // terrain reshapes underfoot
+  }, [gameState]);
+
+  // A pod disgorging a monster gets a small shake — the fight's only remaining
+  // boss-driven beat now that the floor is static. Nonce-keyed so it fires exactly once.
+  const lastPodSpawnRef = useRef<number>(0);
+  useEffect(() => {
+    const boss = (gameState.enemies ?? []).find((e) => e.kind === "quarrymaster");
+    const mem = boss?.behaviorMemory as Record<string, unknown> | undefined;
+    const nonce = quarrymasterPodSpawnNonce(mem);
+    if (nonce != null && nonce !== lastPodSpawnRef.current) {
+      lastPodSpawnRef.current = nonce;
+      triggerScreenShake(180, 4);
+    }
   }, [gameState]);
 
   useEffect(() => {
