@@ -241,15 +241,20 @@ function bbox({ data, width, height }) {
   return maxX < 0 ? null : { minX, minY, maxX, maxY, w: maxX - minX + 1, h: maxY - minY + 1 };
 }
 
-// source file -> destination sprite name(s). See the registry/pose wiring in
-// lib/enemies/registry.ts and components/Tile.tsx.
+// source file -> destination sprite name. ONLY poses the game actually renders belong here:
+// every entry ships to the CDN, so an unused pose is pure payload. The reachable set is the
+// three facings the registry declares plus the `enemyPose` union in Tile.tsx
+// (cocked/pickup/stalk) — nothing else can be requested.
+//
+// `fisher-forward-cocked.png` is deliberately NOT built: it was a front-facing wind-up that
+// the render layer never asks for (the cocked pose uses the side profile), so it was 166KB of
+// dead weight. The source render is still in art-source/ if it's ever wanted.
 const MAP = [
   ["fisher-forward.png", "fisher-stand-front.png"],
   ["fisher-back.png", "fisher-stand-back.png"],
   ["fisher-standing-right.png", "fisher-stand-right.png"],
   ["fisher-forward-mean.png", "fisher-stalk.png"],
   ["fisher-cocked-to-throw-right.png", "fisher-cocked.png"],
-  ["fisher-forward-cocked.png", "fisher-cocked-front.png"],
   ["fisher-pick-up-right.png", "fisher-pickup.png"],
 ];
 
@@ -330,5 +335,41 @@ const MAP = [
       .toFile(path.join(OUT, d));
     fs.unlinkSync(path.join(OUT, `.stage-${d}`));
     console.log(`  ${d.padEnd(26)} ${w}x${h} -> ${CANVAS}x${CANVAS}, feet at baseline`);
+  }
+
+  // --- Quantise to an 8-bit palette. sharp emits 32-bit RGBA, which for flat pixel art is
+  // ~4x larger than it needs to be: these came out ~180KB each and land at ~45KB with no
+  // visible change (measured RMSE ~250 of 65535, i.e. 0.4%). Every one of these files ships
+  // to the CDN on every deploy, so it is worth doing here rather than as a manual step
+  // someone forgets. Skipped with a warning if pngquant isn't installed, so the script still
+  // produces correct (just larger) sprites on a bare machine.
+  const outputs = MAP.map(([, d]) => path.join(OUT, d)).filter((p) => fs.existsSync(p));
+  const beforeKb = outputs.reduce((s, p) => s + fs.statSync(p).size, 0) / 1024;
+  try {
+    require("child_process").execFileSync(
+      "pngquant",
+      [
+        "--quality=70-100",
+        "--speed",
+        "1",
+        "--strip",
+        "--force",
+        "--skip-if-larger", // never let a "smaller" pass make a file bigger
+        "--ext",
+        ".png",
+        ...outputs,
+      ],
+      { stdio: "pipe" }
+    );
+    const afterKb = outputs.reduce((s, p) => s + fs.statSync(p).size, 0) / 1024;
+    console.log(
+      `\nquantised: ${beforeKb.toFixed(0)}KB -> ${afterKb.toFixed(0)}KB ` +
+        `(${(100 - (100 * afterKb) / beforeKb).toFixed(0)}% smaller)`
+    );
+  } catch (err) {
+    console.warn(
+      `\nSKIPPED palette quantisation (${beforeKb.toFixed(0)}KB left unoptimised). ` +
+        `Install pngquant (brew install pngquant) and re-run to shrink these ~72%.`
+    );
   }
 })();
