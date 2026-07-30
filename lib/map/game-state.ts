@@ -1769,10 +1769,10 @@ export interface GameState {
   dailyBossKind?: BossKind;
   bossArenaSeed?: "water" | "lava";
   /**
-   * Switch-and-gate wiring for the current map: each entry is one PRESSURE_PLATE and
-   * the CAGE_GATE tiles it drops. Held here rather than on the tiles so one arena can
-   * run several independent sets (the Quarrymaster's three cages). Absent on maps
-   * without the puzzle.
+   * Switch-and-barrier wiring for the current map: each entry is one PRESSURE_PLATE and the
+   * SPIKES tiles it retracts. Held here rather than on the tiles so one arena can run
+   * several independent sets (the Quarrymaster's three beds plus his chamber switch).
+   * Absent on maps without the puzzle.
    */
   gateGroups?: GateGroup[];
   // The floor to restore when the hero walks back out of a boss arena. Kept
@@ -3088,13 +3088,16 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
 }
 
 /**
- * Throw the pressure plate the hero just stepped onto: latch the switch and drop every
- * cage gate wired to it.
+ * Throw the pressure plate the hero just stepped onto: latch the switch and retract every
+ * spike bed wired to it.
  *
- * Gates go from WALL to bare FLOOR — a portcullis falling into the ground, not a door
- * swinging — so the opening is permanently walkable by hero and enemies alike. The plate
- * itself latches (PRESSURE_PLATE -> PRESSURE_PLATE_PRESSED) and is never re-armed: the
- * whole point of the mechanic is visible, banked progress toward the boss.
+ * The spikes sink into the ground and leave SPIKE_HOLES — bare sockets that are walkable and
+ * purely cosmetic. Keeping a mark rather than reverting to clean floor means a thrown switch
+ * is legible from across the room, which matters when the switches are far apart and the
+ * player is being chased between them.
+ *
+ * The plate itself latches (PRESSURE_PLATE -> PRESSURE_PLATE_PRESSED) and is never re-armed:
+ * the whole point of the mechanic is visible, banked progress toward the boss.
  *
  * Mutates in place; safe to call on a tile with no group wired to it (no-op).
  */
@@ -3115,16 +3118,15 @@ function pressPlate(
   if (!group) return;
   // Replace the array rather than flipping `open` in place: gateGroups is shared by
   // reference with the pre-move state (and with any checkpoint snapshot holding it), and
-  // a mutated group would retroactively "un-press" nothing but would corrupt a restore.
+  // a mutated group would corrupt a restore.
   state.gateGroups = (state.gateGroups ?? []).map((g) =>
     g === group ? { ...g, open: true } : g
   );
   for (const [gy, gx] of group.gates) {
-    if (mapData.tiles[gy]?.[gx] === undefined) continue;
-    mapData.tiles[gy][gx] = FLOOR;
-    mapData.subtypes[gy][gx] = (mapData.subtypes[gy][gx] ?? []).filter(
-      (s) => s !== TileSubtype.CAGE_GATE
-    );
+    const bed = mapData.subtypes[gy]?.[gx];
+    if (!bed) continue;
+    const i = bed.indexOf(TileSubtype.SPIKES);
+    if (i >= 0) bed[i] = TileSubtype.SPIKE_HOLES;
   }
 }
 

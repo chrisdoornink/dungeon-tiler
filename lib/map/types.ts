@@ -48,12 +48,12 @@ export type SealPayload = "boss" | "berry" | "food";
 export type SealPayloads = Record<string, SealPayload>;
 
 /**
- * One switch and the cage gates it raises. Stepping on `plate` sets `open` and drops
- * every tile in `gates` from WALL to FLOOR, permanently.
+ * One switch and the spike beds it retracts. Stepping on `plate` sets `open` and turns every
+ * tile in `gates` from SPIKES into walkable SPIKE_HOLES, permanently.
  *
- * The wiring lives here rather than in the tile subtypes so an arena can run any number
- * of independent plate/gate sets — the Quarrymaster's three cages each answer to their
- * own switch, and a player watching one cage drop learns the rule from one press.
+ * The wiring lives here rather than in the tile subtypes so an arena can run any number of
+ * independent plate/barrier sets — the Quarrymaster's beds each answer to their own switch,
+ * and a player watching one retract learns the rule from a single press.
  */
 export interface GateGroup {
   plate: [number, number];

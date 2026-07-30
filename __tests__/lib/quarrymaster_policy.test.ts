@@ -43,9 +43,15 @@ function heroAt(state: GameState): Pos {
 }
 
 /**
- * Tiles the hero must never voluntarily step on: authored cracks AND any hole a goblin has
- * already opened. Both are visible in-game, so a bot walking into either would be measuring
- * its own carelessness rather than the arena.
+ * Tiles the hero must never voluntarily walk into: authored cracks, any hole a goblin has
+ * already opened, and standing spike beds. All three are plainly visible in-game, so a bot
+ * that blundered into them would be measuring its own carelessness rather than the arena —
+ * and spikes in particular REFUSE the move, so a bot that kept trying would just wedge
+ * itself against one for the rest of the fight (measured: 13 spike deaths and the Broken
+ * Yard at 0/12 before this).
+ *
+ * Retracted beds (SPIKE_HOLES) are deliberately absent — those are walkable, and treating
+ * them as blocked would hide the fact that a thrown switch opens the way.
  */
 function lethalTiles(state: GameState): Set<string> {
   const out = new Set<string>();
@@ -55,7 +61,8 @@ function lethalTiles(state: GameState): Set<string> {
       const cell = subtypes[y][x];
       if (
         cell.includes(TileSubtype.OPEN_ABYSS) ||
-        cell.includes(TileSubtype.FAULTY_FLOOR)
+        cell.includes(TileSubtype.FAULTY_FLOOR) ||
+        cell.includes(TileSubtype.SPIKES)
       ) {
         out.add(`${y},${x}`);
       }

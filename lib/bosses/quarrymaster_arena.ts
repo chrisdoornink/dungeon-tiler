@@ -1,5 +1,5 @@
 // The Quarrymaster's arena: one hall, hand-authored, with the boss penned at the north end
-// behind three stacked portcullis rows.
+// behind three stacked beds of spikes.
 //
 // THE `X` TILES ARE CRACKS (FAULTY_FLOOR), NOT HOLES. The player sees them (crack decal) and
 // simply walks around them — falling in is not meant to be how the player dies. What they do
@@ -16,7 +16,7 @@
 //
 // EDIT THE MAP, NOT THE CODE. `assertLayout` re-checks every invariant after any edit: all
 // switches reachable without crossing a crack, the exit reachable, the pods able to reach the
-// hero, and the boss reachable ONLY once all three gates are down. A bad edit throws with a
+// hero, and the boss reachable ONLY once all three spike beds are down. A bad edit throws with a
 // specific message instead of shipping an invisible soft-lock.
 //
 // Split from quarrymaster.ts for the same reason shaper_arena.ts is split from shaper.ts:
@@ -40,7 +40,8 @@ type Subs = number[][][];
  *   `Q` the boss        `S` spawn pod       `H` hero start      `E` exit
  *   `1` `2` `3` field switches — each drops one row of the boss's cage
  *   `4` the switch INSIDE his chamber — unseals the exit (see GATE_CHAR_FOR_PLATE)
- *   `a` `b` `c` cage rows (answer switches 1-3)      `d` the exit seal (answers switch 4)
+ *   `a` `b` `c` spike beds across the chamber mouth (answer switches 1-3)
+ *   `d` the spike bed sealing the exit (answers switch 4)
  *   `r` a rock to pick up          `p` a pot          `T` wall torch (needs floor below)
  *
  * In every layout the chamber sits at the top behind its three gate rows, and the two pods
@@ -130,8 +131,9 @@ export const QUARRYMASTER_LAYOUTS: QuarrymasterLayout[] = [
 export const QUARRYMASTER_MAP = QUARRYMASTER_LAYOUTS[0].map;
 
 /**
- * Which gate each switch drops, by map character. `1`-`3` are the field switches that peel
- * the boss's cage; `4` is the switch INSIDE his chamber that unseals the way to the exit.
+ * Which spike bed each switch retracts, by map character. `1`-`3` are the field switches that
+ * peel back the beds across his chamber mouth; `4` is the switch INSIDE the chamber that
+ * retracts the bed sealing the way to the exit.
  *
  * Switch 4 exists to close a real loophole: the arena exit only checks `hasExitKey`, so a
  * hero who walked in already carrying a key from the run could stroll straight to the exit
@@ -277,9 +279,10 @@ function parseMap(map: readonly string[]): ParsedMap {
         case "b":
         case "c":
         case "d":
-          // A portcullis is a WALL wearing bars until its switch drops it.
-          tiles[y][x] = WALL;
-          subtypes[y][x] = [TileSubtype.CAGE_GATE];
+          // A bed of spikes standing out of the floor. Stays FLOOR underneath on purpose:
+          // SPIKES is an overlay, so thrown rocks sail over it (the throw scan only breaks
+          // on non-FLOOR tiles) while nothing — hero or goblin — can walk through.
+          subtypes[y][x] = [TileSubtype.SPIKES];
           (gatesByChar[ch] ??= []).push([y, x]);
           break;
         default:
@@ -334,7 +337,8 @@ function reachable(
   const passable = (y: number, x: number) => {
     const subs = subtypes[y]?.[x];
     if (!subs) return false;
-    if (subs.includes(TileSubtype.CAGE_GATE)) return openGates.has(`${y},${x}`);
+    // A spike bed is walkable only once its switch has retracted it.
+    if (subs.includes(TileSubtype.SPIKES)) return openGates.has(`${y},${x}`);
     if (subs.includes(TileSubtype.FAULTY_FLOOR)) return false;
     return tiles[y]?.[x] === FLOOR && !subs.includes(TileSubtype.OPEN_ABYSS);
   };

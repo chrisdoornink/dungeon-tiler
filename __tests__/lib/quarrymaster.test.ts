@@ -330,12 +330,11 @@ describe("spawn pods", () => {
 });
 
 describe("switches and cage gates", () => {
-  test("stepping on a switch latches it and drops its gates", () => {
+  test("stepping on a switch latches it and retracts its spikes", () => {
     const { grid, subs } = openRoom(5);
-    grid[1][3] = 1;
     subs[1][1].push(TileSubtype.PLAYER);
     subs[1][2].push(TileSubtype.PRESSURE_PLATE);
-    subs[1][3].push(TileSubtype.CAGE_GATE);
+    subs[1][3].push(TileSubtype.SPIKES);
     const state = baseState({ tiles: grid, subtypes: subs }, {
       gateGroups: [{ plate: [1, 2], gates: [[1, 3]], open: false }],
     });
@@ -344,20 +343,20 @@ describe("switches and cage gates", () => {
 
     expect(after.mapData.subtypes[1][2]).toContain(TileSubtype.PRESSURE_PLATE_PRESSED);
     expect(after.mapData.subtypes[1][2]).not.toContain(TileSubtype.PRESSURE_PLATE);
+    // The bed sinks into the floor and leaves walkable sockets behind.
+    expect(after.mapData.subtypes[1][3]).toContain(TileSubtype.SPIKE_HOLES);
+    expect(after.mapData.subtypes[1][3]).not.toContain(TileSubtype.SPIKES);
     expect(after.mapData.tiles[1][3]).toBe(0);
-    expect(after.mapData.subtypes[1][3]).not.toContain(TileSubtype.CAGE_GATE);
     expect(after.gateGroups?.[0].open).toBe(true);
     expect(after.mapData.subtypes[1][2]).toContain(TileSubtype.PLAYER);
   });
 
-  test("pressing one switch leaves the other gates standing", () => {
+  test("pressing one switch leaves the other beds standing", () => {
     const { grid, subs } = openRoom(7);
-    grid[1][3] = 1;
-    grid[1][4] = 1;
     subs[1][1].push(TileSubtype.PLAYER);
     subs[1][2].push(TileSubtype.PRESSURE_PLATE);
-    subs[1][3].push(TileSubtype.CAGE_GATE);
-    subs[1][4].push(TileSubtype.CAGE_GATE);
+    subs[1][3].push(TileSubtype.SPIKES);
+    subs[1][4].push(TileSubtype.SPIKES);
     const state = baseState({ tiles: grid, subtypes: subs }, {
       gateGroups: [
         { plate: [1, 2], gates: [[1, 3]], open: false },
@@ -367,17 +366,16 @@ describe("switches and cage gates", () => {
 
     const after = movePlayer(state, Direction.RIGHT);
 
-    expect(after.mapData.tiles[1][3]).toBe(0);
-    expect(after.mapData.tiles[1][4]).toBe(1);
+    expect(after.mapData.subtypes[1][3]).toContain(TileSubtype.SPIKE_HOLES);
+    expect(after.mapData.subtypes[1][4]).toContain(TileSubtype.SPIKES);
     expect(after.gateGroups?.[1].open).toBe(false);
   });
 
   test("pressing a switch does not mutate the pre-move state's gate groups", () => {
     const { grid, subs } = openRoom(5);
-    grid[1][3] = 1;
     subs[1][1].push(TileSubtype.PLAYER);
     subs[1][2].push(TileSubtype.PRESSURE_PLATE);
-    subs[1][3].push(TileSubtype.CAGE_GATE);
+    subs[1][3].push(TileSubtype.SPIKES);
     const groups = [
       { plate: [1, 2] as [number, number], gates: [[1, 3] as [number, number]], open: false },
     ];
@@ -422,13 +420,15 @@ describe("the authored arena", () => {
       const t = tiles.map((r) => [...r]);
       const s = subtypes.map((r) => r.map((c) => [...c]));
       for (let i = 0; i < openCount; i++) {
-        for (const [gy, gx] of groups[i].gates) {
-          t[gy][gx] = 0;
-          s[gy][gx] = [];
-        }
+        for (const [gy, gx] of groups[i].gates) s[gy][gx] = [TileSubtype.SPIKE_HOLES];
       }
-      const passable = (y: number, x: number) =>
-        t[y]?.[x] === 0 && !(s[y]?.[x] ?? []).includes(TileSubtype.OPEN_ABYSS);
+      const passable = (y: number, x: number) => {
+        const cell = s[y]?.[x] ?? [];
+        if (cell.includes(TileSubtype.SPIKES)) return false;
+        if (cell.includes(TileSubtype.OPEN_ABYSS)) return false;
+        if (cell.includes(TileSubtype.FAULTY_FLOOR)) return false;
+        return t[y]?.[x] === 0;
+      };
       const seen = new Set<string>([`${arena.hero[0]},${arena.hero[1]}`]);
       const q: Array<[number, number]> = [arena.hero];
       while (q.length) {
@@ -567,14 +567,12 @@ describe("the authored arena", () => {
         const t = tiles.map((r) => [...r]);
         const sub = subtypes.map((r) => r.map((c) => [...c]));
         for (const gi of openIdx) {
-          for (const [gy, gx] of groups[gi].gates) {
-            t[gy][gx] = 0;
-            sub[gy][gx] = [];
-          }
+          for (const [gy, gx] of groups[gi].gates) sub[gy][gx] = [TileSubtype.SPIKE_HOLES];
         }
         const passable = (y: number, x: number) => {
           const cell = sub[y]?.[x];
           if (!cell) return false;
+          if (cell.includes(TileSubtype.SPIKES)) return false;
           if (cell.includes(TileSubtype.OPEN_ABYSS)) return false;
           if (cell.includes(TileSubtype.FAULTY_FLOOR)) return false;
           return t[y]?.[x] === 0;

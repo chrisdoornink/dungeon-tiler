@@ -450,8 +450,8 @@ export const Tile: React.FC<TileProps> = ({
         return "PRESSURE_PLATE";
       case TileSubtype.PRESSURE_PLATE_PRESSED:
         return "PRESSURE_PLATE_PRESSED";
-      case TileSubtype.CAGE_GATE:
-        return "CAGE_GATE";
+      case TileSubtype.SPIKE_HOLES:
+        return "SPIKE_HOLES";
       default:
         return String(s);
     }
@@ -649,6 +649,10 @@ export const Tile: React.FC<TileProps> = ({
   const hasSpikes = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SPIKES) || false;
   };
+  // Retracted spikes: walkable, and the standing record that a switch was thrown.
+  const hasSpikeHoles = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SPIKE_HOLES) || false;
+  };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
@@ -832,7 +836,7 @@ export const Tile: React.FC<TileProps> = ({
         // Plates and cage gates have their own overlays above/in the wall branch.
         subtype !== TileSubtype.PRESSURE_PLATE &&
         subtype !== TileSubtype.PRESSURE_PLATE_PRESSED &&
-        subtype !== TileSubtype.CAGE_GATE &&
+        subtype !== TileSubtype.SPIKE_HOLES &&
         subtype !== TileSubtype.SPAWN_POD &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
@@ -1986,12 +1990,15 @@ export const Tile: React.FC<TileProps> = ({
       const isDeepWater = hasDeepWater(subtype);
       const isSteppingStone = hasSteppingStone(subtype);
       const isSpikes = hasSpikes(subtype);
+      const isSpikeHoles = hasSpikeHoles(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
         ? styles.openAbyss
         : isSpikes
         ? styles.spikes
+        : isSpikeHoles
+        ? styles.spikeHoles
         : isLava
         ? styles.lava
         : isObsidian
@@ -2482,16 +2489,6 @@ export const Tile: React.FC<TileProps> = ({
             />
           )}
 
-          {/* Cage gate: a portcullis of bars across the wall face. Drawn in CSS (no
-              sprite yet) so the prototype reads correctly — vertical bars plus two
-              cross-braces, which is unmistakably "a cage that can drop". */}
-          {subtype.includes(TileSubtype.CAGE_GATE) && (
-            <div
-              data-testid={`subtype-icon-${TileSubtype.CAGE_GATE}`}
-              className={styles.cageGateOverlay}
-              aria-hidden="true"
-            />
-          )}
 
           {/* Exaggerated base shadow when standing in front of floor */}
           {isFloorBelow && (
