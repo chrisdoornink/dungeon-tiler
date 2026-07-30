@@ -43,6 +43,14 @@ import {
   shaperFireLaunch,
   shaperWallReveal,
 } from "../lib/bosses/shaper";
+import {
+  fisherCoiledLane,
+  fisherIsStunned,
+  fisherStrike,
+  fisherIsPanicking,
+  fisherHurl,
+
+} from "../lib/bosses/fisher";
 import MobileControls from "./MobileControls";
 import PixelFlame, { HERO_FLAME_ANCHOR } from "./PixelFlame";
 import styles from "./TilemapGrid.module.css";
@@ -217,6 +225,7 @@ function runProgressProps(gs: GameState) {
     bossDefeated: !!gs.bossDefeated,
     bossEntranceKind: gs.bossEntranceKind,
     bossKind: gs.bossKind,
+    dailyBossKind: gs.dailyBossKind,
   };
 }
 
@@ -1895,7 +1904,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       y: number,
       x: number,
       keyPrefix: "e" | "n",
-      kind?: string
+      kind?: string,
+      memory?: Record<string, unknown>
     ) => {
       const id = `${keyPrefix}:${rawId}`;
       nextPos.set(id, [y, x]);
@@ -1905,10 +1915,36 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const dx = p[1] - x;
       const dist = Math.abs(dy) + Math.abs(dx);
       if (dist === 0) return; // stood still
+      let arc = false;
       if (kind === "ghost") {
         // Ghosts glide their whole phase move — drifting through walls reads
         // exactly right for them. Cap it so cross-map warps still snap.
         if (dist > 6) return;
+      } else if (kind === "fisher") {
+        // The Fisher covers up to FISHER_STRIDE tiles per turn on stilt legs, and a
+        // long-legged wading bird SHOULD read as one big stride — so animate the whole
+        // move instead of snapping it. Capped so a future teleport/warp still snaps.
+        if (dist > 2) return;
+      } else if (kind === "snake" && dist > 1) {
+        // A snake that moved more than one tile was THROWN by the Fisher. Animate the
+        // whole flight as a tumbling arc — without it the snake simply blinked onto the
+        // near bank and, as reported in playtest, it was impossible to tell what had
+        // happened. Identified from the flight record the snake writes when it lands
+        // rather than from distance: a throw can span most of the map (the landing is
+        // chosen relative to the HERO, not to the snake), so any distance cap would
+        // silently snap the longest — and most dramatic — throws. Matching from/to exactly
+        // also makes this self-expiring, so a stale prev-position entry after a room warp
+        // can never be mistaken for a flight.
+        const flight = memory?.lastFlight as
+          | { from?: [number, number]; to?: [number, number] }
+          | undefined;
+        const matches =
+          flight?.from?.[0] === p[0] &&
+          flight?.from?.[1] === p[1] &&
+          flight?.to?.[0] === y &&
+          flight?.to?.[1] === x;
+        if (!matches) return;
+        arc = true;
       } else if (dist !== 1) {
         // Non-ghosts animate single-tile steps only; pink-ninja slides/blinks
         // and room warps snap.
@@ -1921,10 +1957,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // enemySwarmMembers in renderTileGrid).
       const key =
         kind === "white-goblin" ? `eid:${rawId}` : `${keyPrefix}:${y},${x}`;
-      steps.set(key, { dy, dx, dur, ease, seq });
+      steps.set(key, {
+        dy,
+        dx,
+        // A flight needs longer than a footstep or the whole arc is over before the eye
+        // finds it — scaled by how far it was actually thrown, and capped.
+        dur: arc ? Math.min(620, dur + dist * 55) : dur,
+        // A lobbed snake decelerates at the top of its arc; ease-in-out sells that even
+        // while the hero is running (when steps otherwise go linear).
+        ease: arc ? "ease-in-out" : ease,
+        seq,
+        ...(arc ? { arc: true } : {}),
+      });
     };
     for (const e of gameState.enemies ?? []) {
-      if (typeof e.id === "string" && e.id) visit(e.id, e.y, e.x, "e", e.kind);
+      if (typeof e.id === "string" && e.id) {
+        visit(e.id, e.y, e.x, "e", e.kind, e.behaviorMemory as
+          | Record<string, unknown>
+          | undefined);
+      }
     }
     for (const n of gameState.npcs ?? []) {
       if (n?.id) visit(n.id, n.y, n.x, "n");
@@ -4772,6 +4823,125 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     />
                   ));
                 })()}
+                {/* NOTE: the Fisher deliberately has NO tile telegraph. A glowing lane
+                    gave the answer away — you could read the highlighted column without
+                    ever looking at the bird. Its ONLY tell is its stance: the coiled pose
+                    (neck drawn back over its shoulders) means the spear lands next turn.
+                    Read the boss, not the board. `fisherCoiledLane` is still used, for the
+                    pose swap in the enemyPose prop below. */}
+                {/* Fisher SNAKE THROW: a dust puff where the thrown snake comes down. The
+                    flight itself is animated on the snake's own sprite as a tumbling arc
+                    (SmoothEntityStep.arc), which is what makes the throw legible at all —
+                    this just gives the arc a clear terminus so the eye lands on it. */}
+                {(() => {
+                  const fisher = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "fisher"
+                  );
+                  if (!fisher) return null;
+                  const hurl = fisherHurl(
+                    fisher.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!hurl) return null;
+                  const [ly, lx] = hurl.to;
+                  const tileSize = 40;
+                  return (
+                    <div
+                      key={`fisher-hurl-${hurl.nonce}`}
+                      data-testid="fisher-snake-landing"
+                      aria-hidden="true"
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${lx * tileSize + 4}px`,
+                        top: `${ly * tileSize + tileSize / 2}px`,
+                        width: `${tileSize - 8}px`,
+                        height: `${tileSize / 2}px`,
+                        borderRadius: "50%",
+                        background:
+                          "radial-gradient(ellipse, rgba(210,196,170,0.7) 0%, rgba(170,152,120,0.25) 55%, transparent 100%)",
+                        zIndex: 10400, // under the snake sprite, so it reads as ground dust
+                        // Delayed to land with the snake rather than firing on launch.
+                        animation: "fisherSnakeLanding 460ms ease-out 280ms both",
+                      }}
+                    />
+                  );
+                })()}
+                {/* Fisher SPEAR in flight: the thrown spear travels the whole lane and
+                    vanishes where it lands. Drawn as one element spanning the lane that
+                    wipes along it, plus an impact flash at the end — the flight is what
+                    makes an unlimited-range attack legible instead of instant damage from
+                    nowhere. Rotated to the throw axis; no sprite needed. */}
+                {(() => {
+                  const fisher = (gameState.enemies ?? []).find(
+                    (e) => e.kind === "fisher"
+                  );
+                  if (!fisher) return null;
+                  const strike = fisherStrike(
+                    fisher.behaviorMemory as Record<string, unknown> | undefined
+                  );
+                  if (!strike || strike.tiles.length === 0) return null;
+                  const tileSize = 40;
+                  const [sy, sx] = strike.tiles[0];
+                  const [iy, ix] = strike.tiles[strike.tiles.length - 1];
+                  const vertical = sx === ix;
+                  const len = strike.tiles.length * tileSize;
+                  // Span the lane from the first tile to the last, thin across the axis.
+                  const left = vertical
+                    ? sx * tileSize + tileSize / 2 - 3
+                    : Math.min(sx, ix) * tileSize;
+                  const top = vertical
+                    ? Math.min(sy, iy) * tileSize
+                    : sy * tileSize + tileSize / 2 - 3;
+                  const towardPositive = vertical ? iy > sy : ix > sx;
+                  return (
+                    <React.Fragment key={`fisher-spear-${strike.nonce}`}>
+                      <div
+                        data-testid="fisher-spear-flight"
+                        aria-hidden="true"
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${left}px`,
+                          top: `${top}px`,
+                          width: vertical ? "6px" : `${len}px`,
+                          height: vertical ? `${len}px` : "6px",
+                          background: vertical
+                            ? "linear-gradient(180deg, rgba(214,178,96,0) 0%, rgba(214,178,96,0.95) 60%, rgba(246,238,214,1) 100%)"
+                            : "linear-gradient(90deg, rgba(214,178,96,0) 0%, rgba(214,178,96,0.95) 60%, rgba(246,238,214,1) 100%)",
+                          borderRadius: "2px",
+                          zIndex: 10860,
+                          // Flip the gradient so the pale stone tip always leads.
+                          transform: towardPositive
+                            ? undefined
+                            : vertical
+                            ? "scaleY(-1)"
+                            : "scaleX(-1)",
+                          animation: `${
+                            vertical ? "fisherSpearFlyV" : "fisherSpearFlyH"
+                          } 260ms linear both`,
+                        }}
+                      />
+                      <div
+                        data-testid="fisher-spear-impact"
+                        aria-hidden="true"
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${ix * tileSize}px`,
+                          top: `${iy * tileSize}px`,
+                          width: `${tileSize}px`,
+                          height: `${tileSize}px`,
+                          borderRadius: "50%",
+                          background: strike.hit
+                            ? "radial-gradient(circle, rgba(255,80,80,0.62) 0%, transparent 70%)"
+                            : strike.onRock
+                            ? "radial-gradient(circle, rgba(255,240,200,0.8) 0%, transparent 72%)"
+                            : "radial-gradient(circle, rgba(150,130,100,0.55) 0%, transparent 70%)",
+                          zIndex: 10850,
+                          // Delayed so the flash lands when the spear arrives, not on release.
+                          animation: "fisherStrikeImpact 420ms ease-out 200ms both",
+                        }}
+                      />
+                    </React.Fragment>
+                  );
+                })()}
                 {/* Shaper FIRE launch: a column of lava rockets up out of view
                     from the boss the turn it hurls fire skyward. */}
                 {(() => {
@@ -5970,7 +6140,28 @@ function renderTileGrid(
                 | "snake"
                 | "white-goblin"
                 | "shaper"
+                | "fisher"
                 | undefined
+            }
+            enemyPose={
+              enemyAtTile?.kind === "fisher"
+                ? (() => {
+                    const mem = enemyAtTile.behaviorMemory as
+                      | Record<string, unknown>
+                      | undefined;
+                    // Order is the read: cocked beats everything, because that pose is the
+                    // player's only warning that a spear lands next turn.
+                    if (fisherCoiledLane(mem)) return "cocked" as const;
+                    // Off balance after a miss, or head-down taking a snake — both are the
+                    // "safe to shoot" read, and `pickup` doubles as the hurl wind-up.
+                    if (fisherIsStunned(mem)) return "pickup" as const;
+                    if (fisherHurl(mem)?.nonce === (mem?.turn as number)) {
+                      return "pickup" as const;
+                    }
+                    if (fisherIsPanicking(mem)) return "stalk" as const;
+                    return undefined;
+                  })()
+                : undefined
             }
             enemySwarmCount={swarmCountAtTile}
             enemySwarmMembers={swarmAtTile?.map((m) => ({

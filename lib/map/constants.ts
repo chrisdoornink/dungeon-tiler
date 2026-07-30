@@ -135,6 +135,13 @@ export enum TileSubtype {
   // is always readable. The real seal is bracketed left and right by WALL_TORCHes;
   // decoys are bare. That torch-pair grammar is the whole tell.
   WALL_SEAL = 65,
+  // SPIKES: the outdoor world's impassable hazard — a bed of iron spikes sunk into
+  // the ground. It is a FLOOR overlay, NOT a wall tile, and that distinction is the
+  // whole point: thrown rocks/runes fly OVER it (the throw scan only breaks on
+  // non-FLOOR tiles), while the hero can never enter — bumping into it costs
+  // SPIKES_BUMP_DAMAGE and the move is refused, so it can't be crossed at any HP.
+  // Gives outdoor arenas a hard barrier where lava/abyss would look wrong.
+  SPIKES = 66,
 }
 
 /**

@@ -51,12 +51,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' = 'fire-goblin';
+  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher' = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper') {
+  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher' { return this._kind; }
+  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher') {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -105,6 +105,12 @@ export class Enemy {
       // it reshapes. Melee against it uses the standard formula (see registry).
       this.health = 5;
       this.attack = 0;
+    } else if (k === 'fisher') {
+      // The Fisher boss: unreachable by design, so its HP is denominated in THROWN
+      // ROCKS (2 damage each) — 8 is exactly four clean hits. attack 2 is its spear,
+      // which only lands on a telegraphed lane you failed to step out of.
+      this.health = 8;
+      this.attack = 2;
     }
     this.maxHealth = this.health;
   }
@@ -339,6 +345,7 @@ const SPAWN_BLOCKING_SUBTYPES = new Set<number>([
   58, // SHALLOW_WATER
   59, // DEEP_WATER
   60, // LAVA
+  66, // SPIKES (impassable — an enemy spawned here could never leave)
 ]);
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
@@ -361,7 +368,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper',
+  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher',
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -376,6 +383,7 @@ function isSafeFloorForEnemy(
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
   const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)
+  const isSpikes = tileSubs.includes(66); // SPIKES (impassable to every entity)
   const isShallowWater = tileSubs.includes(58); // SHALLOW_WATER (wadeable shoreline)
   const isDeepWater = tileSubs.includes(59); // DEEP_WATER (swimmers only)
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
@@ -390,6 +398,13 @@ function isSafeFloorForEnemy(
   // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
   // into it (not even when chasing). Only the stone goblin crosses it freely.
   if (isLava && kind !== 'stone-goblin') return false;
+
+  // A bed of spikes is a wall for everything, with no exception — it is the outdoor
+  // world's hard barrier (see TileSubtype.SPIKES), and the Fisher's arena depends on it
+  // holding in BOTH directions: the hero can't cross to the boss, and nothing the boss
+  // throws over can wander back. Without this, snakes would slither across it freely
+  // (spikes are a FLOOR overlay, so the base-grid check waves them through).
+  if (isSpikes) return false;
 
   // Shallow water is wadeable, but not by everyone: fire goblins won't risk their
   // torch near water at all; knife-throwers keep their blades dry; white goblins
@@ -489,8 +504,8 @@ export type PlainEnemy = {
   id?: string;
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
+  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
+  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' | 'fisher';
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -513,7 +528,7 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper') {
+    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper' || k === 'fisher') {
       e.kind = k;
     }
     // Preserve health/attack if present after kind effects

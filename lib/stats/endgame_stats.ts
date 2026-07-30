@@ -42,12 +42,14 @@ export interface GameCompleteRow {
   collectedChestItems: string[];
   deathCause: string | null;
   deathCauseEnemyKind: string | null;
-  /** Boss room (see boss-daily-entrances). Entrance kind/boss kind are recorded even
-   *  if the room was never found, so "what kind of boss day was it" is always known. */
+  /** Boss room (see boss-daily-entrances). Entrance kind and the DAY's boss are recorded
+   *  even if the room was never found, so "what kind of boss day was it" is always known.
+   *  bossKind is narrower: the boss this player actually got into a fight with. */
   reachedBossRoom: boolean;
   bossDefeated: boolean;
   bossEntranceKind: string | null;
   bossKind: string | null;
+  dailyBossKind: string | null;
 }
 
 export interface DaySummary {
@@ -165,6 +167,7 @@ export function toGameCompleteRow(rec: Record<string, unknown>): GameCompleteRow
     bossDefeated: toBool(rec.boss_defeated),
     bossEntranceKind: rec.boss_entrance_kind == null ? null : String(rec.boss_entrance_kind),
     bossKind: rec.boss_kind == null ? null : String(rec.boss_kind),
+    dailyBossKind: rec.daily_boss_kind == null ? null : String(rec.daily_boss_kind),
   };
 }
 

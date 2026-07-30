@@ -3,8 +3,9 @@ import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
 import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
+import { fisherUpdate, FISHER_HP, FISHER_ATTACK } from "../bosses/fisher";
 import { assetUrl } from "../asset_url";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -229,6 +230,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.SHALLOW_WATER) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
@@ -753,6 +755,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.SHALLOW_WATER) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
@@ -1020,6 +1023,45 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // alternating coiled <-> moving each turn.
         e.memory.moved = false;
 
+        // AIRBORNE: the Fisher seized this snake and threw it across the spikes. It
+        // can't move another enemy directly (customUpdate only hands it a positional
+        // copy of the roster) so it stamps a flight order into this memory bag instead;
+        // the snake carries it out here, on its own tick. Landing consumes the whole
+        // turn — a snake that just hit the ground doesn't also get to bite.
+        const hurl = e.memory.fisherHurl as { y: number; x: number } | undefined;
+        if (hurl) {
+          delete e.memory.fisherHurl;
+          const landY = hurl.y;
+          const landX = hurl.x;
+          const inBounds =
+            landY >= 0 && landX >= 0 && landY < grid.length && landX < (grid[0]?.length ?? 0);
+          const occupied = (ctx.enemies ?? []).some(
+            (other, i) => i !== ctx.enemyIndex && other.y === landY && other.x === landX
+          );
+          if (inBounds && !occupied && !(landY === py && landX === px)) {
+            const fromY = e.y;
+            const fromX = e.x;
+            e.y = landY;
+            e.x = landX;
+            e.memory.moved = true;
+            // Flight record for the render layer, which animates this as a tumbling arc
+            // instead of a slide (see the `snake` case in TilemapGrid's smoothEntitySteps).
+            // Storing both ends means the match is exact and self-expiring — it only lines
+            // up on the tick the throw actually happened.
+            e.memory.lastFlight = { from: [fromY, fromX], to: [landY, landX] };
+            // Face the hero as it uncoils, so the threat reads immediately.
+            e.facing =
+              Math.abs(px - landX) >= Math.abs(py - landY)
+                ? px > landX
+                  ? "RIGHT"
+                  : "LEFT"
+                : py > landY
+                ? "DOWN"
+                : "UP";
+          }
+          return 0;
+        }
+
         const heroDark = ctx.player.torchLit === false;
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
 
@@ -1068,9 +1110,12 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
           // Snakes won't swim: deep water is off-limits (shallow is fine to slither).
+          // Spikes are a wall for everything — a snake the Fisher hurls over must not be
+          // able to slither back across the barrier it was thrown over.
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
         };
@@ -1193,6 +1238,41 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
       customUpdate: shaperUpdate,
+    },
+  },
+  "fisher": {
+    kind: "fisher",
+    displayName: "The Fisher",
+    assets: {
+      // Hand-drawn art, background-keyed and baseline-normalised from the source renders
+      // (scratchpad/prep_fisher.js — the originals sit on an opaque vignette with a baked
+      // shadow and the bird at a different height in each). Extra poses the render layer
+      // swaps in — `fisher-cocked` (spear drawn back: the fight's only tell), `fisher-stalk`
+      // (hunched and advancing) and `fisher-pickup` (head down, taking a snake) — live
+      // alongside these; see enemyPose in Tile.tsx.
+      //
+      // There is only a RIGHT profile: unlike the Shaper this one IS mirrored for left, so
+      // the left facing deliberately points at the same file.
+      //
+      // The `-stand-` in these names is load-bearing, not tidiness — do NOT "simplify" them
+      // back to fisher-front.png etc. Those were the filenames of the earlier placeholder
+      // art, and reusing them meant browsers served the cached placeholders instead of the
+      // real art (only the brand-new pose filenames picked up correctly). Any future art
+      // pass should likewise land on a filename that has never been served before.
+      front: assetUrl("/images/enemies/bosses/fisher/fisher-stand-front.png"),
+      left: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
+      right: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
+      back: assetUrl("/images/enemies/bosses/fisher/fisher-stand-back.png"),
+    },
+    base: { health: FISHER_HP, attack: FISHER_ATTACK },
+    // Melee is unreachable by design — the spikes guarantee the hero never stands
+    // adjacent — so this exists only so the kill path is well-defined if a future
+    // arena ever does let you close. Rocks (2 damage) are the intended weapon:
+    // FISHER_HP is set to exactly four of them.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: fisherUpdate,
     },
   },
 };

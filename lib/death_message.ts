@@ -5,7 +5,7 @@
  */
 
 export interface DeathCause {
-  type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava";
+  type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava" | "spikes";
   enemyKind?: string;
 }
 
@@ -16,6 +16,8 @@ export function deathCauseMessage(cause?: DeathCause | null): string {
       return "You fell into the abyss";
     case "lava":
       return "The lava consumed you";
+    case "spikes":
+      return "The spikes took you";
     case "poison":
       return "The poison consumed you";
     case "darkness":

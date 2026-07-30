@@ -780,6 +780,23 @@
   box-shadow: inset 0 0 8px 2px rgba(255, 90, 20, 0.14);
 }
 
+/* Bed of spikes: the outdoor world's impassable hazard (TileSubtype.SPIKES). A 32x32
+   pixel-art tile — iron spikes standing in a shallow pit, with a lit ground lip on the
+   top/left and a shaded one on the bottom/right so it reads as sunk INTO the ground
+   rather than sitting on it. Static on purpose: it is a wall, and a wall shouldn't draw
+   the eye the way lava's bubbles do. The inset shadow deepens the depression and
+   visually seals the tile off from the grass beside it.
+   Regenerate with scratchpad/gen_spikes.js if the palette needs retuning. */
+.spikes {
+  position: relative;
+  background-color: #211a14;
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABOElEQVR42u2XPQ7CMAyFuyMxIKYKBkaWTh05A0MHBk7AIRAj50GMXA6USkauazvOTxsGhgcifXl8BNvQ6nI6vEuqcg/tfltEA4DVcjGrWIBdvZ5FfwAzwOP58obFeLIAQDFNBnC93Xs1TSsGx3qCAeAa/SQSAPZlAZCOUgOAvGwA9ETgddede9F1bp8JQArHQVrhgc95JEgVgKtYGoSPWPI5D64fcxdY2kqrekt3iAD0e+botXDYo3ng9LwAU/Q+DC4AcPIC5Op9uh4FwFU19WkeFUDayAVw4bTvJcggAGmo0HDsiwKwDJ8QALhOs9wzXhvVgFbN9M01UK49sQdPRTNAyuDhfkvYLuA2cN9l6nDKChDqKwLAeX4X4Lipv8LVjtdDALQ/LyOAEFlAfbdmA4BSqlJvr1MBPvsBlJsIzu6jAAAAAElFTkSuQmCC");
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  box-shadow: inset 0 0 6px 2px rgba(0, 0, 0, 0.55);
+}
+
 /* Positions the bubbling lava overlay (a PixelFlame with LAVA_FRAMES). The 20x20 grid
    at cell=2 is 40px square — it fills the tile exactly, bottom-anchored, so the bubbles
    sit low on the molten surface and stay within the tile. The horizontal transform is

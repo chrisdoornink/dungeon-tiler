@@ -21,14 +21,25 @@ import {
   advanceToNextFloor,
 } from "../map/game-state";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
+import { bossInfo, type BossKind } from "../bosses/boss_roster";
 
 export type BossEntranceKind = "bomb" | "douse" | "moat-lava" | "moat-water";
 
 export interface BossDayInfo {
   /** Which of the four doors today rolled; null on a day with no boss room at all. */
   entranceKind: BossEntranceKind | null;
-  /** Which elemental Shaper arena that entrance opens into. */
+  /** Which elemental Shaper arena that entrance opens into. Meaningless for the Fisher. */
   arenaSeed: "water" | "lava" | null;
+  /**
+   * WHICH boss the day holds. Replayed rather than read off analytics for the same reason as
+   * the entrance: a player's row only carries it if that player reached floor 3, so on a day
+   * nobody has played yet the analytics answer would be silently missing.
+   */
+  bossKind: BossKind | null;
+  /** The boss's three-emoji signature, or null on a bossless day. */
+  bossEmoji: string | null;
+  /** Display name, e.g. "The Fisher". */
+  bossName: string | null;
 }
 
 /**
@@ -42,8 +53,13 @@ export function bossDayInfoForDate(dateStr: string): BossDayInfo {
   );
   const f2 = advanceToNextFloor(f1, seed);
   const f3 = advanceToNextFloor(f2, seed);
+  const bossKind = f3.dailyBossKind ?? null;
+  const info = bossInfo(bossKind);
   return {
     entranceKind: f3.bossEntranceKind ?? null,
     arenaSeed: f3.bossArenaSeed ?? null,
+    bossKind,
+    bossEmoji: info ? info.emoji.join("") : null,
+    bossName: info?.displayName ?? null,
   };
 }

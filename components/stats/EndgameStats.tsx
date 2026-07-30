@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { bossEmojiFor, bossNameFor } from "../../lib/bosses/boss_roster";
 import type {
   EndgameStatsResponse,
   StatsDayPayload,
@@ -304,14 +305,17 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
         ) : null}
         {g.bossDefeated ? (
           <span
-            title={`Slew the boss (${g.bossKind ?? "shaper"}) via ${g.bossEntranceKind ?? "unknown"} entrance`}
+            title={`Slew ${bossNameFor(g.bossKind)} via ${g.bossEntranceKind ?? "unknown"} entrance`}
             style={{ fontSize: 14 }}
           >
-            ❄️💀🔥
+            {bossEmojiFor(g.bossKind)}
           </span>
         ) : g.reachedBossRoom ? (
-          <span title="Found the boss room, but didn't defeat it" style={{ fontSize: 14, opacity: 0.5 }}>
-            ❄️💀🔥
+          <span
+            title={`Found ${bossNameFor(g.bossKind)}, but didn't defeat it`}
+            style={{ fontSize: 14, opacity: 0.5 }}
+          >
+            {bossEmojiFor(g.bossKind)}
           </span>
         ) : null}
       </div>
@@ -433,6 +437,28 @@ function DayCard({ day }: { day: StatsDayPayload }) {
               {(BOSS_ENTRANCE_META[day.bossDay.entranceKind]?.label ?? day.bossDay.entranceKind).toUpperCase()}
             </span>
           ) : null}
+          {/* WHICH boss the day rolled, replayed from the date like the entrance beside it —
+              so it's known even on a day nobody has reached floor 3 yet. */}
+          {day.bossDay.bossKind ? (
+            <span
+              className="pixel-text"
+              style={{
+                fontSize: 10,
+                padding: "3px 6px",
+                borderRadius: 3,
+                color: C.text,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+              title={`Today's boss is ${day.bossDay.bossName} (rolled from the date, the same for every player)`}
+            >
+              <span>{day.bossDay.bossEmoji}</span>
+              {(day.bossDay.bossName ?? "").toUpperCase()}
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -449,8 +475,18 @@ function DayCard({ day }: { day: StatsDayPayload }) {
         <StatChip icon={ICON.tree} value={s.blewUpTree} label="tree" accent={C.text} />
         {day.bossDay.entranceKind ? (
           <>
-            <StatChip emoji="❄️💀🔥" value={s.reachedBossRoom} label="found boss" accent={C.text} />
-            <StatChip emoji="❄️💀🔥" value={s.bossDefeated} label="boss slain" accent={C.win} />
+            <StatChip
+              emoji={day.bossDay.bossEmoji ?? bossEmojiFor(null)}
+              value={s.reachedBossRoom}
+              label="found boss"
+              accent={C.text}
+            />
+            <StatChip
+              emoji={day.bossDay.bossEmoji ?? bossEmojiFor(null)}
+              value={s.bossDefeated}
+              label="boss slain"
+              accent={C.win}
+            />
           </>
         ) : null}
       </div>

@@ -52,6 +52,7 @@ const ROW_COLUMNS = [
   "boss_defeated",
   "boss_entrance_kind",
   "boss_kind",
+  "daily_boss_kind",
 ] as const;
 
 // PostHog type-infers `date_seed` as a DateTime (it looks like a date), so
@@ -86,7 +87,8 @@ const ROW_SELECT = `
   properties.reached_boss_room AS reached_boss_room,
   properties.boss_defeated AS boss_defeated,
   properties.boss_entrance_kind AS boss_entrance_kind,
-  properties.boss_kind AS boss_kind
+  properties.boss_kind AS boss_kind,
+  properties.daily_boss_kind AS daily_boss_kind
 `;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;

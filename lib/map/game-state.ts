@@ -59,6 +59,16 @@ import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
+import { collapseFisherIntoBridge, buildFisherArena } from "../bosses/fisher_arena";
+import {
+  rollDailyBossKind,
+  type BossKind,
+} from "../bosses/boss_roster";
+/**
+ * Salt for the boss-kind roll's independent RNG stream. Any fixed value works; it exists
+ * only to decorrelate this roll from the floor's own sequence (see the roll site).
+ */
+const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
 import {
   rollBossEntranceKind,
   rollDecoySealCount,
@@ -125,6 +135,13 @@ function breakPotReleasingContents(
       (s) => s !== TileSubtype.POT && s !== TileSubtype.RUNE
     );
     mapData.subtypes[y][x] = kept.concat([TileSubtype.RUNE]);
+    return { spawnedSnake: null, potOverrides };
+  }
+  // A pot carrying its contents in the tile (`[POT, MED]`) — see the matching branch in
+  // the walk-in path. Shattering it from range must reveal the same thing walking into it
+  // would, so this has to sit ahead of the reveal roll below.
+  if (subs.includes(TileSubtype.MED) || subs.includes(TileSubtype.FOOD)) {
+    mapData.subtypes[y][x] = subs.filter((s) => s !== TileSubtype.POT);
     return { spawnedSnake: null, potOverrides };
   }
   // Food / potion pot: reveal the same contents a walk-in open would (reveal is
@@ -238,6 +255,12 @@ function applyHeroDamage(state: GameState, amount: number): void {
 // at 4 so a pile-on can't instantly delete the hero. The pink realm is a deliberately
 // harder gauntlet guarding the heart, so its buffed swarms + hit-and-run ninjas are
 // allowed to stack more per turn. Tunable knob for realm difficulty.
+// What walking into a bed of SPIKES costs. The move is always refused (spikes are a
+// hard barrier — see the SPIKES branch in the movement handler), so this is purely the
+// penalty for probing the wall: enough to punish mashing into it, small enough that a
+// mis-tap isn't a run-ender.
+export const SPIKES_BUMP_DAMAGE = 1;
+
 const PINK_REALM_DAMAGE_CAP = 6;
 function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
   return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
@@ -533,11 +556,23 @@ export function performUseBerry(gameState: GameState): GameState {
 }
 
 /**
+ * Throw a rock, then settle any boss that died to it. The Fisher can ONLY be killed at
+ * range, so its death payout has to hang off this path as well as movePlayer's — and
+ * performThrowRockCore returns from a dozen places, so it's wrapped rather than hooked.
+ */
+export function performThrowRock(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performThrowRockCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+/**
  * Throw a rock up to 4 tiles in the player's facing direction.
  * Minimal slice: if inventory has a rock and there is a clear 4-tile floor path,
  * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
  */
-export function performThrowRock(gameState: GameState): GameState {
+export function performThrowRockCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
@@ -1663,7 +1698,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava" | "spikes";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -1722,10 +1757,15 @@ export interface GameState {
   // once, the day the entrance was rolled, so analytics can report which kind of
   // exit that day's boss room had (independent of whether the hero ever finds it).
   bossEntranceKind?: BossEntranceKind;
-  // Which boss is in the room. Only "shaper" exists today, but this is set (rather
-  // than inferred from the live enemies array, which is empty after the kill or the
-  // hero leaving) so future boss variety is reportable per run from day one.
-  bossKind?: "shaper";
+  // The boss the hero ACTUALLY entered and fought. Set on entry (rather than inferred from
+  // the live enemies array, which is empty after the kill or after the hero leaves), so a
+  // run reports which boss it faced. Absent on runs that never found the room.
+  bossKind?: BossKind;
+  // The boss the DAY rolled — present from floor-3 generation onward whether or not the
+  // hero ever finds the entrance. Kept distinct from bossKind so "what did today hold" and
+  // "what did this player fight" stay separately answerable; conflating them would make
+  // every floor-3 run look like it met a boss.
+  dailyBossKind?: BossKind;
   bossArenaSeed?: "water" | "lava";
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
@@ -2268,6 +2308,20 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     return mapData;
   });
 
+  // Which boss the day's room holds. Rolled from a SEPARATE stream derived from the daily
+  // seed — NOT from `rng` — so it consumes nothing from the floor's random sequence. Drawing
+  // one value from `rng` here would shift every later roll (enemy placement, snakes), which
+  // would change what past dates replay to and so silently corrupt the historical answers
+  // that lib/stats/boss_day.ts and daily_chest.ts get by re-running this generator.
+  // Deterministic from the date, so every player gets the same boss; independent of it, so
+  // adding bosses later never disturbs existing daily maps.
+  const dailyBossKind = bossEntrance
+    ? withPatchedMathRandom(
+        mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT),
+        rollDailyBossKind
+      )
+    : undefined;
+
   // Find player position to place enemies
   const playerPos = findPlayerPosition(newMapData);
   const enemies = playerPos
@@ -2372,6 +2426,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     bossEntranceKind: bossEntrance ?? undefined,
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
     sealPayloads,
+    dailyBossKind,
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -2895,17 +2950,30 @@ const BOSS_ENTRY_BY_DIRECTION: Record<Direction, ShaperEntry> = {
  * Step onto a boss-room entrance (a lockless cave mouth, or a dark portal while the
  * torch is out) -> warp into the boss arena. Mirrors enterPinkRealm: swap in the
  * freshly built arena map + enemies, carry the run's vitals/inventory, and latch the
- * reachedBossRoom secret flag. For now every entrance leads to the Shaper; the
- * elemental variant is chosen by bossArenaSeed (default lava).
+ * reachedBossRoom secret flag.
+ *
+ * WHICH boss is the day's roll (dailyBossKind), so it's the same for every player that day —
+ * see rollDailyBossKind. The entrance still sets the Shaper's elemental variant; the Fisher
+ * ignores it (its arena is outdoor and always the same shape, varying only in pond layout).
+ * Falls back to the Shaper when dailyBossKind is absent, which covers runs saved before the
+ * roll existed.
  */
 function enterBossRoom(
   state: GameState,
   entrancePos: [number, number],
   direction: Direction
 ): GameState {
-  const seed: "water" | "lava" = state.bossArenaSeed === "water" ? "water" : "lava";
+  const kind: BossKind = state.dailyBossKind ?? "shaper";
   const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
-  const arena = buildShaperArena({ name: "boss", seed }, entry);
+  const arena =
+    kind === "fisher"
+      ? // The Fisher is always entered from the south — you come in at the bottom of the
+        // pond and the whole arena is built around that — so `entry` is deliberately unused.
+        buildFisherArena()
+      : buildShaperArena(
+          { name: "boss", seed: state.bossArenaSeed === "water" ? "water" : "lava" },
+          entry
+        );
 
   // The arena tile the hero arrives on becomes the way back out (same subtype both
   // ways, exactly like the pink realm's ring): step off it, then back onto it, to
@@ -2929,7 +2997,7 @@ function enterBossRoom(
     npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
-    bossKind: "shaper",
+    bossKind: kind,
     playerDirection: direction,
     // Stash the floor exactly as it was (player lifted out) so the way back is a
     // faithful restore. Kept in its own field: dungeonReturn is already in use by
@@ -2946,24 +3014,54 @@ function enterBossRoom(
 }
 
 /**
- * The Shaper's death drops the gold key that opens the arena's exit — the alternate
- * ending. Detected centrally (comparing the pre-move state to the resolved one) rather
- * than hooked into each of the many kill paths, so melee, thrown rocks and bombs all
- * work. Idempotent via bossDefeated.
+ * Where each boss stood going INTO this turn. Captured up front because the turn
+ * handlers mutate the enemies array in place, so after they run the pre-state no longer
+ * shows a boss that just died.
  */
-function dropBossKeyOnDefeat(
-  after: GameState,
-  bossPosBefore: [number, number] | null
-): void {
+export interface BossSnapshot {
+  shaper: [number, number] | null;
+  fisher: [number, number] | null;
+}
+
+export function snapshotBosses(state: GameState): BossSnapshot {
+  const find = (kind: EnemyKind): [number, number] | null => {
+    const e = (state.enemies ?? []).find((en) => en.kind === kind);
+    return e ? [e.y, e.x] : null;
+  };
+  return { shaper: find("shaper"), fisher: find("fisher") };
+}
+
+/**
+ * Boss death payouts, detected centrally by comparing the pre-turn snapshot to the
+ * resolved state rather than hooked into each of the many kill paths — so melee, thrown
+ * rocks and bombs all work. Idempotent via bossDefeated.
+ *
+ *   Shaper -> drops the gold key that opens the arena's exit (the alternate ending).
+ *   Fisher -> topples forward across the spikes; its body IS the crossing, and the key
+ *             comes with it. There is no other way anyone reaches the far bank.
+ */
+function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
   if (!after.inBossRoom || after.bossDefeated) return;
-  if (!bossPosBefore) return; // no Shaper was alive going into this turn
-  if ((after.enemies ?? []).some((e) => e.kind === "shaper")) return; // still standing
+  const alive = after.enemies ?? [];
   // Prefer the recorded death tile; fall back to where it stood before the killing blow.
-  const deaths = after.recentDeaths ?? [];
-  const [ky, kx] = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
-  const cell = after.mapData.subtypes[ky]?.[kx];
-  if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
-  after.bossDefeated = true;
+  const deathTile = (fallback: [number, number]): [number, number] => {
+    const deaths = after.recentDeaths ?? [];
+    return deaths.length > 0 ? deaths[deaths.length - 1] : fallback;
+  };
+
+  if (before.shaper && !alive.some((e) => e.kind === "shaper")) {
+    const [ky, kx] = deathTile(before.shaper);
+    const cell = after.mapData.subtypes[ky]?.[kx];
+    if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    after.bossDefeated = true;
+    return;
+  }
+
+  if (before.fisher && !alive.some((e) => e.kind === "fisher")) {
+    const [, kx] = deathTile(before.fisher);
+    collapseFisherIntoBridge(after, kx);
+    after.bossDefeated = true;
+  }
 }
 
 /** Step back onto the arrival tile inside a boss arena -> restore the saved floor. */
@@ -3054,16 +3152,13 @@ export function movePlayer(
   // position so stepping out of the 3x3 blast keeps the hero safe. (movePlayer never
   // places a bomb, so every BOMB_LIVE present was armed on a previous turn.) Skip
   // detonation on a floor transition — that floor is being replaced.
-  // Snapshot the Shaper's position BEFORE resolving the turn: movePlayerCore mutates
-  // the enemies array in place, so after the call the pre-state no longer shows it.
-  const bossBefore = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
-  const bossPosBefore: [number, number] | null = bossBefore
-    ? [bossBefore.y, bossBefore.x]
-    : null;
+  // Snapshot boss positions BEFORE resolving the turn: movePlayerCore mutates the
+  // enemies array in place, so after the call the pre-state no longer shows them.
+  const bossesBefore = snapshotBosses(gameState);
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
-  // Killing the Shaper drops the gold key for the arena's exit (alternate ending).
-  dropBossKeyOnDefeat(result, bossPosBefore);
+  // Boss death payouts (Shaper's gold key / the Fisher collapsing into a bridge).
+  resolveBossDefeat(result, bossesBefore);
   // Nightmare darkness drains the hero the deeper they wander. Apply only when the hero
   // actually MOVED while staying in the nightmare (not the entry step, the step back out,
   // or bumping a wall).
@@ -3514,6 +3609,23 @@ function movePlayerCore(
       return newGameState;
     }
 
+    // A bed of spikes is an ABSOLUTE barrier, not a survivable toll: the hero shoves
+    // into it, takes a scratch, and does not move. Unlike lava (which kills but is
+    // still *entered*), spikes can never be crossed at any HP — that is what lets an
+    // outdoor arena put the boss permanently out of melee reach. Rocks still fly over
+    // it, because the throw scan only stops on non-FLOOR tiles and this is an overlay.
+    if (subtype.includes(TileSubtype.SPIKES)) {
+      applyHeroDamage(newGameState, SPIKES_BUMP_DAMAGE);
+      newGameState.stats = {
+        ...newGameState.stats,
+        damageTaken: newGameState.stats.damageTaken + SPIKES_BUMP_DAMAGE,
+      };
+      if (newGameState.heroHealth <= 0 && !newGameState.deathCause) {
+        newGameState.deathCause = { type: "spikes" };
+      }
+      return newGameState;
+    }
+
     // Check if tile has a torch on floor - blocks movement (solid object)
     if (subtype.includes(TileSubtype.WALL_TORCH)) {
       return newGameState;
@@ -3714,6 +3826,18 @@ function movePlayerCore(
           (t) => t !== TileSubtype.POT && t !== TileSubtype.RUNE
         );
         newMapData.subtypes[newY][newX] = base.concat([TileSubtype.RUNE]);
+      } else if (
+        subtype.includes(TileSubtype.MED) ||
+        subtype.includes(TileSubtype.FOOD)
+      ) {
+        // A pot whose contents are written INTO the tile (`[POT, MED]`), the same way snake
+        // and rune pots already work. Preferred over the potOverrides side table whenever a
+        // level needs a guaranteed drop: the guarantee travels with the map, so a state
+        // clone, a room transition or a save/restore can't silently turn it back into a
+        // food/potion coin flip. Just drop the POT tag and leave the contents.
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+          (t) => t !== TileSubtype.POT
+        );
       } else {
         const key = `${newY},${newX}`;
         const overrides = newGameState.potOverrides;
