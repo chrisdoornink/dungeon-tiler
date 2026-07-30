@@ -679,11 +679,16 @@ export function updateEnemies(
         subtypes,
         enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health, behaviorMemory: en.behaviorMemory })),
         enemyIndex: i,
-        player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
+        // Read the NORMALIZED opts, not the raw 5th arg: under the legacy
+        // 4-arg signature `opts` is undefined, which silently fed every
+        // custom-update enemy `torchLit: true`. Snakes hunt on exactly this
+        // flag (see the snake behavior in enemies/registry), so a stale `true`
+        // there would quietly disable the mechanic.
+        player: { y: player.y, x: player.x, torchLit: finalOpts?.playerTorchLit ?? true },
         playerNext: finalOpts?.playerNext,
         ghosts: ghostPositions,
         rng,
-        setPlayerTorchLit: opts?.setPlayerTorchLit,
+        setPlayerTorchLit: finalOpts?.setPlayerTorchLit,
         mist: finalOpts?.mist,
         enemy: enemyCtx,
       });
@@ -785,8 +790,9 @@ export function updateEnemies(
       });
     }
     // Robust fallback: if a ghost is adjacent, ensure torch is snuffed regardless of hook wiring
-    if (isAdjacent && e.kind === 'ghost' && opts?.setPlayerTorchLit) {
-      opts.setPlayerTorchLit(false);
+    // (normalized opts, for the same reason as the customUpdate branch above)
+    if (isAdjacent && e.kind === 'ghost' && finalOpts?.setPlayerTorchLit) {
+      finalOpts.setPlayerTorchLit(false);
     }
   }
 

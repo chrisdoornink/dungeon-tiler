@@ -82,6 +82,33 @@ export interface EnemyConfig {
 
 const clampMin = (n: number, min = 0) => (n < min ? min : n);
 
+// --- Snake torch aggression -------------------------------------------------
+// Snakes invert the usual torch-snuff stealth rule. Every other enemy loses the
+// hero when his flame goes out; a snake hunts by body heat, so darkness is when
+// it stops being scenery and starts being a predator. With the torch lit it is
+// aloof (mostly slinks away, occasionally drifts closer); with the torch out it
+// commits, tracks the hero through walls, and bites.
+//
+// This is deliberately global — it reads `ctx.player.torchLit`, so it applies
+// anywhere the torch can go out: ghost snuffs, swimming deep water, the unlit
+// endless floors, and the doused walk to a DARK_PORTAL boss entrance.
+
+// How far a snake senses a doused hero, in Manhattan tiles. Ignores line of
+// sight (heat, not light). Matches ENEMY_VISION_RADIUS and the HUD's "Enemies
+// in sight" panel, so a snake that has a clear line on you is one the HUD is
+// already listing — sensed-through-a-wall is the only unannounced case, and a
+// wall is also what keeps it from reaching you.
+export const SNAKE_DARK_SENSE_RADIUS = 8;
+
+// Turns a snake keeps hunting after it loses the scent — either the hero
+// relights or steps out of range. Relighting is a reprieve, not an off switch:
+// a riled snake finishes its lunge at the hero's last sensed position. Mirrors
+// ENEMY_PURSUIT_TTL, which does the same job for goblin line-of-sight memory.
+export const SNAKE_RILED_TTL = 4;
+
+// Chance an aloof (torch-lit) snake drifts toward the hero rather than away.
+export const SNAKE_LIT_APPROACH_CHANCE = 0.33;
+
 export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
   "fire-goblin": {
     kind: "fire-goblin",
@@ -980,7 +1007,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
-      // Move away from player when visible; wander otherwise
+      // Aloof while the hero's torch burns (mostly slinks away); a relentless
+      // heat-seeking hunter once it goes out. See the SNAKE_DARK_* constants.
       customUpdate: (ctx) => {
         const grid = ctx.grid;
         const e = ctx.enemy; // contains mutable y,x,facing,memory
@@ -992,12 +1020,37 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // alternating coiled <-> moving each turn.
         e.memory.moved = false;
 
-        // Torch-snuff stealth: a hidden hero is neither seen nor bitten.
-        const heroHidden = ctx.player.torchLit === false;
-
-        // If adjacent, attack
+        const heroDark = ctx.player.torchLit === false;
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
-        if (manhattan === 1 && !heroHidden) {
+
+        // Heat sense: a doused hero is prey. No line-of-sight check — the snake
+        // feels him through walls — but it still has to slither around them.
+        const sensesHeat = heroDark && manhattan <= SNAKE_DARK_SENSE_RADIUS;
+        let riledTtl = Number(e.memory.riledTtl ?? 0);
+        if (sensesHeat) {
+          riledTtl = SNAKE_RILED_TTL;
+          e.memory.lastSensed = { y: py, x: px };
+        } else if (riledTtl > 0) {
+          riledTtl -= 1;
+        }
+        e.memory.riledTtl = riledTtl;
+        if (riledTtl <= 0) delete e.memory.lastSensed;
+
+        // A riled snake chases the last place it felt the hero, not his live
+        // position — relighting mid-chase lets you break contact and slip away,
+        // the same escape goblins allow when you snuff mid-chase.
+        const sensed = e.memory.lastSensed as { y: number; x: number } | undefined;
+        const huntTarget = sensesHeat
+          ? { y: py, x: px }
+          : riledTtl > 0 && sensed
+          ? sensed
+          : null;
+        // Exposed for the render layer / debugging: is this snake in hunt mode?
+        e.memory.hunting = huntTarget !== null;
+
+        // If adjacent, bite — lit torch or not. A doused hero used to be
+        // un-bitable even nose-to-nose; darkness is the snake's advantage now.
+        if (manhattan === 1) {
           // Face the player
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
@@ -1022,12 +1075,40 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           );
         };
 
-        // If can see player, decide each tick: 33% approach, 67% avoid (move away)
-        const sees = !heroHidden && canSee(grid, [e.y, e.x], [py, px]);
+        // Hunting the dark: commit, and close the distance every single turn.
+        // Uses the shared pursuit ordering so the approach still can't be read
+        // tile-for-tile (see lib/enemies/pursuit.ts).
+        if (huntTarget) {
+          const steps = orderPursuitSteps(
+            huntTarget.y - e.y,
+            huntTarget.x - e.x,
+            ctx.rng ?? Math.random
+          );
+          for (const [my, mx] of steps) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (isFloor(ny, nx)) {
+              if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
+              else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              return 0;
+            }
+          }
+          // Boxed in by walls this turn — hold position and keep hunting.
+          return 0;
+        }
+
+        // Torch lit: aloof. Decide each tick — mostly avoid, sometimes approach.
+        // A doused hero who is out of heat range is genuinely lost: no flame to
+        // spot and too far to feel, so the snake falls through to wandering.
+        const sees = !heroDark && canSee(grid, [e.y, e.x], [py, px]);
         if (sees) {
           const dy = py - e.y;
           const dx = px - e.x;
-          const goToward = (ctx.rng?.() ?? Math.random()) < 0.33;
+          const goToward =
+            (ctx.rng?.() ?? Math.random()) < SNAKE_LIT_APPROACH_CHANCE;
           const tryMoves: Array<[number, number]> = [];
           if (Math.abs(dx) >= Math.abs(dy)) {
             // Favor X axis first
