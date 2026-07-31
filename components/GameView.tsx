@@ -22,6 +22,37 @@ export interface GameViewProps {
   storageSlot?: "default" | "daily-new" | "story" | "endless";
 }
 
+/**
+ * Header title: "Torch Boy — Floor 2/3" in the multi-floor daily, "Torch Boy — Floor 7"
+ * in endless (no cap worth advertising), and the floor word becomes "Pink Realm" while
+ * the hero is warped into the secret realm. Inside a boss arena the floor keeps its
+ * number and gains a skull: "Torch Boy — Floor 3/3 💀" — deliberately no boss name,
+ * since the internal boss names aren't surfaced to players.
+ */
+export function heroLocationTitle({
+  floor,
+  maxFloors,
+  isEndless,
+  inPinkRealm,
+  inBossRoom,
+}: {
+  floor?: number;
+  maxFloors: number;
+  isEndless: boolean;
+  inPinkRealm?: boolean;
+  inBossRoom?: boolean;
+}): string {
+  const isMultiFloor = maxFloors > 1;
+  if (!floor || (!isEndless && !isMultiFloor)) return "Torch Boy";
+  // Boss arena wins over the realm word: you are standing in the arena, and the skull
+  // is the whole signal. (Unreachable together today — arenas are entered from the
+  // floor-3 dungeon, not the realm — but the precedence keeps the string sane.)
+  const place = inPinkRealm && !inBossRoom ? "Pink Realm" : "Floor";
+  const boss = inBossRoom ? " 💀" : "";
+  const where = isEndless ? `${floor}` : `${floor}/${maxFloors}`;
+  return `Torch Boy — ${place} ${where}${boss}`;
+}
+
 function GameViewInner({
   algorithm,
   replay,
@@ -179,29 +210,24 @@ function GameViewInner({
 
   const finalInitialState = replayState || initialState;
 
-  // Track the hero's location (floor + pink realm) for the title area
+  // Track the hero's location (floor + pink realm + boss arena) for the title area
   const [heroLocation, setHeroLocation] = useState<{
     floor?: number;
     inPinkRealm: boolean;
+    inBossRoom: boolean;
   }>({
     floor: finalInitialState?.currentFloor,
     inPinkRealm: !!finalInitialState?.inPinkRealm,
+    inBossRoom: !!finalInitialState?.inBossRoom,
   });
 
-  // Header title: "Torch Boy — Floor 2/3" in the multi-floor daily,
-  // "Torch Boy — Floor 7" in endless (no cap worth advertising), and the floor
-  // word becomes "Pink Realm" while the hero is warped into the secret realm.
-  const title = (() => {
-    const floor = heroLocation.floor;
-    const maxFloors = finalInitialState?.maxFloors ?? 1;
-    const isEndless = storageSlot === "endless";
-    const isMultiFloor = maxFloors > 1;
-    if (!floor || (!isEndless && !isMultiFloor)) return "Torch Boy";
-    const place = heroLocation.inPinkRealm ? "Pink Realm" : "Floor";
-    return isEndless
-      ? `Torch Boy — ${place} ${floor}`
-      : `Torch Boy — ${place} ${floor}/${maxFloors}`;
-  })();
+  const title = heroLocationTitle({
+    floor: heroLocation.floor,
+    maxFloors: finalInitialState?.maxFloors ?? 1,
+    isEndless: storageSlot === "endless",
+    inPinkRealm: heroLocation.inPinkRealm,
+    inBossRoom: heroLocation.inBossRoom,
+  });
 
   // Fire analytics for game start once we have an initial state
   useEffect(() => {
