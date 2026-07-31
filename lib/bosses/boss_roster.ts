@@ -8,7 +8,7 @@
 // builders in scope; this module only answers "which boss, and how is it labelled".
 
 /** Every boss that can hold the daily boss room. */
-export type BossKind = "shaper" | "fisher";
+export type BossKind = "shaper" | "fisher" | "coilwyrm" | "quarrymaster";
 
 export interface BossInfo {
   kind: BossKind;
@@ -50,6 +50,26 @@ export const BOSS_ROSTER: Record<BossKind, BossInfo> = {
     emoji: ["🏹", "🐦", "🏹"],
     tagline: "A heron across a bed of spikes — rocks are your only reach",
   },
+  coilwyrm: {
+    kind: "coilwyrm",
+    displayName: "The Coilwyrm",
+    // Follows the Fisher's bracket pattern: the creature between the thing you kill it with.
+    // 🪱 rather than 🐍 deliberately — snakes are an ordinary enemy the player meets all the
+    // time, so a snake crest would read "there were snakes" instead of naming this boss, the
+    // exact ambiguity the Fisher's original crest was changed to avoid.
+    emoji: ["🗡️", "🪱", "🗡️"],
+    tagline: "A living wall of coil — cut it anywhere and everything behind dies",
+  },
+  quarrymaster: {
+    kind: "quarrymaster",
+    displayName: "The Quarrymaster",
+    // Same bracket pattern. ⛏️ says quarry and nothing else in the game uses it; 🗿 is a
+    // stone figure, which is what he is. Avoided 💀 despite the Shaper using it — one shared
+    // skull between two crests starts to make them rhyme at a glance, which is the opposite
+    // of the point.
+    emoji: ["⛏️", "🗿", "⛏️"],
+    tagline: "Caged behind spike beds — throw the switches to reach him",
+  },
 };
 
 export const BOSS_KINDS = Object.keys(BOSS_ROSTER) as BossKind[];
@@ -82,9 +102,10 @@ export function bossNameFor(kind: string | null | undefined): string {
  * still being a real roll rather than a rotation anyone can predict from the calendar.
  * (Same contract as rollBossEntranceKind — see boss_entrances.ts.)
  *
- * Uniform across the roster: with only two bosses a weighting scheme would just be a
- * coin-flip with extra steps, and an even split is what makes "which boss did you get?"
- * a real question between players.
+ * Uniform across the roster, and derived from BOSS_KINDS rather than a hand-written list, so
+ * adding an entry to BOSS_ROSTER above is the whole of "put this boss in the rotation" —
+ * there is no second place to update and forget. An even split is what makes "which boss did
+ * you get?" a real question between players.
  */
 export function rollDailyBossKind(): BossKind {
   const i = Math.floor(Math.random() * BOSS_KINDS.length);

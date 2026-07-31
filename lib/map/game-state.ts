@@ -61,6 +61,11 @@ import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
 import { collapseFisherIntoBridge, buildFisherArena } from "../bosses/fisher_arena";
+import { buildCoilwyrmArena } from "../bosses/coilwyrm_arena";
+import {
+  buildQuarrymasterArena,
+  QUARRYMASTER_LAYOUTS,
+} from "../bosses/quarrymaster_arena";
 import {
   rollDailyBossKind,
   type BossKind,
@@ -3100,11 +3105,21 @@ function enterBossRoom(
 ): GameState {
   const kind: BossKind = state.dailyBossKind ?? "shaper";
   const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
-  const arena =
+  // Each boss brings its own arena. Only the Shaper reads `entry`: the others are built
+  // around a fixed approach (the Fisher from the bottom of the pond, the Quarrymaster from
+  // the door opposite his chamber), so passing a compass direction in would mean nothing.
+  const arena: GameState =
     kind === "fisher"
-      ? // The Fisher is always entered from the south — you come in at the bottom of the
-        // pond and the whole arena is built around that — so `entry` is deliberately unused.
-        buildFisherArena()
+      ? buildFisherArena()
+      : kind === "coilwyrm"
+      ? buildCoilwyrmArena()
+      : kind === "quarrymaster"
+      ? // Layout is rolled here rather than defaulted, so every player gets the SAME room on
+        // a given day — enterBossRoom runs inside the daily seeded RNG, same contract as the
+        // boss roll itself. Without this the arena would silently be layout 0 forever.
+        buildQuarrymasterArena({
+          layoutIndex: Math.floor(Math.random() * QUARRYMASTER_LAYOUTS.length),
+        }).state
       : buildShaperArena(
           { name: "boss", seed: state.bossArenaSeed === "water" ? "water" : "lava" },
           entry
@@ -3129,6 +3144,11 @@ function enterBossRoom(
     ...state,
     mapData: arenaMap,
     enemies: arena.enemies,
+    // Switch-and-spike wiring, for the arenas that have it. This has to come from the
+    // builder alongside the map: it is arena STATE, not one of the standalone-harness
+    // defaults the comment above warns against taking. Undefined for the other three
+    // bosses, which is correct — they have no plates.
+    gateGroups: arena.gateGroups,
     npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
