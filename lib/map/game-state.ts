@@ -4012,62 +4012,6 @@ function movePlayerCore(
       }
     }
 
-    // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry
-    // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened)
-    if (
-      (subtype.includes(TileSubtype.SWORD) ||
-        subtype.includes(TileSubtype.SHIELD) ||
-        subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
-        subtype.includes(TileSubtype.EXTRA_HEART) ||
-        subtype.includes(TileSubtype.PINK_HEART) ||
-        subtype.includes(TileSubtype.BOMB)) &&
-      !subtype.includes(TileSubtype.CHEST)
-    ) {
-      // Record exactly which chest item this was (in pickup order) for analytics.
-      const collectedNow: string[] = [];
-      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
-      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
-      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
-      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
-      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
-      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
-      if (collectedNow.length > 0) {
-        newGameState.stats.chestItemsCollected = [
-          ...(newGameState.stats.chestItemsCollected ?? []),
-          ...collectedNow,
-        ];
-      }
-      if (subtype.includes(TileSubtype.BOMB)) {
-        newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SWORD)) {
-        newGameState.hasSword = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SHIELD)) {
-        newGameState.hasShield = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
-        newGameState.hasSnakeMedallion = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.EXTRA_HEART)) {
-        // Adds a heart to the max AND fully refills health (e.g. 1/5 -> 6/6).
-        newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
-        newGameState.heroHealth = newGameState.heroMaxHealth;
-        newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.PINK_HEART)) {
-        // The pink flaming heart prize, revealed from its locked realm chest.
-        newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      // Clearing of item happens below when we set dest tile subtypes
-    }
-
     // If it's a ROCK, pick it up (increment inventory) and clear the tile
     if (subtype.includes(TileSubtype.ROCK)) {
       newGameState.rockCount = (newGameState.rockCount || 0) + 1;
@@ -4160,6 +4104,70 @@ function movePlayerCore(
           return newGameState;
         }
       }
+    }
+
+    // If it's an item revealed from a chest (SWORD/SHIELD/...), pick it up on entry
+    // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened).
+    //
+    // This block MUST stay AFTER the combat branch above, alongside the KEY/EXITKEY
+    // pickups. Combat returns early (the hero never enters an enemy-occupied tile), and
+    // that early return skips the item-tag clearing at the end of the move. Run this
+    // before combat and an enemy standing on an opened chest's loot turns every melee
+    // swing into another pickup: the tag survives, so the item is re-granted and
+    // re-recorded on each hit — a duplicated `chestItemsCollected` entry for the boolean
+    // items, and stacking +1 max HP / +3 bombs for EXTRA_HEART and BOMB.
+    if (
+      (subtype.includes(TileSubtype.SWORD) ||
+        subtype.includes(TileSubtype.SHIELD) ||
+        subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
+        subtype.includes(TileSubtype.EXTRA_HEART) ||
+        subtype.includes(TileSubtype.PINK_HEART) ||
+        subtype.includes(TileSubtype.BOMB)) &&
+      !subtype.includes(TileSubtype.CHEST)
+    ) {
+      // Record exactly which chest item this was (in pickup order) for analytics.
+      const collectedNow: string[] = [];
+      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
+      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
+      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
+      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
+      if (collectedNow.length > 0) {
+        newGameState.stats.chestItemsCollected = [
+          ...(newGameState.stats.chestItemsCollected ?? []),
+          ...collectedNow,
+        ];
+      }
+      if (subtype.includes(TileSubtype.BOMB)) {
+        newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SWORD)) {
+        newGameState.hasSword = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SHIELD)) {
+        newGameState.hasShield = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
+        newGameState.hasSnakeMedallion = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) {
+        // Adds a heart to the max AND fully refills health (e.g. 1/5 -> 6/6).
+        newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
+        newGameState.heroHealth = newGameState.heroMaxHealth;
+        newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.PINK_HEART)) {
+        // The pink flaming heart prize, revealed from its locked realm chest.
+        newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      // Clearing of item happens below when we set dest tile subtypes
     }
 
     // Lava is instant death on entry — a glowing wall, not a survivable toll. This check
