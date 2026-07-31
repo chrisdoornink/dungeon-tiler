@@ -3,6 +3,8 @@ import { TileType, TileSubtype, Direction } from "../lib/map";
 import { assetUrl } from "../lib/asset_url";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
+import type { CoilPiece, CoilHeadPose } from "../lib/bosses/coilwyrm";
+import { CoilwyrmStench } from "./CoilwyrmStench";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
 import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
@@ -28,6 +30,12 @@ const LAVA_CYCLE_S = 1.8;
 // ~1.5x tall; anchored at the feet (transformOrigin 50% 100%) so it grows upward and
 // its head spills into the tile above rather than sinking through the floor.
 const SHAPER_RENDER_SCALE = 1.5;
+// Coilwyrm (PLACEHOLDER art, snake sprites): the head fills its tile so it reads as
+// the dangerous end, and segments sit fat enough to look like a continuous wall of
+// body rather than a queue of separate snakes.
+// The head art is authored to fill its tile with the neck aligned to the body band, so it
+// draws at 1:1 like the body. (Kept as a constant because the pose tell scales off it.)
+const COILWYRM_HEAD_RENDER_SCALE = 1.0;
 
 // Submersion: standing in water hides the lower part of the hero sprite — waist-deep
 // in shallow water, up to the head in deep water. Pure CSS clip (no separate wading
@@ -189,7 +197,32 @@ interface TileProps {
   hasEnemy?: boolean; // Whether this tile contains an enemy
   enemyVisible?: boolean; // Whether enemy is in player's FOV
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
-  enemyKind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
+  enemyKind?: EnemyKind;
+  /**
+   * Optional boss pose driving a visual tell. Placeholder-art stand-in: "reared" means the
+   * head is in its post-bite recoil and cannot bite (the player's window), "surging" means
+   * it is taking two steps this turn.
+   */
+  enemyPose?: "reared" | "surging";
+  /**
+   * Which connecting piece a Coilwyrm body segment should draw (straight, corner or tail cap),
+   * chosen from its neighbours by `coilPieceFor`. Body pieces are cut to leave the tile
+   * edge-to-edge, so they must render at scale 1.0 or the joins break.
+   */
+  enemyCoilPiece?: CoilPiece;
+  /**
+   * Strength of the Coilwyrm's rising green stench on this tile (0/undefined = none). The grid
+   * decides who emits: a full plume off the head, a fainter one off some body segments, so a
+   * long coil reads as an uneven haze instead of a solid green wall.
+   */
+  enemyStench?: number;
+  /** How many stench wisps this tile emits (head plumes, body segments contribute one each). */
+  enemyStenchWisps?: number;
+  /**
+   * Which head sprite the Coilwyrm's head should draw, derived from where its neck is (see
+   * coilHeadPoseFor). Absent once the coil is fully severed, when facing is all that is left.
+   */
+  enemyCoilHeadPose?: CoilHeadPose;
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
   enemySwarmCount?: number; // for white-goblin: how many swarm members share this tile (1-4)
   enemyAura?: boolean; // show eerie green glow when close to hero
@@ -287,6 +320,11 @@ export const Tile: React.FC<TileProps> = ({
   enemyVisible = undefined,
   enemyFacing,
   enemyKind,
+  enemyPose,
+  enemyCoilPiece,
+  enemyStench,
+  enemyStenchWisps,
+  enemyCoilHeadPose,
   enemyMoved,
   enemySwarmCount,
   enemySwarmMembers,
@@ -1683,6 +1721,32 @@ export const Tile: React.FC<TileProps> = ({
         // It's also a big, ominous boss: render it larger (feet planted via the
         // transformOrigin on the sprite div; its head spills up into the tile above).
         if (enemyKind === 'shaper') return `scale(${SHAPER_RENDER_SCALE})`;
+        // Coilwyrm: the placeholder snake art only faces left, so mirror it when the
+        // part is travelling right — that's what makes the coil read as one continuous
+        // body flowing through the room instead of a row of unrelated sprites.
+        // Coil BODY: the art is cut so the tube leaves the tile edge-to-edge, so it must be
+        // drawn at exactly 1:1 and never mirrored — any scale or flip breaks the joins and the
+        // wyrm falls apart into separate blobs.
+        if (enemyKind === 'coilwyrm-coil') return 'none';
+        if (enemyKind === 'coilwyrm') {
+          // Mirror per the POSE (which knows where the neck is), falling back to facing only
+          // when the coil is severed and there is no neck to align to.
+          const flip = (
+            enemyCoilHeadPose ? enemyCoilHeadPose.mirror : enemyFacing === 'LEFT'
+          )
+            ? 'scaleX(-1) '
+            : '';
+          // Pose tell: reared back reads as pulled-back-and-shrunken, a surge as lunged and
+          // swollen. Until there is dedicated reared/biting art this is the only thing making
+          // the bite rhythm visible, and the rhythm is what makes the fight fair.
+          const s =
+            enemyPose === 'reared'
+              ? COILWYRM_HEAD_RENDER_SCALE * 0.82
+              : enemyPose === 'surging'
+              ? COILWYRM_HEAD_RENDER_SCALE * 1.12
+              : COILWYRM_HEAD_RENDER_SCALE;
+          return `${flip}scale(${s})`;
+        }
         // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       }
@@ -1706,6 +1770,15 @@ export const Tile: React.FC<TileProps> = ({
               ...smoothStepStyle(enemyStep, 'translate(-50%, -50%)'),
             }}
             aria-hidden="true"
+          />
+        )}
+        {!!enemyStench && (enemyVisible ?? isVisible) === true && (
+          // Deliberately NOT tied to enemyStep: the mist keeps drifting on its own clock, so it
+          // does not restart every time the creature takes a step.
+          <CoilwyrmStench
+            seed={(row ?? 0) * 31 + (col ?? 0)}
+            strength={enemyStench}
+            wisps={enemyStenchWisps}
           />
         )}
         {((enemyVisible ?? isVisible) === true) && (
@@ -1750,6 +1823,17 @@ export const Tile: React.FC<TileProps> = ({
                     ? ((enemySwarmCount ?? 1) % 2 === 0 ? 'back' : 'front')
                     : toFacing(f);
                   return getEnemyIcon('white-goblin', facing, enemySwarmCount ?? 1);
+                }
+                if (kind === 'coilwyrm' && enemyCoilHeadPose) {
+                  return assetUrl(
+                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilHeadPose.sprite}.png`
+                  );
+                }
+                // Coil segments pick their sprite from their neighbours, not their facing.
+                if (kind === 'coilwyrm-coil') {
+                  return assetUrl(
+                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilPiece ?? 'body-h'}.png`
+                  );
                 }
                 const facing: Facing = toFacing(enemyFacing);
                 // Fire goblins carry an animated torch (see PixelFlame below):

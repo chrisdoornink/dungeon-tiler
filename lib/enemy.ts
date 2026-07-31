@@ -1,6 +1,7 @@
 import { canSee } from "./line_of_sight";
-import { EnemyRegistry, BehaviorContext } from "./enemies/registry";
+import { EnemyRegistry, BehaviorContext, type EnemyKind } from "./enemies/registry";
 import { orderPursuitSteps } from "./enemies/pursuit";
+import { COILWYRM_HEAD_ATTACK, COILWYRM_HEAD_HP, COILWYRM_SEGMENT_HP } from "./bosses/coilwyrm";
 
 export const ENEMY_PURSUIT_TTL = 5;
 // Maximum vision radius for enemies, measured in Manhattan distance.
@@ -51,12 +52,12 @@ export class Enemy {
   facing: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT' = 'DOWN';
   // Basic species/kind classification for behavior and rendering tweaks
   // 'fire-goblin' default; 'ghost' steals the hero's light when adjacent; 'stone-goblin' special hunter; 'snake' poisons
-  private _kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' = 'fire-goblin';
+  private _kind: EnemyKind = 'fire-goblin';
   // Per-enemy memory bag for registry-driven behaviors
   private _behaviorMem: Record<string, unknown> = {};
   get behaviorMemory(): Record<string, unknown> { return this._behaviorMem; }
-  get kind(): 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper' { return this._kind; }
-  set kind(k: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper') {
+  get kind(): EnemyKind { return this._kind; }
+  set kind(k: EnemyKind) {
     this._kind = k;
     if (k === 'ghost') {
       // Ghosts are fragile and do not deal contact damage.
@@ -104,6 +105,15 @@ export class Enemy {
       // it). attack 0 — it never deals contact damage; its weapon is the terrain
       // it reshapes. Melee against it uses the standard formula (see registry).
       this.health = 5;
+      this.attack = 0;
+    } else if (k === 'coilwyrm') {
+      // Coilwyrm head: the only part that bites, and armored until its coil is
+      // fully severed (see the registry's calcMeleeDamage gate).
+      this.health = COILWYRM_HEAD_HP;
+      this.attack = COILWYRM_HEAD_ATTACK;
+    } else if (k === 'coilwyrm-coil') {
+      // A body segment: a moving wall. Deals no damage; only the tail can be cut.
+      this.health = COILWYRM_SEGMENT_HP;
       this.attack = 0;
     }
     this.maxHealth = this.health;
@@ -361,7 +371,7 @@ function isSafeFloorForEnemy(
   subtypes: number[][][] | undefined,
   y: number,
   x: number,
-  kind: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper',
+  kind: EnemyKind,
   isChasing: boolean = false
 ): boolean {
   if (!isInBounds(grid, y, x)) return false;
@@ -489,8 +499,8 @@ export type PlainEnemy = {
   id?: string;
   y: number;
   x: number;
-  kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
-  _kind?: 'fire-goblin' | 'water-goblin' | 'water-goblin-spear' | 'earth-goblin' | 'earth-goblin-knives' | 'pink-goblin' | 'ghost' | 'stone-goblin' | 'snake' | 'white-goblin' | 'shaper';
+  kind?: EnemyKind;
+  _kind?: EnemyKind;
   health?: number;
   attack?: number;
   facing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
@@ -513,8 +523,10 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    if (k === 'ghost' || k === 'stone-goblin' || k === 'fire-goblin' || k === 'water-goblin' || k === 'water-goblin-spear' || k === 'earth-goblin' || k === 'earth-goblin-knives' || k === 'pink-goblin' || k === 'snake' || k === 'white-goblin' || k === 'shaper') {
-      e.kind = k;
+    // Any kind the registry knows about rehydrates as itself (the registry is the
+    // single source of truth, so a new kind never needs adding to a list here).
+    if (k && Object.prototype.hasOwnProperty.call(EnemyRegistry, k)) {
+      e.kind = k as EnemyKind;
     }
     // Preserve health/attack if present after kind effects
     if (typeof d?.health === 'number') e.health = d.health;
@@ -646,6 +658,43 @@ export function updateEnemies(
   // entity vs. tile state and can strand the run — the pink goblin's ring teleport
   // once did exactly that.
   occupied.add(`${player.y},${player.x}`);
+  // Boss adds requested from a customUpdate this tick (Coilwyrm growth, hatches, ...).
+  // Buffered rather than pushed straight onto `enemies`: the loop below reads
+  // enemies.length each iteration, so an immediate push would let a body act on the
+  // very turn it appeared. Appended after the loop instead, and always at the END so
+  // a follower can never tick ahead of the head that steers it.
+  const pendingSpawns: Enemy[] = [];
+  // Tiles handed to a newborn this tick. A mover's old tile is normally released back
+  // into `occupied` after its hook returns; if a spawn claimed it, that release must not
+  // un-reserve it (see the loop below), or a later enemy could stack onto the newborn.
+  const spawnClaimed = new Set<string>();
+  // Whose hook is running right now, and where it started. Lets a behavior spawn into
+  // the tile it is itself stepping out of — the Coilwyrm's tail sprouting a new segment
+  // behind itself. That tile is still in `occupied` at hook time (the release happens
+  // after the hook returns), so without this a "leave something behind me" spawn is
+  // always refused.
+  let actor: { prevKey: string; ctx: BehaviorContext['enemy'] } | null = null;
+  const spawnEnemy: NonNullable<BehaviorContext['spawnEnemy']> = (spec) => {
+    const k = `${spec.y},${spec.x}`;
+    const actorIsVacating =
+      !!actor &&
+      actor.prevKey === k &&
+      `${actor.ctx.y},${actor.ctx.x}` !== actor.prevKey;
+    if (occupied.has(k) && !actorIsVacating) return false;
+    if (!isInBounds(grid, spec.y, spec.x)) return false;
+    const born = new Enemy({ y: spec.y, x: spec.x });
+    born.kind = spec.kind;
+    if (typeof spec.health === 'number') {
+      born.health = spec.health;
+      born.maxHealth = spec.health;
+    }
+    if (typeof spec.attack === 'number') born.attack = spec.attack;
+    if (spec.memory) Object.assign(born.behaviorMemory, spec.memory);
+    occupied.add(k);
+    spawnClaimed.add(k);
+    pendingSpawns.push(born);
+    return true;
+  };
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
   for (let i = 0; i < enemies.length; i++) {
@@ -674,6 +723,7 @@ export function updateEnemies(
         memory: e.behaviorMemory,
         attack: e.attack,
       };
+      actor = { prevKey, ctx: enemyCtx };
       base = cfg.behavior.customUpdate({
         grid,
         subtypes,
@@ -684,16 +734,29 @@ export function updateEnemies(
         ghosts: ghostPositions,
         rng,
         setPlayerTorchLit: opts?.setPlayerTorchLit,
+        spawnEnemy,
         mist: finalOpts?.mist,
         enemy: enemyCtx,
       });
+      actor = null;
       // Write back any mutations from customUpdate
       e.y = enemyCtx.y;
       e.x = enemyCtx.x;
       e.facing = enemyCtx.facing;
-      const mem = enemyCtx.memory as { exciterState?: 'HUNTING' | 'IDLE' };
+      const mem = enemyCtx.memory as {
+        exciterState?: 'HUNTING' | 'IDLE';
+        becomeKind?: EnemyKind;
+      };
       if (mem.exciterState) {
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
+      }
+      // Metamorphosis: a behavior can ask for its own kind to change (a severed length of
+      // Coilwyrm growing its own head, a shelled boss cracking open). Applied here rather
+      // than in the behavior because `kind` lives on the Enemy, not in the snapshot — and
+      // the setter resets health/attack to the new kind's baseline, which is the point.
+      if (mem.becomeKind && mem.becomeKind !== e.kind) {
+        e.kind = mem.becomeKind;
+        delete mem.becomeKind;
       }
     } else {
       base = e.update({
@@ -721,14 +784,10 @@ export function updateEnemies(
         e.y = prevY;
         e.x = prevX;
       } else {
-        // Reserve new tile and release old (white goblins can share tiles)
-        if (!canStack) {
-        occupied.delete(prevKey);
-        occupied.add(newKey);
-        } else {
-          // Just release the old tile; the new tile is already occupied by a swarm-mate
-          occupied.delete(prevKey);
-        }
+        // Reserve new tile and release old (white goblins can share tiles). A tile a
+        // newborn claimed this tick stays reserved even though its former occupant left.
+        if (!spawnClaimed.has(prevKey)) occupied.delete(prevKey);
+        if (!canStack) occupied.add(newKey);
       }
     }
     // Optionally suppress this enemy's attack for this tick
@@ -738,7 +797,11 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin') {
+        // The Coilwyrm's head sits in the goblin bucket deliberately: on the crit
+        // curve its base-2 bite rolls 4, the entire per-turn cap, so two bites killed
+        // a full-health hero with no tell. Here it reads 1-3 and a bite is a mistake
+        // you can survive learning from.
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'coilwyrm') {
           // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
           variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
         } else {
@@ -789,6 +852,9 @@ export function updateEnemies(
       opts.setPlayerTorchLit(false);
     }
   }
+
+  // Bodies summoned during this tick join the roster now, after everyone has acted.
+  if (pendingSpawns.length > 0) enemies.push(...pendingSpawns);
 
   // Backward-compatible return: if called with old signature, return the damage number
   if (usingOldSignature) {

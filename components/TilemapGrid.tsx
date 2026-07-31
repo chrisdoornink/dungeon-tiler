@@ -17,6 +17,7 @@ import {
   serializeNPCs,
   type RoomSnapshot,
 } from "../lib/map";
+import { coilPieceFor, coilHeadPoseFor } from "../lib/bosses/coilwyrm";
 import { findPlayerPosition, removePlayerFromMapData } from "../lib/map/player";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
@@ -35,6 +36,7 @@ import {
   getEnemyIcon,
   createEmptyByKind,
   EnemyRegistry,
+  isMeleeImmune,
   type EnemyKind,
 } from "../lib/enemies/registry";
 import {
@@ -173,6 +175,8 @@ const ENEMY_NUMBER_COLOR: Record<string, string> = {
 const HERO_DAMAGE_COLOR = "#f1c27d"; // hero skin tone — clearly "the hero lost HP"
 const HERO_HEAL_COLOR = "#6afc7a"; // green = healing
 const MISS_COLOR = "#c9c9c9"; // muted gray for a 0-damage "miss"
+// Cold steel, deliberately brighter than a miss: the hit connected, something turned it away.
+const BLOCKED_COLOR = "#9fd0e8";
 
 type FloatingNumber = {
   id: string;
@@ -183,10 +187,16 @@ type FloatingNumber = {
   sign: "+" | "-";
   kind?: string; // enemy kind (for enemy-colored numbers)
   miss?: boolean; // true => render "miss" instead of a value
+  // The blow LANDED and was turned away by armour — a different lesson from a miss, so it
+  // gets its own word and colour (see isMeleeImmune).
+  blocked?: boolean;
   createdAt: number;
 };
 
-function floatingColor(f: Pick<FloatingNumber, "target" | "sign" | "kind" | "miss">): string {
+function floatingColor(
+  f: Pick<FloatingNumber, "target" | "sign" | "kind" | "miss" | "blocked">
+): string {
+  if (f.blocked) return BLOCKED_COLOR;
   if (f.miss) return MISS_COLOR;
   if (f.target === "hero") return f.sign === "+" ? HERO_HEAL_COLOR : HERO_DAMAGE_COLOR;
   return (f.kind && ENEMY_NUMBER_COLOR[f.kind]) || ENEMY_NUMBER_COLOR["fire-goblin"];
@@ -597,17 +607,46 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     [resolvedStorageSlot]
   );
 
+  // Using a consumable RUNS THE WORLD FORWARD — performUse* ticks the enemies, and because its
+  // pre-tick state is a shallow copy it shares the roster, so `updateEnemies` mutates the very
+  // Enemy objects held in `prev`. That makes these updaters impure, and React is free to invoke
+  // an updater more than once for the same `prev` (StrictMode does it on every call in
+  // development). A second run advanced every enemy A SECOND TILE: eating or drinking with
+  // something on your heels silently handed it a free step, which is the worst possible moment
+  // for the game to cheat. Reported from the arena as "drinking a potion makes it move twice".
+  //
+  // Memoised on input identity so a repeat invocation returns the first result instead of
+  // replaying the turn — the same guard `smoothEntityCacheRef` uses for its own diff. Keyed on
+  // the action too, so two different consumables in one tick can never read each other's result.
+  // Note this is a property of every perform* that ticks enemies, not just these four: run them
+  // ONCE per turn, outside an updater (as the movement path does) or behind this guard.
+  const consumeCacheRef = useRef<{
+    prev: GameState;
+    run: (s: GameState) => GameState;
+    next: GameState;
+  } | null>(null);
+  const consumeOnce = useCallback(
+    (prev: GameState, run: (s: GameState) => GameState): GameState => {
+      const cached = consumeCacheRef.current;
+      if (cached && cached.prev === prev && cached.run === run) return cached.next;
+      const next = run(prev);
+      consumeCacheRef.current = { prev, run, next };
+      return next;
+    },
+    []
+  );
+
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
     try {
       trackUse("food");
     } catch {}
     setGameState((prev) => {
-      const newState = performUseFood(prev);
+      const newState = consumeOnce(prev, performUseFood);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [resolvedStorageSlot, consumeOnce]);
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
@@ -615,11 +654,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       trackUse("potion");
     } catch {}
     setGameState((prev) => {
-      const newState = performUsePotion(prev);
+      const newState = consumeOnce(prev, performUsePotion);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [resolvedStorageSlot, consumeOnce]);
 
   // Handle using the pink flaming heart prize (full heal + 3 temporary pink hearts)
   const handleUsePinkHeart = useCallback(() => {
@@ -627,11 +666,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       trackUse("pink_heart");
     } catch {}
     setGameState((prev) => {
-      const newState = performUsePinkHeart(prev);
+      const newState = consumeOnce(prev, performUsePinkHeart);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [resolvedStorageSlot, consumeOnce]);
 
   // Handle using a belted berry (heal 2-3)
   const handleUseBerry = useCallback(() => {
@@ -639,11 +678,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       trackUse("berry");
     } catch {}
     setGameState((prev) => {
-      const newState = performUseBerry(prev);
+      const newState = consumeOnce(prev, performUseBerry);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
-  }, [resolvedStorageSlot]);
+  }, [resolvedStorageSlot, consumeOnce]);
 
   // Handle snake medallion click - place portal or show travel dialogue
   const handleSnakeMedallionClick = useCallback(() => {
@@ -2685,8 +2724,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   });
 
   // Helper function to trigger item pickup animation
+  // Monotonic, because `Date.now()` alone is not unique enough to key a list. Two pickups of the
+  // same kind inside one millisecond collide — and StrictMode runs the pickup effect twice, so in
+  // development EVERY pickup collided with itself and React logged a duplicate-key error for each
+  // one. Cosmetic (two identical animations superimposed) but it buried the console in noise.
+  const itemPickupSeqRef = useRef(0);
   const triggerItemPickupAnimation = (itemType: string) => {
-    const animationId = `${itemType}-${Date.now()}`;
+    itemPickupSeqRef.current += 1;
+    const animationId = `${itemType}-${Date.now()}-${itemPickupSeqRef.current}`;
     setItemPickupAnimations(prev => [...prev, {
       id: animationId,
       itemType
@@ -3288,6 +3333,16 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             )?.kind ||
             preEnemyAtTarget?.kind ||
             "fire-goblin";
+          // A 0 on a target that is STILL STANDING is either a miss or armour, and the two
+          // want opposite reactions from the player. Ask the kind's own damage gate which it
+          // was rather than guessing from the number.
+          const blocked =
+            dealt === 0 &&
+            !!enemyAtTargetPost &&
+            isMeleeImmune(enemyAtTargetPost.kind, {
+              memory: enemyAtTargetPost.behaviorMemory,
+              enemies: newGameState.enemies,
+            });
           const spawn = () => {
             const now = Date.now();
             const id = `fd-enemy-${targetY},${targetX}-${now}-${Math.random()
@@ -3304,7 +3359,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   target: "enemy",
                   sign: "-",
                   kind: hitKind,
-                  miss: dealt === 0,
+                  miss: dealt === 0 && !blocked,
+                  blocked,
                   createdAt: now,
                 },
               ];
@@ -3999,6 +4055,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 (() => {
                   const [py, px] = playerPosition;
                   const visibleNearby = gameState.enemies
+                    // A segmented boss is ONE entry here, not one per link. Its body parts
+                    // carry no meaningful HP of their own and would otherwise crowd out the
+                    // head — the only part whose hearts tell you anything.
+                    .filter((e) => !EnemyRegistry[e.kind]?.bodyPart)
                     .filter((e) =>
                       canSee(gameState.mapData.tiles, [py, px], [e.y, e.x])
                     )
@@ -4897,6 +4957,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           data-color={cssColor}
                           data-kind={f.kind ?? ""}
                           data-miss={f.miss ? "true" : "false"}
+                          data-blocked={f.blocked ? "true" : "false"}
                           aria-hidden="true"
                           className="absolute pointer-events-none"
                           style={{
@@ -4905,16 +4966,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             zIndex: 11500,
                             color: cssColor,
                             fontWeight: 800,
-                            fontSize: f.miss ? "0.78em" : "1em",
+                            fontSize: f.miss || f.blocked ? "0.78em" : "1em",
                             fontStyle: f.miss ? "italic" : "normal",
-                            letterSpacing: f.miss ? "0.02em" : "0",
+                            letterSpacing: f.miss || f.blocked ? "0.02em" : "0",
                             textShadow:
                               "0 1px 2px rgba(0,0,0,0.85), 0 0 3px rgba(0,0,0,0.6)",
                             // Pop, rise, and fade (centered via the keyframes' translate).
                             animation: "damageFloat 1100ms ease-out forwards",
                           }}
                         >
-                          {f.miss ? "miss" : `${f.sign}${f.amount}`}
+                          {f.blocked
+                            ? "armored"
+                            : f.miss
+                            ? "miss"
+                            : `${f.sign}${f.amount}`}
                         </div>
                       );
                     });
@@ -5795,6 +5860,24 @@ function renderTileGrid(
     for (const e of enemies) enemyMap.set(`${e.y},${e.x}`, e);
   }
 
+  // Coil parts indexed by "coilId:index", the head being 0, so a tile can find the parts ahead
+  // of and behind it in O(1). This used to `.find()` across the whole roster twice per tile —
+  // on a 15x15 arena holding two grown wyrms that is thousands of scans per render, and it
+  // showed up in play as the frame rate sagging once the fight got big.
+  const coilPartMap = new Map<string, Enemy>();
+  if (enemies) {
+    for (const e of enemies) {
+      if (e.kind !== "coilwyrm" && e.kind !== "coilwyrm-coil") continue;
+      const m = e.behaviorMemory as
+        | { coilId?: string; coilIndex?: number }
+        | undefined;
+      if (!m?.coilId) continue;
+      const idx = e.kind === "coilwyrm" ? 0 : m.coilIndex;
+      if (idx == null) continue;
+      coilPartMap.set(`${m.coilId}:${idx}`, e);
+    }
+  }
+
   const npcMap = new Map<string, NPC>();
   if (npcs) {
     for (const npc of npcs) {
@@ -5882,6 +5965,27 @@ function renderTileGrid(
       const isPlayerTile = subtype && subtype.includes(TileSubtype.PLAYER);
 
       const enemyAtTile = enemyMap.get(`${rowIndex},${colIndex}`);
+
+      // --- Coilwyrm body ---
+      // A coil part's sprite comes from its NEIGHBOURS in the chain, never from its facing:
+      // each piece has to connect the two specific tile edges the parts ahead of and behind it
+      // sit on, or the body renders as a queue of unrelated blobs.
+      const coilPiece = (() => {
+        if (enemyAtTile?.kind !== "coilwyrm-coil") return undefined;
+        const mem = enemyAtTile.behaviorMemory as
+          | { coilId?: string; coilIndex?: number }
+          | undefined;
+        const id = mem?.coilId;
+        const idx = mem?.coilIndex;
+        if (!id || !idx) return undefined;
+        const ahead = coilPartMap.get(`${id}:${idx - 1}`);
+        const behind = coilPartMap.get(`${id}:${idx + 1}`);
+        return coilPieceFor(
+          [rowIndex, colIndex],
+          ahead ? [ahead.y, ahead.x] : null,
+          behind ? [behind.y, behind.x] : null
+        );
+      })();
       const hasEnemy = !!enemyAtTile;
       // For white goblins: gather ALL swarm members on this tile (the asset /
       // overlaid singles reflect how many are present). Members keep the
@@ -5957,21 +6061,51 @@ function renderTileGrid(
             hasEnemy={hasEnemy}
             enemyVisible={isVisible}
             enemyFacing={enemyAtTile?.facing}
-            enemyKind={
-              enemyAtTile?.kind as
-                | "fire-goblin"
-                | "water-goblin"
-                | "water-goblin-spear"
-                | "earth-goblin"
-                | "earth-goblin-knives"
-                | "pink-goblin"
-                | "ghost"
-                | "stone-goblin"
-                | "snake"
-                | "white-goblin"
-                | "shaper"
-                | undefined
-            }
+            enemyKind={enemyAtTile?.kind}
+            // The head sprite is chosen by where its NECK is, not by where it is looking — it
+            // looks at the hero while adjacent, and using that to pick the sprite screwed the
+            // skull on sideways relative to its own body.
+            enemyCoilHeadPose={(() => {
+              if (enemyAtTile?.kind !== "coilwyrm") return undefined;
+              const id = (
+                enemyAtTile.behaviorMemory as { coilId?: string } | undefined
+              )?.coilId;
+              if (!id) return undefined;
+              const neck = coilPartMap.get(`${id}:1`);
+              return (
+                coilHeadPoseFor(
+                  [enemyAtTile.y, enemyAtTile.x],
+                  neck ? [neck.y, neck.x] : null
+                ) ?? undefined
+              );
+            })()}
+            // A coil segment's sprite depends on its NEIGHBOURS, not its facing: it has to
+            // connect the specific two tile edges the parts ahead of and behind it sit on.
+            // Without this the body renders as a queue of unrelated blobs.
+            // The wyrm reeks. EVERY part emits, so the haze is spread thinly along the whole
+            // creature — clustering it on a few segments read as isolated puffs rather than a
+            // smell coming off the animal. The head plumes (3 wisps at full strength); each body
+            // segment contributes a single fainter one.
+            enemyStench={(() => {
+              if (enemyAtTile?.kind === "coilwyrm") return 1;
+              if (enemyAtTile?.kind === "coilwyrm-coil") return 0.7;
+              return undefined;
+            })()}
+            enemyStenchWisps={enemyAtTile?.kind === "coilwyrm" ? 3 : 1}
+            enemyCoilPiece={coilPiece}
+            // Boss pose, read straight off behaviorMemory: a stand-in tell until the real
+            // sprites land. "reared" is the post-bite recoil (the hero's window to cut) and
+            // "surging" is a two-tile turn. Both were invisible, which made the fight's
+            // rhythm invisible with it.
+            enemyPose={(() => {
+              const mem = enemyAtTile?.behaviorMemory as
+                | { biteRecoil?: number; surging?: boolean }
+                | undefined;
+              if (!mem) return undefined;
+              if ((mem.biteRecoil ?? 0) > 0) return "reared" as const;
+              if (mem.surging === true) return "surging" as const;
+              return undefined;
+            })()}
             enemySwarmCount={swarmCountAtTile}
             enemySwarmMembers={swarmAtTile?.map((m) => ({
               facing: m.facing,
@@ -6012,8 +6146,24 @@ function renderTileGrid(
             heroDeathState={isPlayerTile ? heroDeathState : undefined}
             heroWarping={!!isPlayerTile && heroWarping}
             suppressHeroSprite={!!isPlayerTile && suppressHeroSprite}
+            // Coil segments deliberately do NOT slide. Which piece a segment draws (straight,
+            // corner, tail) is a property of the PATH, not of the segment — so tweening a
+            // segment between tiles draws its new shape at its old position and you watch a
+            // corner pop into existence and then slide, which is exactly what a snake does not
+            // do. Held still, the illusion is correct for free: a coil advancing along an
+            // unchanged path renders IDENTICALLY turn to turn in its interior, and the only
+            // things that visibly change are the head entering new ground and the tail
+            // releasing it. The head still slides — it is the part actually moving.
+            //
+            // The tail SNAPS, deliberately. Sliding a departing copy of the cap out of the
+            // released tile was tried and reverted: it animates a straight run correctly, but
+            // the cap has to rotate through a bend and there is no curved tail art to rotate
+            // it through, so every corner read worse than the snap it replaced. Revisit only
+            // if curving tail pieces ever get drawn.
             enemyStep={
-              hasEnemy ? entitySteps?.get(`e:${rowIndex},${colIndex}`) : undefined
+              hasEnemy && enemyAtTile?.kind !== "coilwyrm-coil"
+                ? entitySteps?.get(`e:${rowIndex},${colIndex}`)
+                : undefined
             }
             npcStep={
               npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined

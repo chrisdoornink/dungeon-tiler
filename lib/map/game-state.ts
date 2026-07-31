@@ -523,7 +523,54 @@ export function performUseBerry(gameState: GameState): GameState {
  * Minimal slice: if inventory has a rock and there is a clear 4-tile floor path,
  * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
  */
+/**
+ * Wrap an action turn (a throw) so that finishing a boss with it still drops the gold
+ * key. `dropBossKeyOnDefeat` was only wired into the movement path, which quietly meant
+ * a boss killed by a thrown rock left an arena with no way out.
+ */
+function withBossDefeatCheck(
+  before: GameState,
+  run: (state: GameState) => GameState
+): GameState {
+  const bossBefore = (before.enemies ?? []).find((e) => EnemyRegistry[e.kind]?.boss);
+  const after = run(before);
+  if (bossBefore) dropBossKeyOnDefeat(after, [bossBefore.y, bossBefore.x]);
+  return after;
+}
+
 export function performThrowRock(gameState: GameState): GameState {
+  return withBossDefeatCheck(gameState, performThrowRockCore);
+}
+
+export function performThrowRune(gameState: GameState): GameState {
+  return withBossDefeatCheck(gameState, performThrowRuneCore);
+}
+
+export function performThrowBomb(gameState: GameState): GameState {
+  return withBossDefeatCheck(gameState, performThrowBombCore);
+}
+
+/**
+ * Damage a thrown thing actually lands on this enemy. Ordinary kinds take the flat
+ * base (rock 2, bomb 8, rune = lethal); a kind with a `calcThrownDamage` gate can
+ * refuse it per part, which is what keeps a rune or bomb from deleting an interior
+ * Coilwyrm segment and desyncing its follow-the-leader chain.
+ */
+function thrownDamageTo(
+  target: Enemy,
+  source: "rock" | "rune" | "bomb",
+  base: number,
+  enemies: Enemy[] | undefined
+): number {
+  const gate = EnemyRegistry[target.kind]?.calcThrownDamage;
+  if (!gate) return base;
+  return Math.max(
+    0,
+    gate({ source, base, memory: target.behaviorMemory, enemies })
+  );
+}
+
+function performThrowRockCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
@@ -568,7 +615,16 @@ export function performThrowRock(gameState: GameState): GameState {
         // (no "jump"). Surviving targets still get to act this tick.
         const runeWillKill =
           target.kind === "stone-goblin" && (preTickState.runeCount ?? 0) > 0;
-        if (targetHp <= 2 || runeWillKill) {
+        // Consult the per-kind gate, not the flat 2: an immune part (a Coilwyrm body
+        // segment) must NOT be frozen for the tick, or the coil would break step.
+        const rockDamage = thrownDamageTo(target, "rock", 2, enemiesNow);
+        // Chained movers (Coilwyrm segments) are never frozen: holding one link out of a
+        // turn leaves everything behind it standing still and tears the body apart. They
+        // forfeit the cosmetic "dies on the tile it was drawn on" guarantee instead.
+        if (
+          ((rockDamage > 0 && targetHp <= rockDamage) || runeWillKill) &&
+          !EnemyRegistry[target.kind]?.movesInLockstep
+        ) {
           rockKillTargetIdx = hitIdx;
         }
         break; // rock stops at first enemy regardless
@@ -715,7 +771,21 @@ export function performThrowRock(gameState: GameState): GameState {
         return finalState;
       }
       const prevHealth = target.health ?? 1;
-      const newHealth = prevHealth - 2; // rock deals 2 damage
+      const rockDamage = thrownDamageTo(target, "rock", 2, newEnemies); // usually 2
+      const newHealth = prevHealth - rockDamage;
+      if (rockDamage <= 0) {
+        // Bounced off an immune part (Coilwyrm body): the rock is spent, nothing else
+        // changes. Falls through to the same "survived" shape below with 0 damage.
+        return {
+          ...preTickState,
+          enemies: newEnemies,
+          stats: {
+            ...preTickState.stats,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          },
+          rockCount: count - 1,
+        };
+      }
       if (newHealth <= 0) {
         // Enemy dies: remove and record for spirit VFX
         cleanupPinkRing(target, newMapData.subtypes);
@@ -733,7 +803,7 @@ export function performThrowRock(gameState: GameState): GameState {
         const newStats = {
           ...preTickState.stats,
           // Count full remaining health as damage dealt when we finish the kill
-          damageDealt: preTickState.stats.damageDealt + Math.min(2, prevHealth),
+          damageDealt: preTickState.stats.damageDealt + Math.min(rockDamage, prevHealth),
           enemiesDefeated: preTickState.stats.enemiesDefeated + 1,
           enemiesKilledByRock: (preTickState.stats.enemiesKilledByRock ?? 0) + 1,
           rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
@@ -768,7 +838,7 @@ export function performThrowRock(gameState: GameState): GameState {
           enemies: newEnemies,
           stats: {
             ...preTickState.stats,
-            damageDealt: preTickState.stats.damageDealt + 2,
+            damageDealt: preTickState.stats.damageDealt + rockDamage,
             rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
           },
           rockCount: count - 1,
@@ -867,7 +937,7 @@ export function performThrowRock(gameState: GameState): GameState {
  *   - stone-goblin: instantly killed, rune is consumed (removed from inventory).
  *   - others: deal 2 damage; if enemy dies, rune is consumed; otherwise, rune lands on the last traversed floor tile.
  */
-export function performThrowRune(gameState: GameState): GameState {
+function performThrowRuneCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
@@ -981,7 +1051,19 @@ export function performThrowRune(gameState: GameState): GameState {
     const hitIdx = enemies.findIndex((e) => e.y === ty && e.x === tx);
     if (hitIdx !== -1) {
       const newEnemies = enemies.slice();
-      // Runes instantly kill ALL enemies, rune consumed
+      // Runes instantly kill ALL enemies — unless the kind gates thrown damage per
+      // part. A rune that strikes an armored part (a Coilwyrm body segment or its
+      // still-coiled head) shatters against it: spent, nothing killed.
+      if (thrownDamageTo(enemies[hitIdx], "rune", Infinity, enemies) <= 0) {
+        return {
+          ...preTickState,
+          runeCount: count - 1,
+          stats: {
+            ...preTickState.stats,
+            runesUsed: (preTickState.stats.runesUsed ?? 0) + 1,
+          },
+        };
+      }
       const removed = newEnemies.splice(hitIdx, 1)[0];
       // A rune is not a bomb — a pink goblin killed this way leaves no teleport ring.
       cleanupPinkRing(removed, newMapData.subtypes);
@@ -1250,8 +1332,12 @@ export function detonateLiveBombs(state: GameState): GameState {
           if (enemies[i].y === y && enemies[i].x === x) {
             const target = enemies[i];
             const prevHp = target.health ?? 1;
-            const newHp = prevHp - BOMB_ENEMY_DAMAGE;
-            stats.damageDealt = stats.damageDealt + Math.min(BOMB_ENEMY_DAMAGE, prevHp);
+            // Per-kind gate: an armored part shrugs the blast off entirely (a bomb
+            // must not blow the middle out of the Coilwyrm's coil).
+            const blastDamage = thrownDamageTo(target, "bomb", BOMB_ENEMY_DAMAGE, enemies);
+            if (blastDamage <= 0) continue;
+            const newHp = prevHp - blastDamage;
+            stats.damageDealt = stats.damageDealt + Math.min(blastDamage, prevHp);
             if (newHp <= 0) {
               const removed = enemies.splice(i, 1)[0];
               // A bomb kill leaves the goblin's teleport ring behind (the pink realm key).
@@ -1381,7 +1467,7 @@ export function detonateLiveBombs(state: GameState): GameState {
  * before any wall/obstacle/edge (or at max range on open floor) and arms a 1-turn fuse.
  * It detonates on the player's next turn (see detonateLiveBombs).
  */
-export function performThrowBomb(gameState: GameState): GameState {
+function performThrowBombCore(gameState: GameState): GameState {
   // Resolve any bomb armed on a previous turn before this throw.
   const state = detonateLiveBombs(gameState);
   if (state.heroHealth <= 0) return state;
@@ -1665,7 +1751,7 @@ export interface GameState {
   // Which boss is in the room. Only "shaper" exists today, but this is set (rather
   // than inferred from the live enemies array, which is empty after the kill or the
   // hero leaving) so future boss variety is reportable per run from day one.
-  bossKind?: "shaper";
+  bossKind?: "shaper" | "coilwyrm";
   bossArenaSeed?: "water" | "lava";
   outsideHasBossEntrance?: boolean;
   // The floor to restore when the hero walks back out of a boss arena. Kept
@@ -1825,6 +1911,12 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const stoneGoblinOnSteppingStone =
       enemy.kind === "stone-goblin" &&
       tileSubs.includes(TileSubtype.STEPPING_STONE);
+    // A length of Coilwyrm cut off from its head. The head flags these the moment it
+    // notices the gap a killed segment left (see coilwyrmHeadUpdate); reaping them here
+    // rather than inside the behavior is what earns them death VFX and kill stats.
+    const severedCoil =
+      enemy.kind === "coilwyrm-coil" &&
+      (enemy.behaviorMemory as { severed?: boolean } | undefined)?.severed === true;
 
     if ((enemy.kind === "stone-goblin" || enemy.kind === "fire-goblin" || enemy.kind === "water-goblin" || enemy.kind === "water-goblin-spear" || enemy.kind === "earth-goblin" || enemy.kind === "earth-goblin-knives") && onFaulty) {
       // Convert faulty floor to open abyss when enemy steps on it
@@ -1864,6 +1956,17 @@ function applyEnemyHazardDeaths(state: GameState): void {
       subtypes[enemy.y][enemy.x].push(TileSubtype.DEEP_WATER);
 
       cleanupPinkRing(enemy, subtypes);
+      defeated.push(enemy);
+
+      if (!state.recentDeaths) state.recentDeaths = [];
+      state.recentDeaths.push([enemy.y, enemy.x]);
+
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+
+      if (!state.defeatedEnemies) state.defeatedEnemies = [];
+      state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    } else if (severedCoil) {
       defeated.push(enemy);
 
       if (!state.recentDeaths) state.recentDeaths = [];
@@ -2863,21 +2966,41 @@ function enterBossRoom(
 }
 
 /**
- * The Shaper's death drops the gold key that opens the arena's exit — the alternate
- * ending. Detected centrally (comparing the pre-move state to the resolved one) rather
+ * An arena boss's death drops the gold key that opens the arena's exit — the alternate
+ * ending. Detected centrally (comparing the pre-turn state to the resolved one) rather
  * than hooked into each of the many kill paths, so melee, thrown rocks and bombs all
- * work. Idempotent via bossDefeated.
+ * work. Which kinds count is registry-driven (`EnemyConfig.boss`), so a multi-part boss
+ * only pays out when its core dies. Idempotent via bossDefeated.
  */
 function dropBossKeyOnDefeat(
   after: GameState,
   bossPosBefore: [number, number] | null
 ): void {
   if (!after.inBossRoom || after.bossDefeated) return;
-  if (!bossPosBefore) return; // no Shaper was alive going into this turn
-  if ((after.enemies ?? []).some((e) => e.kind === "shaper")) return; // still standing
+  // Either we watched a boss go into this turn alive, or the arena declares which boss
+  // it hosts. The second path matters for kills that land on a turn nobody snapshots
+  // (a bomb armed earlier detonating during an item-use turn).
+  if (!bossPosBefore && !after.bossKind) return;
+  // Registry-driven so every arena boss works: only the kind flagged `boss` counts, so
+  // a multi-part boss (the Coilwyrm) drops its key when the HEAD falls, not when a
+  // severed segment dies.
+  //
+  // Body parts count as "still standing" too, and that is load-bearing rather than tidy: the
+  // Coilwyrm's body REGROWS a head, so between the blow that kills a head and the tick where the
+  // body promotes a replacement there is a turn with no boss-kind enemy in the array at all.
+  // Paying out there would hand over the exit key in the middle of the fight. Waiting for the
+  // parts to go too is correct for both endings — a body long enough to promote produces a new
+  // head, and one too short marks itself severed and is reaped within a tick.
+  const bossPartStanding = (e: { kind: EnemyKind }) => {
+    const cfg = EnemyRegistry[e.kind];
+    return Boolean(cfg?.boss || cfg?.bodyPart);
+  };
+  if ((after.enemies ?? []).some(bossPartStanding)) return; // still standing
   // Prefer the recorded death tile; fall back to where it stood before the killing blow.
   const deaths = after.recentDeaths ?? [];
-  const [ky, kx] = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
+  const killTile = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
+  if (!killTile) return; // boss arena, but nothing died anywhere we can place a key
+  const [ky, kx] = killTile;
   const cell = after.mapData.subtypes[ky]?.[kx];
   if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
   after.bossDefeated = true;
@@ -2920,6 +3043,8 @@ function applyHeroChaseHit(
     heroAttack: state.heroAttack,
     swordBonus,
     variance,
+    memory: goblin.behaviorMemory,
+    enemies: state.enemies,
   });
   const dmg = Math.max(1, raw);
   goblin.health -= dmg;
@@ -2973,7 +3098,9 @@ export function movePlayer(
   // detonation on a floor transition — that floor is being replaced.
   // Snapshot the Shaper's position BEFORE resolving the turn: movePlayerCore mutates
   // the enemies array in place, so after the call the pre-state no longer shows it.
-  const bossBefore = (gameState.enemies ?? []).find((e) => e.kind === "shaper");
+  const bossBefore = (gameState.enemies ?? []).find(
+    (e) => EnemyRegistry[e.kind]?.boss
+  );
   const bossPosBefore: [number, number] | null = bossBefore
     ? [bossBefore.y, bossBefore.x]
     : null;
@@ -3824,6 +3951,10 @@ function movePlayerCore(
           heroAttack: newGameState.heroAttack,
           swordBonus,
           variance,
+          // Multi-part bosses gate on the struck part's role and on whether its other
+          // parts still stand (the Coilwyrm's tail-only cuts and armored head).
+          memory: enemy.behaviorMemory,
+          enemies: newGameState.enemies,
         });
         try { /* debug log removed */ } catch {}
         enemy.health -= heroDamage;
