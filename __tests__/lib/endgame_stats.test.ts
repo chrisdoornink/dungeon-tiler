@@ -33,6 +33,7 @@ function makeRow(overrides: Partial<GameCompleteRow> = {}): GameCompleteRow {
     bossDefeated: false,
     bossEntranceKind: null,
     bossKind: null,
+    dailyBossKind: null,
     ...overrides,
   };
 }

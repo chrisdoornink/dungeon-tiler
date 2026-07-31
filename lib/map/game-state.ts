@@ -34,7 +34,14 @@ import {
   WALL,
   type RoomId,
 } from "./constants";
-import type { MapData, RoomSnapshot, RoomTransition } from "./types";
+import type {
+  GateGroup,
+  MapData,
+  PotOverrides,
+  RoomSnapshot,
+  RoomTransition,
+  SealPayloads,
+} from "./types";
 import {
   cloneMapData,
   clonePlainEnemies,
@@ -53,9 +60,22 @@ import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
+import { collapseFisherIntoBridge, buildFisherArena } from "../bosses/fisher_arena";
+import {
+  rollDailyBossKind,
+  type BossKind,
+} from "../bosses/boss_roster";
+/**
+ * Salt for the boss-kind roll's independent RNG stream. Any fixed value works; it exists
+ * only to decorrelate this roll from the floor's own sequence (see the roll site).
+ */
+const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
 import {
   rollBossEntranceKind,
+  rollDecoySealCount,
+  sealCoords,
   stampBossEntranceOnFloor,
+  stampDecoySeals,
   arenaSeedForEntrance,
   type BossEntranceKind,
 } from "../bosses/boss_entrances";
@@ -118,6 +138,13 @@ function breakPotReleasingContents(
     mapData.subtypes[y][x] = kept.concat([TileSubtype.RUNE]);
     return { spawnedSnake: null, potOverrides };
   }
+  // A pot carrying its contents in the tile (`[POT, MED]`) — see the matching branch in
+  // the walk-in path. Shattering it from range must reveal the same thing walking into it
+  // would, so this has to sit ahead of the reveal roll below.
+  if (subs.includes(TileSubtype.MED) || subs.includes(TileSubtype.FOOD)) {
+    mapData.subtypes[y][x] = subs.filter((s) => s !== TileSubtype.POT);
+    return { spawnedSnake: null, potOverrides };
+  }
   // Food / potion pot: reveal the same contents a walk-in open would (reveal is
   // computed while the POT tag is still on the tile, matching the walk-in path).
   const key = `${y},${x}`;
@@ -138,6 +165,11 @@ function breakPotReleasingContents(
     .filter((s) => s !== TileSubtype.POT)
     .concat([reveal]);
   return { spawnedSnake: null, potOverrides };
+}
+
+/** Drop an empty seal-payload map to undefined, so state stays clean when nothing rolled. */
+function orUndefined(payloads: SealPayloads): SealPayloads | undefined {
+  return Object.keys(payloads).length > 0 ? payloads : undefined;
 }
 
 function incrementStepsAndTime(state: GameState, amount: number = 1): void {
@@ -224,6 +256,12 @@ function applyHeroDamage(state: GameState, amount: number): void {
 // at 4 so a pile-on can't instantly delete the hero. The pink realm is a deliberately
 // harder gauntlet guarding the heart, so its buffed swarms + hit-and-run ninjas are
 // allowed to stack more per turn. Tunable knob for realm difficulty.
+// What walking into a bed of SPIKES costs. The move is always refused (spikes are a
+// hard barrier — see the SPIKES branch in the movement handler), so this is purely the
+// penalty for probing the wall: enough to punish mashing into it, small enough that a
+// mis-tap isn't a run-ender.
+export const SPIKES_BUMP_DAMAGE = 1;
+
 const PINK_REALM_DAMAGE_CAP = 6;
 function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
   return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
@@ -519,37 +557,22 @@ export function performUseBerry(gameState: GameState): GameState {
 }
 
 /**
+ * Throw a rock, then settle any boss that died to it. The Fisher can ONLY be killed at
+ * range, so its death payout has to hang off this path as well as movePlayer's — and
+ * performThrowRockCore returns from a dozen places, so it's wrapped rather than hooked.
+ */
+export function performThrowRock(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performThrowRockCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+/**
  * Throw a rock up to 4 tiles in the player's facing direction.
  * Minimal slice: if inventory has a rock and there is a clear 4-tile floor path,
  * land a ROCK on the 4th tile and decrement rockCount. No collisions/effects yet.
  */
-/**
- * Wrap an action turn (a throw) so that finishing a boss with it still drops the gold
- * key. `dropBossKeyOnDefeat` was only wired into the movement path, which quietly meant
- * a boss killed by a thrown rock left an arena with no way out.
- */
-function withBossDefeatCheck(
-  before: GameState,
-  run: (state: GameState) => GameState
-): GameState {
-  const bossBefore = (before.enemies ?? []).find((e) => EnemyRegistry[e.kind]?.boss);
-  const after = run(before);
-  if (bossBefore) dropBossKeyOnDefeat(after, [bossBefore.y, bossBefore.x]);
-  return after;
-}
-
-export function performThrowRock(gameState: GameState): GameState {
-  return withBossDefeatCheck(gameState, performThrowRockCore);
-}
-
-export function performThrowRune(gameState: GameState): GameState {
-  return withBossDefeatCheck(gameState, performThrowRuneCore);
-}
-
-export function performThrowBomb(gameState: GameState): GameState {
-  return withBossDefeatCheck(gameState, performThrowBombCore);
-}
-
 /**
  * Damage a thrown thing actually lands on this enemy. Ordinary kinds take the flat
  * base (rock 2, bomb 8, rune = lethal); a kind with a `calcThrownDamage` gate can
@@ -570,7 +593,7 @@ function thrownDamageTo(
   );
 }
 
-function performThrowRockCore(gameState: GameState): GameState {
+export function performThrowRockCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const pos = findPlayerPosition(gameState.mapData);
@@ -937,6 +960,18 @@ function performThrowRockCore(gameState: GameState): GameState {
  *   - stone-goblin: instantly killed, rune is consumed (removed from inventory).
  *   - others: deal 2 damage; if enemy dies, rune is consumed; otherwise, rune lands on the last traversed floor tile.
  */
+/**
+ * Throw a rune, then settle any boss that died to it. Same reason as the rock wrapper: the
+ * payout used to hang off movePlayer only, so a thrown finisher left the arena with no exit key.
+ * Wrapped rather than hooked, because the core returns from a dozen places.
+ */
+export function performThrowRune(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performThrowRuneCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
 function performThrowRuneCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
@@ -1302,6 +1337,10 @@ export function detonateLiveBombs(state: GameState): GameState {
   // enemy kills) to avoid re-processing a stale, previously-defeated enemy.
   let snakePotKills = 0;
   let playerHit = false;
+  // Sealed doorways opened by this blast. Their payloads are stamped AFTER the
+  // destruction pass below, so the same blast that clears the wall can't also wipe the
+  // pot or cave mouth it just uncovered.
+  const openedSeals: Array<[number, number]> = [];
 
   for (const [cy, cx] of liveCenters) {
     blastCenters.push([cy, cx]);
@@ -1319,12 +1358,21 @@ export function detonateLiveBombs(state: GameState): GameState {
         const wasTree = newMapData.tiles[y][x] === TREE;
         const wasWall =
           newMapData.tiles[y][x] === WALL || wasTree;
-        const openedWall = wasWall && !isProtected;
+        // A torch-bearing wall is set stone and shrugs the blast off. This is what keeps
+        // a sealed doorway's two bracketing torches standing: the bomb rests directly
+        // below the seal, so its 3x3 covers them, and without this the whole motif would
+        // blow into one anonymous 3-wide hole instead of an unsealed door between torches.
+        const isTorchWall =
+          newMapData.tiles[y][x] === WALL && subs.includes(TileSubtype.WALL_TORCH);
+        const openedWall = wasWall && !isProtected && !isTorchWall;
         if (openedWall) {
           newMapData.tiles[y][x] = FLOOR;
           wallsDestroyed += 1;
           if (wasTree) treesDestroyed += 1;
+          if (subs.includes(TileSubtype.WALL_SEAL)) openedSeals.push([y, x]);
         }
+        // A torch wall survives intact — no scorch, no stripped overlays.
+        if (isTorchWall) continue;
 
         // Damage enemies caught in the blast. Most die; tough enemies (stone goblin,
         // 8 HP) can survive a single bomb.
@@ -1421,6 +1469,35 @@ export function detonateLiveBombs(state: GameState): GameState {
   stats.wallsDestroyed = (stats.wallsDestroyed ?? 0) + wallsDestroyed;
   stats.treesDestroyed = (stats.treesDestroyed ?? 0) + treesDestroyed;
 
+  // Unseal any doorway this blast opened. Done after the destruction pass so what the
+  // seal was hiding lands on already-cleared floor: the real doorway becomes a lockless
+  // BOSS_ENTRANCE cave mouth, a decoy becomes a pot holding pink-realm fruit or food.
+  // SINGED is dropped so the reward reads cleanly, and BREACH with it: a seal on the
+  // fallback boundary row would otherwise be tagged as a hole in the dungeon's shell and
+  // walk the hero out to the grassland instead of into what was walled up behind it.
+  let sealPayloads = state.sealPayloads;
+  let potOverrides = state.potOverrides;
+  for (const [y, x] of openedSeals) {
+    const key = `${y},${x}`;
+    const payload = sealPayloads?.[key];
+    if (!payload) continue;
+    const kept = (newMapData.subtypes[y][x] || []).filter(
+      (s) => s !== TileSubtype.SINGED && s !== TileSubtype.BREACH
+    );
+    if (payload === "boss") {
+      newMapData.subtypes[y][x] = kept.concat([TileSubtype.BOSS_ENTRANCE]);
+    } else {
+      newMapData.subtypes[y][x] = kept.concat([TileSubtype.POT]);
+      potOverrides = {
+        ...(potOverrides ?? {}),
+        [key]: payload === "berry" ? TileSubtype.BERRY : TileSubtype.FOOD,
+      };
+    }
+    const next = { ...(sealPayloads ?? {}) };
+    delete next[key];
+    sealPayloads = Object.keys(next).length ? next : undefined;
+  }
+
   let heroHealth = state.heroHealth;
   let bonusHearts = state.bonusHearts;
   let deathCause = state.deathCause;
@@ -1447,6 +1524,8 @@ export function detonateLiveBombs(state: GameState): GameState {
     bonusHearts,
     deathCause,
     recentBombBlasts: blastCenters,
+    sealPayloads,
+    potOverrides,
   };
 
   // Process story events for ONLY the enemies this blast defeated (no-op outside story
@@ -1467,6 +1546,18 @@ export function detonateLiveBombs(state: GameState): GameState {
  * before any wall/obstacle/edge (or at max range on open floor) and arms a 1-turn fuse.
  * It detonates on the player's next turn (see detonateLiveBombs).
  */
+/**
+ * Throw a bomb, then settle any boss that died to it. Same reason as the rock wrapper: the
+ * payout used to hang off movePlayer only, so a thrown finisher left the arena with no exit key.
+ * Wrapped rather than hooked, because the core returns from a dozen places.
+ */
+export function performThrowBomb(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performThrowBombCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
 function performThrowBombCore(gameState: GameState): GameState {
   // Resolve any bomb armed on a previous turn before this throw.
   const state = detonateLiveBombs(gameState);
@@ -1691,7 +1782,7 @@ export interface GameState {
   heroTorchLit?: boolean;
   // Death cause tracking for specific death messages
   deathCause?: {
-    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava";
+    type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava" | "spikes";
     enemyKind?: string;
   };
   // Status conditions affecting the player
@@ -1708,7 +1799,11 @@ export interface GameState {
   rooms?: Record<RoomId, RoomSnapshot>;
   currentRoomId?: RoomId;
   roomTransitions?: RoomTransition[];
-  potOverrides?: Record<string, TileSubtype.FOOD | TileSubtype.MED>;
+  potOverrides?: PotOverrides;
+  // What each WALL_SEAL on this floor hides, keyed by `${y},${x}`. Deliberately held
+  // here instead of on the tile so every seal looks identical until it is blown open
+  // (see SealPayload). Consumed by detonateLiveBombs and reset on each new floor.
+  sealPayloads?: SealPayloads;
   lastCheckpoint?: CheckpointSnapshot;
   // Portal state for snake medallion
   portalLocation?: {
@@ -1737,8 +1832,6 @@ export interface GameState {
   // inBossRoom: transient, true while the hero is inside a boss arena.
   // reachedBossRoom: run-level latch, true once a boss arena was entered this run.
   // bossArenaSeed: which elemental Shaper arena to build on entry (defaults lava).
-  // outsideHasBossEntrance: when true, the outside world built from this floor
-  // carves a hidden boss entrance in its far tree wall (a boss-day marker).
   inBossRoom?: boolean;
   reachedBossRoom?: boolean;
   // Latches when the Shaper dies (gold key dropped). Run-level, so the endgame can
@@ -1748,12 +1841,23 @@ export interface GameState {
   // once, the day the entrance was rolled, so analytics can report which kind of
   // exit that day's boss room had (independent of whether the hero ever finds it).
   bossEntranceKind?: BossEntranceKind;
-  // Which boss is in the room. Only "shaper" exists today, but this is set (rather
-  // than inferred from the live enemies array, which is empty after the kill or the
-  // hero leaving) so future boss variety is reportable per run from day one.
-  bossKind?: "shaper" | "coilwyrm";
+  // The boss the hero ACTUALLY entered and fought. Set on entry (rather than inferred from
+  // the live enemies array, which is empty after the kill or after the hero leaves), so a
+  // run reports which boss it faced. Absent on runs that never found the room.
+  bossKind?: BossKind;
+  // The boss the DAY rolled — present from floor-3 generation onward whether or not the
+  // hero ever finds the entrance. Kept distinct from bossKind so "what did today hold" and
+  // "what did this player fight" stay separately answerable; conflating them would make
+  // every floor-3 run look like it met a boss.
+  dailyBossKind?: BossKind;
   bossArenaSeed?: "water" | "lava";
-  outsideHasBossEntrance?: boolean;
+  /**
+   * Switch-and-barrier wiring for the current map: each entry is one PRESSURE_PLATE and the
+   * SPIKES tiles it retracts. Held here rather than on the tiles so one arena can run
+   * several independent sets (the Quarrymaster's three beds plus his chamber switch).
+   * Absent on maps without the puzzle.
+   */
+  gateGroups?: GateGroup[];
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -2083,6 +2187,13 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
   const mapData = generateCompleteMapForFloor(floorAlloc, floor);
 
+  // Decoy cracks, 0-2, on every floor including this one. On floor 1 the hero has no
+  // bombs at all, so a crack here is pure intrigue — it teaches the motif before it can
+  // ever be used. (The real sealed doorway is floor 3 only; see advanceToNextFloor.)
+  const sealPayloads = orUndefined(
+    stampDecoySeals(mapData, rollDecoySealCount())
+  );
+
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
     ? placeEnemies({
@@ -2143,6 +2254,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     currentFloor: floor,
     maxFloors: 3,
     mapData: withRunes,
+    sealPayloads,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN,
@@ -2259,6 +2371,8 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // every player gets the same one. Null on a bombless-unlucky roll or when the floor
   // had no safe spot for it — that day is simply bossless.
   let bossEntrance: BossEntranceKind | null = null;
+  // What each WALL_SEAL on a bomb day hides (empty on the other entrance kinds).
+  let sealPayloads: SealPayloads | undefined;
   // Ghosts guaranteed on a douse day (they're how you go dark, and the tell).
   const DOUSE_DAY_MIN_GHOSTS = 3;
 
@@ -2282,10 +2396,39 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         (a) => (a.chestContents ?? []).includes(TileSubtype.BOMB)
       );
       const kind = rollBossEntranceKind({ bombAvailable });
-      if (kind && stampBossEntranceOnFloor(mapData, kind)) bossEntrance = kind;
+      if (kind) {
+        const stamped = stampBossEntranceOnFloor(mapData, kind);
+        if (stamped.placed) {
+          bossEntrance = kind;
+          sealPayloads = stamped.sealPayloads;
+        }
+      }
     }
+    // Decoy cracks, 0-2, on EVERY floor — independent of the boss roll, so a floor can
+    // carry cracks with no doorway behind any of them and a bomb day can roll none at
+    // all. Placed after the doorway so they keep their distance from it.
+    const decoys = stampDecoySeals(
+      mapData,
+      rollDecoySealCount(),
+      sealPayloads ? sealCoords(sealPayloads) : []
+    );
+    sealPayloads = orUndefined({ ...(sealPayloads ?? {}), ...decoys });
     return mapData;
   });
+
+  // Which boss the day's room holds. Rolled from a SEPARATE stream derived from the daily
+  // seed — NOT from `rng` — so it consumes nothing from the floor's random sequence. Drawing
+  // one value from `rng` here would shift every later roll (enemy placement, snakes), which
+  // would change what past dates replay to and so silently corrupt the historical answers
+  // that lib/stats/boss_day.ts and daily_chest.ts get by re-running this generator.
+  // Deterministic from the date, so every player gets the same boss; independent of it, so
+  // adding bosses later never disturbs existing daily maps.
+  const dailyBossKind = bossEntrance
+    ? withPatchedMathRandom(
+        mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT),
+        rollDailyBossKind
+      )
+    : undefined;
 
   // Find player position to place enemies
   const playerPos = findPlayerPosition(newMapData);
@@ -2384,13 +2527,14 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
-    // Boss room for the day: which elemental arena the entrance opens into, and (for
-    // the bomb entrance) permission for the outside world to carve its hidden mouth.
-    // bossEntranceKind is persisted even if the hero never finds the entrance, so
-    // analytics can report what kind of door the day actually had.
+    // Boss room for the day: which elemental arena the entrance opens into, and (on a
+    // bomb day) what each sealed wall tile hides. bossEntranceKind is persisted even if
+    // the hero never finds the entrance, so analytics can report what kind of door the
+    // day actually had.
     bossEntranceKind: bossEntrance ?? undefined,
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
-    outsideHasBossEntrance: bossEntrance === "bomb",
+    sealPayloads,
+    dailyBossKind,
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -2692,8 +2836,7 @@ function enterOutsideWorld(
   const { mapData: outsideMap, enemies: outsideEnemies, entry } = buildOutsideWorld(
     direction,
     width,
-    height,
-    { bossEntrance: state.outsideHasBossEntrance }
+    height
   );
   const dungeonReturn = {
     mapData: removePlayerFromMapData(state.mapData),
@@ -2915,17 +3058,30 @@ const BOSS_ENTRY_BY_DIRECTION: Record<Direction, ShaperEntry> = {
  * Step onto a boss-room entrance (a lockless cave mouth, or a dark portal while the
  * torch is out) -> warp into the boss arena. Mirrors enterPinkRealm: swap in the
  * freshly built arena map + enemies, carry the run's vitals/inventory, and latch the
- * reachedBossRoom secret flag. For now every entrance leads to the Shaper; the
- * elemental variant is chosen by bossArenaSeed (default lava).
+ * reachedBossRoom secret flag.
+ *
+ * WHICH boss is the day's roll (dailyBossKind), so it's the same for every player that day —
+ * see rollDailyBossKind. The entrance still sets the Shaper's elemental variant; the Fisher
+ * ignores it (its arena is outdoor and always the same shape, varying only in pond layout).
+ * Falls back to the Shaper when dailyBossKind is absent, which covers runs saved before the
+ * roll existed.
  */
 function enterBossRoom(
   state: GameState,
   entrancePos: [number, number],
   direction: Direction
 ): GameState {
-  const seed: "water" | "lava" = state.bossArenaSeed === "water" ? "water" : "lava";
+  const kind: BossKind = state.dailyBossKind ?? "shaper";
   const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
-  const arena = buildShaperArena({ name: "boss", seed }, entry);
+  const arena =
+    kind === "fisher"
+      ? // The Fisher is always entered from the south — you come in at the bottom of the
+        // pond and the whole arena is built around that — so `entry` is deliberately unused.
+        buildFisherArena()
+      : buildShaperArena(
+          { name: "boss", seed: state.bossArenaSeed === "water" ? "water" : "lava" },
+          entry
+        );
 
   // The arena tile the hero arrives on becomes the way back out (same subtype both
   // ways, exactly like the pink realm's ring): step off it, then back onto it, to
@@ -2949,7 +3105,7 @@ function enterBossRoom(
     npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
-    bossKind: "shaper",
+    bossKind: kind,
     playerDirection: direction,
     // Stash the floor exactly as it was (player lifted out) so the way back is a
     // faithful restore. Kept in its own field: dungeonReturn is already in use by
@@ -2966,44 +3122,144 @@ function enterBossRoom(
 }
 
 /**
- * An arena boss's death drops the gold key that opens the arena's exit — the alternate
- * ending. Detected centrally (comparing the pre-turn state to the resolved one) rather
- * than hooked into each of the many kill paths, so melee, thrown rocks and bombs all
- * work. Which kinds count is registry-driven (`EnemyConfig.boss`), so a multi-part boss
- * only pays out when its core dies. Idempotent via bossDefeated.
+
+ * Where each boss stood going INTO this turn. Captured up front because the turn
+ * handlers mutate the enemies array in place, so after they run the pre-state no longer
+ * shows a boss that just died.
  */
-function dropBossKeyOnDefeat(
-  after: GameState,
-  bossPosBefore: [number, number] | null
-): void {
-  if (!after.inBossRoom || after.bossDefeated) return;
-  // Either we watched a boss go into this turn alive, or the arena declares which boss
-  // it hosts. The second path matters for kills that land on a turn nobody snapshots
-  // (a bomb armed earlier detonating during an item-use turn).
-  if (!bossPosBefore && !after.bossKind) return;
-  // Registry-driven so every arena boss works: only the kind flagged `boss` counts, so
-  // a multi-part boss (the Coilwyrm) drops its key when the HEAD falls, not when a
-  // severed segment dies.
-  //
-  // Body parts count as "still standing" too, and that is load-bearing rather than tidy: the
-  // Coilwyrm's body REGROWS a head, so between the blow that kills a head and the tick where the
-  // body promotes a replacement there is a turn with no boss-kind enemy in the array at all.
-  // Paying out there would hand over the exit key in the middle of the fight. Waiting for the
-  // parts to go too is correct for both endings — a body long enough to promote produces a new
-  // head, and one too short marks itself severed and is reaped within a tick.
-  const bossPartStanding = (e: { kind: EnemyKind }) => {
-    const cfg = EnemyRegistry[e.kind];
-    return Boolean(cfg?.boss || cfg?.bodyPart);
+export interface BossSnapshot {
+  shaper: [number, number] | null;
+  fisher: [number, number] | null;
+  quarrymaster: [number, number] | null;
+  coilwyrm: [number, number] | null;
+}
+
+export function snapshotBosses(state: GameState): BossSnapshot {
+  const find = (kind: EnemyKind): [number, number] | null => {
+    const e = (state.enemies ?? []).find((en) => en.kind === kind);
+    return e ? [e.y, e.x] : null;
   };
-  if ((after.enemies ?? []).some(bossPartStanding)) return; // still standing
+  return {
+    shaper: find("shaper"),
+    fisher: find("fisher"),
+    quarrymaster: find("quarrymaster"),
+    coilwyrm: find("coilwyrm"),
+  };
+}
+
+/**
+ * Boss death payouts, detected centrally by comparing the pre-turn snapshot to the
+ * resolved state rather than hooked into each of the many kill paths — so melee, thrown
+ * rocks and bombs all work. Idempotent via bossDefeated.
+ *
+ *   Shaper -> drops the gold key that opens the arena's exit (the alternate ending).
+ *   Fisher -> topples forward across the spikes; its body IS the crossing, and the key
+ *             comes with it. There is no other way anyone reaches the far bank.
+ *   Quarrymaster -> drops the gold key like the Shaper. Reaching the exit still needs the
+ *             chamber switch thrown, which is a separate gate (see gateGroups).
+ */
+function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
+  if (!after.inBossRoom || after.bossDefeated) return;
+  const alive = after.enemies ?? [];
   // Prefer the recorded death tile; fall back to where it stood before the killing blow.
-  const deaths = after.recentDeaths ?? [];
-  const killTile = deaths.length > 0 ? deaths[deaths.length - 1] : bossPosBefore;
-  if (!killTile) return; // boss arena, but nothing died anywhere we can place a key
-  const [ky, kx] = killTile;
-  const cell = after.mapData.subtypes[ky]?.[kx];
-  if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
-  after.bossDefeated = true;
+  const deathTile = (fallback: [number, number]): [number, number] => {
+    const deaths = after.recentDeaths ?? [];
+    return deaths.length > 0 ? deaths[deaths.length - 1] : fallback;
+  };
+
+  if (before.shaper && !alive.some((e) => e.kind === "shaper")) {
+    const [ky, kx] = deathTile(before.shaper);
+    const cell = after.mapData.subtypes[ky]?.[kx];
+    if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    after.bossDefeated = true;
+    return;
+  }
+
+  if (before.fisher && !alive.some((e) => e.kind === "fisher")) {
+    const [, kx] = deathTile(before.fisher);
+    collapseFisherIntoBridge(after, kx);
+    after.bossDefeated = true;
+    return;
+  }
+
+  if (before.coilwyrm) {
+    // The ONLY boss here whose "is it dead" test cannot just be "no enemy of that kind
+    // remains". A Coilwyrm's body REGROWS a head, so between the blow that kills one and the
+    // tick where the body promotes a replacement there is a turn with no coilwyrm in the array
+    // at all — paying out there hands over the exit key mid-fight. Its body parts therefore
+    // count as the boss still standing, which is correct for both endings: a body long enough
+    // to promote produces a new head, and one too short marks itself severed and is reaped
+    // within a tick. `bodyPart` is registry-driven so the next segmented boss inherits this.
+    const standing = alive.some((e) => {
+      const cfg = EnemyRegistry[e.kind];
+      return Boolean(cfg?.boss || cfg?.bodyPart);
+    });
+    if (standing) return;
+    const [ky, kx] = deathTile(before.coilwyrm);
+    const cell = after.mapData.subtypes[ky]?.[kx];
+    if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    after.bossDefeated = true;
+    return;
+  }
+
+  if (before.quarrymaster && !alive.some((e) => e.kind === "quarrymaster")) {
+    const [ky, kx] = deathTile(before.quarrymaster);
+    const cell = after.mapData.subtypes[ky]?.[kx];
+    if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
+    // His pods close with him — he is what held them open. Leaving them glowing after he
+    // dies reads as "more is coming" during the walk back to the exit, which is the exact
+    // opposite of what killing him should feel like.
+    for (const row of after.mapData.subtypes) {
+      for (let x = 0; x < row.length; x++) {
+        const i = row[x].indexOf(TileSubtype.SPAWN_POD);
+        if (i >= 0) row[x].splice(i, 1);
+      }
+    }
+    after.bossDefeated = true;
+  }
+}
+
+/**
+ * Throw the pressure plate the hero just stepped onto: latch the switch and retract every
+ * spike bed wired to it.
+ *
+ * The spikes sink into the ground and leave SPIKE_HOLES — bare sockets that are walkable and
+ * purely cosmetic. Keeping a mark rather than reverting to clean floor means a thrown switch
+ * is legible from across the room, which matters when the switches are far apart and the
+ * player is being chased between them.
+ *
+ * The plate itself latches (PRESSURE_PLATE -> PRESSURE_PLATE_PRESSED) and is never re-armed:
+ * the whole point of the mechanic is visible, banked progress toward the boss.
+ *
+ * Mutates in place; safe to call on a tile with no group wired to it (no-op).
+ */
+function pressPlate(
+  state: GameState,
+  mapData: MapData,
+  y: number,
+  x: number
+): void {
+  const cell = mapData.subtypes[y]?.[x];
+  if (cell) {
+    const i = cell.indexOf(TileSubtype.PRESSURE_PLATE);
+    if (i >= 0) cell[i] = TileSubtype.PRESSURE_PLATE_PRESSED;
+  }
+  const group = state.gateGroups?.find(
+    (g) => g.plate[0] === y && g.plate[1] === x && !g.open
+  );
+  if (!group) return;
+  // Replace the array rather than flipping `open` in place: gateGroups is shared by
+  // reference with the pre-move state (and with any checkpoint snapshot holding it), and
+  // a mutated group would corrupt a restore.
+  state.gateGroups = (state.gateGroups ?? []).map((g) =>
+    g === group ? { ...g, open: true } : g
+  );
+  for (const [gy, gx] of group.gates) {
+    const bed = mapData.subtypes[gy]?.[gx];
+    if (!bed) continue;
+    const i = bed.indexOf(TileSubtype.SPIKES);
+    if (i >= 0) bed[i] = TileSubtype.SPIKE_HOLES;
+  }
 }
 
 /** Step back onto the arrival tile inside a boss arena -> restore the saved floor. */
@@ -3096,18 +3352,13 @@ export function movePlayer(
   // position so stepping out of the 3x3 blast keeps the hero safe. (movePlayer never
   // places a bomb, so every BOMB_LIVE present was armed on a previous turn.) Skip
   // detonation on a floor transition — that floor is being replaced.
-  // Snapshot the Shaper's position BEFORE resolving the turn: movePlayerCore mutates
-  // the enemies array in place, so after the call the pre-state no longer shows it.
-  const bossBefore = (gameState.enemies ?? []).find(
-    (e) => EnemyRegistry[e.kind]?.boss
-  );
-  const bossPosBefore: [number, number] | null = bossBefore
-    ? [bossBefore.y, bossBefore.x]
-    : null;
+  // Snapshot boss positions BEFORE resolving the turn: movePlayerCore mutates the
+  // enemies array in place, so after the call the pre-state no longer shows them.
+  const bossesBefore = snapshotBosses(gameState);
   const result = movePlayerCore(gameState, direction);
   if (result.needsFloorTransition) return result;
-  // Killing the Shaper drops the gold key for the arena's exit (alternate ending).
-  dropBossKeyOnDefeat(result, bossPosBefore);
+  // Boss death payouts (Shaper's gold key / the Fisher collapsing into a bridge).
+  resolveBossDefeat(result, bossesBefore);
   // Nightmare darkness drains the hero the deeper they wander. Apply only when the hero
   // actually MOVED while staying in the nightmare (not the entry step, the step back out,
   // or bumping a wall).
@@ -3558,6 +3809,23 @@ function movePlayerCore(
       return newGameState;
     }
 
+    // A bed of spikes is an ABSOLUTE barrier, not a survivable toll: the hero shoves
+    // into it, takes a scratch, and does not move. Unlike lava (which kills but is
+    // still *entered*), spikes can never be crossed at any HP — that is what lets an
+    // outdoor arena put the boss permanently out of melee reach. Rocks still fly over
+    // it, because the throw scan only stops on non-FLOOR tiles and this is an overlay.
+    if (subtype.includes(TileSubtype.SPIKES)) {
+      applyHeroDamage(newGameState, SPIKES_BUMP_DAMAGE);
+      newGameState.stats = {
+        ...newGameState.stats,
+        damageTaken: newGameState.stats.damageTaken + SPIKES_BUMP_DAMAGE,
+      };
+      if (newGameState.heroHealth <= 0 && !newGameState.deathCause) {
+        newGameState.deathCause = { type: "spikes" };
+      }
+      return newGameState;
+    }
+
     // Check if tile has a torch on floor - blocks movement (solid object)
     if (subtype.includes(TileSubtype.WALL_TORCH)) {
       return newGameState;
@@ -3758,6 +4026,18 @@ function movePlayerCore(
           (t) => t !== TileSubtype.POT && t !== TileSubtype.RUNE
         );
         newMapData.subtypes[newY][newX] = base.concat([TileSubtype.RUNE]);
+      } else if (
+        subtype.includes(TileSubtype.MED) ||
+        subtype.includes(TileSubtype.FOOD)
+      ) {
+        // A pot whose contents are written INTO the tile (`[POT, MED]`), the same way snake
+        // and rune pots already work. Preferred over the potOverrides side table whenever a
+        // level needs a guaranteed drop: the guarantee travels with the map, so a state
+        // clone, a room transition or a save/restore can't silently turn it back into a
+        // food/potion coin flip. Just drop the POT tag and leave the contents.
+        newMapData.subtypes[newY][newX] = newMapData.subtypes[newY][newX].filter(
+          (t) => t !== TileSubtype.POT
+        );
       } else {
         const key = `${newY},${newX}`;
         const overrides = newGameState.potOverrides;
@@ -3855,62 +4135,6 @@ function movePlayerCore(
         // debug: player won or advancing floor
         // Continue to generic movement below so the player moves onto the tile this tick
       }
-    }
-
-    // If it's an item revealed from a chest (SWORD/SHIELD), pick it up on entry
-    // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened)
-    if (
-      (subtype.includes(TileSubtype.SWORD) ||
-        subtype.includes(TileSubtype.SHIELD) ||
-        subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
-        subtype.includes(TileSubtype.EXTRA_HEART) ||
-        subtype.includes(TileSubtype.PINK_HEART) ||
-        subtype.includes(TileSubtype.BOMB)) &&
-      !subtype.includes(TileSubtype.CHEST)
-    ) {
-      // Record exactly which chest item this was (in pickup order) for analytics.
-      const collectedNow: string[] = [];
-      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
-      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
-      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
-      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
-      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
-      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
-      if (collectedNow.length > 0) {
-        newGameState.stats.chestItemsCollected = [
-          ...(newGameState.stats.chestItemsCollected ?? []),
-          ...collectedNow,
-        ];
-      }
-      if (subtype.includes(TileSubtype.BOMB)) {
-        newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SWORD)) {
-        newGameState.hasSword = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SHIELD)) {
-        newGameState.hasShield = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
-        newGameState.hasSnakeMedallion = true;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.EXTRA_HEART)) {
-        // Adds a heart to the max AND fully refills health (e.g. 1/5 -> 6/6).
-        newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
-        newGameState.heroHealth = newGameState.heroMaxHealth;
-        newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      if (subtype.includes(TileSubtype.PINK_HEART)) {
-        // The pink flaming heart prize, revealed from its locked realm chest.
-        newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
-        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
-      }
-      // Clearing of item happens below when we set dest tile subtypes
     }
 
     // If it's a ROCK, pick it up (increment inventory) and clear the tile
@@ -4011,6 +4235,70 @@ function movePlayerCore(
       }
     }
 
+    // If it's an item revealed from a chest (SWORD/SHIELD/...), pick it up on entry
+    // but ONLY if the tile no longer has a CHEST (i.e., after it's been opened).
+    //
+    // This block MUST stay AFTER the combat branch above, alongside the KEY/EXITKEY
+    // pickups. Combat returns early (the hero never enters an enemy-occupied tile), and
+    // that early return skips the item-tag clearing at the end of the move. Run this
+    // before combat and an enemy standing on an opened chest's loot turns every melee
+    // swing into another pickup: the tag survives, so the item is re-granted and
+    // re-recorded on each hit — a duplicated `chestItemsCollected` entry for the boolean
+    // items, and stacking +1 max HP / +3 bombs for EXTRA_HEART and BOMB.
+    if (
+      (subtype.includes(TileSubtype.SWORD) ||
+        subtype.includes(TileSubtype.SHIELD) ||
+        subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
+        subtype.includes(TileSubtype.EXTRA_HEART) ||
+        subtype.includes(TileSubtype.PINK_HEART) ||
+        subtype.includes(TileSubtype.BOMB)) &&
+      !subtype.includes(TileSubtype.CHEST)
+    ) {
+      // Record exactly which chest item this was (in pickup order) for analytics.
+      const collectedNow: string[] = [];
+      if (subtype.includes(TileSubtype.BOMB)) collectedNow.push("bomb");
+      if (subtype.includes(TileSubtype.SWORD)) collectedNow.push("sword");
+      if (subtype.includes(TileSubtype.SHIELD)) collectedNow.push("shield");
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
+      if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
+      if (collectedNow.length > 0) {
+        newGameState.stats.chestItemsCollected = [
+          ...(newGameState.stats.chestItemsCollected ?? []),
+          ...collectedNow,
+        ];
+      }
+      if (subtype.includes(TileSubtype.BOMB)) {
+        newGameState.bombCount = (newGameState.bombCount ?? 0) + BOMB_PACK_SIZE;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SWORD)) {
+        newGameState.hasSword = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SHIELD)) {
+        newGameState.hasShield = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) {
+        newGameState.hasSnakeMedallion = true;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.EXTRA_HEART)) {
+        // Adds a heart to the max AND fully refills health (e.g. 1/5 -> 6/6).
+        newGameState.heroMaxHealth = (newGameState.heroMaxHealth ?? 5) + 1;
+        newGameState.heroHealth = newGameState.heroMaxHealth;
+        newGameState.stats.maxHealth = Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth);
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.PINK_HEART)) {
+        // The pink flaming heart prize, revealed from its locked realm chest.
+        newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      // Clearing of item happens below when we set dest tile subtypes
+    }
+
     // Lava is instant death on entry — a glowing wall, not a survivable toll. This check
     // sits AFTER the combat branch above (gotcha: the FAULTY_FLOOR block runs BEFORE combat):
     // attacking a stone goblin standing on lava must resolve melee in place, and the hero never
@@ -4049,6 +4337,13 @@ function movePlayerCore(
 
       // Keep the lightswitch on the tile (don't remove it)
       // Player and lightswitch will coexist on the same tile
+    }
+
+    // If it's a pressure plate, throw it: the switch latches down for good and every
+    // cage gate in its group drops to bare floor. Like the lightswitch, the plate stays
+    // on the tile and coexists with the player (it just changes to the pressed art).
+    if (subtype.includes(TileSubtype.PRESSURE_PLATE)) {
+      pressPlate(newGameState, newMapData, newY, newX);
     }
 
     // If it's a chest, handle opening logic (supports optional lock)
@@ -4110,6 +4405,14 @@ function movePlayerCore(
     const destSubtypes = newMapData.subtypes[newY][newX];
     if (
       destSubtypes.includes(TileSubtype.LIGHTSWITCH) ||
+      // Pressure plates are floor switches the hero stands ON to hold/throw them.
+      destSubtypes.includes(TileSubtype.PRESSURE_PLATE) ||
+      destSubtypes.includes(TileSubtype.PRESSURE_PLATE_PRESSED) ||
+      // Retracted spike beds are walkable floor decals. Without this the hero standing on
+      // one replaces the tile's subtypes with just PLAYER, so the sockets are erased for
+      // good the first time anyone walks the opened lane — the mark that records a thrown
+      // switch would vanish exactly when the player used it.
+      destSubtypes.includes(TileSubtype.SPIKE_HOLES) ||
       destSubtypes.includes(TileSubtype.OPEN_CHEST) ||
       destSubtypes.includes(TileSubtype.CHEST) ||
       destSubtypes.includes(TileSubtype.ROOM_TRANSITION) ||

@@ -140,12 +140,16 @@ export function trackGameComplete(params: {
   // Boss room (see .claude/features/boss-daily-entrances/index.md). reachedBossRoom
   // and bossDefeated answer "made it in" / "won the fight"; bossEntranceKind records
   // which of the day's four doors it was (independent of whether it was ever found);
-  // bossKind identifies which boss (future-proofing once more than one exists — the
-  // per-kind kill is also already in byKind for today's single boss).
+  // bossKind identifies which boss the player actually FOUGHT (absent if they never got
+  // in), while dailyBossKind is what the day ROLLED — present on any run that reached
+  // floor 3, so "which boss did today hold" is answerable from players who never found the
+  // door. The two are separate on purpose; conflating them would make every floor-3 run
+  // look like it met a boss.
   reachedBossRoom?: boolean;
   bossDefeated?: boolean;
   bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
   bossKind?: string;
+  dailyBossKind?: string;
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -179,6 +183,7 @@ export function trackGameComplete(params: {
     boss_defeated: params.bossDefeated,
     boss_entrance_kind: params.bossEntranceKind,
     boss_kind: params.bossKind,
+    daily_boss_kind: params.dailyBossKind,
   });
 }
 

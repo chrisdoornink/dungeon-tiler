@@ -592,6 +592,69 @@ body {
   }
 }
 
+/* The thrown spear crossing the lane. The element already spans the whole flight path, so
+   the throw is animated by WIPING it into view along that axis — the pale tip leads and the
+   shaft trails behind it. Unlimited range means the spear can cross most of the map, and
+   without a visible flight the hero just takes damage from nowhere.
+   `transform-origin` is set per axis so the scale grows from the Fisher's end. */
+@keyframes fisherSpearFlyV {
+  0% {
+    transform-origin: top center;
+    opacity: 0;
+    transform: scaleY(0.05);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    transform-origin: top center;
+    opacity: 1;
+    transform: scaleY(1);
+  }
+  100% {
+    transform-origin: top center;
+    opacity: 0;
+    transform: scaleY(1);
+  }
+}
+@keyframes fisherSpearFlyH {
+  0% {
+    transform-origin: left center;
+    opacity: 0;
+    transform: scaleX(0.05);
+  }
+  15% {
+    opacity: 1;
+  }
+  70% {
+    transform-origin: left center;
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    transform-origin: left center;
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+/* The spear landing: a hard punch-in on the impact tile, then out. (There is deliberately
+   no pre-strike tile telegraph — the Fisher's stance is the only tell.) */
+@keyframes fisherStrikeImpact {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+}
+
 /* Item pickup animation - center screen scale up and fade */
 @keyframes itemPickupCenter {
   0% {
@@ -637,6 +700,39 @@ body {
   }
   100% {
     transform: var(--smooth-step-to, none);
+  }
+}
+
+/* A thrown snake sailing over the spikes (see smoothStepArcStyle in Tile.tsx). Same
+   three-stop from/mid/to structure as the bob, but the midpoint is lifted well off the
+   ground and the sprite spins a full rotation across the flight, so the throw reads as a
+   lob rather than a teleport. The sprite is also scaled up slightly at the apex — it is
+   closer to the camera mid-air — and lands with a small squash. */
+@keyframes smoothStepArc {
+  0% {
+    transform: var(--smooth-step-from, none);
+  }
+  50% {
+    transform: var(--smooth-step-mid, none);
+  }
+  100% {
+    transform: var(--smooth-step-to, none);
+  }
+}
+
+/* Dust puff where a thrown snake hits the ground. */
+@keyframes fisherSnakeLanding {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  35% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.5);
   }
 }
 

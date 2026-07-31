@@ -775,8 +775,7 @@ export function coilwyrmSegmentUpdate(ctx: BehaviorContext): number {
       y: at[0],
       x: at[1],
       kind: "coilwyrm-coil",
-      health: COILWYRM_SEGMENT_HP,
-      attack: 0,
+      // No health/attack here: the Enemy kind setter applies each kind's stats.
       memory: {
         coilId: mem.coilId,
         coilIndex: idx + 1,

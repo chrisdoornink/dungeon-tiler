@@ -2,6 +2,7 @@ import { canSee } from "./line_of_sight";
 import { EnemyRegistry, BehaviorContext, type EnemyKind } from "./enemies/registry";
 import { orderPursuitSteps } from "./enemies/pursuit";
 import { COILWYRM_HEAD_ATTACK, COILWYRM_HEAD_HP, COILWYRM_SEGMENT_HP } from "./bosses/coilwyrm";
+import { QUARRYMASTER_HP, QUARRYMASTER_ATTACK } from "./bosses/quarrymaster";
 
 export const ENEMY_PURSUIT_TTL = 5;
 // Maximum vision radius for enemies, measured in Manhattan distance.
@@ -107,14 +108,27 @@ export class Enemy {
       this.health = 5;
       this.attack = 0;
     } else if (k === 'coilwyrm') {
-      // Coilwyrm head: the only part that bites, and armored until its coil is
-      // fully severed (see the registry's calcMeleeDamage gate).
+      // Coilwyrm head: the only part that bites. Two hits kill it (a flat
+      // COILWYRM_HEADSHOT_DAMAGE per blow, see the registry gate), but a body of
+      // COILWYRM_SPLIT_MIN or more behind it just grows a replacement.
       this.health = COILWYRM_HEAD_HP;
       this.attack = COILWYRM_HEAD_ATTACK;
     } else if (k === 'coilwyrm-coil') {
-      // A body segment: a moving wall. Deals no damage; only the tail can be cut.
+      // A body segment: a moving wall. Deals no damage; every segment is cuttable.
       this.health = COILWYRM_SEGMENT_HP;
       this.attack = 0;
+    } else if (k === 'fisher') {
+      // The Fisher boss: unreachable by design, so its HP is denominated in THROWN
+      // ROCKS (2 damage each) — 8 is exactly four clean hits. attack 2 is its spear,
+      // which only lands on a telegraphed lane you failed to step out of.
+      this.health = 8;
+      this.attack = 2;
+    } else if (k === 'quarrymaster') {
+      // The Quarrymaster boss: deliberately no tougher than a spear goblin. The fight
+      // is his summons and his crumbling floor, not his statline — once you are through
+      // the cage gates and standing next to him he goes down in a few swings.
+      this.health = QUARRYMASTER_HP;
+      this.attack = QUARRYMASTER_ATTACK;
     }
     this.maxHealth = this.health;
   }
@@ -349,6 +363,7 @@ const SPAWN_BLOCKING_SUBTYPES = new Set<number>([
   58, // SHALLOW_WATER
   59, // DEEP_WATER
   60, // LAVA
+  66, // SPIKES (impassable — an enemy spawned here could never leave)
 ]);
 
 function isFloor(grid: number[][], y: number, x: number): boolean {
@@ -386,6 +401,7 @@ function isSafeFloorForEnemy(
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
   const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)
+  const isSpikes = tileSubs.includes(66); // SPIKES (impassable to every entity)
   const isShallowWater = tileSubs.includes(58); // SHALLOW_WATER (wadeable shoreline)
   const isDeepWater = tileSubs.includes(59); // DEEP_WATER (swimmers only)
   // Check for blocking subtypes (torches on floor, town signs, checkpoints, bookshelves)
@@ -394,12 +410,21 @@ function isSafeFloorForEnemy(
                               tileSubs.includes(22) || // CHECKPOINT
                               tileSubs.includes(36);   // BOOKSHELF
 
-  // Always avoid open abysses
+  // Always avoid open abysses. A crack that has already given way is a visible hole, and
+  // nothing walks into one on purpose — falling in is what FAULTY_FLOOR is for (a chasing
+  // goblin steps on the hidden crack, it opens, and thereafter everyone routes around it).
   if (isOpenAbyss) return false;
 
   // Lava is a lethal, obvious wall: unlike hidden faulty cracks, no goblin ever walks
   // into it (not even when chasing). Only the stone goblin crosses it freely.
   if (isLava && kind !== 'stone-goblin') return false;
+
+  // A bed of spikes is a wall for everything, with no exception — it is the outdoor
+  // world's hard barrier (see TileSubtype.SPIKES), and the Fisher's arena depends on it
+  // holding in BOTH directions: the hero can't cross to the boss, and nothing the boss
+  // throws over can wander back. Without this, snakes would slither across it freely
+  // (spikes are a FLOOR overlay, so the base-grid check waves them through).
+  if (isSpikes) return false;
 
   // Shallow water is wadeable, but not by everyone: fire goblins won't risk their
   // torch near water at all; knife-throwers keep their blades dry; white goblins
@@ -523,8 +548,10 @@ export function rehydrateEnemies(list: PlainEnemy[]): Enemy[] {
     // Migration: old saved games may have legacy kind names
     if (k === 'goblin') k = 'fire-goblin';
     if (k === 'stone-exciter') k = 'stone-goblin';
-    // Any kind the registry knows about rehydrates as itself (the registry is the
-    // single source of truth, so a new kind never needs adding to a list here).
+    // Validate against the registry rather than a hand-written list. The list version
+    // silently dropped any kind nobody remembered to add to it — a rehydrated enemy would
+    // come back as a default fire-goblin — and it needed editing for every new boss, which
+    // is exactly what conflicted when the Fisher and the Quarrymaster landed together.
     if (k && Object.prototype.hasOwnProperty.call(EnemyRegistry, k)) {
       e.kind = k as EnemyKind;
     }
@@ -658,46 +685,45 @@ export function updateEnemies(
   // entity vs. tile state and can strand the run — the pink goblin's ring teleport
   // once did exactly that.
   occupied.add(`${player.y},${player.x}`);
-  // Boss adds requested from a customUpdate this tick (Coilwyrm growth, hatches, ...).
-  // Buffered rather than pushed straight onto `enemies`: the loop below reads
-  // enemies.length each iteration, so an immediate push would let a body act on the
-  // very turn it appeared. Appended after the loop instead, and always at the END so
-  // a follower can never tick ahead of the head that steers it.
-  const pendingSpawns: Enemy[] = [];
-  // Tiles handed to a newborn this tick. A mover's old tile is normally released back
-  // into `occupied` after its hook returns; if a spawn claimed it, that release must not
-  // un-reserve it (see the loop below), or a later enemy could stack onto the newborn.
+  // Boss adds — the summon channel (Quarrymaster hatches, Coilwyrm growth, ...).
+  // Buffered rather than pushed straight onto `enemies`: the loop below captures its bound,
+  // so an immediate push would let a newborn act on the very turn it appeared. Appended
+  // after the loop, and always at the END so a follower can never tick ahead of the head
+  // that steers it.
+  const spawned: Enemy[] = [];
+  // Tiles handed to a newborn this tick. A mover's old tile is normally released back into
+  // `occupied` after its hook returns; if a spawn claimed it, that release must NOT
+  // un-reserve it, or a later enemy stacks onto the newborn.
   const spawnClaimed = new Set<string>();
-  // Whose hook is running right now, and where it started. Lets a behavior spawn into
-  // the tile it is itself stepping out of — the Coilwyrm's tail sprouting a new segment
-  // behind itself. That tile is still in `occupied` at hook time (the release happens
-  // after the hook returns), so without this a "leave something behind me" spawn is
-  // always refused.
+  // Whose hook is running, and where it started. This is what lets a behavior spawn into the
+  // tile it is itself stepping out of — the Coilwyrm's tail sprouting a segment behind
+  // itself. That tile is still in `occupied` at hook time (the release happens after the
+  // hook returns), so without the exemption a "leave something behind me" spawn is always
+  // refused and the coil cannot grow.
   let actor: { prevKey: string; ctx: BehaviorContext['enemy'] } | null = null;
   const spawnEnemy: NonNullable<BehaviorContext['spawnEnemy']> = (spec) => {
-    const k = `${spec.y},${spec.x}`;
+    const key = `${spec.y},${spec.x}`;
     const actorIsVacating =
       !!actor &&
-      actor.prevKey === k &&
+      actor.prevKey === key &&
       `${actor.ctx.y},${actor.ctx.x}` !== actor.prevKey;
-    if (occupied.has(k) && !actorIsVacating) return false;
+    // A summon may NOT land on the hero, a live enemy, or another newborn — unless it is
+    // the caller's own tile and the caller is on its way out of it.
+    if (occupied.has(key) && !actorIsVacating) return false;
+    if (spawned.some((sp) => sp.y === spec.y && sp.x === spec.x)) return false;
     if (!isInBounds(grid, spec.y, spec.x)) return false;
     const born = new Enemy({ y: spec.y, x: spec.x });
-    born.kind = spec.kind;
-    if (typeof spec.health === 'number') {
-      born.health = spec.health;
-      born.maxHealth = spec.health;
-    }
-    if (typeof spec.attack === 'number') born.attack = spec.attack;
+    born.kind = spec.kind; // the kind setter applies that kind's HP/attack
     if (spec.memory) Object.assign(born.behaviorMemory, spec.memory);
-    occupied.add(k);
-    spawnClaimed.add(k);
-    pendingSpawns.push(born);
+    occupied.add(key);
+    spawnClaimed.add(key);
+    spawned.push(born);
     return true;
   };
   // Precompute ghost positions for context
   const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
-  for (let i = 0; i < enemies.length; i++) {
+  const initialCount = enemies.length;
+  for (let i = 0; i < initialCount; i++) {
     const e = enemies[i];
     // Skip enemies marked for skip (e.g., about to die to a player's projectile this turn).
     // Skipped enemies do not move, attack, or trigger proximity hooks.
@@ -729,13 +755,18 @@ export function updateEnemies(
         subtypes,
         enemies: enemies.map(en => ({ y: en.y, x: en.x, kind: en.kind, health: en.health, behaviorMemory: en.behaviorMemory })),
         enemyIndex: i,
-        player: { y: player.y, x: player.x, torchLit: opts?.playerTorchLit ?? true },
+        // Read the NORMALIZED opts, not the raw 5th arg: under the legacy
+        // 4-arg signature `opts` is undefined, which silently fed every
+        // custom-update enemy `torchLit: true`. Snakes hunt on exactly this
+        // flag (see the snake behavior in enemies/registry), so a stale `true`
+        // there would quietly disable the mechanic.
+        player: { y: player.y, x: player.x, torchLit: finalOpts?.playerTorchLit ?? true },
         playerNext: finalOpts?.playerNext,
         ghosts: ghostPositions,
         rng,
-        setPlayerTorchLit: opts?.setPlayerTorchLit,
-        spawnEnemy,
+        setPlayerTorchLit: finalOpts?.setPlayerTorchLit,
         mist: finalOpts?.mist,
+        spawnEnemy,
         enemy: enemyCtx,
       });
       actor = null;
@@ -797,11 +828,13 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        // The Coilwyrm's head sits in the goblin bucket deliberately: on the crit
-        // curve its base-2 bite rolls 4, the entire per-turn cap, so two bites killed
-        // a full-health hero with no tell. Here it reads 1-3 and a bite is a mistake
-        // you can survive learning from.
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'coilwyrm') {
+        // Both bosses sit in the goblin bucket deliberately, for the same reason: the
+        // 'other' branch below hands out a 25% +2 crit. On the Coilwyrm's head that made
+        // its base-2 bite roll 4 — the entire per-turn cap — so two bites killed a
+        // full-health hero with no tell; here it reads 1-3 and a bite is a mistake you can
+        // survive learning from. The Quarrymaster is meant to hit like a spear goblin, and
+        // the crit would make him spikier than his design brief allows.
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'coilwyrm' || e.kind === 'quarrymaster') {
           // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
           variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
         } else {
@@ -848,13 +881,14 @@ export function updateEnemies(
       });
     }
     // Robust fallback: if a ghost is adjacent, ensure torch is snuffed regardless of hook wiring
-    if (isAdjacent && e.kind === 'ghost' && opts?.setPlayerTorchLit) {
-      opts.setPlayerTorchLit(false);
+    // (normalized opts, for the same reason as the customUpdate branch above)
+    if (isAdjacent && e.kind === 'ghost' && finalOpts?.setPlayerTorchLit) {
+      finalOpts.setPlayerTorchLit(false);
     }
   }
 
-  // Bodies summoned during this tick join the roster now, after everyone has acted.
-  if (pendingSpawns.length > 0) enemies.push(...pendingSpawns);
+  // Newborns join the roster now that every existing enemy has taken its tick.
+  if (spawned.length > 0) enemies.push(...spawned);
 
   // Backward-compatible return: if called with old signature, return the damage number
   if (usingOldSignature) {

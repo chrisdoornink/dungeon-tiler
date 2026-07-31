@@ -115,4 +115,8 @@ export type SmoothEntityStep = {
   dur: number; // ms — matches the hero's current step duration
   ease: "linear" | "ease-in-out"; // linear while the hero is running
   seq: number;
+  // Multi-tile flight rather than a step: animate as a lobbed, tumbling arc instead of a
+  // straight glide. Set for a snake the Fisher has thrown across the spikes — without it
+  // the snake simply blinked to its landing tile and the throw was unreadable.
+  arc?: boolean;
 };

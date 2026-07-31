@@ -618,8 +618,7 @@ describe("two hits kill a head, and the body grows another", () => {
     head.health = COILWYRM_HEADSHOT_DAMAGE; // one blow from death
     const state = coilState(13, [5, 6], enemies, {
       inBossRoom: true,
-      bossKind: "coilwyrm",
-      playerDirection: Direction.LEFT,
+        playerDirection: Direction.LEFT,
     });
     const after = movePlayer(state, Direction.LEFT);
     expect((after.enemies ?? []).some((e) => e === head)).toBe(false); // head died
@@ -638,8 +637,7 @@ describe("two hits kill a head, and the body grows another", () => {
     head.health = 1; // one blow from death
     const state = coilState(11, [5, 4], [head], {
       inBossRoom: true,
-      bossKind: "coilwyrm",
-    });
+      });
     const after = movePlayer(state, Direction.RIGHT);
     expect((after.enemies ?? []).some((e) => e.kind === "coilwyrm")).toBe(false);
     expect(after.bossDefeated).toBe(true);

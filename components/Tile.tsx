@@ -30,12 +30,18 @@ const LAVA_CYCLE_S = 1.8;
 // ~1.5x tall; anchored at the feet (transformOrigin 50% 100%) so it grows upward and
 // its head spills into the tile above rather than sinking through the floor.
 const SHAPER_RENDER_SCALE = 1.5;
-// Coilwyrm (PLACEHOLDER art, snake sprites): the head fills its tile so it reads as
-// the dangerous end, and segments sit fat enough to look like a continuous wall of
-// body rather than a queue of separate snakes.
-// The head art is authored to fill its tile with the neck aligned to the body band, so it
-// draws at 1:1 like the body. (Kept as a constant because the pose tell scales off it.)
+// The Coilwyrm's head art is authored to fill its tile with the neck aligned to the body band,
+// so it draws at 1:1 like the body pieces do. Kept as a constant because the pose tell scales
+// off it.
 const COILWYRM_HEAD_RENDER_SCALE = 1.0;
+// The Fisher stands on stilt legs, so it still spills up out of its tile (feet planted via
+// transformOrigin) — but only a little. At 1.7 it was so big it obscured the tiles around
+// it, which matters more than usual here because its STANCE is the fight's only tell and
+// you need to see it against the ground it's standing on.
+const FISHER_RENDER_SCALE = 1.2;
+// Ceiling on how high a thrown snake arcs (see smoothStepArcStyle). Tiles are 40px, so
+// this keeps a long throw inside roughly one tile of airspace above the flight path.
+const THROWN_ARC_MAX_LIFT_PX = 46;
 
 // Submersion: standing in water hides the lower part of the hero sprite — waist-deep
 // in shallow water, up to the head in deep water. Pure CSS clip (no separate wading
@@ -199,11 +205,12 @@ interface TileProps {
   enemyFacing?: 'UP' | 'RIGHT' | 'DOWN' | 'LEFT';
   enemyKind?: EnemyKind;
   /**
-   * Optional boss pose driving a visual tell. Placeholder-art stand-in: "reared" means the
-   * head is in its post-bite recoil and cannot bite (the player's window), "surging" means
-   * it is taking two steps this turn.
+   * Boss pose driving a visual tell. One shared prop across every boss, so the union carries
+   * all of their poses: the Fisher's 'cocked' (spear drawn — the fight's only tell), 'pickup'
+   * and 'stalk'; the Quarrymaster's 'summon'; and the Coilwyrm's 'reared' (post-bite recoil,
+   * so it cannot bite) and 'surging' (taking two steps this turn).
    */
-  enemyPose?: "reared" | "surging";
+  enemyPose?: 'cocked' | 'pickup' | 'stalk' | 'summon' | 'reared' | 'surging';
   /**
    * Which connecting piece a Coilwyrm body segment should draw (straight, corner or tail cap),
    * chosen from its neighbours by `coilPieceFor`. Body pieces are cut to leave the tile
@@ -224,6 +231,13 @@ interface TileProps {
    */
   enemyCoilHeadPose?: CoilHeadPose;
   enemyMoved?: boolean; // did the enemy move last tick (for snakes: choose moving vs coiled)
+  // Fisher only: which pose sprite to draw instead of the facing sprite.
+  //   'cocked'  - spear drawn back, throw lands next turn. The fight's ONLY tell, since
+  //               there is deliberately no tile telegraph.
+  //   'pickup'  - head down in the shallows, taking a snake.
+  //   'stalk'   - hunched and advancing.
+  // The pose art is drawn facing RIGHT, so unlike the facing sprites these are mirrored
+  // when it faces left (see enemyBaseTransform).
   enemySwarmCount?: number; // for white-goblin: how many swarm members share this tile (1-4)
   enemyAura?: boolean; // show eerie green glow when close to hero
   npc?: NPC;
@@ -467,6 +481,12 @@ export const Tile: React.FC<TileProps> = ({
         return "ROAD_ROTATE_270";
       case TileSubtype.OPEN_ABYSS:
         return "OPEN_ABYSS";
+      case TileSubtype.PRESSURE_PLATE:
+        return "PRESSURE_PLATE";
+      case TileSubtype.PRESSURE_PLATE_PRESSED:
+        return "PRESSURE_PLATE_PRESSED";
+      case TileSubtype.SPIKE_HOLES:
+        return "SPIKE_HOLES";
       default:
         return String(s);
     }
@@ -576,6 +596,16 @@ export const Tile: React.FC<TileProps> = ({
     return subtypes?.includes(TileSubtype.LIGHTSWITCH) || false;
   };
 
+  // Switch-and-gate puzzle pieces. PLACEHOLDER ART for both: the plate reuses the
+  // existing switch sprite (tinted, and dimmed once thrown) and the cage gate is drawn
+  // in CSS as bars over the wall face — no sprite yet. See the feature doc's deferred list.
+  const hasPressurePlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE) || false;
+  };
+  const hasPressedPlate = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PRESSURE_PLATE_PRESSED) || false;
+  };
+
   // Check if a tile has a key subtype
   const hasKey = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.KEY) || false;
@@ -651,6 +681,13 @@ export const Tile: React.FC<TileProps> = ({
   const hasSteppingStone = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.STEPPING_STONE) || false;
   };
+  const hasSpikes = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SPIKES) || false;
+  };
+  // Retracted spikes: walkable, and the standing record that a switch was thrown.
+  const hasSpikeHoles = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.SPIKE_HOLES) || false;
+  };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
@@ -686,6 +723,9 @@ export const Tile: React.FC<TileProps> = ({
   };
   const hasPinkHeart = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.PINK_HEART) || false;
+  };
+  const hasWallSeal = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.WALL_SEAL) || false;
   };
   const hasBerry = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.BERRY) || false;
@@ -828,6 +868,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.PINK_RING &&
         // Exclude checkpoint: it has a custom asset overlay
         subtype !== TileSubtype.CHECKPOINT &&
+        // Plates and cage gates have their own overlays above/in the wall branch.
+        subtype !== TileSubtype.PRESSURE_PLATE &&
+        subtype !== TileSubtype.PRESSURE_PLATE_PRESSED &&
+        subtype !== TileSubtype.SPIKE_HOLES &&
+        subtype !== TileSubtype.SPAWN_POD &&
         subtype !== TileSubtype.FAULTY_FLOOR &&
         subtype !== TileSubtype.OPEN_ABYSS &&
         subtype !== TileSubtype.LAVA &&
@@ -835,6 +880,7 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.SHALLOW_WATER &&
         subtype !== TileSubtype.DEEP_WATER &&
         subtype !== TileSubtype.STEPPING_STONE &&
+        subtype !== TileSubtype.SPIKES &&
         subtype !== TileSubtype.DARKNESS &&
         subtype !== TileSubtype.DOOR &&
         subtype !== TileSubtype.ROOM_TRANSITION &&
@@ -869,7 +915,9 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BREACH &&
         // Pink realm prizes have custom rendering (heart gets a glow overlay)
         subtype !== TileSubtype.PINK_HEART &&
-        subtype !== TileSubtype.BERRY
+        subtype !== TileSubtype.BERRY &&
+        // Sealed doorway: a crack decal on the wall face
+        subtype !== TileSubtype.WALL_SEAL
     );
   };
 
@@ -956,6 +1004,49 @@ export const Tile: React.FC<TileProps> = ({
             key="lightswitch"
             data-testid={`subtype-icon-${TileSubtype.LIGHTSWITCH}`}
             className={`${styles.assetIcon} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Floor switch. Unthrown reads bright and pulses (it is the objective); thrown
+            goes flat and dark so a glance across the room counts your progress. */}
+        {hasPressurePlate(subtypes) && (
+          <div
+            key="pressure-plate"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE}`}
+            className={`${styles.assetIcon} ${styles.switchIcon} ${styles.plateArmed}`}
+          />
+        )}
+        {hasPressedPlate(subtypes) && (
+          <div
+            key="pressure-plate-pressed"
+            data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
+            className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Spawn pod: the mouth summons climb out of. PLACEHOLDER — drawn in CSS as a dark
+            ringed hole so its position is legible while the real asset is undecided. */}
+        {subtypes?.includes(TileSubtype.SPAWN_POD) && (
+          <div
+            key="spawn-pod"
+            data-testid={`subtype-icon-${TileSubtype.SPAWN_POD}`}
+            className={styles.spawnPod}
+            aria-hidden="true"
+          />
+        )}
+
+        {/* Sealed doorway: a crack decal low on the wall's face, where the forced
+            perspective actually shows stone (see isFloorBelow in the wall branch). Sits
+            below the torch flames so a bracketed seal reads as one motif. Deterministic
+            rotation + variant per tile so no two seals on a floor look stamped. */}
+        {hasWallSeal(subtypes) && (
+          <div
+            key="wall-seal"
+            data-testid={`subtype-icon-${TileSubtype.WALL_SEAL}`}
+            className={`${styles.wallSealIcon} ${
+              pickVariant([styles.wallSealVariantA, styles.wallSealVariantB])
+            }`}
+            style={{ transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg)` }}
           />
         )}
 
@@ -1496,6 +1587,30 @@ export const Tile: React.FC<TileProps> = ({
     } as React.CSSProperties;
   };
 
+  // Thrown-snake variant: a lobbed, tumbling arc rather than a step. Used when the Fisher
+  // hurls a snake over the spikes (SmoothEntityStep.arc). The midpoint is the geometric
+  // centre of the flight lifted well clear of the ground, and the sprite spins a full turn
+  // across the throw, so the snake reads as sailing through the air — the throw was
+  // otherwise invisible, since the snake simply appeared on the near bank. Lift scales
+  // with distance so a short toss doesn't loop absurdly high.
+  const smoothStepArcStyle = (
+    step: SmoothEntityStep | undefined,
+    base: string
+  ): React.CSSProperties | null => {
+    if (!step) return null;
+    const baseSuffix = !base || base === 'none' ? '' : ` ${base}`;
+    const dist = Math.abs(step.dy) + Math.abs(step.dx);
+    const lift = Math.min(THROWN_ARC_MAX_LIFT_PX, 14 + dist * 7);
+    const midX = (step.dx * 40) / 2;
+    const midY = (step.dy * 40) / 2 - lift;
+    return {
+      ['--smooth-step-from' as string]: `translate(${step.dx * 40}px, ${step.dy * 40}px) rotate(0deg)${baseSuffix}`,
+      ['--smooth-step-mid' as string]: `translate(${midX}px, ${midY}px) rotate(180deg)${baseSuffix}`,
+      ['--smooth-step-to' as string]: `rotate(360deg)${baseSuffix}`,
+      animation: `smoothStepArc ${step.dur}ms ${step.ease} both`,
+    } as React.CSSProperties;
+  };
+
   // Regular-goblin variant: same slide, plus a bob + alternating tilt baked
   // into a midpoint keyframe (see smoothStepSlideBob in globals.css). The
   // midpoint is the geometric center of the slide with a vertical lift
@@ -1721,9 +1836,6 @@ export const Tile: React.FC<TileProps> = ({
         // It's also a big, ominous boss: render it larger (feet planted via the
         // transformOrigin on the sprite div; its head spills up into the tile above).
         if (enemyKind === 'shaper') return `scale(${SHAPER_RENDER_SCALE})`;
-        // Coilwyrm: the placeholder snake art only faces left, so mirror it when the
-        // part is travelling right — that's what makes the coil read as one continuous
-        // body flowing through the room instead of a row of unrelated sprites.
         // Coil BODY: the art is cut so the tube leaves the tile edge-to-edge, so it must be
         // drawn at exactly 1:1 and never mirrored — any scale or flip breaks the joins and the
         // wyrm falls apart into separate blobs.
@@ -1737,8 +1849,8 @@ export const Tile: React.FC<TileProps> = ({
             ? 'scaleX(-1) '
             : '';
           // Pose tell: reared back reads as pulled-back-and-shrunken, a surge as lunged and
-          // swollen. Until there is dedicated reared/biting art this is the only thing making
-          // the bite rhythm visible, and the rhythm is what makes the fight fair.
+          // swollen. A stand-in until dedicated art exists — polish, not fairness: a winning
+          // line never has to read the recoil (measured).
           const s =
             enemyPose === 'reared'
               ? COILWYRM_HEAD_RENDER_SCALE * 0.82
@@ -1746,6 +1858,13 @@ export const Tile: React.FC<TileProps> = ({
               ? COILWYRM_HEAD_RENDER_SCALE * 1.12
               : COILWYRM_HEAD_RENDER_SCALE;
           return `${flip}scale(${s})`;
+        }
+        // The Fisher has a single RIGHT-facing profile (and its pose art is drawn facing
+        // right too), so unlike the Shaper it does get mirrored when facing left. Front/back
+        // are symmetrical enough that mirroring them is harmless.
+        if (enemyKind === 'fisher') {
+          const flip = enemyFacing === 'LEFT' ? ' scaleX(-1)' : '';
+          return `scale(${FISHER_RENDER_SCALE})${flip}`;
         }
         // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
@@ -1835,6 +1954,17 @@ export const Tile: React.FC<TileProps> = ({
                     `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilPiece ?? 'body-h'}.png`
                   );
                 }
+                // The Fisher swaps to a pose sprite for its readable states — above all the
+                // cocked wind-up, which is the only warning the player gets before a spear.
+                if (kind === 'fisher' && enemyPose) {
+                  return assetUrl(`/images/enemies/bosses/fisher/fisher-${enemyPose}.png`);
+                }
+                // The Quarrymaster throws his arms up on the turn he calls a wave. It is his
+                // only tell, and the reason a separate pose was drawn — the raised-arm
+                // silhouette is the one thing that still reads at 40px.
+                if (kind === 'quarrymaster' && enemyPose === 'summon') {
+                  return assetUrl('/images/enemies/bosses/quarrymaster/quarry-summon-front.png');
+                }
                 const facing: Facing = toFacing(enemyFacing);
                 // Fire goblins carry an animated torch (see PixelFlame below):
                 // swap in the flameless base art. Registry paths stay flamed
@@ -1850,9 +1980,10 @@ export const Tile: React.FC<TileProps> = ({
               backgroundPosition: 'center',
               zIndex: 10500, // above fog (10000), below wall tops (12000)
               transform: enemyBaseTransform,
-              // The Shaper's up-scale pivots at its feet so it grows into the tile
-              // above; every other enemy keeps the default center origin.
-              transformOrigin: enemyKind === 'shaper' ? '50% 100%' : undefined,
+              // The Shaper's and the Fisher's up-scale pivots at their feet so they grow
+              // into the tile above; every other enemy keeps the default center origin.
+              transformOrigin:
+                enemyKind === 'shaper' || enemyKind === 'fisher' ? '50% 100%' : undefined,
               // Darken non-torch-carrying enemies in cave/underground environments
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
@@ -1881,7 +2012,10 @@ export const Tile: React.FC<TileProps> = ({
               // goblins (fire/water/earth family) get the bob+tilt variant so
               // their walk reads as a step rather than a flat glide.
               ...(enemySliding
-                ? (REGULAR_GOBLIN_KINDS.has(enemyKind ?? '') || enemyKind === 'shaper')
+                ? enemyStep?.arc
+                  ? // Thrown, not walking: a snake the Fisher lobbed over the spikes.
+                    smoothStepArcStyle(enemyStep, enemyBaseTransform)
+                  : (REGULAR_GOBLIN_KINDS.has(enemyKind ?? '') || enemyKind === 'shaper')
                   ? // Shaper + regular goblins step (bob + tilt) so movement reads as a
                     // heavy footfall, not the flat glide that made the Shaper look like
                     // it was floating/sliding magically.
@@ -1892,7 +2026,8 @@ export const Tile: React.FC<TileProps> = ({
             onAnimationEnd={(e) => {
               if (
                 (e.animationName === 'smoothStepSlide' ||
-                  e.animationName === 'smoothStepSlideBob') &&
+                  e.animationName === 'smoothStepSlideBob' ||
+                  e.animationName === 'smoothStepArc') &&
                 enemyStep
               ) {
                 setSmoothSlideDoneSeq(enemyStep.seq);
@@ -1938,10 +2073,16 @@ export const Tile: React.FC<TileProps> = ({
       const isShallowWater = hasShallowWater(subtype);
       const isDeepWater = hasDeepWater(subtype);
       const isSteppingStone = hasSteppingStone(subtype);
+      const isSpikes = hasSpikes(subtype);
+      const isSpikeHoles = hasSpikeHoles(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
         ? styles.openAbyss
+        : isSpikes
+        ? styles.spikes
+        : isSpikeHoles
+        ? styles.spikeHoles
         : isLava
         ? styles.lava
         : isObsidian
@@ -1997,9 +2138,18 @@ export const Tile: React.FC<TileProps> = ({
           style={{
             // Elemental terrain supplies its own pixel-art background via the CSS
             // class; an inline floor-asset image here would override it (that override
-            // is why lava first rendered as a bare framed square). Leave it unset.
+            // is why lava first rendered as a bare framed square, and later why retracted
+            // spike beds rendered as plain floor). Leave it unset. ANY new terrain that
+            // paints itself from a CSS class must be added here or it will silently lose
+            // to this inline style — the class is not the thing that wins.
             backgroundImage:
-              isLava || isObsidian || isShallowWater || isDeepWater || isSteppingStone
+              isLava ||
+              isObsidian ||
+              isShallowWater ||
+              isDeepWater ||
+              isSteppingStone ||
+              isSpikes ||
+              isSpikeHoles
                 ? undefined
                 : `url(${floorAsset})`,
             backgroundSize: "cover",
@@ -2431,6 +2581,7 @@ export const Tile: React.FC<TileProps> = ({
               aria-hidden="true"
             />
           )}
+
 
           {/* Exaggerated base shadow when standing in front of floor */}
           {isFloorBelow && (

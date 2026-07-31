@@ -49,7 +49,6 @@ export function buildOutsideWorld(
   direction: Direction,
   width: number,
   height: number,
-  opts?: { bossEntrance?: boolean }
 ): { mapData: MapData; enemies: PlainEnemy[]; entry: [number, number] } {
   const tiles: number[][] = [];
   const subtypes: number[][][] = [];
@@ -137,27 +136,12 @@ export function buildOutsideWorld(
     }
   }
 
-  // Boss-day marker: carve a 1-wide corridor straight through the FAR tree wall
-  // (opposite the dungeon-facing edge) and place a lockless cave mouth at its outer
-  // end. Reads as an opening in the trees with a path leading down into the boss
-  // room; the stone-goblin line guards the approach to it.
-  if (opts?.bossEntrance) {
-    let entrance: [number, number];
-    if (inner === "top") {
-      for (let y = lastY - TREE_BORDER + 1; y <= lastY; y++) tiles[y][midX] = FLOOR;
-      entrance = [lastY, midX];
-    } else if (inner === "bottom") {
-      for (let y = 0; y <= TREE_BORDER - 1; y++) tiles[y][midX] = FLOOR;
-      entrance = [0, midX];
-    } else if (inner === "left") {
-      for (let x = lastX - TREE_BORDER + 1; x <= lastX; x++) tiles[midY][x] = FLOOR;
-      entrance = [midY, lastX];
-    } else {
-      for (let x = 0; x <= TREE_BORDER - 1; x++) tiles[midY][x] = FLOOR;
-      entrance = [midY, 0];
-    }
-    subtypes[entrance[0]][entrance[1]].push(TileSubtype.BOSS_ENTRANCE);
-  }
+  // NOTE: the outside world used to carve a hidden boss entrance through its far tree
+  // wall on bomb days. That route is gone — once players knew it existed, bombing any
+  // outer wall got you to the boss, so there was nothing left to find. The boss now sits
+  // behind a sealed doorway inside the dungeon (see stampSealedDoorway), and the outside
+  // world is back to being what it was designed as: a dead-end curiosity with stone
+  // goblins and no reward.
 
   const mapData: MapData = { tiles, subtypes, environment: "outdoor" };
   return { mapData, enemies, entry };

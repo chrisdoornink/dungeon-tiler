@@ -12,8 +12,14 @@ import {
   COILWYRM_HEADSHOT_DAMAGE,
   COILWYRM_SEGMENT_HP,
 } from "../bosses/coilwyrm";
+import { fisherUpdate, FISHER_HP, FISHER_ATTACK } from "../bosses/fisher";
+import {
+  quarrymasterUpdate,
+  QUARRYMASTER_HP,
+  QUARRYMASTER_ATTACK,
+} from "../bosses/quarrymaster";
 import { assetUrl } from "../asset_url";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "coilwyrm" | "coilwyrm-coil";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher" | "quarrymaster" | "coilwyrm" | "coilwyrm-coil";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -41,16 +47,20 @@ export interface BehaviorContext {
   rng?: () => number;
   // actions
   setPlayerTorchLit?: (lit: boolean) => void;
-  // Add a new enemy to the live roster (boss adds: Coilwyrm growth, broodling
-  // hatches, ...). Queued by the engine and appended AFTER this tick's loop, so a
-  // freshly spawned body never acts on the turn it appears. Returns false when the
-  // tile is already claimed this tick.
+  /**
+   * Summon an enemy — the boss-adds channel. Returns false when the tile is taken (the
+   * hero, a live enemy, or another newborn from this same tick), so a summoner can try
+   * its next candidate tile. Newborns are buffered by the engine and appended after every
+   * existing enemy has ticked, so a summon never acts on the turn it appears.
+   * Absent when a behavior is driven outside `updateEnemies` (tests, tooling).
+   *
+   * A caller MAY spawn into the tile it is itself stepping out of (the Coilwyrm's tail
+   * sprouting a segment behind itself); every other occupied tile is refused.
+   */
   spawnEnemy?: (spec: {
     y: number;
     x: number;
     kind: EnemyKind;
-    health?: number;
-    attack?: number;
     memory?: Record<string, unknown>;
   }) => boolean;
   // current enemy snapshot with a mutable memory bag persisted by engine
@@ -157,6 +167,33 @@ export interface EnemyConfig {
 }
 
 const clampMin = (n: number, min = 0) => (n < min ? min : n);
+
+// --- Snake torch aggression -------------------------------------------------
+// Snakes invert the usual torch-snuff stealth rule. Every other enemy loses the
+// hero when his flame goes out; a snake hunts by body heat, so darkness is when
+// it stops being scenery and starts being a predator. With the torch lit it is
+// aloof (mostly slinks away, occasionally drifts closer); with the torch out it
+// commits, tracks the hero through walls, and bites.
+//
+// This is deliberately global — it reads `ctx.player.torchLit`, so it applies
+// anywhere the torch can go out: ghost snuffs, swimming deep water, the unlit
+// endless floors, and the doused walk to a DARK_PORTAL boss entrance.
+
+// How far a snake senses a doused hero, in Manhattan tiles. Ignores line of
+// sight (heat, not light). Matches ENEMY_VISION_RADIUS and the HUD's "Enemies
+// in sight" panel, so a snake that has a clear line on you is one the HUD is
+// already listing — sensed-through-a-wall is the only unannounced case, and a
+// wall is also what keeps it from reaching you.
+export const SNAKE_DARK_SENSE_RADIUS = 8;
+
+// Turns a snake keeps hunting after it loses the scent — either the hero
+// relights or steps out of range. Relighting is a reprieve, not an off switch:
+// a riled snake finishes its lunge at the hero's last sensed position. Mirrors
+// ENEMY_PURSUIT_TTL, which does the same job for goblin line-of-sight memory.
+export const SNAKE_RILED_TTL = 4;
+
+// Chance an aloof (torch-lit) snake drifts toward the hero rather than away.
+export const SNAKE_LIT_APPROACH_CHANCE = 0.33;
 
 export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
   "fire-goblin": {
@@ -278,6 +315,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.SHALLOW_WATER) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
@@ -802,6 +840,7 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.SHALLOW_WATER) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
@@ -1056,7 +1095,8 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
-      // Move away from player when visible; wander otherwise
+      // Aloof while the hero's torch burns (mostly slinks away); a relentless
+      // heat-seeking hunter once it goes out. See the SNAKE_DARK_* constants.
       customUpdate: (ctx) => {
         const grid = ctx.grid;
         const e = ctx.enemy; // contains mutable y,x,facing,memory
@@ -1068,12 +1108,76 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
         // alternating coiled <-> moving each turn.
         e.memory.moved = false;
 
-        // Torch-snuff stealth: a hidden hero is neither seen nor bitten.
-        const heroHidden = ctx.player.torchLit === false;
+        // AIRBORNE: the Fisher seized this snake and threw it across the spikes. It
+        // can't move another enemy directly (customUpdate only hands it a positional
+        // copy of the roster) so it stamps a flight order into this memory bag instead;
+        // the snake carries it out here, on its own tick. Landing consumes the whole
+        // turn — a snake that just hit the ground doesn't also get to bite.
+        const hurl = e.memory.fisherHurl as { y: number; x: number } | undefined;
+        if (hurl) {
+          delete e.memory.fisherHurl;
+          const landY = hurl.y;
+          const landX = hurl.x;
+          const inBounds =
+            landY >= 0 && landX >= 0 && landY < grid.length && landX < (grid[0]?.length ?? 0);
+          const occupied = (ctx.enemies ?? []).some(
+            (other, i) => i !== ctx.enemyIndex && other.y === landY && other.x === landX
+          );
+          if (inBounds && !occupied && !(landY === py && landX === px)) {
+            const fromY = e.y;
+            const fromX = e.x;
+            e.y = landY;
+            e.x = landX;
+            e.memory.moved = true;
+            // Flight record for the render layer, which animates this as a tumbling arc
+            // instead of a slide (see the `snake` case in TilemapGrid's smoothEntitySteps).
+            // Storing both ends means the match is exact and self-expiring — it only lines
+            // up on the tick the throw actually happened.
+            e.memory.lastFlight = { from: [fromY, fromX], to: [landY, landX] };
+            // Face the hero as it uncoils, so the threat reads immediately.
+            e.facing =
+              Math.abs(px - landX) >= Math.abs(py - landY)
+                ? px > landX
+                  ? "RIGHT"
+                  : "LEFT"
+                : py > landY
+                ? "DOWN"
+                : "UP";
+          }
+          return 0;
+        }
 
-        // If adjacent, attack
+        const heroDark = ctx.player.torchLit === false;
         const manhattan = Math.abs(e.y - py) + Math.abs(e.x - px);
-        if (manhattan === 1 && !heroHidden) {
+
+        // Heat sense: a doused hero is prey. No line-of-sight check — the snake
+        // feels him through walls — but it still has to slither around them.
+        const sensesHeat = heroDark && manhattan <= SNAKE_DARK_SENSE_RADIUS;
+        let riledTtl = Number(e.memory.riledTtl ?? 0);
+        if (sensesHeat) {
+          riledTtl = SNAKE_RILED_TTL;
+          e.memory.lastSensed = { y: py, x: px };
+        } else if (riledTtl > 0) {
+          riledTtl -= 1;
+        }
+        e.memory.riledTtl = riledTtl;
+        if (riledTtl <= 0) delete e.memory.lastSensed;
+
+        // A riled snake chases the last place it felt the hero, not his live
+        // position — relighting mid-chase lets you break contact and slip away,
+        // the same escape goblins allow when you snuff mid-chase.
+        const sensed = e.memory.lastSensed as { y: number; x: number } | undefined;
+        const huntTarget = sensesHeat
+          ? { y: py, x: px }
+          : riledTtl > 0 && sensed
+          ? sensed
+          : null;
+        // Exposed for the render layer / debugging: is this snake in hunt mode?
+        e.memory.hunting = huntTarget !== null;
+
+        // If adjacent, bite — lit torch or not. A doused hero used to be
+        // un-bitable even nose-to-nose; darkness is the snake's advantage now.
+        if (manhattan === 1) {
           // Face the player
           if (Math.abs(px - e.x) >= Math.abs(py - e.y)) {
             e.facing = px > e.x ? "RIGHT" : "LEFT";
@@ -1091,19 +1195,50 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
           if (!isIn(y, x) || grid[y][x] !== 0) return false;
           const subs = ctx.subtypes?.[y]?.[x] ?? [];
           // Snakes won't swim: deep water is off-limits (shallow is fine to slither).
+          // Spikes are a wall for everything — a snake the Fisher hurls over must not be
+          // able to slither back across the barrier it was thrown over.
           return (
             !subs.includes(TileSubtype.OPEN_ABYSS) &&
             !subs.includes(TileSubtype.LAVA) &&
+            !subs.includes(TileSubtype.SPIKES) &&
             !subs.includes(TileSubtype.DEEP_WATER)
           );
         };
 
-        // If can see player, decide each tick: 33% approach, 67% avoid (move away)
-        const sees = !heroHidden && canSee(grid, [e.y, e.x], [py, px]);
+        // Hunting the dark: commit, and close the distance every single turn.
+        // Uses the shared pursuit ordering so the approach still can't be read
+        // tile-for-tile (see lib/enemies/pursuit.ts).
+        if (huntTarget) {
+          const steps = orderPursuitSteps(
+            huntTarget.y - e.y,
+            huntTarget.x - e.x,
+            ctx.rng ?? Math.random
+          );
+          for (const [my, mx] of steps) {
+            const ny = e.y + my;
+            const nx = e.x + mx;
+            if (isFloor(ny, nx)) {
+              if (mx !== 0) e.facing = mx > 0 ? "RIGHT" : "LEFT";
+              else if (my !== 0) e.facing = my > 0 ? "DOWN" : "UP";
+              e.y = ny;
+              e.x = nx;
+              e.memory.moved = true;
+              return 0;
+            }
+          }
+          // Boxed in by walls this turn — hold position and keep hunting.
+          return 0;
+        }
+
+        // Torch lit: aloof. Decide each tick — mostly avoid, sometimes approach.
+        // A doused hero who is out of heat range is genuinely lost: no flame to
+        // spot and too far to feel, so the snake falls through to wandering.
+        const sees = !heroDark && canSee(grid, [e.y, e.x], [py, px]);
         if (sees) {
           const dy = py - e.y;
           const dx = px - e.x;
-          const goToward = (ctx.rng?.() ?? Math.random()) < 0.33;
+          const goToward =
+            (ctx.rng?.() ?? Math.random()) < SNAKE_LIT_APPROACH_CHANCE;
           const tryMoves: Array<[number, number]> = [];
           if (Math.abs(dx) >= Math.abs(dy)) {
             // Favor X axis first
@@ -1250,14 +1385,77 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     // cut". Thrown damage is likewise ungated, which makes a rune or a bomb a legitimate way
     // to blow a deep hole in the coil rather than a way to break it.
     //
-    // KNOWN OPEN ISSUE (see .claude/features/boss-coilwyrm/index.md): because segment 1 always
-    // flows into the tile the head vacates, a player who leads the target can sever the whole
-    // coil with a single blow at the head's tile. Simulated fights end in ~4 turns of contact.
-    // The fix is a design choice, not a tuning nudge, so it is deliberately left open.
+    // Segment 1 always flows into the tile the head vacates, so a player who leads the target
+    // can sever the coil at its neck with one blow. That USED to end fights in ~4 turns of
+    // contact; COILWYRM_SPLIT_MIN closed it — a severed length of 4+ grows its own head, so the
+    // greedy deep cut now costs you a second boss instead of winning.
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
       customUpdate: coilwyrmSegmentUpdate,
+    },
+  },
+  "fisher": {
+    kind: "fisher",
+    displayName: "The Fisher",
+    assets: {
+      // Hand-drawn art, background-keyed and baseline-normalised from the source renders
+      // (scratchpad/prep_fisher.js — the originals sit on an opaque vignette with a baked
+      // shadow and the bird at a different height in each). Extra poses the render layer
+      // swaps in — `fisher-cocked` (spear drawn back: the fight's only tell), `fisher-stalk`
+      // (hunched and advancing) and `fisher-pickup` (head down, taking a snake) — live
+      // alongside these; see enemyPose in Tile.tsx.
+      //
+      // There is only a RIGHT profile: unlike the Shaper this one IS mirrored for left, so
+      // the left facing deliberately points at the same file.
+      //
+      // The `-stand-` in these names is load-bearing, not tidiness — do NOT "simplify" them
+      // back to fisher-front.png etc. Those were the filenames of the earlier placeholder
+      // art, and reusing them meant browsers served the cached placeholders instead of the
+      // real art (only the brand-new pose filenames picked up correctly). Any future art
+      // pass should likewise land on a filename that has never been served before.
+      front: assetUrl("/images/enemies/bosses/fisher/fisher-stand-front.png"),
+      left: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
+      right: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
+      back: assetUrl("/images/enemies/bosses/fisher/fisher-stand-back.png"),
+    },
+    base: { health: FISHER_HP, attack: FISHER_ATTACK },
+    // Melee is unreachable by design — the spikes guarantee the hero never stands
+    // adjacent — so this exists only so the kill path is well-defined if a future
+    // arena ever does let you close. Rocks (2 damage) are the intended weapon:
+    // FISHER_HP is set to exactly four of them.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: fisherUpdate,
+    },
+  },
+  "quarrymaster": {
+    kind: "quarrymaster",
+    displayName: "The Quarrymaster",
+    assets: {
+      // Chained rock taskmaster with ember-lit cracks. Prepared from a single contact sheet
+      // by scripts/prep-quarrymaster-sprites.js, which slices the poses, keys the paper,
+      // strips the baked shadow and de-halos the smoothed edges, then plants every pose on a
+      // common baseline at one shared scale so he does not change size as he turns or raises
+      // his arms.
+      //
+      // Only a RIGHT profile exists; it is mirrored for left (same as the Fisher, unlike the
+      // Shaper whose two halves differ). The `quarry-` prefix is deliberate: these names have
+      // never been served before, because dropping real art onto a placeholder's filenames is
+      // how the Fisher ended up with browsers serving cached placeholders.
+      front: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-front.png"),
+      left: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
+      right: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
+      back: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-back.png"),
+    },
+    base: { health: QUARRYMASTER_HP, attack: QUARRYMASTER_ATTACK },
+    // Ordinary melee, ordinary HP. Reaching him past the cage gates is the whole fight;
+    // two or three swings and he is done.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: quarrymasterUpdate,
     },
   },
 };

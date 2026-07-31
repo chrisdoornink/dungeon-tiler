@@ -127,6 +127,48 @@ export enum TileSubtype {
   // visuals never accidentally trigger a boss warp.
   BOSS_ENTRANCE = 63,
   DARK_PORTAL = 64,
+  // WALL_SEAL is a walled-up doorway: a WALL tile wearing a crack decal. Bomb it and
+  // it opens into whatever the day stashed behind it (a BOSS_ENTRANCE on the real one,
+  // a reward POT on a decoy) — see sealPayloads in game-state.ts. Only ever placed on
+  // a wall tile with FLOOR directly below it, because that is the only wall the
+  // renderer gives a camera-facing face to (see Tile.tsx's isFloorBelow), so the crack
+  // is always readable. The real seal is bracketed left and right by WALL_TORCHes;
+  // decoys are bare. That torch-pair grammar is the whole tell.
+  WALL_SEAL = 65,
+  // SPIKES: the outdoor world's impassable hazard — a bed of iron spikes sunk into
+  // the ground. It is a FLOOR overlay, NOT a wall tile, and that distinction is the
+  // whole point: thrown rocks/runes fly OVER it (the throw scan only breaks on
+  // non-FLOOR tiles), while the hero can never enter — bumping into it costs
+  // SPIKES_BUMP_DAMAGE and the move is refused, so it can't be crossed at any HP.
+  // Gives outdoor arenas a hard barrier where lava/abyss would look wrong.
+  SPIKES = 66,
+  // Switch-and-gate puzzle pieces (see .claude/features/boss-arena-switch-mechanic/index.md).
+  // PRESSURE_PLATE is a floor switch the hero throws by standing on it — the step-on
+  // pattern of LIGHTSWITCH, so the hero and the plate coexist on the tile — and it
+  // becomes PRESSURE_PLATE_PRESSED for good once thrown. Which plate clears which
+  // barrier is wired per-arena in GameState.gateGroups, not encoded in the subtype, so
+  // one arena can run any number of plate/barrier sets.
+  //
+  // The barrier itself is just SPIKES. That reuses a shipped, fully-behaved hazard —
+  // impassable to every entity, 1 damage and a refused move for the hero, rocks fly over
+  // — and, being a FLOOR overlay rather than a wall, it looks identical from every
+  // direction. An earlier version used a WALL tile wearing a portcullis, which needed a
+  // separate sprite per orientation and, seen edge-on, could not read as a gate at all.
+  //
+  // SPIKE_HOLES is the retracted state: the spikes have sunk into the ground and left
+  // bare sockets. Purely cosmetic and fully walkable — it is the visible record that a
+  // switch was thrown, readable from across the room.
+  //
+  // Numbered from 67 because SPIKES took 66 on main while this branch was in flight.
+  // Subtype numbers end up inside serialized maps, so these are numbered around a value
+  // that has already shipped rather than shuffling it.
+  PRESSURE_PLATE = 67,
+  PRESSURE_PLATE_PRESSED = 68,
+  SPIKE_HOLES = 69,
+  // A fixed mouth that a boss's summons climb out of — a floor overlay you can walk over.
+  // Placed by the arena, never generated. The Quarrymaster has exactly two, flanking his
+  // chamber, and fields one monster from each. Art is undetermined; renders as a placeholder.
+  SPAWN_POD = 70,
 }
 
 /**

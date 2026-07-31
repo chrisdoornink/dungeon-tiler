@@ -6,7 +6,7 @@ import { buildOutsideWorld } from "../../lib/map/outside-world";
 import {
   buildMoatApproach,
   buildDousePortalApproach,
-  buildBombOutsideApproach,
+  buildBombSealApproach,
 } from "../../lib/bosses/boss_entrances";
 
 const SHAPER_ARENA_SIZE = 25;
@@ -197,27 +197,18 @@ describe("moat approach in a real Level-3 room", () => {
   });
 });
 
-describe("outside-world boss entrance", () => {
-  test("bossEntrance:true carves an opening and places a BOSS_ENTRANCE in the far tree wall", () => {
-    // Stepping UP out of the dungeon -> inner edge is the bottom, far wall the top.
-    const { mapData } = buildOutsideWorld(Direction.UP, 15, 15, { bossEntrance: true });
-    let found: [number, number] | null = null;
-    for (let y = 0; y < mapData.subtypes.length; y++)
-      for (let x = 0; x < mapData.subtypes[y].length; x++)
-        if (mapData.subtypes[y][x].includes(TileSubtype.BOSS_ENTRANCE)) found = [y, x];
-    expect(found).not.toBeNull();
-    // The carve runs through the far (top) tree border, so the entrance's column is FLOOR.
-    const [ey, ex] = found!;
-    expect(mapData.tiles[ey][ex]).toBe(0);
-    expect(mapData.tiles[ey + 1][ex]).toBe(0); // path punched through the border
-  });
-
-  test("without the flag, no boss entrance is carved", () => {
-    const { mapData } = buildOutsideWorld(Direction.UP, 15, 15);
-    const any = mapData.subtypes.some((row) =>
-      row.some((cell) => cell.includes(TileSubtype.BOSS_ENTRANCE))
-    );
-    expect(any).toBe(false);
+describe("outside world is no longer a boss route", () => {
+  // The old bomb entrance carved a cave mouth through the far tree wall. Once players
+  // knew it was there, bombing ANY outer wall reached the boss, so the secret was gone.
+  // The outside world is now a dead end again; the boss sits behind a sealed doorway.
+  test("carves no boss entrance in any direction", () => {
+    for (const dir of [Direction.UP, Direction.DOWN, Direction.LEFT, Direction.RIGHT]) {
+      const { mapData } = buildOutsideWorld(dir, 15, 15);
+      const any = mapData.subtypes.some((row) =>
+        row.some((cell) => cell.includes(TileSubtype.BOSS_ENTRANCE))
+      );
+      expect(any).toBe(false);
+    }
   });
 });
 
@@ -231,9 +222,16 @@ describe("approach builders are valid playable states", () => {
     expect(hasPortal).toBe(true);
     expect(douse.showFullMap).toBe(false); // fog on so the dark reveal renders
 
-    const bomb = buildBombOutsideApproach();
+    const bomb = buildBombSealApproach();
     expect(bomb.bombCount).toBe(3);
-    expect(bomb.outsideHasBossEntrance).toBe(true);
+    expect(findHero(bomb)[0]).toBeGreaterThanOrEqual(0);
+    // A sealed doorway + its decoys, and a payload recorded for each one.
+    const seals = bomb.mapData.subtypes
+      .flat()
+      .filter((c) => c.includes(TileSubtype.WALL_SEAL));
+    expect(seals.length).toBeGreaterThanOrEqual(1);
+    expect(Object.keys(bomb.sealPayloads ?? {}).length).toBe(seals.length);
+    expect(Object.values(bomb.sealPayloads ?? {})).toContain("boss");
   });
 });
 

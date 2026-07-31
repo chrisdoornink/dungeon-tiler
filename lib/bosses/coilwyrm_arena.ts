@@ -280,7 +280,6 @@ export function buildCoilwyrmArena(
     // than advancing a floor. There is no bossReturn here, so the sandbox has no way
     // back out to a dungeon — the exit is the only door.
     inBossRoom: true,
-    bossKind: "coilwyrm",
     // More slack than the Shaper's arena, because this fight is a long dance inside
     // biting range: headless simulation put a 6 HP hero's win rate in the single digits
     // purely on the HP economy. Food and the potion are the pacing valve — spending a
