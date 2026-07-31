@@ -61,6 +61,11 @@ import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
 import { collapseFisherIntoBridge, buildFisherArena } from "../bosses/fisher_arena";
+import { buildCoilwyrmArena } from "../bosses/coilwyrm_arena";
+import {
+  buildQuarrymasterArena,
+  QUARRYMASTER_LAYOUTS,
+} from "../bosses/quarrymaster_arena";
 import {
   rollDailyBossKind,
   type BossKind,
@@ -886,6 +891,33 @@ export function performThrowRockCore(gameState: GameState): GameState {
         return {
           ...preTickState,
           mapData: newMapData,
+          rockCount: count - 1,
+          stats: {
+            ...preTickState.stats,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          },
+        };
+      }
+    }
+    // A rock landing on an unthrown floor switch HOLDS IT DOWN and is spent doing so. The
+    // throw stops here rather than flying on, which is the whole point: rocks otherwise
+    // travel their full range, so a switch three tiles away would be sailed straight over
+    // and land behind it. Stopping on the plate is what turns "a switch across a crack" from
+    // scenery into a puzzle you can actually solve.
+    //
+    // Only an UNTHROWN plate stops a rock — a pressed one is spent, so the rock sails over it
+    // like any other floor decal.
+    {
+      const plateSubs = newMapData.subtypes[ty][tx] || [];
+      if (plateSubs.includes(TileSubtype.PRESSURE_PLATE)) {
+        const wiring: { gateGroups?: GateGroup[] } = {
+          gateGroups: preTickState.gateGroups,
+        };
+        pressPlate(wiring, newMapData, ty, tx);
+        return {
+          ...preTickState,
+          mapData: newMapData,
+          gateGroups: wiring.gateGroups,
           rockCount: count - 1,
           stats: {
             ...preTickState.stats,
@@ -3073,11 +3105,21 @@ function enterBossRoom(
 ): GameState {
   const kind: BossKind = state.dailyBossKind ?? "shaper";
   const entry = BOSS_ENTRY_BY_DIRECTION[direction] ?? "south";
-  const arena =
+  // Each boss brings its own arena. Only the Shaper reads `entry`: the others are built
+  // around a fixed approach (the Fisher from the bottom of the pond, the Quarrymaster from
+  // the door opposite his chamber), so passing a compass direction in would mean nothing.
+  const arena: GameState =
     kind === "fisher"
-      ? // The Fisher is always entered from the south — you come in at the bottom of the
-        // pond and the whole arena is built around that — so `entry` is deliberately unused.
-        buildFisherArena()
+      ? buildFisherArena()
+      : kind === "coilwyrm"
+      ? buildCoilwyrmArena()
+      : kind === "quarrymaster"
+      ? // Layout is rolled here rather than defaulted, so every player gets the SAME room on
+        // a given day — enterBossRoom runs inside the daily seeded RNG, same contract as the
+        // boss roll itself. Without this the arena would silently be layout 0 forever.
+        buildQuarrymasterArena({
+          layoutIndex: Math.floor(Math.random() * QUARRYMASTER_LAYOUTS.length),
+        }).state
       : buildShaperArena(
           { name: "boss", seed: state.bossArenaSeed === "water" ? "water" : "lava" },
           entry
@@ -3102,6 +3144,11 @@ function enterBossRoom(
     ...state,
     mapData: arenaMap,
     enemies: arena.enemies,
+    // Switch-and-spike wiring, for the arenas that have it. This has to come from the
+    // builder alongside the map: it is arena STATE, not one of the standalone-harness
+    // defaults the comment above warns against taking. Undefined for the other three
+    // bosses, which is correct — they have no plates.
+    gateGroups: arena.gateGroups,
     npcs: [],
     inBossRoom: true,
     reachedBossRoom: true,
@@ -3220,8 +3267,11 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
 }
 
 /**
- * Throw the pressure plate the hero just stepped onto: latch the switch and retract every
- * spike bed wired to it.
+ * Throw a pressure plate: latch the switch and retract every spike bed wired to it.
+ *
+ * Called both when the hero steps onto one and when a thrown rock lands on one — a rock has
+ * weight, so it holds the plate down just as a boot does, and that is what lets a switch on
+ * the far side of a crack be solved rather than merely looked at.
  *
  * The spikes sink into the ground and leave SPIKE_HOLES — bare sockets that are walkable and
  * purely cosmetic. Keeping a mark rather than reverting to clean floor means a thrown switch
@@ -3234,7 +3284,7 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
  * Mutates in place; safe to call on a tile with no group wired to it (no-op).
  */
 function pressPlate(
-  state: GameState,
+  state: { gateGroups?: GateGroup[] },
   mapData: MapData,
   y: number,
   x: number

@@ -80,16 +80,34 @@ const GROUP_DEFS: GroupDef[] = [
     rep: "shaper",
     kinds: ["shaper"],
   },
-  // Registered ahead of use: the Quarrymaster is prototype-only for now (/test-quarrymaster,
-  // not in the daily rotation), and a kind with no group here is silently dropped from the
-  // kill tally rather than erroring — exactly the sort of gap that would go unnoticed on
-  // the day he joins the rotation. Pick + hammer for the thing that quarries the floor.
+  // Crests here MUST match BOSS_ROSTER in lib/bosses/boss_roster.ts — the same boss showing
+  // one signature on the stats page and another in the kill tally reads as two bosses.
+  //
+  // A kind with no group here is silently DROPPED from the tally rather than erroring, which
+  // is how the Fisher and the Coilwyrm both shipped without one; they are added below.
   {
     key: "quarrymaster",
     label: "The Quarrymaster",
-    emoji: "⛏️💀🪨",
+    emoji: "⛏️🗿⛏️",
     rep: "quarrymaster",
     kinds: ["quarrymaster"],
+  },
+  {
+    key: "fisher",
+    label: "The Fisher",
+    emoji: "🏹🐦🏹",
+    rep: "fisher",
+    kinds: ["fisher"],
+  },
+  {
+    // Head and body are one boss in the tally. Counting severed segments separately would
+    // report a single kill as a dozen, and the segments are the fight rather than a
+    // different enemy.
+    key: "coilwyrm",
+    label: "The Coilwyrm",
+    emoji: "🗡️🪱🗡️",
+    rep: "coilwyrm",
+    kinds: ["coilwyrm", "coilwyrm-coil"],
   },
 ];
 

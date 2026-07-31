@@ -63,10 +63,14 @@ describe("the boss roster", () => {
   });
 
   it("does not invent a boss for an unknown kind", () => {
-    expect(bossInfo("coilwyrm")).toBeNull();
+    // Uses a sentinel that can never become real. This originally used "coilwyrm" as the
+    // stand-in for "not a boss", which quietly became false the day the Coilwyrm joined the
+    // roster — an unknown-value test should not be written against a value anyone might
+    // later add.
+    expect(bossInfo("not-a-boss")).toBeNull();
     expect(bossInfo("")).toBeNull();
     // ...but the display helpers still return something renderable.
-    expect(bossEmojiFor("coilwyrm")).toBe(bossEmojiFor("shaper"));
+    expect(bossEmojiFor("not-a-boss")).toBe(bossEmojiFor("shaper"));
   });
 
   it("only ever rolls a boss that is actually in the roster", () => {

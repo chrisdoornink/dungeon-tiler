@@ -265,8 +265,8 @@ export function quarrymasterUpdate(ctx: BehaviorContext): number {
     mem.nextWaveAt = turn + QUARRYMASTER_WAVE_EVERY;
   }
 
-  // FIGHT or pace. He swings the moment the hero is orthogonally adjacent — through an
-  // open gate mouth as readily as inside the chamber.
+  // FIGHT, or pace, or plant. He swings the moment the hero is orthogonally adjacent —
+  // through an open gate mouth as readily as inside the chamber.
   if (collared) {
     const dy = hero.y - boss.y;
     const dx = hero.x - boss.x;
@@ -274,7 +274,11 @@ export function quarrymasterUpdate(ctx: BehaviorContext): number {
     else ctx.enemy.facing = dy > 0 ? "DOWN" : "UP";
     return ctx.enemy.attack;
   }
-  pace(ctx, mem, rng);
+  // He does NOT pace on a turn he called a wave: both arms are over his head. Sliding a tile
+  // mid-summon made the tell unreadable (the pose is only up for one turn, so a simultaneous
+  // step is most of what the eye catches) and looked like a rendering glitch rather than an
+  // action.
+  if (!quarrymasterIsSummoning(mem)) pace(ctx, mem, rng);
   return 0;
 }
 
