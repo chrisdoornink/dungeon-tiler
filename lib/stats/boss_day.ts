@@ -43,6 +43,53 @@ export interface BossDayInfo {
 }
 
 /**
+ * Correct a replayed day against what players' clients actually rolled that morning.
+ *
+ * The replay below is only faithful while BOSS_ROSTER is the same SIZE it was on the date in
+ * question: rollDailyBossKind is `floor(rand * BOSS_KINDS.length)`, so adding a boss re-indexes
+ * the same seeded draw and silently rewrites history. Taking the roster from 2 to 4 (the
+ * Coilwyrm and the Quarrymaster) moved 2026-07-30 from the Shaper to the Fisher, and would
+ * have shown days as bosses that did not exist yet on those days.
+ *
+ * A player's stored `daily_boss_kind` is not a replay — it is what their browser computed under
+ * the roster that was live — so it is authoritative and wins whenever we have one. Majority
+ * rather than first-seen so a single malformed row cannot relabel a day.
+ *
+ * Falls back to the replay when no row that day carries a value, which is the case the replay
+ * exists for: nobody reached floor 3, or nobody has played yet.
+ */
+export function reconcileBossDay(
+  replayed: BossDayInfo,
+  recorded: Array<string | null | undefined>
+): BossDayInfo {
+  const tally = new Map<string, number>();
+  for (const kind of recorded) {
+    if (!kind) continue;
+    if (!bossInfo(kind)) continue; // ignore values no longer in the roster
+    tally.set(kind, (tally.get(kind) ?? 0) + 1);
+  }
+  if (tally.size === 0) return replayed;
+
+  let best: string | null = null;
+  let bestCount = 0;
+  for (const [kind, count] of tally) {
+    if (count > bestCount) {
+      best = kind;
+      bestCount = count;
+    }
+  }
+  const info = bossInfo(best);
+  if (!info) return replayed;
+
+  return {
+    ...replayed,
+    bossKind: info.kind,
+    bossEmoji: info.emoji.join(""),
+    bossName: info.displayName,
+  };
+}
+
+/**
  * Compute the day's boss-entrance kind for a daily run identified by its local date
  * string (YYYY-MM-DD, the same value stored on analytics as `date_seed`).
  */

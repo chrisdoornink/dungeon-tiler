@@ -70,6 +70,19 @@ const GROUP_DEFS: GroupDef[] = [
   },
   { key: "snake", label: "Snake", emoji: "🐍", rep: "snake", kinds: ["snake"] },
   { key: "wisp", label: "Wisp", emoji: "👻", rep: "ghost", kinds: ["ghost"] },
+  // Severed Coilwyrm lengths get their OWN bucket rather than folding into the boss below.
+  // They have to be counted somewhere: the reaping path in game-state.ts increments
+  // enemiesDefeated for each one, so dropping them here would leave the ⚔️ total short of
+  // the run's actual kill count. But they must not be counted AS Coilwyrms — a fight where
+  // you cut the coil eight times would report nine of a boss there is only ever one of.
+  // Sits with the ordinary enemies so the boss crest still reads last as the headline kill.
+  {
+    key: "coil",
+    label: "Coilwyrm Segment",
+    emoji: "➰",
+    rep: "coilwyrm-coil",
+    kinds: ["coilwyrm-coil"],
+  },
   // The boss goes last so it reads as the headline kill of the run. Three glyphs
   // (ice + skull + fire) capture its whole essence — a skeleton that wields water and
   // lava — and make it unmistakably a boss beside the single-emoji enemies.
@@ -100,14 +113,15 @@ const GROUP_DEFS: GroupDef[] = [
     kinds: ["fisher"],
   },
   {
-    // Head and body are one boss in the tally. Counting severed segments separately would
-    // report a single kill as a dozen, and the segments are the fight rather than a
-    // different enemy.
+    // The HEAD only. There is exactly one Coilwyrm per run, so this count is 0 or 1 and the
+    // crest means "you killed the boss" rather than "you hit it a lot". Its severed lengths
+    // are tallied by the `coil` group above — folding them in here summed to a count of nine
+    // for one dead boss.
     key: "coilwyrm",
     label: "The Coilwyrm",
     emoji: "🗡️🪱🗡️",
     rep: "coilwyrm",
-    kinds: ["coilwyrm", "coilwyrm-coil"],
+    kinds: ["coilwyrm"],
   },
 ];
 

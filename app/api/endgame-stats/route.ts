@@ -6,7 +6,7 @@ import {
   type StatsDayPayload,
 } from "../../../lib/stats/endgame_stats";
 import { level2ChestStatusForDate } from "../../../lib/stats/daily_chest";
-import { bossDayInfoForDate } from "../../../lib/stats/boss_day";
+import { bossDayInfoForDate, reconcileBossDay } from "../../../lib/stats/boss_day";
 
 // Reads historical daily runs out of PostHog for the endgame stats dashboard.
 // This is a read path (PostHog Query / HogQL) and needs a *personal* API key +
@@ -208,7 +208,13 @@ export async function GET(req: NextRequest) {
     const payloadDays: StatsDayPayload[] = pageDays.map((date) => {
       const g = groupedByDate.get(date);
       const chestStatus = level2ChestStatusForDate(date);
-      const bossDay = bossDayInfoForDate(date);
+      // Replay first, then let the day's own rows overrule which boss it was — the replay
+      // re-indexes whenever the roster grows, so it cannot be trusted about the past on its
+      // own. See reconcileBossDay.
+      const bossDay = reconcileBossDay(
+        bossDayInfoForDate(date),
+        (g?.games ?? []).map((row) => row.dailyBossKind)
+      );
       return {
         date,
         chests: {
