@@ -1,10 +1,11 @@
 import { Enemy, updateEnemies } from "../../lib/enemy";
 import { TileSubtype, Direction } from "../../lib/map";
-import { movePlayer } from "../../lib/map/game-state";
+import { movePlayer, performThrowRock } from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
 import {
   isStandable,
   podExit,
+  quarrymasterIsSummoning,
   quarrymasterPodSpawnNonce,
   quarrymasterUpdate,
   QUARRYMASTER_WAVE_EVERY,
@@ -704,5 +705,131 @@ describe("his death", () => {
       .flat()
       .filter((c) => c.includes(TileSubtype.SPAWN_POD)).length;
     expect(podsAfter).toBe(0);
+  });
+});
+
+describe("the summoning tell", () => {
+  test("he stands still on the turn he calls a wave", () => {
+    // The pose is only up for one turn, so a simultaneous step is most of what the eye
+    // catches — it read as a rendering glitch rather than an action.
+    const { grid, subs } = openRoom(15);
+    const mem: Record<string, unknown> = { pods: [[2, 2], [2, 12]], nextWaveAt: 1 };
+    const ctx = bossCtx({
+      grid,
+      subs,
+      boss: { y: 6, x: 7 },
+      hero: { y: 12, x: 7 },
+      mem,
+      onSpawn: () => true,
+    });
+    // Give him room to pace, so standing still is a real choice and not a blocked move.
+    Object.assign(mem, { roamMinY: 5, roamMaxY: 7, roamMinX: 6, roamMaxX: 8 });
+
+    quarrymasterUpdate(ctx);
+
+    expect(quarrymasterIsSummoning(mem)).toBe(true);
+    expect([ctx.enemy.y, ctx.enemy.x]).toEqual([6, 7]);
+  });
+
+  test("he does pace on a turn he is not calling", () => {
+    const { grid, subs } = openRoom(15);
+    const mem: Record<string, unknown> = {
+      pods: [[2, 2]],
+      nextWaveAt: 9999, // never summons
+      roamMinY: 5,
+      roamMaxY: 7,
+      roamMinX: 6,
+      roamMaxX: 8,
+    };
+    const ctx = bossCtx({
+      grid,
+      subs,
+      boss: { y: 6, x: 7 },
+      hero: { y: 12, x: 7 },
+      mem,
+      onSpawn: () => true,
+    });
+
+    // rng is fixed at 0.5 in bossCtx, so the shuffle is deterministic and he does move.
+    quarrymasterUpdate(ctx);
+
+    expect(quarrymasterIsSummoning(mem)).toBe(false);
+    expect([ctx.enemy.y, ctx.enemy.x]).not.toEqual([6, 7]);
+  });
+});
+
+describe("throwing a rock at a switch", () => {
+  /** Hero at [1,1] facing right, a plate at [1,x], a spike bed the plate retracts. */
+  function rockAtPlate(plateX: number) {
+    const { grid, subs } = openRoom(9);
+    subs[1][1].push(TileSubtype.PLAYER);
+    subs[1][plateX].push(TileSubtype.PRESSURE_PLATE);
+    subs[3][3].push(TileSubtype.SPIKES);
+    return baseState({ tiles: grid, subtypes: subs }, {
+      playerDirection: Direction.RIGHT,
+      rockCount: 3,
+      gateGroups: [{ plate: [1, plateX], gates: [[3, 3]], open: false }],
+    });
+  }
+
+  test("a rock landing on a switch throws it and is spent", () => {
+    const st = rockAtPlate(4);
+    const after = performThrowRock(st);
+
+    expect(after.gateGroups?.[0].open).toBe(true);
+    expect(after.mapData.subtypes[1][4]).toContain(TileSubtype.PRESSURE_PLATE_PRESSED);
+    expect(after.mapData.subtypes[3][3]).toContain(TileSubtype.SPIKE_HOLES);
+    // Spent, not left lying on the switch.
+    expect(after.mapData.subtypes[1][4]).not.toContain(TileSubtype.ROCK);
+    expect(after.rockCount).toBe(2);
+  });
+
+  test("the rock stops AT the switch instead of sailing past it", () => {
+    // The bug this fixes: rocks travel their full range, so a switch short of that range was
+    // flown over and the rock landed behind it — "next to the switch, bumping it up".
+    const st = rockAtPlate(3); // well inside the 4-tile range
+    const after = performThrowRock(st);
+
+    expect(after.gateGroups?.[0].open).toBe(true);
+    // Nothing landed beyond the plate.
+    for (let x = 4; x < 8; x++) {
+      expect(after.mapData.subtypes[1][x]).not.toContain(TileSubtype.ROCK);
+    }
+  });
+
+  test("an already-thrown switch does not eat the rock", () => {
+    const { grid, subs } = openRoom(9);
+    subs[1][1].push(TileSubtype.PLAYER);
+    subs[1][3].push(TileSubtype.PRESSURE_PLATE_PRESSED);
+    const st = baseState({ tiles: grid, subtypes: subs }, {
+      playerDirection: Direction.RIGHT,
+      rockCount: 1,
+    });
+
+    const after = performThrowRock(st);
+
+    // Sails over the spent plate and lands at full range.
+    expect(after.mapData.subtypes[1][3]).not.toContain(TileSubtype.ROCK);
+    expect(after.mapData.subtypes[1][5]).toContain(TileSubtype.ROCK);
+  });
+
+  test("it works across a crack the hero cannot walk over", () => {
+    // The scenario that prompted this: a switch on the far side of a crack field.
+    const { grid, subs } = openRoom(9);
+    subs[1][1].push(TileSubtype.PLAYER);
+    subs[1][2].push(TileSubtype.FAULTY_FLOOR);
+    subs[1][3].push(TileSubtype.OPEN_ABYSS);
+    subs[1][4].push(TileSubtype.PRESSURE_PLATE);
+    subs[5][5].push(TileSubtype.SPIKES);
+    const st = baseState({ tiles: grid, subtypes: subs }, {
+      playerDirection: Direction.RIGHT,
+      rockCount: 1,
+      gateGroups: [{ plate: [1, 4], gates: [[5, 5]], open: false }],
+    });
+
+    const after = performThrowRock(st);
+
+    expect(after.gateGroups?.[0].open).toBe(true);
+    expect(after.mapData.subtypes[5][5]).toContain(TileSubtype.SPIKE_HOLES);
   });
 });

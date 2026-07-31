@@ -39,6 +39,22 @@ const COILWYRM_HEAD_RENDER_SCALE = 1.0;
 // it, which matters more than usual here because its STANCE is the fight's only tell and
 // you need to see it against the ground it's standing on.
 const FISHER_RENDER_SCALE = 1.2;
+// The Quarrymaster stands about as tall as the hero — he is broad, not looming.
+//
+// This is NOT 1.0, and the reason is worth writing down. Sprites are drawn `contain` in the
+// tile, so what matters is how much of its CANVAS each sprite's art actually fills, and the
+// bosses differ from everyone else there. The hero's art fills 93% of its canvas height and
+// renders at scale 1.0. The Quarrymaster's standing pose fills only 73%, because his sheet is
+// scaled to fit the SUMMON pose's arm span (525px wide against the standing pose's 459) and
+// that leaves vertical headroom in every other pose. At 1.0 he therefore came out visibly
+// SHORTER than the hero, and shorter than the goblins he summons.
+//
+//   0.93 (hero fill) / 0.73 (his fill) = 1.28
+//
+// Re-derive this if the art changes: the numbers come from the opaque bounding box of
+// hero-front-static.png against quarry-stand-front.png. The summon pose fills 84%, so it
+// lands a little taller than the hero — correct, his arms are over his head.
+const QUARRYMASTER_RENDER_SCALE = 1.28;
 // Ceiling on how high a thrown snake arcs (see smoothStepArcStyle). Tiles are 40px, so
 // this keeps a long throw inside roughly one tile of airspace above the flight path.
 const THROWN_ARC_MAX_LIFT_PX = 46;
@@ -1866,6 +1882,12 @@ export const Tile: React.FC<TileProps> = ({
           const flip = enemyFacing === 'LEFT' ? ' scaleX(-1)' : '';
           return `scale(${FISHER_RENDER_SCALE})${flip}`;
         }
+        // Only a RIGHT profile exists, so he mirrors for left like the Fisher. The summon
+        // pose is drawn front-facing and is symmetrical, so the mirror never touches it.
+        if (enemyKind === 'quarrymaster') {
+          const flip = enemyFacing === 'LEFT' ? ' scaleX(-1)' : '';
+          return `scale(${QUARRYMASTER_RENDER_SCALE})${flip}`;
+        }
         // (pink-goblin never reaches here — it always takes the hover branch)
         return enemyFacing === 'LEFT' ? 'scaleX(-1)' : 'none';
       }
@@ -1978,12 +2000,27 @@ export const Tile: React.FC<TileProps> = ({
               backgroundSize: 'contain',
               backgroundRepeat: 'no-repeat',
               backgroundPosition: 'center',
+              // Nearest-neighbour, or the pixel art is destroyed on the way down. These
+              // sprites are authored at 512px and render around 73px, and the browser's
+              // default smooth filter averages every chunky block into mush — three
+              // successive art passes at increasing block size all arrived on screen looking
+              // identical and equally soft, because the downscale was throwing the difference
+              // away. The terrain already does this (see .spikes, .openAbyss and friends in
+              // Tile.module.css), so without it the scene was half-filtered and half not.
+              //
+              // Scoped to the Quarrymaster rather than every enemy: it visibly changes any
+              // sprite it touches, and widening it is a look-of-the-whole-game call.
+              imageRendering: enemyKind === 'quarrymaster' ? 'pixelated' : undefined,
               zIndex: 10500, // above fog (10000), below wall tops (12000)
               transform: enemyBaseTransform,
               // The Shaper's and the Fisher's up-scale pivots at their feet so they grow
               // into the tile above; every other enemy keeps the default center origin.
               transformOrigin:
-                enemyKind === 'shaper' || enemyKind === 'fisher' ? '50% 100%' : undefined,
+                enemyKind === 'shaper' ||
+                enemyKind === 'fisher' ||
+                enemyKind === 'quarrymaster'
+                  ? '50% 100%'
+                  : undefined,
               // Darken non-torch-carrying enemies in cave/underground environments
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
                 ? 'brightness(var(--enemy-dim, 0.80))'
