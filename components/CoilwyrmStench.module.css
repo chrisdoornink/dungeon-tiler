@@ -1,0 +1,71 @@
+/*
+ * The Coilwyrm's stench: a thin green miasma rising off a pale, carrion-coloured burrower.
+ * Deliberately faint — it should read as "this thing smells" ambience while you stand still,
+ * never as a fog that hides the board. Soft radial wisps rather than hard pixels because it
+ * is a smell, not an object; the crisp-pixel treatment lives in PixelFlame for actual flames.
+ */
+
+.stench {
+  position: absolute;
+  /* Exactly the tile's width, and twice its height anchored to the tile's bottom — so the
+     coordinate space is simple: 0-50% of this box is the tile, 50-100% is the air above it.
+     Percentage widths on the wisps are therefore percentages OF A TILE, which is what makes
+     centring them on the creature straightforward. */
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 200%;
+  pointer-events: none;
+  /* Above the enemy sprite (10500), below wall tops (12000) so a wall still occludes it. */
+  z-index: 10600;
+}
+
+.wisp {
+  position: absolute;
+  border-radius: 50%;
+  /* Pale, luminous green with a near-white core. Tuned in the browser against the arena floor:
+     a saturated mid-green reads as almost nothing here, because the dungeon stone is ALREADY
+     green-grey, so the mist only separates from it by being lighter. */
+  background: radial-gradient(
+    circle at 50% 50%,
+    rgba(214, 255, 198, 0.95),
+    rgba(150, 230, 160, 0.5) 45%,
+    rgba(120, 200, 130, 0) 72%
+  );
+  /* screen keeps it a glow over dark stone instead of a grey smudge */
+  mix-blend-mode: screen;
+  filter: blur(2.5px);
+  opacity: 0;
+  /* Deliberately no `will-change`: it would promote every wisp to its own compositor layer, and
+     a fully grown coil can have dozens on screen. transform/opacity animate on the compositor
+     anyway, so the hint buys nothing here and costs memory. */
+  animation-name: rise;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-out;
+}
+
+@keyframes rise {
+  0% {
+    transform: translate(0, 25%) scale(0.55);
+    opacity: 0;
+  }
+  22% {
+    opacity: var(--peak, 0.3);
+  }
+  62% {
+    opacity: calc(var(--peak, 0.3) * 0.55);
+  }
+  100% {
+    transform: translate(var(--drift, 3px), -110%) scale(1.35);
+    opacity: 0;
+  }
+}
+
+/* Respect a reduced-motion preference: keep a faint static haze, stop the drifting. */
+@media (prefers-reduced-motion: reduce) {
+  .wisp {
+    animation: none;
+    opacity: calc(var(--peak, 0.3) * 0.5);
+    transform: translate(0, -10%) scale(1);
+  }
+}

@@ -1,6 +1,7 @@
 import { canSee } from "./line_of_sight";
-import { EnemyRegistry, BehaviorContext, EnemyKind } from "./enemies/registry";
+import { EnemyRegistry, BehaviorContext, type EnemyKind } from "./enemies/registry";
 import { orderPursuitSteps } from "./enemies/pursuit";
+import { COILWYRM_HEAD_ATTACK, COILWYRM_HEAD_HP, COILWYRM_SEGMENT_HP } from "./bosses/coilwyrm";
 import { QUARRYMASTER_HP, QUARRYMASTER_ATTACK } from "./bosses/quarrymaster";
 
 export const ENEMY_PURSUIT_TTL = 5;
@@ -105,6 +106,16 @@ export class Enemy {
       // it). attack 0 — it never deals contact damage; its weapon is the terrain
       // it reshapes. Melee against it uses the standard formula (see registry).
       this.health = 5;
+      this.attack = 0;
+    } else if (k === 'coilwyrm') {
+      // Coilwyrm head: the only part that bites. Two hits kill it (a flat
+      // COILWYRM_HEADSHOT_DAMAGE per blow, see the registry gate), but a body of
+      // COILWYRM_SPLIT_MIN or more behind it just grows a replacement.
+      this.health = COILWYRM_HEAD_HP;
+      this.attack = COILWYRM_HEAD_ATTACK;
+    } else if (k === 'coilwyrm-coil') {
+      // A body segment: a moving wall. Deals no damage; every segment is cuttable.
+      this.health = COILWYRM_SEGMENT_HP;
       this.attack = 0;
     } else if (k === 'fisher') {
       // The Fisher boss: unreachable by design, so its HP is denominated in THROWN
@@ -674,24 +685,43 @@ export function updateEnemies(
   // entity vs. tile state and can strand the run — the pink goblin's ring teleport
   // once did exactly that.
   occupied.add(`${player.y},${player.x}`);
-  // Precompute ghost positions for context
-  const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
-  // Boss adds. Buffered rather than pushed straight onto `enemies` so a newborn never
-  // acts on the turn it appears (the loop bound is captured below) and so it can't be
-  // spawned into a tile another enemy is still about to vacate. Appended after the tick.
+  // Boss adds — the summon channel (Quarrymaster hatches, Coilwyrm growth, ...).
+  // Buffered rather than pushed straight onto `enemies`: the loop below captures its bound,
+  // so an immediate push would let a newborn act on the very turn it appeared. Appended
+  // after the loop, and always at the END so a follower can never tick ahead of the head
+  // that steers it.
   const spawned: Enemy[] = [];
+  // Tiles handed to a newborn this tick. A mover's old tile is normally released back into
+  // `occupied` after its hook returns; if a spawn claimed it, that release must NOT
+  // un-reserve it, or a later enemy stacks onto the newborn.
+  const spawnClaimed = new Set<string>();
+  // Whose hook is running, and where it started. This is what lets a behavior spawn into the
+  // tile it is itself stepping out of — the Coilwyrm's tail sprouting a segment behind
+  // itself. That tile is still in `occupied` at hook time (the release happens after the
+  // hook returns), so without the exemption a "leave something behind me" spawn is always
+  // refused and the coil cannot grow.
+  let actor: { prevKey: string; ctx: BehaviorContext['enemy'] } | null = null;
   const spawnEnemy: NonNullable<BehaviorContext['spawnEnemy']> = (spec) => {
     const key = `${spec.y},${spec.x}`;
-    // A summon may NOT land on the hero, on a live enemy, or on another newborn.
-    if (occupied.has(key)) return false;
-    if (spawned.some((s) => s.y === spec.y && s.x === spec.x)) return false;
+    const actorIsVacating =
+      !!actor &&
+      actor.prevKey === key &&
+      `${actor.ctx.y},${actor.ctx.x}` !== actor.prevKey;
+    // A summon may NOT land on the hero, a live enemy, or another newborn — unless it is
+    // the caller's own tile and the caller is on its way out of it.
+    if (occupied.has(key) && !actorIsVacating) return false;
+    if (spawned.some((sp) => sp.y === spec.y && sp.x === spec.x)) return false;
+    if (!isInBounds(grid, spec.y, spec.x)) return false;
     const born = new Enemy({ y: spec.y, x: spec.x });
-    born.kind = spec.kind;
+    born.kind = spec.kind; // the kind setter applies that kind's HP/attack
     if (spec.memory) Object.assign(born.behaviorMemory, spec.memory);
-    spawned.push(born);
     occupied.add(key);
+    spawnClaimed.add(key);
+    spawned.push(born);
     return true;
   };
+  // Precompute ghost positions for context
+  const ghostPositions = enemies.filter(e => e.kind === 'ghost').map(e => ({ y: e.y, x: e.x }));
   const initialCount = enemies.length;
   for (let i = 0; i < initialCount; i++) {
     const e = enemies[i];
@@ -719,6 +749,7 @@ export function updateEnemies(
         memory: e.behaviorMemory,
         attack: e.attack,
       };
+      actor = { prevKey, ctx: enemyCtx };
       base = cfg.behavior.customUpdate({
         grid,
         subtypes,
@@ -738,13 +769,25 @@ export function updateEnemies(
         spawnEnemy,
         enemy: enemyCtx,
       });
+      actor = null;
       // Write back any mutations from customUpdate
       e.y = enemyCtx.y;
       e.x = enemyCtx.x;
       e.facing = enemyCtx.facing;
-      const mem = enemyCtx.memory as { exciterState?: 'HUNTING' | 'IDLE' };
+      const mem = enemyCtx.memory as {
+        exciterState?: 'HUNTING' | 'IDLE';
+        becomeKind?: EnemyKind;
+      };
       if (mem.exciterState) {
         e.state = mem.exciterState === 'HUNTING' ? EnemyState.HUNTING : EnemyState.IDLE;
+      }
+      // Metamorphosis: a behavior can ask for its own kind to change (a severed length of
+      // Coilwyrm growing its own head, a shelled boss cracking open). Applied here rather
+      // than in the behavior because `kind` lives on the Enemy, not in the snapshot — and
+      // the setter resets health/attack to the new kind's baseline, which is the point.
+      if (mem.becomeKind && mem.becomeKind !== e.kind) {
+        e.kind = mem.becomeKind;
+        delete mem.becomeKind;
       }
     } else {
       base = e.update({
@@ -772,14 +815,10 @@ export function updateEnemies(
         e.y = prevY;
         e.x = prevX;
       } else {
-        // Reserve new tile and release old (white goblins can share tiles)
-        if (!canStack) {
-        occupied.delete(prevKey);
-        occupied.add(newKey);
-        } else {
-          // Just release the old tile; the new tile is already occupied by a swarm-mate
-          occupied.delete(prevKey);
-        }
+        // Reserve new tile and release old (white goblins can share tiles). A tile a
+        // newborn claimed this tick stays reserved even though its former occupant left.
+        if (!spawnClaimed.has(prevKey)) occupied.delete(prevKey);
+        if (!canStack) occupied.add(newKey);
       }
     }
     // Optionally suppress this enemy's attack for this tick
@@ -789,10 +828,13 @@ export function updateEnemies(
       let rVal: number | null = null;
       if (rng) {
         rVal = rng();
-        // The Quarrymaster is in this bucket on purpose: he is meant to hit like a spear
-        // goblin, and the 'other' branch below hands out a 25% +2 crit that would make
-        // him spikier than his whole design brief allows.
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'quarrymaster') {
+        // Both bosses sit in the goblin bucket deliberately, for the same reason: the
+        // 'other' branch below hands out a 25% +2 crit. On the Coilwyrm's head that made
+        // its base-2 bite roll 4 — the entire per-turn cap — so two bites killed a
+        // full-health hero with no tell; here it reads 1-3 and a bite is a mistake you can
+        // survive learning from. The Quarrymaster is meant to hit like a spear goblin, and
+        // the crit would make him spikier than his design brief allows.
+        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'coilwyrm' || e.kind === 'quarrymaster') {
           // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
           variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
         } else {

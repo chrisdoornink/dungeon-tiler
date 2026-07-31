@@ -3,6 +3,15 @@ import { canSee } from "../line_of_sight";
 import { TileSubtype } from "../map/constants";
 import { orderPursuitSteps } from "./pursuit";
 import { shaperUpdate, SHAPER_HP } from "../bosses/shaper";
+import {
+  coilwyrmHeadUpdate,
+  coilwyrmSegmentUpdate,
+  coilwyrmHeadStranded,
+  COILWYRM_HEAD_ATTACK,
+  COILWYRM_HEAD_HP,
+  COILWYRM_HEADSHOT_DAMAGE,
+  COILWYRM_SEGMENT_HP,
+} from "../bosses/coilwyrm";
 import { fisherUpdate, FISHER_HP, FISHER_ATTACK } from "../bosses/fisher";
 import {
   quarrymasterUpdate,
@@ -10,7 +19,7 @@ import {
   QUARRYMASTER_ATTACK,
 } from "../bosses/quarrymaster";
 import { assetUrl } from "../asset_url";
-export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher" | "quarrymaster";
+export type EnemyKind = "fire-goblin" | "water-goblin" | "water-goblin-spear" | "earth-goblin" | "earth-goblin-knives" | "pink-goblin" | "ghost" | "stone-goblin" | "snake" | "white-goblin" | "shaper" | "fisher" | "quarrymaster" | "coilwyrm" | "coilwyrm-coil";
 
 export type Facing = "front" | "left" | "right" | "back";
 
@@ -44,6 +53,9 @@ export interface BehaviorContext {
    * its next candidate tile. Newborns are buffered by the engine and appended after every
    * existing enemy has ticked, so a summon never acts on the turn it appears.
    * Absent when a behavior is driven outside `updateEnemies` (tests, tooling).
+   *
+   * A caller MAY spawn into the tile it is itself stepping out of (the Coilwyrm's tail
+   * sprouting a segment behind itself); every other occupied tile is refused.
    */
   spawnEnemy?: (spec: {
     y: number;
@@ -78,6 +90,24 @@ export interface BehaviorHooks {
   customUpdate?: (ctx: BehaviorContext) => number;
 }
 
+/**
+ * What the hero's blow (or thrown thing) knows about its target beyond the raw
+ * numbers. Multi-part bosses need this: the Coilwyrm's body is a wall while only its
+ * tail can be cut, and its head is armored until the coil is fully severed — both
+ * decisions read the struck enemy's own memory plus the live roster, so a gate can
+ * never lag a tick behind a kill.
+ */
+export interface DamageTargetContext {
+  /** The struck enemy's behaviorMemory (role/phase flags). */
+  memory?: Record<string, unknown>;
+  /** The live enemy roster, for bosses whose parts protect each other. */
+  enemies?: ReadonlyArray<{
+    kind: EnemyKind;
+    health: number;
+    behaviorMemory?: Record<string, unknown>;
+  }>;
+}
+
 export interface EnemyConfig {
   kind: EnemyKind;
   displayName: string;
@@ -86,6 +116,30 @@ export interface EnemyConfig {
   // Carries a lit torch: renders glowing/visible in darkness, and striking it
   // in melee relights the hero's own snuffed torch (flame transfer).
   carriesTorch?: boolean;
+  /**
+   * This kind's movement is COUPLED to other enemies (it follows a leader), so it must
+   * never be held out of a turn. The thrown-rock path normally freezes an enemy it
+   * predicts the throw will kill, so the corpse lands on the tile it was drawn on — but
+   * freezing one link of the Coilwyrm's chain leaves the segments behind it standing on
+   * their old tiles and tears the body apart. Kinds that flag this keep ticking and give
+   * up the cosmetic guarantee instead.
+   */
+  movesInLockstep?: boolean;
+  /**
+   * This kind IS the boss of its arena: its death drops the gold key that opens the
+   * arena exit (see dropBossKeyOnDefeat). Only the killable core gets this — a
+   * multi-part boss marks its head, never its limbs, or losing one piece would end
+   * the fight.
+   */
+  boss?: boolean;
+  /**
+   * This kind is a PIECE of a larger creature, not an enemy in its own right. Roster-style UI
+   * (the "Enemies in sight" panel) skips it and lists only the creature's core, because a
+   * segmented boss otherwise floods the list with its own body — a 5-segment Coilwyrm filled
+   * every one of the panel's five slots with identical segment rows and pushed the head, the
+   * only part with meaningful HP, off the bottom.
+   */
+  bodyPart?: boolean;
   // Desired per-level count bounds used by assignment logic
   desiredMinCount?: number;
   desiredMaxCount?: number;
@@ -94,7 +148,20 @@ export interface EnemyConfig {
     heroAttack: number;
     swordBonus: number;
     variance: number; // already discretized to -1/0/1 when used
-  }) => number;
+  } & DamageTargetContext) => number;
+  /**
+   * Per-kind gate for THROWN damage (rock 2, rune = instakill, bomb 8). Omitted means
+   * "take the flat base", which is how every ordinary enemy behaves. Return 0 to make a
+   * part immune — that is what stops a rune or bomb from chopping the middle out of the
+   * Coilwyrm and desyncing its follow-the-leader chain.
+   */
+  calcThrownDamage?: (
+    ctx: {
+      source: "rock" | "rune" | "bomb";
+      /** Flat damage the engine would apply; Infinity for a rune's instakill. */
+      base: number;
+    } & DamageTargetContext
+  ) => number;
   // Optional behavior hooks implemented by specific kinds
   behavior?: BehaviorHooks;
 }
@@ -1250,12 +1317,82 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       back: assetUrl("/images/enemies/bosses/shaper/shaper-back.png"),
     },
     base: { health: SHAPER_HP, attack: 0 },
+    boss: true,
     // Standard melee: once you fight through its terrain and reach it, it dies
     // like anything else (low HP). The challenge is the crossing, not the kill.
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
       clampMin(heroAttack + swordBonus + variance),
     behavior: {
       customUpdate: shaperUpdate,
+    },
+  },
+  "coilwyrm": {
+    kind: "coilwyrm",
+    displayName: "The Coilwyrm",
+    // Facing maps to which end of the skull you can see, and each sprite is cut so the NECK
+    // leaves the tile on the side the body trails: front (moving toward the viewer) exits the
+    // top, back (moving away) exits the bottom, side exits the left. The side art faces RIGHT,
+    // so Tile.tsx mirrors it for LEFT.
+    assets: {
+      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-front.png"),
+      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side.png"),
+      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side.png"),
+      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-back.png"),
+    },
+    base: { health: COILWYRM_HEAD_HP, attack: COILWYRM_HEAD_ATTACK },
+    boss: true, // the head only — a severed segment must not end the fight
+    // The head is ALWAYS killable: COILWYRM_HEADSHOT_DAMAGE per hit, so exactly two hits fell
+    // it whatever you land them with. It used to be armored until the body was gone, which
+    // played badly — see the write-up in .claude/features/boss-coilwyrm/index.md. Killing a
+    // head is not winning: a body of COILWYRM_SPLIT_MIN or more promotes a replacement head, so
+    // headshots only pay off once the coil has been cut into lengths too short to regrow one.
+    //
+    // A FLAT number rather than the usual attack+sword+variance roll, on purpose: "two hits to
+    // the head" has to be a rule the player can rely on, and a variance roll makes it two hits
+    // sometimes and one or three other times. Deterministic resolution is the house style for
+    // bosses. The sword still does its real work on the body, where the fight is decided.
+    // ...and a head with no body left dies to a SINGLE blow, because a lone head cannot move
+    // and is no longer a fight — just cleanup. See coilwyrmHeadStranded.
+    calcMeleeDamage: ({ memory, enemies }) =>
+      coilwyrmHeadStranded(memory, enemies)
+        ? COILWYRM_HEAD_HP
+        : COILWYRM_HEADSHOT_DAMAGE,
+    calcThrownDamage: ({ memory, enemies }) =>
+      coilwyrmHeadStranded(memory, enemies)
+        ? COILWYRM_HEAD_HP
+        : COILWYRM_HEADSHOT_DAMAGE,
+    behavior: {
+      customUpdate: coilwyrmHeadUpdate,
+    },
+  },
+  "coilwyrm-coil": {
+    kind: "coilwyrm-coil",
+    displayName: "Coilwyrm Segment",
+    // Only a fallback: the real sprite is chosen per segment from its neighbours (see
+    // coilPieceFor / Tile.tsx), because a body piece has to connect the two specific edges its
+    // neighbours sit on. Facing alone cannot express that.
+    assets: {
+      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
+      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
+      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
+      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-v.png"),
+    },
+    base: { health: COILWYRM_SEGMENT_HP, attack: 0 },
+    movesInLockstep: true, // never freeze a link: it would break the chain
+    bodyPart: true, // one creature in the HUD, not a queue of segments
+    // A cut severs the coil: whatever was behind it dies too (see coilwyrmHeadUpdate), so
+    // the difficulty is not "can I damage this piece", it is "how close to the teeth dare I
+    // cut". Thrown damage is likewise ungated, which makes a rune or a bomb a legitimate way
+    // to blow a deep hole in the coil rather than a way to break it.
+    //
+    // Segment 1 always flows into the tile the head vacates, so a player who leads the target
+    // can sever the coil at its neck with one blow. That USED to end fights in ~4 turns of
+    // contact; COILWYRM_SPLIT_MIN closed it — a severed length of 4+ grows its own head, so the
+    // greedy deep cut now costs you a second boss instead of winning.
+    calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
+      clampMin(heroAttack + swordBonus + variance),
+    behavior: {
+      customUpdate: coilwyrmSegmentUpdate,
     },
   },
   "fisher": {
@@ -1322,6 +1459,30 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     },
   },
 };
+
+/**
+ * Did a 0-damage melee hit bounce off ARMOUR, or was it simply a miss?
+ *
+ * The two need different words on screen, and the distinction is not cosmetic. "miss" tells a
+ * player to swing again; armour tells them the plan itself is wrong. The Coilwyrm's head is
+ * immune until its body is severed, so labelling that "miss" reads as *your hits are not
+ * landing* — and a player keeps hammering the one target that cannot die yet instead of going
+ * after the body. That is exactly how it was misread on playtest.
+ *
+ * Answered by asking the kind's OWN gate what a maximal swing would do: if even that lands 0,
+ * no roll could have hurt it, so the 0 came from a rule rather than a bad variance draw.
+ * Deliberately a probe instead of a second copy of each boss's armour condition — the gate stays
+ * the single source of truth, and any future armoured boss gets the right label for free.
+ */
+export function isMeleeImmune(
+  kind: EnemyKind,
+  ctx: DamageTargetContext = {}
+): boolean {
+  const calc = EnemyRegistry[kind]?.calcMeleeDamage;
+  if (!calc) return false; // no gate: it takes whatever it is dealt
+  // variance is discretized to -1/0/1, so 1 is the best possible roll.
+  return calc({ heroAttack: 99, swordBonus: 99, variance: 1, ...ctx }) === 0;
+}
 
 export function getEnemyIcon(
   kind: EnemyKind,

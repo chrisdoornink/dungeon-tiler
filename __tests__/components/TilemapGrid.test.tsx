@@ -8,6 +8,7 @@ jest.mock('next/navigation', () => ({
 import { TilemapGrid } from '../../components/TilemapGrid';
 import { TileSubtype, GameState, Direction } from '../../lib/map';
 import { NPC } from '../../lib/npc';
+import { Enemy } from '../../lib/enemy';
 import '@testing-library/jest-dom';
 
 describe('TilemapGrid component', () => {
@@ -857,5 +858,70 @@ describe('TilemapGrid component', () => {
       // Response text should match one of the new caretaker responses
       expect(text.textContent ?? '').toMatch(/Just outside of this sanctum|This is the sanctum|Thank you! I'll be here when you return/);
     });
+  });
+});
+
+describe('consumables advance the world exactly once (StrictMode safe)', () => {
+  // performUsePotion / performUseFood run a full turn: they tick the enemies, and because their
+  // pre-tick state is a shallow copy they MUTATE the very Enemy objects held in `prev`. They used
+  // to be called inside a setGameState updater, and React invokes updaters twice under StrictMode,
+  // so every enemy took two steps on any turn the hero ate or drank — a free step handed to
+  // whatever was chasing them, at the worst possible moment. Rendered in StrictMode on purpose:
+  // without the guard these assertions fail, which is the whole point of the test.
+  const tileTypes = {
+    0: { id: 0, name: 'floor', color: '#ccc', walkable: true },
+    1: { id: 1, name: 'wall', color: '#333', walkable: false },
+  };
+
+  const setup = () => {
+    const size = 25;
+    const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
+    const subtypes = Array(size)
+      .fill(0)
+      .map(() => Array(size).fill(0).map(() => [] as number[]));
+    subtypes[12][12] = [TileSubtype.PLAYER];
+    const goblin = new Enemy({ y: 12, x: 17 });
+    goblin.kind = 'fire-goblin';
+    const initialGameState: GameState = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      heroHealth: 3,
+      heroMaxHealth: 10,
+      heroAttack: 1,
+      heroTorchLit: true,
+      enemies: [goblin],
+      foodCount: 2,
+      potionCount: 2,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+    } as unknown as GameState;
+    return { tiles, subtypes, initialGameState, goblin };
+  };
+
+  it.each([
+    ['potion', 'p'],
+    ['food', 'f'],
+  ])('using %s moves a chasing enemy one tile, not two', (_label, key) => {
+    const { tiles, subtypes, initialGameState, goblin } = setup();
+    const start = { y: goblin.y, x: goblin.x };
+    render(
+      <React.StrictMode>
+        <TilemapGrid
+          tilemap={tiles}
+          tileTypes={tileTypes}
+          subtypes={subtypes}
+          initialGameState={initialGameState}
+        />
+      </React.StrictMode>
+    );
+    act(() => {
+      fireEvent.keyDown(window, { key });
+    });
+    const moved =
+      Math.abs(goblin.y - start.y) + Math.abs(goblin.x - start.x);
+    expect(moved).toBeLessThanOrEqual(1);
   });
 });
