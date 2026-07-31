@@ -264,9 +264,13 @@ interface TilemapGridProps {
    */
   onDeath?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
-  // Notify parent where the hero is (floor number + pink realm status) so it
-  // can render a location title. Fires on mount and whenever either changes.
-  onLocationChange?: (loc: { floor?: number; inPinkRealm: boolean }) => void;
+  // Notify parent where the hero is (floor number + pink realm / boss arena
+  // status) so it can render a location title. Fires on mount and on any change.
+  onLocationChange?: (loc: {
+    floor?: number;
+    inPinkRealm: boolean;
+    inBossRoom: boolean;
+  }) => void;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -2446,15 +2450,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     }
   }, [gameState.showFullMap, suppressDarknessOverlay]);
 
-  // Report the hero's location (floor + pink realm) up to the parent for the
-  // header title. Keyed on committed game state, so it covers floor swaps,
-  // pink-realm warps in and out, and the initial mount.
+  // Report the hero's location (floor + pink realm + boss arena) up to the parent
+  // for the header title. Keyed on committed game state, so it covers floor swaps,
+  // pink-realm warps in and out, boss-arena entry/exit, and the initial mount.
   useEffect(() => {
     onLocationChange?.({
       floor: gameState.currentFloor,
       inPinkRealm: !!gameState.inPinkRealm,
+      inBossRoom: !!gameState.inBossRoom,
     });
-  }, [gameState.currentFloor, gameState.inPinkRealm, onLocationChange]);
+  }, [
+    gameState.currentFloor,
+    gameState.inPinkRealm,
+    gameState.inBossRoom,
+    onLocationChange,
+  ]);
 
   // Endless: register the run with the server so floor checkpoints can be
   // attested (anti-fraud for the leaderboard). Fail-soft — a run that can't
