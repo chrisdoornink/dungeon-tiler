@@ -128,6 +128,59 @@ describe("checkpoint validation", () => {
   });
 });
 
+/**
+ * A boss stands on every 6th endless floor, and each one hands over a heart on top of the
+ * arena's own population. Both bounds have to keep up or an honest deep run is silently
+ * kept off the board — the exact failure this module says is worse than a cheater.
+ */
+describe("boss floors stay inside the plausibility bounds", () => {
+  const later = T0 + 600_000;
+
+  it("allows the heart every boss floor hands over", () => {
+    // Entering floor 7: base 5 + the starter-plan heart + floor 6's boss.
+    expect(maxHeartsEnteringFloor(7)).toBeGreaterThanOrEqual(7);
+    // Entering floor 25: four boss floors behind (6, 12, 18, 24) plus 15's and 20's chests.
+    expect(maxHeartsEnteringFloor(25)).toBeGreaterThanOrEqual(12);
+  });
+
+  it("passes a real deep run carrying its boss hearts", () => {
+    const run = freshRun({ floor: 24, steps: 900, enemiesDefeated: 120 });
+    const flags = validateCheckpoint(
+      run,
+      25,
+      // 5 base + 1 plan heart + 2 post-10 chests + 4 boss hearts
+      stats({ steps: 1000, enemiesDefeated: 140, heroMaxHealth: 12, hasSword: true }),
+      later
+    );
+    expect(flags).toEqual([]);
+  });
+
+  it("still flags a heart total no boss cadence could explain", () => {
+    const run = freshRun({ floor: 6, steps: 200, enemiesDefeated: 20 });
+    const flags = validateCheckpoint(
+      run,
+      7,
+      stats({ steps: 260, enemiesDefeated: 25, heroMaxHealth: 30 }),
+      later
+    );
+    expect(flags.some((f) => f.startsWith("hearts"))).toBe(true);
+  });
+
+  it("allows a long boss fight's kill count", () => {
+    // A Coilwyrm regrows a head every time one is severed and a Quarrymaster's pods keep
+    // disgorging, so floor 6 alone can produce far more kills than any ordinary floor.
+    expect(maxKillsThroughFloor(6) - maxKillsThroughFloor(5)).toBeGreaterThanOrEqual(40);
+    const run = freshRun({ floor: 6, steps: 200, enemiesDefeated: 20 });
+    const flags = validateCheckpoint(
+      run,
+      7,
+      stats({ steps: 300, enemiesDefeated: 60, heroMaxHealth: 7 }),
+      later
+    );
+    expect(flags).toEqual([]);
+  });
+});
+
 describe("submission validation", () => {
   it("passes a clean submission", () => {
     const run = freshRun({ floor: 4, steps: 100, enemiesDefeated: 6 });

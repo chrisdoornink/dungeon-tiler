@@ -3,11 +3,16 @@ import { enemyTypeAssignement, assignWhiteGoblinSwarmIds } from "../enemy_assign
 import { createEmptyByKind, type EnemyKind } from "../enemies/registry";
 import { createInitialStoryFlags } from "../story/event_registry";
 import { Direction, TileSubtype } from "./constants";
-import type { MapData } from "./types";
+import type { GateGroup, MapData } from "./types";
 import { findPlayerPosition } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMapForFloor } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
 import { mulberry32, withPatchedMathRandom } from "../rng";
+import { rollEndlessBossOrder, type BossKind } from "../bosses/boss_roster";
+import { buildShaperArena, SHAPER_ENTRIES, SHAPER_LAYOUTS } from "../bosses/shaper_arena";
+import { buildFisherArena, FISHER_LAYOUTS } from "../bosses/fisher_arena";
+import { buildCoilwyrmArena, COILWYRM_LAYOUTS } from "../bosses/coilwyrm_arena";
+import { buildQuarrymasterArena, QUARRYMASTER_LAYOUTS } from "../bosses/quarrymaster_arena";
 import type { GameState } from "./game-state";
 
 /**
@@ -31,6 +36,9 @@ import type { GameState } from "./game-state";
  *   through floor 3, armed goblins trickle in on 4-5, pink/stone goblins first
  *   appear lightly on 6-7, and the full daily-floor-3 menagerie waits until 8+.
  *   Early playtesting had pink+stone on floor 3 and it walled new runs.
+ * - Every 6th floor IS a boss arena (see ENDLESS_BOSS_CADENCE). Unlike the daily,
+ *   there is no entrance to find: the stairs simply open into the fight, and its
+ *   exit is the way down to the next floor rather than an alternate ending.
  * - Score is the floor reached. Each run has its own seed; floors are generated
  *   deterministically from (runSeed + floor) so a resumed run stays consistent.
  */
@@ -69,6 +77,99 @@ const ITEM_PLAN_FLOOR_MAX = 10;
 const POST10_HEART_CADENCE = 5; // hearts on floors 15, 20, 25, ...
 const POST10_BOMB_CHANCE = 0.25;
 const POST10_WEAPON_FILL_CHANCE = 0.3;
+
+/**
+ * Every Nth endless floor IS a boss arena. 6 because the best runs so far reached 10 and
+ * 14, so this cadence puts one boss inside a good run and rewards a great one with two or
+ * three — a boss stays an event rather than becoming the rhythm of the tower.
+ */
+export const ENDLESS_BOSS_CADENCE = 6;
+
+/** True on floors 6, 12, 18, ... — the ones whose whole map is a boss arena. */
+export function isEndlessBossFloor(floor: number): boolean {
+  return floor >= ENDLESS_BOSS_CADENCE && floor % ENDLESS_BOSS_CADENCE === 0;
+}
+
+/**
+ * Which boss floor N holds, or null on an ordinary floor. Walks the run's shuffled boss
+ * order (see rollEndlessBossOrder) and recycles it, so floors 6/12/18/24 are the four
+ * bosses in a random order and floors 30/36/42/48 repeat that same order.
+ */
+export function endlessBossKindForFloor(floor: number, seed: number): BossKind | null {
+  if (!isEndlessBossFloor(floor)) return null;
+  const order = rollEndlessBossOrder(seed);
+  return order[(floor / ENDLESS_BOSS_CADENCE - 1) % order.length];
+}
+
+/**
+ * Build the arena for an endless boss floor.
+ *
+ * Deliberately DIFFERENT from the daily's enterBossRoom in two ways:
+ *  - No BOSS_ENTRANCE tile is stamped on the hero's arrival tile. In the daily that tile is
+ *    the way back out to floor 3; here the arena IS the floor, so there is nowhere to go
+ *    back to and a return tile would strand the run in a warp with no destination.
+ *  - The layout/variant is rolled for EVERY boss, not just the Quarrymaster. A long run can
+ *    meet the same boss twice (floors 6 and 30), and the second meeting should not be the
+ *    first one replayed tile for tile.
+ *
+ * Must be called inside the floor's seeded RNG patch so a resumed run rebuilds the same
+ * room. Returns only what a floor needs — the builders' own inventory/vitals are
+ * standalone-harness defaults and must never reach the live run.
+ */
+function buildEndlessBossArena(kind: BossKind): {
+  mapData: MapData;
+  enemies: Enemy[];
+  gateGroups?: GateGroup[];
+} {
+  const pick = <T,>(arr: T[]): T => arr[Math.floor(Math.random() * arr.length)];
+  const arena: GameState =
+    kind === "fisher"
+      ? buildFisherArena(pick(FISHER_LAYOUTS))
+      : kind === "coilwyrm"
+      ? buildCoilwyrmArena(pick(COILWYRM_LAYOUTS))
+      : kind === "quarrymaster"
+      ? buildQuarrymasterArena({
+          layoutIndex: Math.floor(Math.random() * QUARRYMASTER_LAYOUTS.length),
+        }).state
+      : buildShaperArena(pick(SHAPER_LAYOUTS), pick(SHAPER_ENTRIES));
+  return {
+    mapData: arena.mapData,
+    // Every arena builder seats its boss, but GameState.enemies is optional — an empty
+    // array is the only sane read of "no enemies", and it keeps the floor contract
+    // non-optional so callers never have to null-check a boss floor's occupants.
+    enemies: arena.enemies ?? [],
+    gateGroups: arena.gateGroups,
+  };
+}
+
+/**
+ * The boss-floor fields a GameState needs on top of its map + enemies. Spread onto the
+ * state by both callers so entering and leaving a boss floor is one shared contract, and
+ * an ordinary floor explicitly CLEARS every one of them (a stale inBossRoom would make the
+ * next floor's exit behave like the arena's).
+ */
+function endlessBossStateFor(kind: BossKind | null): Partial<GameState> {
+  if (!kind) {
+    return {
+      inBossRoom: false,
+      bossKind: undefined,
+      bossDefeated: false,
+      bossReturn: undefined,
+    };
+  }
+  return {
+    inBossRoom: true,
+    bossKind: kind,
+    bossDefeated: false,
+    reachedBossRoom: true,
+    bossReturn: undefined,
+    // Arrive with the torch LIT. Three of the four arenas carry wall torches, but the
+    // Fisher's is open ground with none, and a set-piece fight the hero stumbles into
+    // blind is a coin flip rather than a fight. Endless snuffs the torch constantly
+    // (ghosts are its signature pressure) — the boss floor is where it comes back.
+    heroTorchLit: true,
+  };
+}
 
 /** Grids start tight (16x16) and grow +2 per floor to a 28x28 cap. */
 export function endlessGridSizeForFloor(floor: number): [number, number] {
@@ -210,8 +311,12 @@ function endlessEnemyMinDistance(floor: number): number {
 export function rollEndlessItemPlan(rng: () => number = Math.random): EndlessItemPlan {
   // Shuffle the eligible floors and give the first five (one per starter item)
   // a distinct home, so items spread out instead of clumping onto one floor.
+  // Boss floors are excluded: their map is an arena with no chest placement at all,
+  // so a starter item planned for floor 6 would simply never be generated.
   const floors: number[] = [];
-  for (let f = ITEM_PLAN_FLOOR_MIN; f <= ITEM_PLAN_FLOOR_MAX; f++) floors.push(f);
+  for (let f = ITEM_PLAN_FLOOR_MIN; f <= ITEM_PLAN_FLOOR_MAX; f++) {
+    if (!isEndlessBossFloor(f)) floors.push(f);
+  }
   for (let i = floors.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
     [floors[i], floors[j]] = [floors[j], floors[i]];
@@ -241,6 +346,11 @@ export function endlessAllocationForFloor(
 ): { chests: number; keys: number; chestContents: TileSubtype[] } {
   const chestContents: TileSubtype[] = [];
 
+  // Boss floors carry no chests — the arena has nowhere to put them, and the boss's own
+  // payout (exit key + a heart) IS that floor's reward. Returning empty rather than
+  // letting the post-10 rolls run keeps floor 30 from silently eating its heart chest.
+  if (isEndlessBossFloor(floor)) return { chests: 0, keys: 0, chestContents };
+
   if (floor <= ITEM_PLAN_FLOOR_MAX) {
     const planned = plan.floorItems[floor];
     if (planned) chestContents.push(...planned);
@@ -262,8 +372,12 @@ const DARK_FLOOR_WALL_TORCHES = 2;
 function buildEndlessFloor(
   floor: number,
   plan: EndlessItemPlan,
-  inventory: { hasSword?: boolean; hasShield?: boolean } = {}
-): { mapData: MapData; enemies: Enemy[] } {
+  inventory: { hasSword?: boolean; hasShield?: boolean; bossKind?: BossKind | null } = {}
+): { mapData: MapData; enemies: Enemy[]; gateGroups?: GateGroup[] } {
+  // A boss floor replaces the whole floor rather than decorating one: no rooms, no
+  // chests, no ghost/goblin tables — just the arena and its occupant.
+  if (inventory.bossKind) return buildEndlessBossArena(inventory.bossKind);
+
   const isDarkFloor = floor === 1;
   // Math.random is patched to the seeded per-floor RNG in the callers, so the
   // post-10 chance-based chests stay deterministic for a given (seed, floor).
@@ -356,9 +470,12 @@ export function initializeGameStateForEndless(): GameState {
   const endlessPlan = rollEndlessItemPlan(() => planRng.next());
 
   const floorRng = mulberry32(endlessSeed + 1);
+  // Floor 1 is never a boss floor at the current cadence, but the lookup is asked anyway
+  // so lowering ENDLESS_BOSS_CADENCE can never leave the first floor half-wired.
+  const bossKind = endlessBossKindForFloor(1, endlessSeed);
   // Fresh run: the hero starts with neither sword nor shield.
-  const { mapData, enemies } = withPatchedMathRandom(floorRng, () =>
-    buildEndlessFloor(1, endlessPlan, { hasSword: false, hasShield: false })
+  const { mapData, enemies, gateGroups } = withPatchedMathRandom(floorRng, () =>
+    buildEndlessFloor(1, endlessPlan, { hasSword: false, hasShield: false, bossKind })
   );
 
   return {
@@ -378,6 +495,7 @@ export function initializeGameStateForEndless(): GameState {
     win: false,
     playerDirection: Direction.DOWN,
     enemies,
+    gateGroups,
     npcs: [],
     heroHealth: 5,
     heroMaxHealth: 5,
@@ -399,6 +517,7 @@ export function initializeGameStateForEndless(): GameState {
     npcInteractionQueue: [],
     storyFlags: createInitialStoryFlags(),
     diaryEntries: [],
+    ...endlessBossStateFor(bossKind),
   };
 }
 
@@ -414,11 +533,13 @@ export function advanceToNextEndlessFloor(currentState: GameState): GameState {
   const plan = currentState.endlessPlan ?? rollEndlessItemPlan(() => planRng.next());
 
   const rng = mulberry32(seed + nextFloor);
+  const bossKind = endlessBossKindForFloor(nextFloor, seed);
   // Post-10 sword/shield fill-ins depend on what the hero is still missing.
-  const { mapData, enemies } = withPatchedMathRandom(rng, () =>
+  const { mapData, enemies, gateGroups } = withPatchedMathRandom(rng, () =>
     buildEndlessFloor(nextFloor, plan, {
       hasSword: !!currentState.hasSword,
       hasShield: !!currentState.hasShield,
+      bossKind,
     })
   );
 
@@ -428,6 +549,10 @@ export function advanceToNextEndlessFloor(currentState: GameState): GameState {
     maxFloors: currentState.maxFloors ?? ENDLESS_MAX_FLOORS,
     mapData,
     enemies,
+    // Switch-and-spike wiring for the arenas that have it, and explicitly cleared on every
+    // ordinary floor — a Quarrymaster's groups left standing would point at tiles that no
+    // longer exist on the next map.
+    gateGroups,
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false,
@@ -437,6 +562,9 @@ export function advanceToNextEndlessFloor(currentState: GameState): GameState {
     npcInteractionQueue: [],
     bookshelfInteractionQueue: [],
     bedInteractionQueue: [],
+    // Enter/leave the boss floor: sets inBossRoom + bossKind on floors 6/12/18..., and
+    // clears them (plus the bossDefeated latch) on every other floor.
+    ...endlessBossStateFor(bossKind),
     // Preserve: heroHealth, heroMaxHealth, bonusHearts, heroAttack, hasSword,
     // hasShield, hasSnakeMedallion, rockCount, runeCount, foodCount, potionCount,
     // chestKeyCount, stats, endlessSeed, endlessPlan, etc.

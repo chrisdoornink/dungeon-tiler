@@ -1781,6 +1781,10 @@ export interface GameState {
     maxHealth?: number; // Highest health reached
     poisonSteps?: number; // Steps taken while poisoned
     ghostsVanished?: number; // Ghosts that vanished by getting close
+    // Bosses killed this run. The daily has at most one (so `bossDefeated` says it all),
+    // but endless stands a boss on every 6th floor, and a run that killed four should not
+    // report the same thing as a run that killed one.
+    bossesDefeated?: number;
   };
   // Transient: positions where enemies died this tick
   recentDeaths?: Array<[number, number]>;
@@ -3195,6 +3199,30 @@ export function snapshotBosses(state: GameState): BossSnapshot {
 }
 
 /**
+ * The payout every boss owes on top of its own drop: a HEART.
+ *
+ * Granted outright rather than dropped as an EXTRA_HEART tile because the four bosses die
+ * in four different places — the Fisher's corpse becomes a bridge across the spikes, so
+ * "the tile it died on" is not somewhere an item can safely sit — and because a reward that
+ * lands the instant the last blow does reads as the kill paying out, not as more looting.
+ * Same effect as the chest item: +1 to max health and a full refill.
+ *
+ * It matters most in endless, where a boss stands on every 6th floor and its heart is the
+ * only sustain the arena offers, but it applies in the daily too: killing the boss and
+ * walking back out to finish floor 3 should leave the hero stronger for it.
+ *
+ * `bossesDefeated` counts them because `bossDefeated` is a boolean — true for the daily's
+ * single fight, useless for an endless run that killed four.
+ */
+function settleBossKill(after: GameState): void {
+  after.bossDefeated = true;
+  after.heroMaxHealth = (after.heroMaxHealth ?? 5) + 1;
+  after.heroHealth = after.heroMaxHealth;
+  after.stats.maxHealth = Math.max(after.stats.maxHealth ?? 0, after.heroHealth);
+  after.stats.bossesDefeated = (after.stats.bossesDefeated ?? 0) + 1;
+}
+
+/**
  * Boss death payouts, detected centrally by comparing the pre-turn snapshot to the
  * resolved state rather than hooked into each of the many kill paths — so melee, thrown
  * rocks and bombs all work. Idempotent via bossDefeated.
@@ -3204,6 +3232,8 @@ export function snapshotBosses(state: GameState): BossSnapshot {
  *             comes with it. There is no other way anyone reaches the far bank.
  *   Quarrymaster -> drops the gold key like the Shaper. Reaching the exit still needs the
  *             chamber switch thrown, which is a separate gate (see gateGroups).
+ *
+ * All four also hand over a heart — see settleBossKill.
  */
 function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
   if (!after.inBossRoom || after.bossDefeated) return;
@@ -3218,14 +3248,14 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     const [ky, kx] = deathTile(before.shaper);
     const cell = after.mapData.subtypes[ky]?.[kx];
     if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
-    after.bossDefeated = true;
+    settleBossKill(after);
     return;
   }
 
   if (before.fisher && !alive.some((e) => e.kind === "fisher")) {
     const [, kx] = deathTile(before.fisher);
     collapseFisherIntoBridge(after, kx);
-    after.bossDefeated = true;
+    settleBossKill(after);
     return;
   }
 
@@ -3245,7 +3275,7 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     const [ky, kx] = deathTile(before.coilwyrm);
     const cell = after.mapData.subtypes[ky]?.[kx];
     if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
-    after.bossDefeated = true;
+    settleBossKill(after);
     return;
   }
 
@@ -3262,7 +3292,7 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
         if (i >= 0) row[x].splice(i, 1);
       }
     }
-    after.bossDefeated = true;
+    settleBossKill(after);
   }
 }
 
@@ -3310,6 +3340,20 @@ function pressPlate(
     const i = bed.indexOf(TileSubtype.SPIKES);
     if (i >= 0) bed[i] = TileSubtype.SPIKE_HOLES;
   }
+}
+
+/**
+ * Does taking the boss arena's exit END the run?
+ *
+ * In the DAILY it does: the arena is a secret room hidden off floor 3, and its exit is an
+ * ALTERNATE ENDING — there is no floor after the boss, so walking out wins outright.
+ *
+ * In ENDLESS it does not. There the boss floor IS floor 6/12/18/... — the descent opens
+ * straight into the arena with no entrance to find — so its exit is the stairs down like
+ * any other floor's, and treating it as an ending would cash the whole run out at floor 6.
+ */
+function bossArenaEndsRun(state: GameState): boolean {
+  return !!state.inBossRoom && state.mode !== "endless";
 }
 
 /** Step back onto the arrival tile inside a boss arena -> restore the saved floor. */
@@ -3797,9 +3841,7 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
-        // outright, never advances a floor (there is no floor after the boss).
-        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
+        const isFinalFloor = currentFloor >= maxFloors || bossArenaEndsRun(newGameState);
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning
@@ -4166,9 +4208,7 @@ function movePlayerCore(
         const isMultiTier = newGameState.maxFloors && newGameState.maxFloors > 1;
         const currentFloor = newGameState.currentFloor ?? 1;
         const maxFloors = newGameState.maxFloors ?? 1;
-        // The boss arena's exit is an ALTERNATE ENDING: taking it always wins the run
-        // outright, never advances a floor (there is no floor after the boss).
-        const isFinalFloor = currentFloor >= maxFloors || !!newGameState.inBossRoom;
+        const isFinalFloor = currentFloor >= maxFloors || bossArenaEndsRun(newGameState);
 
         if (isMultiTier && !isFinalFloor) {
           // Multi-tier mode: advance to next floor instead of winning

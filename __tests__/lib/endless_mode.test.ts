@@ -143,7 +143,9 @@ describe("endless item plan", () => {
   it("offers bombs by chance and a sword only when the hero lacks one, past floor 10", () => {
     const plan = rollEndlessItemPlan();
     const always = () => 0.0; // every chance fires
-    const missing = endlessAllocationForFloor(12, plan, {
+    // Floor 13, not 12: every 6th floor is a boss arena with no chests at all (see
+    // endless_boss_floors.test.ts), so 12 would test that instead of the sustain rolls.
+    const missing = endlessAllocationForFloor(13, plan, {
       hasSword: false,
       hasShield: false,
       rng: always,
@@ -152,7 +154,7 @@ describe("endless item plan", () => {
     expect(missing).toContain(TileSubtype.SWORD);
     expect(missing).toContain(TileSubtype.SHIELD);
 
-    const equipped = endlessAllocationForFloor(12, plan, {
+    const equipped = endlessAllocationForFloor(13, plan, {
       hasSword: true,
       hasShield: true,
       rng: always,

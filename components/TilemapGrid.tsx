@@ -236,6 +236,7 @@ function runProgressProps(gs: GameState) {
     collectedChestItems: gs.stats?.chestItemsCollected ?? [],
     reachedBossRoom: !!gs.reachedBossRoom,
     bossDefeated: !!gs.bossDefeated,
+    bossesDefeated: gs.stats?.bossesDefeated ?? 0,
     bossEntranceKind: gs.bossEntranceKind,
     bossKind: gs.bossKind,
     dailyBossKind: gs.dailyBossKind,

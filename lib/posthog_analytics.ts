@@ -147,6 +147,10 @@ export function trackGameComplete(params: {
   // look like it met a boss.
   reachedBossRoom?: boolean;
   bossDefeated?: boolean;
+  // How many bosses the run killed. Endless stands one on every 6th floor, so this is the
+  // only boss field that can tell a floor-6 run from a floor-24 one; in the daily it is
+  // 0 or 1 and says the same thing as bossDefeated.
+  bossesDefeated?: number;
   bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
   bossKind?: string;
   dailyBossKind?: string;
@@ -181,6 +185,7 @@ export function trackGameComplete(params: {
     collected_chest_items: params.collectedChestItems,
     reached_boss_room: params.reachedBossRoom,
     boss_defeated: params.bossDefeated,
+    bosses_defeated: params.bossesDefeated,
     boss_entrance_kind: params.bossEntranceKind,
     boss_kind: params.bossKind,
     daily_boss_kind: params.dailyBossKind,

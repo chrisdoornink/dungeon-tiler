@@ -44,17 +44,38 @@ export const MIN_SECONDS_PER_FLOOR = 4;
 // Real routes run 20+; 8 tolerates absurd luck.
 export const MIN_STEPS_PER_FLOOR = 8;
 
+// Every Nth endless floor is a boss arena. Mirrors ENDLESS_BOSS_CADENCE in
+// lib/map/endless.ts rather than importing it: this module is loaded by the API route,
+// and importing endless.ts would drag the whole map/enemy/arena graph onto the server.
+// Same reason the spawn bounds below are re-derived rather than imported.
+const BOSS_FLOOR_CADENCE = 6;
+
+/**
+ * Kill ceiling for a boss floor. Its map is an arena, so NONE of the ordinary spawn
+ * tables apply — each boss brings its own population instead, and the biggest of them
+ * are open-ended: a Coilwyrm grows to 24 segments and regrows a head each time one is
+ * severed, and the Quarrymaster's pods disgorge a fresh wave every few turns for as long
+ * as the fight lasts. 60 sits far above any of that on purpose. It is a plausibility
+ * bound, not a tight one — flagging an honest player who ground out a long boss fight
+ * would be much worse than letting a forger through to the timing/sequence checks.
+ */
+const MAX_KILLS_ON_BOSS_FLOOR = 60;
+
 /**
  * Maximum enemies that can possibly exist on endless floor f, with margin:
  * goblins min(1+f,12)+1, ghosts (2 corner wisps on f1; 1-2 early, 2-3 deep),
  * white goblin swarms (phase 2: 1x4, phase 3: up to 3x4), snakes (up to 3 deep).
+ *
+ * Boss floors take the arena ceiling instead, whichever is larger.
  */
 export function maxKillsOnFloor(floor: number): number {
   const goblins = Math.min(1 + floor, 12) + 1;
   const ghosts = floor === 1 ? 2 : floor <= 6 ? 2 : 3;
   const swarmGoblins = floor <= 3 ? 0 : floor <= 7 ? 4 : 12;
   const snakes = floor === 1 ? 0 : floor <= 6 ? 1 : 3;
-  return goblins + ghosts + swarmGoblins + snakes;
+  const ordinary = goblins + ghosts + swarmGoblins + snakes;
+  const isBossFloor = floor >= BOSS_FLOOR_CADENCE && floor % BOSS_FLOOR_CADENCE === 0;
+  return isBossFloor ? Math.max(ordinary, MAX_KILLS_ON_BOSS_FLOOR) : ordinary;
 }
 
 /** Cumulative kill ceiling through the end of floor f (inclusive). */
@@ -72,12 +93,18 @@ export function maxKillsThroughFloor(floor: number): number {
  * Extra-heart chests: exactly one somewhere in the floor-2-10 starter plan (so
  * available as early as entering floor 3), then one on every 5th floor past 10
  * (15, 20, 25, ...). Post-10 sword/shield fill-ins never add hearts.
+ *
+ * BOSSES also hand over a heart each, and one stands on every 6th floor — so a hero
+ * entering floor 25 can legitimately be carrying four of them on top of the chests. This
+ * is the bound most likely to shadow-flag an honest deep run if it falls behind the game's
+ * heart economy, so it counts a boss heart for every boss floor left behind.
  */
 export function maxHeartsEnteringFloor(floor: number): number {
   const completed = floor - 1;
   const planHeart = completed >= 2 ? 1 : 0; // earliest starter heart sits on floor 2
   const post10Hearts = Math.max(0, Math.floor(completed / 5) - 2); // floors 15,20,25,...
-  return 5 + planHeart + post10Hearts + 1;
+  const bossHearts = Math.floor(completed / BOSS_FLOOR_CADENCE); // floors 6,12,18,...
+  return 5 + planHeart + post10Hearts + bossHearts + 1;
 }
 
 /**

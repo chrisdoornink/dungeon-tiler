@@ -14,13 +14,15 @@ const IMAGES = path.resolve(dirname, "../dist/images");
 const MAX_DIM = 256;
 
 // Directories that are story/town/daily-only — never rendered in endless mode.
+// NOTE: enemies/bosses/ was here while bosses were daily-only. Endless now stands one on
+// every 6th floor (ENDLESS_BOSS_CADENCE), so those sprites MUST ship — trimming them again
+// would 404 the whole floor-6 fight.
 const REMOVE = [
   "npcs",
   "dog-golden",
   "hanging-signs",
   "roof",
   "items/beds",
-  "enemies/bosses", // the Shaper puzzle boss is daily/test-only, not in endless
 ];
 
 function dirSize(dir) {

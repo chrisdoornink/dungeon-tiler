@@ -94,5 +94,8 @@ export {
   endlessAllocationForFloor,
   rollEndlessItemPlan,
   ENDLESS_MAX_FLOORS,
+  ENDLESS_BOSS_CADENCE,
+  isEndlessBossFloor,
+  endlessBossKindForFloor,
   type EndlessItemPlan,
 } from "./map/endless";

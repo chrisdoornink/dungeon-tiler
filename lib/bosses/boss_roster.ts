@@ -6,6 +6,8 @@
 // GameState, and game-state.ts imports this — routing the builders through here would make
 // that cycle load-bearing. Arena construction stays in enterBossRoom, which already has both
 // builders in scope; this module only answers "which boss, and how is it labelled".
+// (`../rng` is pure arithmetic with no imports of its own, so it can't reintroduce a cycle.)
+import { mulberry32 } from "../rng";
 
 /** Every boss that can hold the daily boss room. */
 export type BossKind = "shaper" | "fisher" | "coilwyrm" | "quarrymaster";
@@ -110,4 +112,33 @@ export function bossNameFor(kind: string | null | undefined): string {
 export function rollDailyBossKind(): BossKind {
   const i = Math.floor(Math.random() * BOSS_KINDS.length);
   return BOSS_KINDS[Math.min(i, BOSS_KINDS.length - 1)];
+}
+
+/**
+ * Salt for the endless boss-order stream. Endless derives its streams from the run seed
+ * ADDITIVELY (`seed` for the item plan, `seed + N` for floor N), so this one XORs instead —
+ * no additive offset could be guaranteed clear of a floor's stream however deep a run runs.
+ */
+const ENDLESS_BOSS_ORDER_SALT = 0xb055;
+
+/**
+ * The order an endless run meets its bosses: every kind exactly once, shuffled, and then
+ * the same sequence recycled from the top.
+ *
+ * A shuffle rather than an independent roll per boss floor because a run deep enough to
+ * reach four boss floors should meet four DIFFERENT bosses — independent rolls would repeat
+ * one before showing all four more often than not, and "which one is left?" is a better
+ * question at floor 18 than "this one again?".
+ *
+ * Derived from the run seed rather than stored on the GameState: a resumed run re-derives
+ * the identical order, so there is no new field to persist, serialize or migrate.
+ */
+export function rollEndlessBossOrder(seed: number): BossKind[] {
+  const rng = mulberry32((seed ^ ENDLESS_BOSS_ORDER_SALT) >>> 0);
+  const order = BOSS_KINDS.slice();
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return order;
 }
