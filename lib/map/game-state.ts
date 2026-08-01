@@ -3512,8 +3512,14 @@ function movePlayerCore(
   const height = getMapHeight(gameState.mapData);
   const width = getMapWidth(gameState.mapData);
 
-  // Stepping off the map edge from a breach tile leads to the outside world.
-  if (isSteppingThroughBreach(gameState, [currentY, currentX], direction, height, width)) {
+  // Stepping off the map edge from a breach tile leads to the outside world. Story mode
+  // is excluded: its geography is authored rooms wired together by ROOM_TRANSITION, so a
+  // bombed perimeter wall is just a hole in the wall — dropping the hero into a generated
+  // grassland would strand them outside the story's room graph.
+  if (
+    gameState.mode !== "story" &&
+    isSteppingThroughBreach(gameState, [currentY, currentX], direction, height, width)
+  ) {
     const outside = enterOutsideWorld(gameState, [currentY, currentX], direction);
     if (outside) return outside;
   }

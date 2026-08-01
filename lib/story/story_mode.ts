@@ -633,6 +633,7 @@ export function buildStoryModeState(): GameState {
     heroTorchLit: false,
     rockCount: 0,
     runeCount: 0,
+    bombCount: 0,
     foodCount: 0,
     potionCount: 0,
     stats: {
@@ -778,6 +779,7 @@ export interface StoryResetConfig {
   hasSnakeMedallion: boolean;
   rockCount: number;
   runeCount: number;
+  bombCount: number;
   foodCount: number;
   potionCount: number;
   storyFlags?: Record<string, boolean>;
@@ -840,6 +842,7 @@ function applyStoryResetConfig(
   state.hasSnakeMedallion = config.hasSnakeMedallion;
   state.rockCount = clamp(Math.floor(config.rockCount), 0, 99);
   state.runeCount = clamp(Math.floor(config.runeCount), 0, 99);
+  state.bombCount = clamp(Math.floor(config.bombCount), 0, 99);
   state.foodCount = clamp(Math.floor(config.foodCount), 0, 99);
   state.potionCount = clamp(Math.floor(config.potionCount), 0, 99);
 

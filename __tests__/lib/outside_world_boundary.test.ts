@@ -115,4 +115,35 @@ describe("reachedOutsideWorld latches when breaching to the grassland", () => {
     expect(after.inOutsideWorld).toBe(true);
     expect(after.reachedOutsideWorld).toBe(true);
   });
+
+  it("story mode stays put: a bombed perimeter never opens the grassland", () => {
+    const size = 8;
+    const tiles = Array.from({ length: size }, () => Array(size).fill(FLOOR));
+    const subtypes = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [] as number[])
+    );
+    subtypes[0][4] = [TileSubtype.PLAYER, TileSubtype.BREACH];
+
+    const state = {
+      hasKey: false,
+      hasExitKey: false,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.UP,
+      enemies: [],
+      heroHealth: 5,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      heroTorchLit: true,
+      mode: "story",
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      recentDeaths: [],
+    } as unknown as GameState;
+
+    const after = movePlayer(state, Direction.UP);
+    expect(after.inOutsideWorld).toBeFalsy();
+    expect(after.reachedOutsideWorld).toBeFalsy();
+    expect(after.mapData.subtypes[0][4]).toContain(TileSubtype.PLAYER);
+  });
 });

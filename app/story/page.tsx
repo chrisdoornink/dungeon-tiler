@@ -45,6 +45,7 @@ function createDefaultResetConfig(
     hasSnakeMedallion: !!state.hasSnakeMedallion,
     rockCount: state.rockCount ?? 0,
     runeCount: state.runeCount ?? 0,
+    bombCount: state.bombCount ?? 0,
     foodCount: state.foodCount ?? 0,
     potionCount: state.potionCount ?? 0,
   };

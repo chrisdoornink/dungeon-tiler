@@ -253,6 +253,19 @@ const StoryResetModal: React.FC<StoryResetModalProps> = ({
             </div>
             <div>
               <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
+                Bombs
+              </label>
+              <input
+                type="number"
+                min={0}
+                max={99}
+                value={config.bombCount}
+                onChange={updateNumeric("bombCount")}
+                className="w-full rounded border border-white/30 bg-black/60 px-2 py-1 focus:border-emerald-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs uppercase tracking-wide text-gray-400">
                 Food
               </label>
               <input
