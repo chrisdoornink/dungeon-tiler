@@ -1,10 +1,17 @@
-import { allocateChestsAndKeys } from '../../lib/map/map-features';
+import {
+  allocateChestsAndKeys,
+  L2_OPTIONAL_POOL_V2,
+} from '../../lib/map/map-features';
 import { TileSubtype } from '../../lib/map/constants';
 import { mulberry32, withPatchedMathRandom } from '../../lib/rng';
 
 describe('Multi-tier chest/key allocation', () => {
   // Run multiple iterations to cover randomness
   const ITERATIONS = 50;
+
+  // Read the live pool rather than restating it — a hand-copied list here silently
+  // failed the day the Amber Moth took the pool from three items to four.
+  const L2_POOL = L2_OPTIONAL_POOL_V2;
 
   test('sword and shield chests are placed only on floor 1', () => {
     for (let i = 0; i < ITERATIONS; i++) {
@@ -36,8 +43,8 @@ describe('Multi-tier chest/key allocation', () => {
     expect(draws.size).toBeGreaterThan(1);
   });
 
-  test('Level 2 optional items (bomb / medallion / heart) only ever appear on floor 2', () => {
-    const optional = [TileSubtype.SNAKE_MEDALLION, TileSubtype.EXTRA_HEART, TileSubtype.BOMB];
+  test('Level 2 optional items only ever appear on floor 2', () => {
+    const optional: TileSubtype[] = L2_POOL;
     for (let i = 0; i < ITERATIONS; i++) {
       const alloc = allocateChestsAndKeys();
       for (const [floor, data] of alloc.entries()) {
@@ -51,11 +58,7 @@ describe('Multi-tier chest/key allocation', () => {
   });
 
   test('Floor 2 draws exactly 2 distinct items from the optional pool each run', () => {
-    const pool = new Set([
-      TileSubtype.SNAKE_MEDALLION,
-      TileSubtype.EXTRA_HEART,
-      TileSubtype.BOMB,
-    ]);
+    const pool = new Set<TileSubtype>(L2_POOL);
     for (let i = 0; i < ITERATIONS; i++) {
       const f2 = allocateChestsAndKeys().get(2)!;
       expect(f2.chestContents.length).toBe(2);
@@ -68,13 +71,13 @@ describe('Multi-tier chest/key allocation', () => {
 
   test('over many runs, every optional item appears on floor 2 at least once', () => {
     const seen = new Set<number>();
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 400; i++) {
       const f2 = allocateChestsAndKeys().get(2)!;
       for (const c of f2.chestContents) seen.add(c);
     }
-    expect(seen.has(TileSubtype.SNAKE_MEDALLION)).toBe(true);
-    expect(seen.has(TileSubtype.EXTRA_HEART)).toBe(true);
-    expect(seen.has(TileSubtype.BOMB)).toBe(true);
+    // Every pool entry must be reachable — catches an item stranded by an off-by-one
+    // in the pool slice, which a hardcoded expectation list would miss for new items.
+    for (const item of L2_POOL) expect(seen.has(item)).toBe(true);
   });
 
   test('exactly 4 chests total: F1 sword+shield, F2 two optional items', () => {

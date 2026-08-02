@@ -564,4 +564,45 @@ describe('Tile component', () => {
       expect(heroImage.style.animation).not.toContain('combatLunge');
     });
   });
+
+  describe('Amber Moth', () => {
+    const mockTileType = { id: 0, name: 'floor', color: '#ccc', walkable: true };
+    const testId = `subtype-icon-${TileSubtype.AMBER_MOTH}`;
+
+    it('renders its own sprite on an opened chest, not the generic glyph', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.OPEN_CHEST, TileSubtype.AMBER_MOTH]}
+          isVisible={true}
+        />
+      );
+      expect(screen.getByTestId(testId)).toBeInTheDocument();
+    });
+
+    it('renders standalone when dropped loose on the floor', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.AMBER_MOTH]}
+          isVisible={true}
+        />
+      );
+      expect(screen.getByTestId(testId)).toBeInTheDocument();
+    });
+
+    it('stays hidden inside a chest that is still closed', () => {
+      render(
+        <Tile
+          tileId={0}
+          tileType={mockTileType}
+          subtype={[TileSubtype.CHEST, TileSubtype.AMBER_MOTH, TileSubtype.LOCK]}
+          isVisible={true}
+        />
+      );
+      expect(screen.queryByTestId(testId)).toBeNull();
+    });
+  });
 });

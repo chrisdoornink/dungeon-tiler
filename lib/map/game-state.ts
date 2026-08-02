@@ -54,6 +54,7 @@ import {
   isWithinBounds,
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
+import { recordRewindStep, type RewindSnapshot } from "./rewind";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
@@ -1751,6 +1752,12 @@ export interface GameState {
   pinkHeartCount?: number; // Pink flaming heart prizes held (pink realm); use with 'h' or keep as a trophy
   berryCount?: number; // Belted berries held (pink realm); use with 'g' to heal 2-3
   hasSnakeMedallion?: boolean; // Snake medallion for portal travel
+  // Amber Moth rewind charm (Level 2 chest pool). rewindCharges is how many uses are left
+  // — 1 from a chest, spent by either a manual rewind or the automatic on-death one.
+  // rewindHistory is the ring buffer of recent world snapshots it winds back into; it is
+  // only recorded while a charge is held. See lib/map/rewind.ts.
+  rewindCharges?: number;
+  rewindHistory?: RewindSnapshot[];
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -1924,8 +1931,17 @@ export interface GameState {
   };
 }
 
+/**
+ * `rewindHistory` is excluded alongside `lastCheckpoint` for the same reason: both are
+ * themselves collections of snapshots, so storing one inside a snapshot nests state
+ * within state and grows it exponentially. The rewind buffer is rebuilt from live play
+ * after a checkpoint revive, which is correct anyway — you can't wind back past a death.
+ */
 export type CheckpointSnapshot =
-  Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies" | "npcs"> & {
+  Omit<
+    GameState,
+    "combatRng" | "lastCheckpoint" | "rewindHistory" | "enemies" | "npcs"
+  > & {
     enemies?: PlainEnemy[];
     npcs?: PlainNPC[];
   };
@@ -1940,12 +1956,16 @@ function cloneCheckpointSnapshot(
 export function createCheckpointSnapshot(
   state: GameState
 ): CheckpointSnapshot {
-  const { combatRng, lastCheckpoint, enemies, ...rest } = state;
+  const { combatRng, lastCheckpoint, rewindHistory, enemies, ...rest } = state;
   void combatRng;
   void lastCheckpoint;
+  void rewindHistory;
   const base = JSON.parse(
     JSON.stringify(rest)
-  ) as Omit<GameState, "combatRng" | "lastCheckpoint" | "enemies">;
+  ) as Omit<
+    GameState,
+    "combatRng" | "lastCheckpoint" | "rewindHistory" | "enemies"
+  >;
   return {
     ...base,
     enemies: serializeEnemies(enemies),
@@ -3481,9 +3501,24 @@ export function movePlayer(
   // Standing actions (throwing, using items) blind mist-covered enemies but deliberately
   // don't shift the cloud; the hero stirs it by walking through it.
   if (gameState.inPinkRealm && detonated.inPinkRealm) {
-    return { ...detonated, mist: advanceMist(detonated.mist ?? [], detonated.mapData) };
+    return withRewindStep(gameState, {
+      ...detonated,
+      mist: advanceMist(detonated.mist ?? [], detonated.mapData),
+    });
   }
-  return detonated;
+  return withRewindStep(gameState, detonated);
+}
+
+/**
+ * Record the pre-move world on the Amber Moth's ring buffer. Placed at the very end of
+ * movePlayer so the snapshot is taken against the turn as it FINALLY resolved (post-bomb,
+ * post-hazard, post-mist) — and so every rewind lands on a state the engine itself
+ * produced. A no-op unless the hero is carrying a charge and actually took a step.
+ */
+function withRewindStep(before: GameState, after: GameState): GameState {
+  const history = recordRewindStep(before, after);
+  if (history === after.rewindHistory) return after;
+  return { ...after, rewindHistory: history };
 }
 
 /**
@@ -4347,6 +4382,7 @@ function movePlayerCore(
         subtype.includes(TileSubtype.SNAKE_MEDALLION) ||
         subtype.includes(TileSubtype.EXTRA_HEART) ||
         subtype.includes(TileSubtype.PINK_HEART) ||
+        subtype.includes(TileSubtype.AMBER_MOTH) ||
         subtype.includes(TileSubtype.BOMB)) &&
       !subtype.includes(TileSubtype.CHEST)
     ) {
@@ -4358,6 +4394,7 @@ function movePlayerCore(
       if (subtype.includes(TileSubtype.SNAKE_MEDALLION)) collectedNow.push("snake_medallion");
       if (subtype.includes(TileSubtype.EXTRA_HEART)) collectedNow.push("extra_heart");
       if (subtype.includes(TileSubtype.PINK_HEART)) collectedNow.push("pink_heart");
+      if (subtype.includes(TileSubtype.AMBER_MOTH)) collectedNow.push("amber_moth");
       if (collectedNow.length > 0) {
         newGameState.stats.chestItemsCollected = [
           ...(newGameState.stats.chestItemsCollected ?? []),
@@ -4390,6 +4427,13 @@ function movePlayerCore(
       if (subtype.includes(TileSubtype.PINK_HEART)) {
         // The pink flaming heart prize, revealed from its locked realm chest.
         newGameState.pinkHeartCount = (newGameState.pinkHeartCount ?? 0) + 1;
+        newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
+      }
+      if (subtype.includes(TileSubtype.AMBER_MOTH)) {
+        // One rewind, spendable manually or automatically on death. The ring buffer only
+        // starts recording once a charge is held (see recordRewindStep), so the charm can
+        // never wind back past the moment it was picked up.
+        newGameState.rewindCharges = (newGameState.rewindCharges ?? 0) + 1;
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       // Clearing of item happens below when we set dest tile subtypes
@@ -4560,7 +4604,7 @@ function movePlayerCore(
     newMapData.subtypes[newY][newX] = dest.filter((t) => {
       if (t === TileSubtype.FOOD || t === TileSubtype.MED) return false;
       if (
-        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART || t === TileSubtype.BOMB || t === TileSubtype.PINK_HEART) &&
+        (t === TileSubtype.SWORD || t === TileSubtype.SHIELD || t === TileSubtype.SNAKE_MEDALLION || t === TileSubtype.EXTRA_HEART || t === TileSubtype.BOMB || t === TileSubtype.PINK_HEART || t === TileSubtype.AMBER_MOTH) &&
         !hasClosedChest
       )
         return false;

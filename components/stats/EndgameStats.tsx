@@ -35,6 +35,7 @@ const ICON = {
   portal: "/images/items/portal-static.png",
   tree: "/images/trees/tree-1.png",
   bomb: "/images/items/bomb-black.png",
+  amberMoth: "/images/items/amber-moth.png",
 };
 
 // Maps a recorded chest-item key (from analytics `collected_chest_items`) to its
@@ -46,6 +47,7 @@ const LOOT_META: Record<string, { icon: string; label: string }> = {
   extra_heart: { icon: ICON.heart, label: "Extra Heart" },
   bomb: { icon: ICON.bomb, label: "Bomb" },
   pink_heart: { icon: ICON.pinkHeart, label: "Pink Heart" },
+  amber_moth: { icon: ICON.amberMoth, label: "Amber Moth" },
 };
 
 // The four daily boss-entrance kinds (see boss_day.ts). Emoji only — no dedicated

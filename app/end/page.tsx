@@ -20,6 +20,7 @@ type LastGame = {
   heroMaxHealth?: number;
   berryCount?: number;
   pinkHeartCount?: number;
+  rewindCharges?: number;
   bonusHearts?: number;
   rockCount?: number;
   runeCount?: number;
@@ -202,6 +203,8 @@ export default function EndPage() {
   if ((last.foodCount ?? 0) > 0) items.push(`🧀×${last.foodCount}`);
   if ((last.potionCount ?? 0) > 0) items.push(`🧪×${last.potionCount}`);
   if ((last.berryCount ?? 0) > 0) items.push(`🍓×${last.berryCount}`);
+  // Amber Moth shown only if the rewind went unspent.
+  if ((last.rewindCharges ?? 0) > 0) items.push('🪲');
   // Pink flaming heart shown here only if still HELD (kept unused).
   if ((last.pinkHeartCount ?? 0) > 0) items.push(`💗×${last.pinkHeartCount}`);
   shareLines.push(`🗃️ ${items.join(' ')}`);
@@ -374,6 +377,7 @@ export default function EndPage() {
             if ((last.foodCount ?? 0) > 0) inv.push({ emoji: '🧀', label: `Food x${last.foodCount}` });
             if ((last.potionCount ?? 0) > 0) inv.push({ emoji: '🧪', label: `Potion x${last.potionCount}` });
             if ((last.berryCount ?? 0) > 0) inv.push({ emoji: '🍓', label: `Belted Berry x${last.berryCount}` });
+            if ((last.rewindCharges ?? 0) > 0) inv.push({ emoji: '🪲', label: 'Amber Moth (unspent)' });
             if ((last.pinkHeartCount ?? 0) > 0) inv.push({ emoji: '💗', label: 'Pink Flaming Heart' });
             if (last.showFullMap) inv.push({ emoji: '💡', label: 'Map Reveal' });
             if (inv.length === 0) {

@@ -63,6 +63,7 @@ export default function PreloadImages() {
       "/images/items/heart.png",
       "/images/items/pink-heart.png",
       "/images/items/berry.png",
+      "/images/items/amber-moth.png",
       "/images/items/bomb-black.png",
       "/images/items/bomb-red.png",
       // Bomb explosion frames

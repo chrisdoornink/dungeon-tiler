@@ -746,6 +746,9 @@ export const Tile: React.FC<TileProps> = ({
   const hasBerry = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.BERRY) || false;
   };
+  const hasAmberMoth = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.AMBER_MOTH) || false;
+  };
 
   // Bed helpers
   const hasBed = (subtypes: number[] | undefined): boolean => {
@@ -932,6 +935,8 @@ export const Tile: React.FC<TileProps> = ({
         // Pink realm prizes have custom rendering (heart gets a glow overlay)
         subtype !== TileSubtype.PINK_HEART &&
         subtype !== TileSubtype.BERRY &&
+        // The Amber Moth rewind charm has its own sprite overlay
+        subtype !== TileSubtype.AMBER_MOTH &&
         // Sealed doorway: a crack decal on the wall face
         subtype !== TileSubtype.WALL_SEAL
     );
@@ -1012,6 +1017,16 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.BOMB}`}
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.bombIcon}`}
           />
+        )}
+        {hasOpenChest(subtypes) && hasAmberMoth(subtypes) && (
+          <>
+            <div className={styles.amberGlow} aria-hidden="true" />
+            <div
+              key="amber-moth-revealed"
+              data-testid={`subtype-icon-${TileSubtype.AMBER_MOTH}`}
+              className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.amberMothIcon}`}
+            />
+          </>
         )}
 
         {/* Render lightswitch with asset if present */}
@@ -1405,6 +1420,18 @@ export const Tile: React.FC<TileProps> = ({
               backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue.png')})`,
             }}
           />
+        )}
+
+        {/* Render the Amber Moth standalone (dropped on the floor, not inside a chest) */}
+        {hasAmberMoth(subtypes) && !hasChest(subtypes) && !hasOpenChest(subtypes) && (
+          <>
+            <div className={styles.amberGlow} aria-hidden="true" />
+            <div
+              key="amber-moth"
+              data-testid={`subtype-icon-${TileSubtype.AMBER_MOTH}`}
+              className={`${styles.assetIcon} ${styles.amberMothIcon}`}
+            />
+          </>
         )}
 
         {/* Render bed */}

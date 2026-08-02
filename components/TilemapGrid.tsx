@@ -19,6 +19,12 @@ import {
 } from "../lib/map";
 import { coilPieceFor, coilHeadPoseFor } from "../lib/bosses/coilwyrm";
 import { findPlayerPosition, removePlayerFromMapData } from "../lib/map/player";
+import {
+  REWIND_DEATH_DEPTH,
+  rewindDepthAvailable,
+  rewindStateBy,
+} from "../lib/map/rewind";
+import { RewindOverlay } from "./RewindOverlay";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
@@ -89,6 +95,7 @@ import {
   trackGameComplete,
   trackUse,
   trackPickup,
+  trackRewindUsed,
   trackPinkRealmReached,
   trackOutsideWorldReached,
   trackOutsideTreeDestroyed,
@@ -364,6 +371,39 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [showDeathScreen, setShowDeathScreen] = useState(false);
   // Daily death: fade to black during the spirit phase, bridging into the results screen.
   const [deathFade, setDeathFade] = useState(false);
+
+  /**
+   * Amber Moth rewind session.
+   *
+   * The board renders the PAST state for real (gameState is swapped to the previewed
+   * snapshot) so every existing renderer, camera, and light works unchanged — nothing in
+   * the render tree needs to know about rewinding. `present` is the state to put back on
+   * cancel. Nothing is written to localStorage while a session is open; only commit and
+   * cancel persist. See .claude/features/amber-moth-rewind/index.md.
+   */
+  const [rewindSession, setRewindSession] = useState<null | {
+    present: GameState;
+    depth: number;
+    maxDepth: number;
+  }>(null);
+  // One-shot "the amber cracks" beat after the automatic on-death rewind.
+  const [rewindDeathBeat, setRewindDeathBeat] = useState<null | { depth: number }>(
+    null
+  );
+  /**
+   * How far back the charm can currently reach. While a preview is open the board holds a
+   * PAST state whose buffer is already truncated, so read the depth from the stashed
+   * present — otherwise the "further" button would stop short.
+   *
+   * Derived during render rather than memoized: gameState only changes identity once per
+   * turn (the smooth-movement rAF loop writes DOM styles through refs and never sets
+   * state), and the scan is over at most REWIND_MAX_DEPTH entries.
+   */
+  const rewindAvailableDepth = rewindSession
+    ? rewindSession.maxDepth
+    : (gameState.rewindCharges ?? 0) > 0
+      ? rewindDepthAvailable(gameState)
+      : 0;
 
   // Transient moving rock effect
   const [rockEffect, setRockEffect] = useState<null | {
@@ -708,6 +748,75 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return newState;
     });
   }, [resolvedStorageSlot, consumeOnce]);
+
+  /**
+   * Amber Moth: open a rewind preview one step into the past.
+   *
+   * All side effects run in the handler body and set a VALUE rather than using an updater
+   * function — the StrictMode-safe pattern (see handleThrowBomb): React double-invokes
+   * updaters in dev, and rewinding inside one would preview two steps back.
+   */
+  const handleOpenRewind = useCallback(() => {
+    if ((gameState.rewindCharges ?? 0) <= 0) return;
+    if (rewindSession) return; // already previewing
+    const maxDepth = rewindDepthAvailable(gameState);
+    if (maxDepth <= 0) return; // nothing recorded yet on this floor
+    const preview = rewindStateBy(gameState, 1, { spendCharge: false });
+    if (!preview) return;
+    // Nothing is tracked here — opening a preview is not a use. Analytics fire on commit.
+    setRewindSession({ present: gameState, depth: 1, maxDepth });
+    setGameState(preview);
+  }, [gameState, rewindSession]);
+
+  /** Step one further into the past, up to what history holds. */
+  const handleRewindFurther = useCallback(() => {
+    if (!rewindSession) return;
+    const next = rewindSession.depth + 1;
+    if (next > rewindSession.maxDepth) return;
+    // Always rewind from the stashed PRESENT, never from the currently previewed state:
+    // the preview already truncated its own history, so stepping from it would
+    // double-count and land in the wrong moment.
+    const preview = rewindStateBy(rewindSession.present, next, {
+      spendCharge: false,
+    });
+    if (!preview) return;
+    setRewindSession({ ...rewindSession, depth: next });
+    setGameState(preview);
+  }, [rewindSession]);
+
+  /** Stay in the past: spend the charge and make this the live state. */
+  const handleRewindCommit = useCallback(() => {
+    if (!rewindSession) return;
+    const committed = rewindStateBy(rewindSession.present, rewindSession.depth);
+    setRewindSession(null);
+    if (!committed) {
+      // Should be unreachable (the preview proved the depth reachable), but never leave
+      // the player stranded in an uncommitted past — put the present back.
+      setGameState(rewindSession.present);
+      return;
+    }
+    setGameState(committed);
+    CurrentGameStorage.saveCurrentGame(committed, resolvedStorageSlot);
+    try {
+      trackUse("amber_moth");
+      trackRewindUsed({
+        trigger: "manual",
+        depth: rewindSession.depth,
+        mode: isDailyChallenge ? "daily" : isEndless ? "endless" : "normal",
+        floor: rewindSession.present.currentFloor,
+        dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+      });
+    } catch {}
+  }, [rewindSession, resolvedStorageSlot, isDailyChallenge, isEndless]);
+
+  /** Back to the present, charm unspent. */
+  const handleRewindCancel = useCallback(() => {
+    if (!rewindSession) return;
+    const { present } = rewindSession;
+    setRewindSession(null);
+    setGameState(present);
+    CurrentGameStorage.saveCurrentGame(present, resolvedStorageSlot);
+  }, [rewindSession, resolvedStorageSlot]);
 
   // Handle snake medallion click - place portal or show travel dialogue
   const handleSnakeMedallionClick = useCallback(() => {
@@ -2983,6 +3092,40 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       return;
     }
 
+    /**
+     * The Amber Moth catches the hero before they fall — the Zelda-fairy save.
+     *
+     * Deliberately ABOVE the death-animation gate and every branch below it: the run must
+     * never be recorded as a death, so this has to beat the analytics call, the storage
+     * clear, and the results redirect. The charm reads as intercepting the death rather
+     * than undoing one.
+     *
+     * Self-limiting: a successful rewind spends the charge, so the guard fails on any
+     * repeat. If it somehow restores a state that is still dead, the charge is gone and
+     * the ordinary death path takes over on the next pass — no loop either way.
+     */
+    if ((gameState.rewindCharges ?? 0) > 0) {
+      const depth = Math.min(REWIND_DEATH_DEPTH, rewindDepthAvailable(gameState));
+      const saved = depth > 0 ? rewindStateBy(gameState, depth) : null;
+      if (saved && saved.heroHealth > 0) {
+        setRewindSession(null);
+        setRewindDeathBeat({ depth });
+        setGameState(saved);
+        CurrentGameStorage.saveCurrentGame(saved, resolvedStorageSlot);
+        try {
+          trackUse("amber_moth");
+          trackRewindUsed({
+            trigger: "death_save",
+            depth,
+            mode: isDailyChallenge ? "daily" : isEndless ? "endless" : "normal",
+            floor: gameState.currentFloor,
+            dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+          });
+        } catch {}
+        return;
+      }
+    }
+
     if (shouldAnimateHeroDeath && heroDeathPhase !== "complete") {
       return;
     }
@@ -3918,6 +4061,31 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         }
         return;
       }
+      /**
+       * A rewind preview owns the keyboard while it is open. The board is showing a past
+       * state, so movement and every other item must be inert: stepping there would play
+       * out a future from a moment the player has not committed to (and has not paid the
+       * charge for). Only "further back", commit, and cancel get through.
+       */
+      if (rewindSession) {
+        switch (event.key) {
+          case "z":
+          case "Z":
+          case "ArrowLeft":
+            handleRewindFurther();
+            return;
+          case "Enter":
+          case " ":
+            handleRewindCommit();
+            return;
+          case "Escape":
+            handleRewindCancel();
+            return;
+          default:
+            return;
+        }
+      }
+
       let direction: Direction | null = null;
 
       switch (event.key) {
@@ -3967,6 +4135,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         case "G":
           // Use a belted berry
           handleUseBerry();
+          return;
+        case "z":
+        case "Z":
+          // Amber Moth: open the rewind preview, or step one further back once open.
+          if (rewindSession) handleRewindFurther();
+          else handleOpenRewind();
           return;
         case "m":
         case "M":
@@ -4039,6 +4213,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleInteract,
     handleDialogueChoiceNavigate,
     handleDialogueChoiceConfirm,
+    rewindSession,
+    handleOpenRewind,
+    handleRewindFurther,
+    handleRewindCommit,
+    handleRewindCancel,
     heroDeathPhase,
     smoothEnabled,
   ]);
@@ -4073,6 +4252,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           deathCause={gameState.deathCause}
           onRestart={handleRestartFromCheckpoint}
           hasCheckpoint={!!gameState.lastCheckpoint}
+        />
+      )}
+      {/* Amber Moth: the manual rewind preview, and the automatic on-death beat. */}
+      {rewindSession && (
+        <RewindOverlay
+          mode="preview"
+          depth={rewindSession.depth}
+          maxDepth={rewindSession.maxDepth}
+          onFurther={handleRewindFurther}
+          onCommit={handleRewindCommit}
+          onCancel={handleRewindCancel}
+        />
+      )}
+      {rewindDeathBeat && (
+        <RewindOverlay
+          mode="death"
+          depth={rewindDeathBeat.depth}
+          onDone={() => setRewindDeathBeat(null)}
         />
       )}
       {/* Daily death: fade to black under the rising spirit, bridging to results */}
@@ -4649,6 +4846,51 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             <span>Berry x{gameState.berryCount}</span>
                             <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
                               (tap or G)
+                            </span>
+                          </>
+                        )}
+                      </button>
+                    )}
+                    {(gameState.rewindCharges ?? 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleOpenRewind}
+                        disabled={!!rewindSession || rewindAvailableDepth <= 0}
+                        data-testid="amber-moth-button"
+                        className={
+                          isCompact
+                            ? "relative flex h-10 w-10 items-center justify-center rounded bg-[#333333] transition-colors hover:bg-[#444444] disabled:opacity-40"
+                            : "px-2 py-0.5 text-xs bg-[#333333] text-white rounded hover:bg-[#444444] transition-colors border-0 flex items-center gap-1 disabled:opacity-40"
+                        }
+                        title={
+                          rewindAvailableDepth > 0
+                            ? `Amber Moth — rewind up to ${rewindAvailableDepth} step${
+                                rewindAvailableDepth === 1 ? "" : "s"
+                              } (one use) — tap or press Z`
+                            : "Amber Moth — take a few steps first"
+                        }
+                      >
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 32,
+                            height: 32,
+                            backgroundImage: `url(${assetUrl("/images/items/amber-moth.png")})`,
+                            backgroundSize: "contain",
+                            backgroundRepeat: "no-repeat",
+                            backgroundPosition: "center",
+                          }}
+                        />
+                        {isCompact ? (
+                          <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                            Z
+                          </span>
+                        ) : (
+                          <>
+                            <span>Amber Moth</span>
+                            <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
+                              (tap or Z)
                             </span>
                           </>
                         )}
@@ -5842,6 +6084,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 icon: assetUrl("/images/items/pink-heart.png"),
                 count: gameState.pinkHeartCount,
                 onUse: handleUsePinkHeart,
+              }]
+            : []),
+          ...((gameState.rewindCharges ?? 0) > 0
+            ? [{
+                key: "amber-moth",
+                label: "Amber Moth",
+                icon: assetUrl("/images/items/amber-moth.png"),
+                // No count: it is one-use, so a permanent "1" is noise.
+                onUse: handleOpenRewind,
               }]
             : []),
           ...(gameState.hasSnakeMedallion
