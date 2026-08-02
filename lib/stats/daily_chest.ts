@@ -14,14 +14,25 @@
 // items we compute match what every player saw that day — no need to store chest
 // contents in analytics.
 
-import { allocateChestsAndKeys } from "../map/map-features";
+import {
+  allocateChestsAndKeys,
+  L2_OPTIONAL_POOL_V1,
+  L2_POOL_V2_START_DATE,
+} from "../map/map-features";
 import { TileSubtype } from "../map/constants";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
 
 export interface ChestItemMeta {
   subtype: TileSubtype;
   /** Stable machine key for the item (used in JSON payloads / analytics joins). */
-  key: "bomb" | "snake_medallion" | "extra_heart" | "sword" | "shield" | "unknown";
+  key:
+    | "bomb"
+    | "snake_medallion"
+    | "extra_heart"
+    | "amber_moth"
+    | "sword"
+    | "shield"
+    | "unknown";
   label: string;
   /** Public path to the in-game icon so the stats UI matches the game. */
   icon: string;
@@ -42,6 +53,11 @@ const ITEM_META: Partial<Record<TileSubtype, Omit<ChestItemMeta, "subtype">>> = 
     key: "extra_heart",
     label: "Extra Heart",
     icon: "/images/items/heart.png",
+  },
+  [TileSubtype.AMBER_MOTH]: {
+    key: "amber_moth",
+    label: "Amber Moth",
+    icon: "/images/items/amber-moth.png",
   },
   [TileSubtype.SWORD]: {
     key: "sword",
@@ -71,11 +87,20 @@ export interface Level2ChestStatus {
 /**
  * Compute the two Level 2 chest items for a daily run identified by its local
  * date string (YYYY-MM-DD, the same value stored on analytics as `date_seed`).
+ *
+ * The pool is pinned to the version that was live on `dateStr`. This matters more than it
+ * looks: the pool's Fisher-Yates shuffle makes one RNG call per entry, so replaying an old
+ * date against a LARGER pool consumes a different number of draws and reports loot that
+ * day never held. Any future pool addition needs another branch here.
  */
 export function level2ChestStatusForDate(dateStr: string): Level2ChestStatus {
   const seed = hashStringToSeed(dateStr);
   const rng = mulberry32(seed);
-  const allocation = withPatchedMathRandom(rng, () => allocateChestsAndKeys());
+  const l2Pool =
+    dateStr < L2_POOL_V2_START_DATE ? L2_OPTIONAL_POOL_V1 : undefined;
+  const allocation = withPatchedMathRandom(rng, () =>
+    allocateChestsAndKeys({ l2Pool })
+  );
   const contents = allocation.get(2)?.chestContents ?? [];
   const items = contents.map((subtype) => chestItemMeta(subtype));
   return {

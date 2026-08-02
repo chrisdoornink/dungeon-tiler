@@ -461,6 +461,41 @@
   background-image: url("/images/items/berry.png");
 }
 
+/* Amber Moth rewind charm. */
+.amberMothIcon {
+  background-image: url("/images/items/amber-moth.png");
+}
+
+/* Warm glow behind the Amber Moth — the amber reads as lit from within, and it makes the
+   charm findable on an opened chest tile from across a dim room. Sibling of .pinkGlow. */
+.amberGlow {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  pointer-events: none;
+  z-index: 0; /* under assetIcon */
+  background: radial-gradient(
+    60% 60% at 50% 50%,
+    rgba(255, 197, 92, 0.55) 0%,
+    rgba(233, 148, 38, 0.28) 55%,
+    rgba(233, 148, 38, 0) 100%
+  );
+  animation: amberPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes amberPulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* Pink glow behind the pink flaming heart (matches the pink_realm aesthetic). */
 .pinkGlow {
   position: absolute;

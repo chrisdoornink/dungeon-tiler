@@ -256,8 +256,26 @@ export function trackPickup(item: "key" | "exit_key" | "sword" | "shield" | "roc
   captureEvent('item_pickup', { item });
 }
 
-export function trackUse(item: "rock" | "rune" | "bomb" | "food" | "potion" | "pink_heart" | "berry") {
+export function trackUse(item: "rock" | "rune" | "bomb" | "food" | "potion" | "pink_heart" | "berry" | "amber_moth") {
   captureEvent('item_use', { item });
+}
+
+/**
+ * The Amber Moth's rewind actually resolving. Separate from the `item_use` above (which
+ * only says the charm was spent) because the interesting questions are how the charge got
+ * spent and how far back players choose to go:
+ *  - trigger "manual" vs "death_save" — is it played as a tool or as a safety net?
+ *  - depth — do players use the full 10, or bail out after 2?
+ * Fired on commit, never on opening the preview, so a cancelled preview records nothing.
+ */
+export function trackRewindUsed(params: {
+  trigger: "manual" | "death_save";
+  depth: number;
+  mode?: "daily" | "normal" | "endless";
+  floor?: number;
+  dateSeed?: string;
+}) {
+  captureEvent('rewind_used', { ...params });
 }
 
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {

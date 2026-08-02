@@ -169,6 +169,14 @@ export enum TileSubtype {
   // Placed by the arena, never generated. The Quarrymaster has exactly two, flanking his
   // chamber, and fields one monster from each. Art is undetermined; renders as a placeholder.
   SPAWN_POD = 70,
+  // The Amber Moth: a teardrop of amber with a moth curled inside, wings faintly alight —
+  // a moment of the world caught and kept. A one-time rewind charm from the Level 2 chest
+  // pool. Break it and the hero is carried back up to 10 steps (the player picks where to
+  // stop), and it also fires by itself the turn the hero would have died, rewinding 5.
+  // Amber rather than a clockwork camera/stopwatch because every other item in the game is
+  // organic-mystical, and amber is literally preserved time. See lib/map/rewind.ts for the
+  // snapshot ring buffer and .claude/features/amber-moth-rewind/index.md for the design.
+  AMBER_MOTH = 71,
 }
 
 /**

@@ -64,8 +64,18 @@ export function trackPickup(name: "key" | "exit_key" | "sword" | "shield" | "roc
   posthogAnalytics.trackPickup(name);
 }
 
-export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion" | "pink_heart" | "berry") {
+export function trackUse(name: "rock" | "rune" | "bomb" | "food" | "potion" | "pink_heart" | "berry" | "amber_moth") {
   posthogAnalytics.trackUse(name);
+}
+
+export function trackRewindUsed(params: {
+  trigger: "manual" | "death_save";
+  depth: number;
+  mode?: "daily" | "normal" | "endless";
+  floor?: number;
+  dateSeed?: string;
+}) {
+  posthogAnalytics.trackRewindUsed(params);
 }
 
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {

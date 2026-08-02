@@ -940,12 +940,45 @@ const EARLY_CHEST_CONTENTS = [
 ];
 
 // Level 2 optional-item pool. Each run draws 2 distinct items from this pool into the
-// two L2 chests. Add more options here later.
-const L2_OPTIONAL_POOL = [
+// two L2 chests.
+//
+// VERSIONED, and it has to be. allocateChestsAndKeys() is the daily seed's FIRST RNG
+// consumer, and the Fisher-Yates shuffle below makes one call per pool entry — so growing
+// the pool changes both the draws AND the number of RNG calls, which shifts the entire
+// downstream stream (enemies, water, boss) for a given date. lib/stats/daily_chest.ts
+// replays past dates to reconstruct what each day's chests held; without a version pinned
+// by date, every historical day on /stats would silently re-report the wrong loot.
+// So: append new items to a NEW version, never edit an old one.
+export const L2_OPTIONAL_POOL_V1 = [
   TileSubtype.SNAKE_MEDALLION,
   TileSubtype.EXTRA_HEART,
   TileSubtype.BOMB,
 ];
+
+/** V2 adds the Amber Moth rewind charm. */
+export const L2_OPTIONAL_POOL_V2 = [
+  ...L2_OPTIONAL_POOL_V1,
+  TileSubtype.AMBER_MOTH,
+];
+
+/**
+ * First daily date (YYYY-MM-DD) generated with the V2 pool. Dates before this replay with
+ * V1 — see lib/stats/daily_chest.ts, the only caller that needs the old one.
+ *
+ * MUST be the day AFTER this ships, and it has to be re-checked at merge time — authored
+ * 2026-07-31, already bumped once when the merge slipped a day.
+ *
+ * Why the day after and not the day of: the daily map is generated from the date seed at
+ * run start, so on the deploy day itself some players hold a V1 map (started before the
+ * deploy) and some a V2 map (started after). Naming tomorrow keeps every already-played
+ * run correct and leaves only same-day post-deploy runs mismatched, which is the smaller
+ * and shrinking half. There is no way to test this from inside the repo — the invariant is
+ * about when the code went live — so it is a merge-time human check. See the
+ * pre-promote checklist.
+ */
+export const L2_POOL_V2_START_DATE = "2026-08-03";
+
+const L2_OPTIONAL_POOL = L2_OPTIONAL_POOL_V2;
 
 /**
  * Deterministically allocate chests and keys across floors.
@@ -959,7 +992,9 @@ const L2_OPTIONAL_POOL = [
  * Constraint: cumulative keys ≥ cumulative chests at each floor,
  * so the player always has enough keys to open available chests.
  */
-export function allocateChestsAndKeys(): Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }> {
+export function allocateChestsAndKeys(
+  opts?: { l2Pool?: TileSubtype[] }
+): Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }> {
   const result = new Map<number, { chests: number; keys: number; chestContents: TileSubtype[] }>();
   for (let f = 1; f <= 3; f++) {
     result.set(f, { chests: 0, keys: 0, chestContents: [] });
@@ -978,12 +1013,13 @@ export function allocateChestsAndKeys(): Map<number, { chests: number; keys: num
   floor1.chestContents = earlyContents;
 
   // Floor 2: two optional-item chests (2 keys). Each run the daily seed draws 2
-  // distinct items from the L2 optional pool. Extend L2_OPTIONAL_POOL to add more
-  // possibilities later.
+  // distinct items from the L2 optional pool. Add possibilities by defining a NEW
+  // pool version (see L2_OPTIONAL_POOL_V2) rather than editing an existing one; callers
+  // replaying a past date pass that date's pool via opts.l2Pool.
   const floor2 = result.get(2)!;
   floor2.chests = 2;
   floor2.keys = 2;
-  const pool = [...L2_OPTIONAL_POOL];
+  const pool = [...(opts?.l2Pool ?? L2_OPTIONAL_POOL)];
   for (let i = pool.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [pool[i], pool[j]] = [pool[j], pool[i]];

@@ -83,6 +83,7 @@ export interface EndGameSnapshot {
   potionCount?: number;
   berryCount?: number;
   pinkHeartCount?: number;
+  rewindCharges?: number;
   heroHealth?: number;
   heroMaxHealth?: number;
   bonusHearts?: number;
@@ -127,6 +128,10 @@ export function buildInventoryEntries(
     inv.push({ key: "potion", asset: "/images/items/meds-1.png", emoji: "🧪", alt: "Potion", count: game.potionCount });
   if ((game.berryCount ?? 0) > 0)
     inv.push({ key: "berry", asset: "/images/items/berry.png", emoji: "🍓", alt: "Belted Berry", count: game.berryCount });
+  // Amber Moth: shown only if the rewind was never spent — a run that finished with the
+  // charm intact is a different story from one the charm saved.
+  if ((game.rewindCharges ?? 0) > 0)
+    inv.push({ key: "amberMoth", asset: "/images/items/amber-moth.png", emoji: "🪲", alt: "Amber Moth — unspent rewind" });
   // Pink flaming heart prize: shown only if still HELD at the end (using it
   // consumes it). A trophy for finding the secret realm.
   if ((game.pinkHeartCount ?? 0) > 0)
