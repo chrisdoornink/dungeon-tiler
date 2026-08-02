@@ -44,14 +44,20 @@ function heroAt(state: GameState): Pos {
 
 /**
  * Tiles the hero must never voluntarily walk into: authored cracks, any hole a goblin has
- * already opened, and standing spike beds. All three are plainly visible in-game, so a bot
- * that blundered into them would be measuring its own carelessness rather than the arena —
- * and spikes in particular REFUSE the move, so a bot that kept trying would just wedge
- * itself against one for the rest of the fight (measured: 13 spike deaths and the Broken
- * Yard at 0/12 before this).
+ * already opened, standing spike beds, and the lava pools by the door. All are plainly
+ * visible in-game, so a bot that blundered into them would be measuring its own
+ * carelessness rather than the arena — and spikes in particular REFUSE the move, so a bot
+ * that kept trying would just wedge itself against one for the rest of the fight
+ * (measured: 13 spike deaths and the Broken Yard at 0/12 before this).
+ *
+ * Lava belongs here for the same reason and is the clearest case of it: it GLOWS, which is
+ * the whole point of putting it by the hero's start (see the arena's `L` legend), so it is
+ * the most visible hazard in the room. Omitting it took the switch-runner from 40/40 to
+ * 14/40 purely on walk-into-the-fire deaths.
  *
  * Retracted beds (SPIKE_HOLES) are deliberately absent — those are walkable, and treating
- * them as blocked would hide the fact that a thrown switch opens the way.
+ * them as blocked would hide the fact that a thrown switch opens the way. So is OBSIDIAN,
+ * a rock-cooled lava tile, which is genuinely safe to cross.
  */
 function lethalTiles(state: GameState): Set<string> {
   const out = new Set<string>();
@@ -62,7 +68,8 @@ function lethalTiles(state: GameState): Set<string> {
       if (
         cell.includes(TileSubtype.OPEN_ABYSS) ||
         cell.includes(TileSubtype.FAULTY_FLOOR) ||
-        cell.includes(TileSubtype.SPIKES)
+        cell.includes(TileSubtype.SPIKES) ||
+        (cell.includes(TileSubtype.LAVA) && !cell.includes(TileSubtype.OBSIDIAN))
       ) {
         out.add(`${y},${x}`);
       }
