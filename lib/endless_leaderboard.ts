@@ -7,7 +7,7 @@
  */
 
 import { getOrCreateUserId as getUserId } from "./posthog_analytics";
-import { isStandalone } from "./standalone_env";
+import { apiUrl, hasApiBase } from "./api_base";
 import type { GameState } from "./map";
 
 export interface LeaderboardEntry {
@@ -70,10 +70,10 @@ function statsPayload(state: GameState) {
 
 /** Register a fresh run with the server; returns the runId or null on failure. */
 export async function startEndlessRun(): Promise<string | null> {
-  // Standalone (portal) builds have no server: skip the network, run local-best-only.
-  if (isStandalone()) return null;
+  // No reachable server (a portal build with no API base): local-best-only, as before.
+  if (!hasApiBase()) return null;
   try {
-    const res = await fetch("/api/endless-run", {
+    const res = await fetch(apiUrl("/api/endless-run"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "start", playerId: getUserId() }),
@@ -88,10 +88,10 @@ export async function startEndlessRun(): Promise<string | null> {
 
 /** Report entering `floor`; fire-and-forget from the floor transition. */
 export function reportEndlessCheckpoint(state: GameState, floor: number): void {
-  if (isStandalone()) return;
+  if (!hasApiBase()) return;
   if (!state.endlessRunId) return;
   try {
-    void fetch("/api/endless-run", {
+    void fetch(apiUrl("/api/endless-run"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -108,9 +108,9 @@ export function reportEndlessCheckpoint(state: GameState, floor: number): void {
 
 /** Submit the finished run. The server scores it from its own verified floor. */
 export async function submitEndlessRun(state: GameState): Promise<SubmitResult | null> {
-  if (isStandalone()) return null;
+  if (!hasApiBase()) return null;
   try {
-    const res = await fetch("/api/endless-run", {
+    const res = await fetch(apiUrl("/api/endless-run"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -130,11 +130,11 @@ export async function submitEndlessRun(state: GameState): Promise<SubmitResult |
 export async function fetchEndlessLeaderboard(
   limit?: number
 ): Promise<LeaderboardData | null> {
-  if (isStandalone()) return null;
+  if (!hasApiBase()) return null;
   try {
     const params = new URLSearchParams({ playerId: getUserId() });
     if (limit) params.set("limit", String(limit));
-    const res = await fetch(`/api/endless-run?${params.toString()}`);
+    const res = await fetch(apiUrl(`/api/endless-run?${params.toString()}`));
     if (!res.ok) return null;
     return (await res.json()) as LeaderboardData;
   } catch {
@@ -144,9 +144,9 @@ export async function fetchEndlessLeaderboard(
 
 export async function saveEndlessPlayerName(name: string): Promise<void> {
   setEndlessPlayerName(name);
-  if (isStandalone()) return; // saved locally; no server board in the portal build
+  if (!hasApiBase()) return; // saved locally; nothing to sync without a server
   try {
-    await fetch("/api/endless-run", {
+    await fetch(apiUrl("/api/endless-run"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "setName", playerId: getUserId(), name }),

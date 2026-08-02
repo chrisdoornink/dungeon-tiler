@@ -1,0 +1,27 @@
+{
+  "//": "Typechecks the standalone bundle, which nothing else does: the ROOT tsconfig excludes standalone/ on purpose (so Vercel's Next build never tries to resolve its vite imports), and `vite build` uses esbuild, which STRIPS types without checking them. Without this file, everything under src/ — including the CrazyGames SDK binding — ships unverified. Run it with `npm --prefix standalone run typecheck`; it is never part of the Next/Vercel build.",
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["DOM", "DOM.Iterable", "ES2020"],
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    // Mirrors the aliases in vite.config.ts so tsc checks the same modules the bundle
+    // actually gets — which also verifies the shims stay API-compatible with the next/*
+    // surfaces the shared components use.
+    "paths": {
+      "next/image": ["./src/shims/next-image.tsx"],
+      "next/link": ["./src/shims/next-link.tsx"],
+      "next/navigation": ["./src/shims/next-navigation.ts"],
+      "posthog-js": ["./src/shims/posthog-stub.ts"]
+    }
+  },
+  "include": ["src", "vite.config.ts"]
+}

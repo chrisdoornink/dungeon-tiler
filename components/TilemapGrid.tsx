@@ -131,6 +131,7 @@ import { applyStoryEffectsWithDiary } from "../lib/story/event_registry";
 import { updateConditionalNpcs } from "../lib/story/story_mode";
 import { HeroDiaryModal } from "./HeroDiaryModal";
 import { FloorTransition } from "./FloorTransition";
+import { hasAdBreakHandler, runAdBreak } from "../lib/ad_break";
 import { PinkRealmSparkles } from "./PinkRealmSparkles";
 import { assetUrl } from "../lib/asset_url";
 
@@ -5633,6 +5634,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     setFloorTransition(null);
                     setWarpFlicker(false);
                   }}
+                  // Portal builds only: a midgame ad plays over the black phase. Passed
+                  // conditionally so the Next app (which never registers a handler) keeps
+                  // the original synchronous timing rather than awaiting a resolved
+                  // promise. See lib/ad_break.ts.
+                  onBlackHold={
+                    hasAdBreakHandler()
+                      ? () =>
+                          runAdBreak({
+                            floor:
+                              floorTransition.pendingGameState?.currentFloor ??
+                              gameState.currentFloor ??
+                              1,
+                          })
+                      : undefined
+                  }
                 />
               )}
             </div>

@@ -6,7 +6,7 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>TorchBoy Endless — Standalone Spike</title>
+    <title>TorchBoy Endless</title>
     <script>
       // Provide a `process` shim BEFORE any ESM module evaluates. lib/map/constants.ts
       // reads process.env.NEXT_PUBLIC_MAP_SIZE at module top level, and many components
@@ -16,12 +16,22 @@
       // relative to the document so it resolves under a portal's CDN subpath. Set here
       // (before modules) so import-time data (enemy registry, environment) sees it too.
       window.__ASSET_BASE__ = "./";
-      // Standalone flag: shared code (e.g. the leaderboard client) checks this to skip
-      // server calls that don't exist in the portal build.
+      // Standalone flag: shared code checks this to take portal-appropriate paths.
       window.__STANDALONE__ = true;
+      // Origin for the game's own API. The bundle is a static CDN asset with no server of
+      // its own, so the endless leaderboard talks to the live site cross-origin — that is
+      // what /api/endless-run's CORS headers are for, and it keeps ONE shared board across
+      // the web game and the portals. Unset it to fall back to local-best-only (see
+      // lib/api_base.ts); a relative fetch would resolve against the portal's own origin.
+      window.__API_BASE__ = "https://torchboy.com";
     </script>
     <!-- Tailwind utilities + globals.css + self-hosted fonts are all bundled via
-         PostCSS/Vite from src/main.tsx now — no external CDN requests (portals block them). -->
+         PostCSS/Vite from src/main.tsx — no external CDN requests for those (portals block
+         them). The ONE permitted external script is the portal's own SDK below. -->
+    <!-- CrazyGames HTML5 SDK v3. Loaded as a classic script so window.CrazyGames exists
+         before the module entry runs; src/crazygames.ts still init()s it explicitly and
+         degrades to no-ops if this request is blocked or the build is served elsewhere. -->
+    <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>
     <style>
       html,
       body,

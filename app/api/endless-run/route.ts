@@ -26,6 +26,41 @@ import {
  *   endless:starts:<id>:<day> — per-player run-start counter (anti-spam)
  */
 
+/**
+ * CORS, so the standalone portal bundle can share this one leaderboard.
+ *
+ * `*` rather than an allowlist, deliberately. The portal serves the game from origins we
+ * don't control and that can change (a CrazyGames/Poki CDN host), so an allowlist would be
+ * a guess that silently breaks the board. More to the point, CORS is not this route's
+ * security boundary and cannot be: it only stops OTHER PAGES' JavaScript from reading
+ * responses, and curl ignores it entirely. What actually protects the board is that the
+ * client is already assumed hostile — the score is the floor the SERVER witnessed through
+ * sequential checkpoints (see lib/endless_validation.ts), not anything the caller claims.
+ *
+ * Credentials are deliberately NOT allowed: there are no cookies or auth on this route
+ * (the playerId is a client-generated localStorage id), so there is no ambient authority
+ * for a cross-origin caller to borrow, which is what would make `*` dangerous.
+ */
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Access-Control-Max-Age": "86400",
+};
+
+/** NextResponse.json + the CORS headers. Used for EVERY response on this route. */
+function jsonCors(body: unknown, init?: { status?: number }): NextResponse {
+  return NextResponse.json(body, { ...init, headers: CORS_HEADERS });
+}
+
+/**
+ * Preflight. Required, not optional: the POSTs send `Content-Type: application/json`,
+ * which is not a CORS-safelisted request header value, so the browser preflights them.
+ */
+export async function OPTIONS(): Promise<NextResponse> {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
+}
+
 const RUN_TTL_SECONDS = 60 * 60 * 48;
 const MAX_STARTS_PER_DAY = 200; // generous: a real run takes minutes
 const LEADERBOARD_KEY = "endless:lb";
@@ -151,10 +186,10 @@ export async function GET(req: NextRequest) {
       redis.zcard(LEADERBOARD_KEY),
     ]);
     const me = playerId ? await playerRank(playerId) : { rank: null, bestFloor: null };
-    return NextResponse.json({ top, totalPlayers: total, ...me });
+    return jsonCors({ top, totalPlayers: total, ...me });
   } catch (err) {
     console.error("[endless-run GET]", err);
-    return NextResponse.json({ error: "Failed to fetch" }, { status: 500 });
+    return jsonCors({ error: "Failed to fetch" }, { status: 500 });
   }
 }
 
@@ -165,7 +200,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "start") {
       const playerId = typeof body.playerId === "string" ? body.playerId.slice(0, 64) : "";
-      if (!playerId) return NextResponse.json({ error: "Missing playerId" }, { status: 400 });
+      if (!playerId) return jsonCors({ error: "Missing playerId" }, { status: 400 });
 
       // Anti-spam: cap run starts per player per day
       const day = new Date().toISOString().slice(0, 10);
@@ -187,7 +222,7 @@ export async function POST(req: NextRequest) {
           damageTaken: 0,
           flags: ["start:rate-limited"],
         });
-        return NextResponse.json({ runId });
+        return jsonCors({ runId });
       }
 
       const runId = randomUUID();
@@ -203,15 +238,15 @@ export async function POST(req: NextRequest) {
         damageTaken: 0,
         flags: [],
       });
-      return NextResponse.json({ runId });
+      return jsonCors({ runId });
     }
 
     if (action === "checkpoint") {
       const runId = typeof body.runId === "string" ? body.runId : "";
       const floor = typeof body.floor === "number" ? body.floor : 0;
-      if (!runId || !floor) return NextResponse.json({ ok: true }); // nothing to verify
+      if (!runId || !floor) return jsonCors({ ok: true }); // nothing to verify
       const run = await loadRun(runId);
-      if (!run) return NextResponse.json({ ok: true }); // expired/unknown: silently unverified
+      if (!run) return jsonCors({ ok: true }); // expired/unknown: silently unverified
 
       const stats = readStats(body);
       const now = Date.now();
@@ -228,7 +263,7 @@ export async function POST(req: NextRequest) {
       }
       run.lastCheckpointAt = now;
       await saveRun(runId, run);
-      return NextResponse.json({ ok: true });
+      return jsonCors({ ok: true });
     }
 
     if (action === "submit") {
@@ -237,7 +272,7 @@ export async function POST(req: NextRequest) {
       if (!run) {
         // No server-witnessed run: nothing to score. Report the board anyway.
         const top = await topEntries(10);
-        return NextResponse.json({ verified: false, top });
+        return jsonCors({ verified: false, top });
       }
 
       const finalStats = readStats(body);
@@ -260,7 +295,7 @@ export async function POST(req: NextRequest) {
           topEntries(10),
           redis.zcard(LEADERBOARD_KEY),
         ]);
-        return NextResponse.json({ verified: true, floor: verifiedFloor, saved: false, top, totalPlayers: total });
+        return jsonCors({ verified: true, floor: verifiedFloor, saved: false, top, totalPlayers: total });
       }
 
       // Resolve the run's display name: this submission's name, else one the
@@ -299,7 +334,7 @@ export async function POST(req: NextRequest) {
         topEntries(10),
         redis.zcard(LEADERBOARD_KEY),
       ]);
-      return NextResponse.json({
+      return jsonCors({
         verified: true,
         floor: verifiedFloor,
         saved,
@@ -326,12 +361,12 @@ export async function POST(req: NextRequest) {
         }
       }
       const me = playerId ? await playerRank(playerId) : { rank: null, bestFloor: null };
-      return NextResponse.json({ ok: true, ...me });
+      return jsonCors({ ok: true, ...me });
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    return jsonCors({ error: "Unknown action" }, { status: 400 });
   } catch (err) {
     console.error("[endless-run POST]", err);
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+    return jsonCors({ error: "Failed" }, { status: 500 });
   }
 }

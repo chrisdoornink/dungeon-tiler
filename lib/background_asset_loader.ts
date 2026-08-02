@@ -1,5 +1,6 @@
 // Background asset loader for non-critical assets
 import { ASSET_URLS, CRITICAL_ASSETS } from './assets_manifest';
+import { assetUrl } from './asset_url';
 
 class BackgroundAssetLoader {
   private static instance: BackgroundAssetLoader;
@@ -54,7 +55,10 @@ class BackgroundAssetLoader {
               resolve();
             };
             
-            img.src = url;
+            // Canonical absolute paths from the manifest -> deploy-target URL. The
+            // loadedAssets set is keyed by the UNWRAPPED url above, so the bookkeeping
+            // stays comparable with CRITICAL_ASSETS/ASSET_URLS. No-op in the Next app.
+            img.src = assetUrl(url);
           }, 50); // Small delay between requests
         });
       }

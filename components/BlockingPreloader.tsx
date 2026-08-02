@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect } from "react";
+import { assetUrl } from "../lib/asset_url";
 import { CRITICAL_ASSETS } from "../lib/assets_manifest";
 
 interface BlockingPreloaderProps {
@@ -31,7 +32,12 @@ const BlockingPreloader: React.FC<BlockingPreloaderProps> = ({ onReady }) => {
               img.loading = "eager";
               img.onload = () => resolve();
               img.onerror = () => resolve();
-              img.src = cur;
+              // assets_manifest holds canonical absolute paths; resolve for the deploy
+              // target here so the portal build warms "./images/..." rather than 404ing
+              // on "/images/...". No-op in the Next app. Wrapped at the load point rather
+              // than in the manifest so BackgroundAssetLoader's `includes`/`has` set
+              // comparisons keep operating on one consistent (unwrapped) key space.
+              img.src = assetUrl(cur);
             } catch {
               resolve();
             }
@@ -54,7 +60,7 @@ const BlockingPreloader: React.FC<BlockingPreloaderProps> = ({ onReady }) => {
     <div
       className="min-h-screen flex items-center justify-center"
       style={{
-        backgroundImage: "url(/images/presentational/wall-up-close.png)",
+        backgroundImage: `url(${assetUrl("/images/presentational/wall-up-close.png")})`,
         backgroundRepeat: "repeat",
         backgroundSize: "auto",
       }}

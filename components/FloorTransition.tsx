@@ -21,6 +21,13 @@ interface FloorTransitionProps {
   onSwapFloor: () => void;
   /** Called when the full transition is complete */
   onComplete: () => void;
+  /**
+   * Optional: held open while the screen is fully black, before `blackDuration` starts.
+   * The portal builds put a midgame video ad here — the black phase is the one moment the
+   * game is both paused and not mid-gameplay. Omitted in the Next app, which skips the
+   * promise path entirely so its timing is unchanged. See lib/ad_break.ts.
+   */
+  onBlackHold?: () => Promise<void>;
   /** Duration of close animation in ms */
   closeDuration?: number;
   /** Duration of the black pause in ms */
@@ -38,6 +45,7 @@ export const FloorTransition: React.FC<FloorTransitionProps> = ({
   openCenter,
   onSwapFloor,
   onComplete,
+  onBlackHold,
   closeDuration = 500,
   blackDuration = 250,
   openDuration = 500,
@@ -51,6 +59,8 @@ export const FloorTransition: React.FC<FloorTransitionProps> = ({
   onSwapFloorRef.current = onSwapFloor;
   const onCompleteRef = useRef(onComplete);
   onCompleteRef.current = onComplete;
+  const onBlackHoldRef = useRef(onBlackHold);
+  onBlackHoldRef.current = onBlackHold;
 
   useEffect(() => {
     let raf: number;
@@ -76,10 +86,30 @@ export const FloorTransition: React.FC<FloorTransitionProps> = ({
         swapFiredRef.current = true;
         onSwapFloorRef.current();
       }
-      const timeout = setTimeout(() => {
-        setPhase("opening");
-      }, blackDuration);
-      return () => clearTimeout(timeout);
+      // The floor is swapped and the screen is black. If something wants to hold here (a
+      // portal ad break), wait for it before timing the pause — the ad covers the screen,
+      // so the wipe must not reopen underneath it. Unmount cancels either path.
+      let cancelled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
+      const proceed = () => {
+        if (cancelled) return;
+        timeout = setTimeout(() => setPhase("opening"), blackDuration);
+      };
+      const hold = onBlackHoldRef.current;
+      if (hold) {
+        // runAdBreak already swallows failures, but belt-and-braces: a throw here would
+        // leave the player staring at a black screen forever.
+        void Promise.resolve()
+          .then(hold)
+          .catch(() => {})
+          .then(proceed);
+      } else {
+        proceed();
+      }
+      return () => {
+        cancelled = true;
+        if (timeout) clearTimeout(timeout);
+      };
     } else if (phase === "opening") {
       startTime = performance.now();
       const animate = (now: number) => {
