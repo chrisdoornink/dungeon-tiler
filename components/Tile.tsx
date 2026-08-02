@@ -995,7 +995,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/snake-medalion.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue.png')})`,
             }}
           />
         )}
@@ -1402,7 +1402,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/snake-medalion.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue.png')})`,
             }}
           />
         )}

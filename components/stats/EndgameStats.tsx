@@ -31,7 +31,7 @@ const ICON = {
   pinkHeart: "/images/items/pink-heart.png",
   sword: "/images/items/sword.png",
   shield: "/images/items/shield.png",
-  medallion: "/images/items/snake-medalion.png",
+  medallion: "/images/items/snake-medallion-blue.png",
   portal: "/images/items/portal-static.png",
   tree: "/images/trees/tree-1.png",
   bomb: "/images/items/bomb-black.png",

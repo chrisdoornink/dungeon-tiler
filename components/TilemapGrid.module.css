@@ -94,7 +94,11 @@
 }
 
 /* Pink-realm drifting mist: a soft translucent haze that fades + drifts over a tile.
-   Sits above the floor and actors, blended to read as glowing vapor. */
+   Sits above the floor and actors, blended to read as glowing vapor.
+
+   This is the most expensive effect in the game and there can be dozens of them at
+   once (mistMax is ~10% of the walkable tiles), so it is tiered — see .mistOverlay
+   under [data-fx="reduced"] below, and lib/render_quality.ts for who gets which. */
 .mistOverlay {
   position: absolute;
   inset: -10%;
@@ -123,5 +127,47 @@
   100% {
     opacity: 0.28;
     transform: translate(-6%, -4%) scale(0.94);
+  }
+}
+
+/* Reduced tier (phones). Three things made the full version unplayable once a cloud
+   got big, and all three had to go together:
+     - filter: blur() on an element whose transform is animating means the blurred
+       bitmap can never be cached — it is re-rasterized every single frame.
+     - mix-blend-mode forces the compositor to read back the pixels underneath before
+       it can draw, which takes the tile off the GPU fast path.
+     - inset: -10% overlaps neighbouring misty tiles, so a solid cloud pays all of the
+       above several times over for the same pixels.
+   What is left animates opacity only, which the compositor does for free. The gradient
+   carries the softness on its own, and its alpha is raised slightly to make up for no
+   longer being lightened by `screen`. */
+:global([data-fx="reduced"]) .mistOverlay {
+  inset: 0;
+  background: radial-gradient(
+    78% 78% at 50% 45%,
+    rgba(255, 182, 232, 0.5),
+    rgba(240, 138, 212, 0.3) 55%,
+    rgba(228, 120, 200, 0) 82%
+  );
+  filter: none;
+  mix-blend-mode: normal;
+  animation: mistPulse 4.6s ease-in-out infinite;
+}
+
+@keyframes mistPulse {
+  0%,
+  100% {
+    opacity: 0.34;
+  }
+  50% {
+    opacity: 0.58;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mistOverlay,
+  :global([data-fx="reduced"]) .mistOverlay {
+    animation: none;
+    opacity: 0.46;
   }
 }

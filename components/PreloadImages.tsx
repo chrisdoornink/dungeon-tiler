@@ -59,7 +59,7 @@ export default function PreloadImages() {
       "/images/items/sword.png",
       "/images/items/shield.png",
       // Chest-reveal items + bomb (these popped in late when a chest opened)
-      "/images/items/snake-medalion.png",
+      "/images/items/snake-medallion-blue.png",
       "/images/items/heart.png",
       "/images/items/pink-heart.png",
       "/images/items/berry.png",

@@ -36,7 +36,7 @@ const ITEM_META: Partial<Record<TileSubtype, Omit<ChestItemMeta, "subtype">>> = 
   [TileSubtype.SNAKE_MEDALLION]: {
     key: "snake_medallion",
     label: "Snake Medallion",
-    icon: "/images/items/snake-medalion.png",
+    icon: "/images/items/snake-medallion-blue.png",
   },
   [TileSubtype.EXTRA_HEART]: {
     key: "extra_heart",

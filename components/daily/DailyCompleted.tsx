@@ -114,7 +114,7 @@ export function buildInventoryEntries(
   if (game.hasShield)
     inv.push({ key: "shield", asset: "/images/items/shield.png", emoji: "🛡️", alt: "Shield" });
   if (game.hasSnakeMedallion)
-    inv.push({ key: "medallion", asset: "/images/items/snake-medalion.png", emoji: "🌀", alt: "Travel Medallion" });
+    inv.push({ key: "medallion", asset: "/images/items/snake-medallion-blue.png", emoji: "🌀", alt: "Travel Medallion" });
   if ((game.rockCount ?? 0) > 0)
     inv.push({ key: "rock", asset: "/images/items/rock-1.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
   if ((game.runeCount ?? 0) > 0)

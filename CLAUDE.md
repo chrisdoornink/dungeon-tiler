@@ -38,6 +38,14 @@ npm run lint      # ESLint
 
 Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `/ship` to commit and push.
 
+## Art assets (`public/images/`)
+
+**When a sprite's pixels change, rename the file. Editing it in place will not reach players who already have it.** Art is served from a stable URL with a long `Cache-Control` max-age (see `next.config.ts`) and there is no content hash in the filename, so a browser that fetched the old art keeps serving it from disk without asking the server again. This is not theoretical — the snake medallion stayed pink on returning devices for weeks after it was recolored blue.
+
+- **Recolor or redraw → new filename**, ideally one that says what changed (`snake-medalion.png` → `snake-medallion-blue.png`). Then update every reference: `grep -rn "old-name" components lib app`. Expect hits beyond the obvious render component — the preload lists (`lib/assets_manifest.ts`, `components/PreloadImages.tsx`) and the end-screen/stats icon maps (`components/daily/DailyCompleted.tsx`, `components/stats/EndgameStats.tsx`, `lib/stats/daily_chest.ts`) each carry their own copy of the path.
+- **A brand-new sprite at a new path needs none of this** — only in-place edits to an existing filename are the hazard.
+- **The cache header is a backstop, not the fix.** `max-age=604800, stale-while-revalidate=2592000` caps a forgotten rename at roughly a week; it does nothing for clients that already cached a file under the older `immutable` header. Only a new URL reaches those.
+
 ## Standalone HTML5 build (`standalone/`)
 
 `standalone/` is a separate Vite build of **endless mode** for web-game portals (CrazyGames/Poki). It reuses this repo's `lib/` + `components/` engine unchanged and ships as a static bundle served from a CDN subpath. Everything standalone-specific is a **no-op in the Next app** (gated on `window.__ASSET_BASE__` / `window.__STANDALONE__`, which only the standalone sets). When editing shared game/render code, keep it working:
@@ -55,6 +63,7 @@ Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `
 
 - Do not modify `lib/rng.ts` without understanding downstream effects on daily seeds
 - When adding `/images/...` paths or new enemies/items to shared code, keep the standalone build working — wrap paths in `assetUrl()` (see the Standalone HTML5 build section)
+- **Do not change a sprite's pixels without renaming the file** — cached devices keep the old art indefinitely (see Art assets)
 - Do not add emojis to code or comments unless already present
 - Never commit or push unless explicitly asked to in that message
 - **Do not run `npm run build` while the dev server is running.** It overwrites `.next/` with production-hashed chunks, after which the dev server keeps serving HTML referencing dev-mode chunk paths that no longer exist → every refresh 404s. Use `npm run typecheck` for in-session verification; only run `npm run build` after the user has stopped dev (e.g. right before `/ship`).

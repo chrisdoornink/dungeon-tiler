@@ -1,0 +1,37 @@
+/* Pink-realm sparkles. The animation runs forever off a per-sparkle delay/duration
+   instead of being restarted from React on every cycle — see PinkRealmSparkles.tsx.
+   Only opacity and transform animate, so the whole field is compositor work. */
+.layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 20;
+}
+
+.sparkle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0;
+  animation: sparkleTwinkle var(--sparkle-duration) ease-in-out
+    var(--sparkle-delay) infinite;
+}
+
+@keyframes sparkleTwinkle {
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  50% {
+    opacity: var(--sparkle-peak);
+    transform: scale(1);
+  }
+}
+
+/* Motion-sensitive players keep the field, lit at a steady middle brightness. */
+@media (prefers-reduced-motion: reduce) {
+  .sparkle {
+    animation: none;
+    opacity: calc(var(--sparkle-peak) * 0.6);
+  }
+}

@@ -133,6 +133,7 @@ import { HeroDiaryModal } from "./HeroDiaryModal";
 import { FloorTransition } from "./FloorTransition";
 import { hasAdBreakHandler, runAdBreak } from "../lib/ad_break";
 import { PinkRealmSparkles } from "./PinkRealmSparkles";
+import { useRenderQuality } from "./useRenderQuality";
 import { assetUrl } from "../lib/asset_url";
 
 type DialogueSession = {
@@ -425,6 +426,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // under `.bright-mode` in globals.css. Default (no param) is untouched. Read
   // on mount to avoid an SSR/client class mismatch.
   const [brightMode, setBrightMode] = useState<boolean>(false);
+
+  // Effects budget for this device, published to CSS as `data-fx` on the root below so
+  // stylesheets can drop expensive properties without any component branching.
+  // Override with `?fx=full` / `?fx=reduced` to compare the two on one device.
+  const renderQuality = useRenderQuality();
+
   useEffect(() => {
     try {
       setBrightMode(
@@ -4037,7 +4044,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   ]);
 
   return (
-    <div className={`relative${brightMode ? " bright-mode" : ""}`}>
+    <div
+      className={`relative${brightMode ? " bright-mode" : ""}`}
+      data-fx={renderQuality}
+    >
       {/* Brightness A/B prototype: highlight-safe shadow-lift curve referenced
           by `.bright-mode .game-scale` in globals.css. Gamma < 1 raises dark
           values toward mid while leaving near-white (candles) almost fixed.
@@ -4372,7 +4382,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 28 : 20,
                             height: isCompact ? 28 : 20,
-                            backgroundImage: `url(${assetUrl("/images/items/snake-medalion.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/snake-medallion-blue.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -4731,6 +4741,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   <PinkRealmSparkles
                     tiles={gameState.mapData.tiles}
                     dark={inNightmare}
+                    quality={renderQuality}
                   />
                 )}
                 {/* Death vignette overlay - darkens everything except spotlight on hero */}
@@ -5837,7 +5848,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "medallion",
                 label: "Medallion",
-                icon: assetUrl("/images/items/snake-medalion.png"),
+                icon: assetUrl("/images/items/snake-medallion-blue.png"),
                 onUse: handleSnakeMedallionClick,
               }]
             : []),
