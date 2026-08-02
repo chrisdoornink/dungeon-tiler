@@ -43,9 +43,12 @@ type Subs = number[][][];
  *   `a` `b` `c` spike beds across the chamber mouth (answer switches 1-3)
  *   `d` the spike bed sealing the exit (answers switch 4)
  *   `r` a rock to pick up          `p` a pot          `T` wall torch (needs floor below)
+ *   `L` lava — light + instant death (must sit DIAGONALLY from `H`, see assertLayout 5b/5c)
  *
  * In every layout the chamber sits at the top behind its three gate rows, and the two pods
- * sit high and outside the chamber walls so goblins come down into the hall.
+ * sit high and outside the chamber walls so goblins come down into the hall. Every layout
+ * also owes a light source within 2 tiles of `H`, because the hero can arrive with a doused
+ * torch and the wall torches are up at the chamber mouth.
  */
 export interface QuarrymasterLayout {
   name: string;
@@ -72,7 +75,7 @@ export const QUARRYMASTER_LAYOUTS: QuarrymasterLayout[] = [
       "#.....X...X.....#",
       "#.1.X.X...X.X.p.#",
       "#...X.XXXXX.X...#",
-      "#.X.X.......X.X##",
+      "#.X.X.L...L.X.X##",
       "#.2.X...H...X.dE#",
       "#################",
     ],
@@ -96,7 +99,7 @@ export const QUARRYMASTER_LAYOUTS: QuarrymasterLayout[] = [
       "#.X..1.X.X....X.#",
       "#...XX.....XX..##",
       "#.p...X...X...dE#",
-      "#.X...........X##",
+      "#.X...L...L...X##",
       "#.......H.......#",
       "#################",
     ],
@@ -120,7 +123,7 @@ export const QUARRYMASTER_LAYOUTS: QuarrymasterLayout[] = [
       "#.X..XXXXXXX..X.#",
       "#....XXXXXXX....#",
       "#.......X.....p##",
-      "#.1...........dE#",
+      "#.1...L...L...dE#",
       "#.......H......##",
       "#################",
     ],
@@ -180,6 +183,8 @@ export interface QuarrymasterArena {
   cracks: Array<[number, number]>;
   /** Wall torches — the hero's way back from a ghost snuffing their light. */
   torches: Array<[number, number]>;
+  /** Lava pools — the light a hero who arrives doused can actually see, and a hazard. */
+  lava: Array<[number, number]>;
 }
 
 const ORTHO: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
@@ -196,6 +201,7 @@ interface ParsedMap {
   pods: Array<[number, number]>;
   cracks: Array<[number, number]>;
   torches: Array<[number, number]>;
+  lava: Array<[number, number]>;
   gateGroups: GateGroup[];
 }
 
@@ -214,6 +220,7 @@ function parseMap(map: readonly string[]): ParsedMap {
   const pods: Array<[number, number]> = [];
   const cracks: Array<[number, number]> = [];
   const torches: Array<[number, number]> = [];
+  const lava: Array<[number, number]> = [];
   const gatesByChar: Record<string, Array<[number, number]>> = {};
 
   for (let y = 0; y < size; y++) {
@@ -261,6 +268,20 @@ function parseMap(map: readonly string[]): ParsedMap {
         case "S":
           subtypes[y][x] = [TileSubtype.SPAWN_POD];
           pods.push([y, x]);
+          break;
+        case "L":
+          // A pool of molten rock, and the arena's only light the hero arrives with.
+          // enterBossRoom carries the live run's torch state in, and the douse-to-see
+          // DARK_PORTAL entrance only appears while the torch is OUT — so on those days the
+          // hero lands here in the dark, and the wall torches are up at the chamber mouth
+          // across the crack field. Lava glows on its own (see computeTorchGlow, the same
+          // area the render layer lights), so it is visible from arrival, and ending a move
+          // inside that glow relights the torch. It also kills instantly, which is the
+          // point: light you have to stand next to. Placed DIAGONALLY from the hero start,
+          // never orthogonally — movement is orthogonal-only, so the first keypress out of
+          // the gate can never walk into it blind.
+          subtypes[y][x] = [TileSubtype.LAVA];
+          lava.push([y, x]);
           break;
         case "r":
           subtypes[y][x] = [TileSubtype.ROCK];
@@ -323,6 +344,7 @@ function parseMap(map: readonly string[]): ParsedMap {
     pods,
     cracks,
     torches,
+    lava,
     gateGroups,
   };
 }
@@ -340,6 +362,12 @@ function reachable(
     // A spike bed is walkable only once its switch has retracted it.
     if (subs.includes(TileSubtype.SPIKES)) return openGates.has(`${y},${x}`);
     if (subs.includes(TileSubtype.FAULTY_FLOOR)) return false;
+    // Lava is instant death on entry, so it is a wall for routing purposes. It is a FLOOR
+    // overlay, not a wall tile, so without this line every check below would happily
+    // certify a layout whose only path to a switch or the exit runs through it — the exact
+    // invisible soft-lock this validator exists to catch. (OBSIDIAN, a rock-cooled lava
+    // tile, is safe and walkable, but no layout authors one: it only appears at runtime.)
+    if (subs.includes(TileSubtype.LAVA) && !subs.includes(TileSubtype.OBSIDIAN)) return false;
     return tiles[y]?.[x] === FLOOR && !subs.includes(TileSubtype.OPEN_ABYSS);
   };
   const seen = new Set<string>([`${from[0]},${from[1]}`]);
@@ -441,6 +469,43 @@ export function assertLayout(parsed: ParsedMap): void {
     }
   }
 
+  // 5b. A light source must be visible FROM THE HERO'S START, not merely somewhere in the
+  //     room. enterBossRoom carries the live run's torch state in, and the douse-to-see
+  //     DARK_PORTAL entrance only appears while the torch is OUT — so on those days the hero
+  //     lands here blind, with a doused FOV of their own tile plus dim neighbours. Every
+  //     layout used to put both torches at the chamber mouth, nine tiles away across the
+  //     crack field, which made a doused arrival a death sentence: you could not see far
+  //     enough to route around the cracks, and standing still let the pods bury you.
+  //
+  //     GLOW_RADIUS is Chebyshev 2 because that is what computeTorchGlow lights (an octagon,
+  //     far corners dropped) and also the range at which ending a move relights the torch.
+  //     So a source inside it is both visible on arrival and one step from a relight.
+  const GLOW_RADIUS = 2;
+  const [hy, hx] = hero;
+  const nearStart = [...parsed.lava, ...parsed.torches].some(([ly, lx]) => {
+    const dy = Math.abs(ly - hy);
+    const dx = Math.abs(lx - hx);
+    // The octagon: Chebyshev 2 minus the four far corners.
+    return Math.max(dy, dx) <= GLOW_RADIUS && !(dy === GLOW_RADIUS && dx === GLOW_RADIUS);
+  });
+  if (!nearStart) {
+    throw new Error(
+      `quarrymaster map: no light source (L or T) within ${GLOW_RADIUS} tiles of the hero start ${[hy, hx]} — a hero arriving with a doused torch (the DARK_PORTAL entrance requires one) would be blind in a crack field`
+    );
+  }
+
+  // 5c. Lava must never sit ORTHOGONALLY adjacent to the hero start. Movement is
+  //     orthogonal-only, so an adjacent pool means the very first keypress — pressed in the
+  //     dark, before the torch relights — can be instant death with no tell. Diagonal is
+  //     fine and is the intended placement: visible and lighting, but unreachable in one move.
+  for (const [ly, lx] of parsed.lava) {
+    if (Math.abs(ly - hy) + Math.abs(lx - hx) === 1) {
+      throw new Error(
+        `quarrymaster map: lava at ${[ly, lx]} is orthogonally adjacent to the hero start ${[hy, hx]} — the first keypress out of the gate would be instant death. Place it diagonally instead.`
+      );
+    }
+  }
+
   // 6. Pods must be able to field monsters that can actually reach the hero, or there is no
   //    pressure at all. Checked with gates SHUT, which is the state for most of the fight.
   for (const pod of pods) {
@@ -464,7 +529,7 @@ export function buildQuarrymasterArena(
   const parsed = parseMap(opts.map ?? layout.map);
   assertLayout(parsed);
 
-  const { tiles, subtypes, boss: bossPos, hero, plates, pods, cracks, torches, gateGroups } =
+  const { tiles, subtypes, boss: bossPos, hero, plates, pods, cracks, torches, lava, gateGroups } =
     parsed;
   const [bossY, bossX] = bossPos;
 
@@ -517,5 +582,5 @@ export function buildQuarrymasterArena(
     gateGroups,
   };
 
-  return { state, layoutName: layout.name, boss: bossPos, hero, plates, pods, cracks, torches };
+  return { state, layoutName: layout.name, boss: bossPos, hero, plates, pods, cracks, torches, lava };
 }
