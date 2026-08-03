@@ -207,10 +207,21 @@ export class CurrentGameStorage {
         return null;
       }
 
-      // For daily slots, reject saves that are stale (from a previous calendar day,
-      // already won, or hero is dead). These would immediately re-trigger completion.
+      // A dead save is a finished run in the one-life modes: resuming it would replay a
+      // completion that has already been recorded (a duplicate daily result, a duplicate
+      // endless leaderboard submission). Story/tutorial deliberately keep theirs — their
+      // death screen offers a checkpoint restart, and dropping the save would lose the run.
+      if (slot === "daily-new" || slot === "endless") {
+        if (parsed.heroHealth <= 0) {
+          this.clearCurrentGame(slot);
+          return null;
+        }
+      }
+
+      // For daily slots, also reject saves that are stale (already won, or from a previous
+      // calendar day). These would immediately re-trigger completion.
       if (slot === "daily-new") {
-        if (parsed.win || parsed.heroHealth <= 0) {
+        if (parsed.win) {
           this.clearCurrentGame(slot);
           return null;
         }

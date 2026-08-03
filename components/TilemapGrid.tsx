@@ -373,6 +373,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [deathFade, setDeathFade] = useState(false);
 
   /**
+   * Death (and the cinematic that follows it) locks out every player action.
+   *
+   * Movement and the keydown listener gate on this themselves, but the on-screen item
+   * buttons did not: tapping rock — or any item — during the death animation still ran a
+   * full handler, and its `saveCurrentGame` wrote the dead run back into the slot AFTER
+   * the death path had cleared it. That resurrected save then reloaded as a frozen board:
+   * a dead hero who cannot move, whose items still work, and whose run can never finish.
+   * The fade-to-black is `pointer-events-none`, so the strip stays tappable underneath it.
+   *
+   * A ref (assigned during render further down, once heroDeathPhase exists) rather than a
+   * value: the handlers are memoized on their own inputs and should not re-subscribe on
+   * every health tick, and a ref can never hand them a stale gate.
+   */
+  const actionsLockedRef = useRef(false);
+
+  /**
    * Amber Moth rewind session.
    *
    * The board renders the PAST state for real (gameState is swapped to the previewed
@@ -725,6 +741,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using food from inventory
   const handleUseFood = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("food");
     } catch {}
@@ -737,6 +754,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("potion");
     } catch {}
@@ -749,6 +767,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using the pink flaming heart prize (full heal + 3 temporary pink hearts)
   const handleUsePinkHeart = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("pink_heart");
     } catch {}
@@ -761,6 +780,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle using a belted berry (heal 2-3)
   const handleUseBerry = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("berry");
     } catch {}
@@ -779,6 +799,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
    * updaters in dev, and rewinding inside one would preview two steps back.
    */
   const handleOpenRewind = useCallback(() => {
+    // Dying does not open a manual preview: the charm's own death-save branch in the
+    // completion effect owns that moment, and it must not race a hand-opened session.
+    if (actionsLockedRef.current) return;
     if ((gameState.rewindCharges ?? 0) <= 0) return;
     if (rewindSession) return; // already previewing
     const maxDepth = rewindDepthAvailable(gameState);
@@ -842,6 +865,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle snake medallion click - place portal or show travel dialogue
   const handleSnakeMedallionClick = useCallback(() => {
+    if (actionsLockedRef.current) return;
     if (!playerPosition) return;
     
     // Check current state synchronously
@@ -946,6 +970,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle throwing a rune: animate like rock and resolve via performThrowRune
   const handleThrowRune = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("rune");
     } catch {}
@@ -1401,6 +1426,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   );
 
   const handleInteract = useCallback(() => {
+    if (actionsLockedRef.current) return;
     if (dialogueActive) {
       handleDialogueAdvance();
       return;
@@ -1528,6 +1554,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // throw (an earlier version set up the flight inside an updater, so StrictMode ran it
   // twice — detonating the first bomb on impact and arming a second).
   const handleThrowBomb = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("bomb");
     } catch {}
@@ -1618,6 +1645,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // performThrowRock. All side effects run in the handler body and state is applied as a
   // VALUE (not a function updater), so React StrictMode's dev double-invoke can't double-throw.
   const handleThrowRock = useCallback(() => {
+    if (actionsLockedRef.current) return;
     try {
       trackUse("rock");
     } catch {}
@@ -2243,11 +2271,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // Seed with the initial state's array so a rehydrated save doesn't replay
   // its last tick's beam on load.
   const lastProcessedAttacksRef = useRef<unknown>(gameState.recentEnemyAttacks ?? null);
-  const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>("idle");
+  const [heroDeathPhase, setHeroDeathPhase] = useState<HeroDeathPhase>(() =>
+    // A save that is already dead when we mount never makes the >0 -> 0 transition the
+    // death trigger below watches for, so the cinematic never starts — and the completion
+    // effect, which waits for phase "complete", would then hang forever on a frozen board.
+    // Start such a mount at the end of the cinematic so the run resolves straight to its
+    // results screen instead. (Reachable by resuming/refreshing mid-death-animation.)
+    gameState.heroHealth <= 0 ? "complete" : "idle"
+  );
   const [heroDeathOrientation, setHeroDeathOrientation] = useState<Direction>(Direction.RIGHT);
   const heroDeathPositionRef = useRef<[number, number] | null>(null);
   const heroDeathTimeouts = useRef<number[]>([]);
   const previousHeroHealth = useRef<number>(gameState.heroHealth);
+  // Keep the action lock pointed at the live death state (see actionsLockedRef).
+  actionsLockedRef.current =
+    gameState.heroHealth <= 0 || heroDeathPhase !== "idle";
   const clearHeroDeathTimeouts = useCallback(() => {
     if (typeof window === "undefined") return;
     heroDeathTimeouts.current.forEach((id) => window.clearTimeout(id));
