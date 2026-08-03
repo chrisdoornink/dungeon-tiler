@@ -1709,6 +1709,17 @@ function performThrowBombCore(gameState: GameState): GameState {
  */
 
 /**
+ * Where the snake medallion's portal is currently parked. The coordinates are only
+ * meaningful for the map they were set on, so this travels with the map: every sub-area
+ * (pink realm, nightmare, outside world, boss arena) stashes the outer portal in its
+ * return record and starts with an empty slot of its own.
+ */
+export interface PortalLocation {
+  roomId: RoomId;
+  position: [number, number];
+}
+
+/**
  * Game state interface for tracking player inventory and game progress
  */
 export interface GameState {
@@ -1848,11 +1859,9 @@ export interface GameState {
   // (see SealPayload). Consumed by detonateLiveBombs and reset on each new floor.
   sealPayloads?: SealPayloads;
   lastCheckpoint?: CheckpointSnapshot;
-  // Portal state for snake medallion
-  portalLocation?: {
-    roomId: RoomId;
-    position: [number, number];
-  };
+  // Portal state for snake medallion. Belongs to the map it was set on — the sub-area
+  // stashes below carry the outer map's portal while the hero is away from it.
+  portalLocation?: PortalLocation;
   // Multi-tier daily mode: signals that the player entered the exit and needs to advance to the next floor
   needsFloorTransition?: boolean;
   // Outside world: set while the player has stepped through a wall breach into the
@@ -1908,6 +1917,7 @@ export interface GameState {
     mapData: MapData;
     enemies?: PlainEnemy[];
     position: [number, number];
+    portalLocation?: PortalLocation;
   };
   // Pink realm only: the drifting mist's currently-covered tiles ([y,x] pairs). Grows/
   // shrinks organically each turn. Standing in it reverses the hero's controls; enemies
@@ -1917,6 +1927,11 @@ export interface GameState {
     mapData: MapData;
     enemies?: PlainEnemy[];
     position: [number, number];
+    // The dungeon's own medallion portal, held while the hero is in the sub-area. Its
+    // coordinates only mean anything on the dungeon map (the pink realm is a MIRROR of
+    // that map, so an unscoped portal set in the realm reads back as a wall tile), so it
+    // rides here instead of staying live. See PortalLocation.
+    portalLocation?: PortalLocation;
   };
   // Nightmare room: set while the player has bombed through the pink realm's outer wall
   // and stepped into the pitch-black nightmare beyond. realmReturn holds the realm snapshot
@@ -1928,6 +1943,7 @@ export interface GameState {
     enemies?: PlainEnemy[];
     position: [number, number];
     mist?: Array<[number, number]>;
+    portalLocation?: PortalLocation;
   };
 }
 
@@ -2829,6 +2845,7 @@ function enterOutsideWorld(
       inPinkRealm: true,
       mist: ret.mist,
       heroTorchLit: true,
+      portalLocation: ret.portalLocation,
       realmReturn: undefined,
       recentDeaths: [],
       recentBombBlasts: [],
@@ -2857,11 +2874,13 @@ function enterOutsideWorld(
       // Keep the torch lit so the flame still shows — the nightmare's darkness is forced
       // by the renderer (inNightmare), which limits the light to the 4 adjacent tiles.
       heroTorchLit: true,
+      portalLocation: undefined, // per-map; the realm's rides in the stash
       realmReturn: {
         mapData: removePlayerFromMapData(state.mapData),
         enemies: serializeEnemies(state.enemies),
         position,
         mist: state.mist,
+        portalLocation: state.portalLocation,
       },
       recentDeaths: [],
       recentBombBlasts: [],
@@ -2880,6 +2899,7 @@ function enterOutsideWorld(
       playerDirection: direction,
       inOutsideWorld: false,
       outsideDirection: undefined,
+      portalLocation: ret.portalLocation,
       dungeonReturn: undefined,
       recentDeaths: [],
       recentBombBlasts: [],
@@ -2898,6 +2918,7 @@ function enterOutsideWorld(
     mapData: removePlayerFromMapData(state.mapData),
     enemies: serializeEnemies(state.enemies),
     position,
+    portalLocation: state.portalLocation,
   };
   return {
     ...state,
@@ -2907,6 +2928,7 @@ function enterOutsideWorld(
     inOutsideWorld: true,
     outsideDirection: direction,
     reachedOutsideWorld: true,
+    portalLocation: undefined, // per-map; the dungeon's rides in dungeonReturn
     dungeonReturn,
     recentDeaths: [],
     recentBombBlasts: [],
@@ -3071,10 +3093,15 @@ function enterPinkRealm(
     // Keep the entry/return-ring tile clear so the hero's first move isn't reversed
     // before any mist has visibly drifted onto them.
     mist: seedMist(realmMap, Math.random, [entry]),
+    // The realm gets a blank portal slot; the dungeon's rides in the stash. Leaving it
+    // live would let a portal set in here — a horizontal mirror of the dungeon — teleport
+    // the hero onto the mirrored dungeon tile (typically a wall) after they walk back.
+    portalLocation: undefined,
     dungeonReturn: {
       mapData: dungeonMap,
       enemies: serializeEnemies(state.enemies),
       position: ringPos,
+      portalLocation: state.portalLocation,
     },
     recentDeaths: [],
     recentBombBlasts: [],
@@ -3095,6 +3122,8 @@ function returnFromPinkRealm(
     playerDirection: direction,
     inPinkRealm: false,
     mist: undefined, // the mist belongs to the realm; clear it on the way out
+    // Any portal placed inside the realm dies with the realm; the dungeon's comes back.
+    portalLocation: ret.portalLocation,
     dungeonReturn: undefined,
     recentDeaths: [],
     recentBombBlasts: [],
@@ -3185,7 +3214,9 @@ function enterBossRoom(
       mapData: removePlayerFromMapData(state.mapData),
       enemies: serializeEnemies(state.enemies),
       position: entrancePos,
+      portalLocation: state.portalLocation,
     },
+    portalLocation: undefined, // per-map; the floor's rides in bossReturn
     mist: undefined, // realm mist doesn't follow you into the arena
     recentDeaths: [],
     recentBombBlasts: [],
@@ -3389,6 +3420,7 @@ function returnFromBossRoom(
     enemies: ret.enemies ? rehydrateEnemies(ret.enemies) : [],
     playerDirection: direction,
     inBossRoom: false,
+    portalLocation: ret.portalLocation,
     bossReturn: undefined,
     recentDeaths: [],
     recentBombBlasts: [],

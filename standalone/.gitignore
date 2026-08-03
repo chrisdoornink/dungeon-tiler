@@ -1,3 +1,5 @@
 node_modules/
 dist/
 *.zip
+# Trimmed portal bundle produced by scripts/trim-dist.mjs (the CDN upload payload)
+torchboy-endless-crazygames/

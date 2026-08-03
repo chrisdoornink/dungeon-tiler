@@ -548,7 +548,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const targetRoomId = gameState.portalLocation.roomId;
           const targetPos = gameState.portalLocation.position;
           const currentRoomId = gameState.currentRoomId ?? '__base__';
-          
+
+          // A recorded portal is only real while its tile still carries the marker. If it
+          // doesn't, the record is stale — a bomb blast strips PORTAL (it isn't in
+          // BOMB_PRESERVED_SUBTYPES), and pre-fix saves can hold coordinates set on some
+          // other map — and teleporting anyway would drop the hero onto whatever now
+          // occupies those coordinates, up to and including a wall. Refuse the trip and
+          // forget the portal so the medallion offers to place a fresh one.
+          const targetMap =
+            targetRoomId === currentRoomId
+              ? gameState.mapData
+              : gameState.rooms?.[targetRoomId]?.mapData;
+          const destSubs = targetMap?.subtypes?.[targetPos[0]]?.[targetPos[1]];
+          if (!destSubs || !destSubs.includes(TileSubtype.PORTAL)) {
+            setTravelAnimation(null);
+            setGameState((prev) => {
+              if (!prev.portalLocation) return prev;
+              const nextState: GameState = { ...prev, portalLocation: undefined };
+              CurrentGameStorage.saveCurrentGame(nextState, resolvedStorageSlot);
+              return nextState;
+            });
+            return;
+          }
+
           if (targetRoomId !== currentRoomId && gameState.rooms) {
             // Cross-room travel - save current room and load target room
             setGameState((prev) => {
@@ -646,7 +668,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     const interval = setInterval(checkPhase, 100);
     
     return () => clearInterval(interval);
-  }, [travelAnimation, gameState.portalLocation, gameState.currentRoomId, gameState.rooms, playerPosition, resolvedStorageSlot]);
+  }, [travelAnimation, gameState.portalLocation, gameState.currentRoomId, gameState.rooms, gameState.mapData, playerPosition, resolvedStorageSlot]);
 
   const consumeNpcInteraction = useCallback(
     (timestamp: number) => {
