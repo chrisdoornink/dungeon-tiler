@@ -4318,13 +4318,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         {/* Vertically center the entire game UI within the viewport */}
         <div className="w-full mt-12 max-[600px]:mt-1 flex items-center justify-center">
           <div className="game-scale relative" data-testid="game-scale">
-            {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width. */}
+            {/* Responsive HUD top bar: wraps on small screens. Each panel takes 1/2 width.
+                Panels are SEMI-TRANSPARENT on purpose. The bar is absolutely positioned over
+                the top of the viewport (to give the map the full 600px rather than stacking
+                above it), and the camera clamps at map edges — so whenever the hero stands in
+                the top rows, he is drawn UNDERNEATH this bar. At full opacity he simply
+                vanished, along with whatever was on those tiles. This is not a small-screen
+                issue: it happens at every size, the narrow CrazyGames frame just made it
+                obvious. 80% keeps the text readable over busy tiles while leaving the hero
+                and his torch visible through it. */}
             <div
               className={`${styles.hudBar} absolute top-2 left-2 right-2 z-10 flex flex-wrap items-start gap-2`}
             >
             {/* Health + visible enemies - Left side */}
             <div
-              className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white"
+              className="p-2 bg-[#1B1B1B]/80 rounded-md shadow-md text-white"
               style={{ flex: "1" }}
             >
               <div className="text-xs font-medium mb-1">Health</div>
@@ -4395,7 +4403,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             </div>
             {/* Inventory - Right side, grows with content */}
             <div
-              className="p-2 bg-[#1B1B1B] rounded-md shadow-md text-white"
+              className="p-2 bg-[#1B1B1B]/80 rounded-md shadow-md text-white"
               style={{ flex: "1" }}
             >
               <h3 className="text-xs font-medium mb-1">Inventory</h3>

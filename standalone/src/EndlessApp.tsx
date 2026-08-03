@@ -157,41 +157,58 @@ export default function EndlessApp() {
     >
       <div className="max-w-md sm:max-w-xl w-full bg-black/70 rounded-lg p-5 sm:p-8 backdrop-blur-sm text-center flex flex-col gap-5">
         {phase === "start" ? (
+          /* A TITLE SCREEN, mirroring the daily's DailyAvailable: the game's name, the
+             hero, Start. Deliberately no mode description and no "Endless Mode" heading —
+             this is the first thing every portal player sees, and copy explaining what
+             endless mode is reads as a manual rather than a game. The leaderboard moves
+             behind a High Scores button for the same reason: nothing on this screen but
+             the name, the hero, and the way in. */
           <>
-            <h1 className="text-2xl font-bold text-amber-300">Endless Mode</h1>
-            <p className="text-gray-300">
-              Descend as far as you can. Every floor is deadlier than the last,
-              and there is no way out — only down.
-            </p>
-            {records && (
-              <p className="text-gray-200">
-                Best: <span className="font-bold text-amber-300">Floor {records.bestFloor}</span>
-                <span className="text-gray-400 text-sm"> · {records.totalRuns} run{records.totalRuns === 1 ? "" : "s"}</span>
-              </p>
-            )}
-            {board && board.top.length > 0 && (
-              <div className="text-left bg-black/40 rounded-lg p-3 sm:p-4 flex flex-col gap-3">
-                <h2 className="text-amber-300 font-bold text-sm text-center">
-                  All-Time Deepest Descents
-                </h2>
-                <EndlessLeaderboard
-                  entries={board.top.slice(0, 5)}
-                  highlightPlayerId={myShortId}
-                />
-                <button
-                  onClick={openPanel}
-                  className="text-amber-300 hover:text-amber-200 text-sm underline underline-offset-2 self-center"
-                >
-                  View full leaderboard
-                </button>
-              </div>
-            )}
+            <header>
+              <h1 className="text-3xl sm:text-4xl font-bold text-blue-400">Torch Boy</h1>
+              <div
+                className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mt-4"
+                style={{
+                  backgroundImage: `url(${assetUrl("/images/hero/hero-front-static.png")})`,
+                  backgroundSize: "contain",
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "center",
+                }}
+              />
+            </header>
+
             <button
               onClick={handleStart}
-              className="bg-amber-600 hover:bg-amber-500 text-white font-bold py-3 px-6 rounded-lg transition-colors"
+              className="px-10 py-4 text-lg sm:text-xl font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-lg self-center"
             >
-              Descend
+              Start
             </button>
+
+            <button
+              onClick={openPanel}
+              className="text-gray-300 hover:text-white text-sm underline underline-offset-4 self-center"
+            >
+              High Scores
+            </button>
+
+            {records && records.totalRuns > 0 && (
+              <div className="bg-black/50 rounded-lg p-4 border border-gray-600 text-left">
+                <div className="space-y-2.5 text-xs sm:text-base">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Best</span>
+                    <span className="font-bold text-blue-300">
+                      Floor {records.bestFloor}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-300">Runs</span>
+                    <span className="font-semibold text-gray-200">
+                      {records.totalRuns}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <>
