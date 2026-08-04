@@ -1400,9 +1400,13 @@
       rgba(0, 0, 0, 0.18) 0 1px,
       rgba(0, 0, 0, 0) 1px 33%
     );
-  box-shadow: inset 0 0 0 1px rgba(20, 22, 26, 0.85),
-    /* A hard drop shadow sells "hovering over something lethal" far better than any amount of
-       texture on the slab itself. */ 0 3px 5px rgba(0, 0, 0, 0.55);
+  /* NO full inset border. A deck can span two or three tiles, each drawn by its own tile, so a
+     1px outline on every one of them cut the raft into visibly separate boxes. The lit top edge and
+     dark underside in the gradients above still give each tile an edge, which across a multi-tile
+     deck reads as planking — a raft made of boards, which is what it should look like anyway.
+     A hard drop shadow sells "hovering over something lethal" better than any amount of texture on
+     the deck itself. */
+  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.55);
   image-rendering: pixelated;
 }
 

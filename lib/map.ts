@@ -53,7 +53,9 @@ export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/en
 export {
   advanceMachinery,
   nextPlatformTile,
+  platformCovers,
   platformTile,
+  platformTiles,
   stampPlatform,
   throwToggle,
   tileIsPlatformed,

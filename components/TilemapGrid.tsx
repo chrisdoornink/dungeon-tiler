@@ -11,6 +11,7 @@ import {
   performUseFood,
   performWait,
   platformTile,
+  platformTiles,
   performUsePotion,
   performUsePinkHeart,
   performUseBerry,
@@ -2190,16 +2191,23 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (dy === 0 && dx === 0) continue;
       platformLastMoveAtRef.current = now;
       if (snap) continue; // moved, but rendered without a tween
-      // A slab only ever steps one tile; anything longer is a room swap and should snap.
+      // A deck only ever steps one tile; anything longer is a room swap and should snap.
       if (Math.abs(dy) + Math.abs(dx) !== 1) continue;
-      steps.set(`p:${at[0]},${at[1]}`, {
-        dy,
-        dx,
-        dur: PLATFORM_SLIDE.durMs,
-        ease: "ease-in-out",
-        seq,
-        delay: PLATFORM_SLIDE.delayMs,
-      });
+      // EVERY tile of the deck gets the slide, not just the leading edge. With a multi-tile raft the
+      // old and new spans overlap, so animating only the newly-covered tile would read as the deck
+      // stretching forward while the rest sat still. Giving all of them the same offset makes the
+      // whole raft travel, and the union of the animating tiles covers the vacated tile at the start
+      // of the tween, so nothing flickers off.
+      for (const [ty, tx] of platformTiles(p)) {
+        steps.set(`p:${ty},${tx}`, {
+          dy,
+          dx,
+          dur: PLATFORM_SLIDE.durMs,
+          ease: "ease-in-out",
+          seq,
+          delay: PLATFORM_SLIDE.delayMs,
+        });
+      }
     }
 
     platformPrevRef.current = next;

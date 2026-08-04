@@ -1,6 +1,6 @@
 import { PUZZLE_ROOMS, parsePuzzleRoom, describeRoom } from "../../lib/puzzles/rooms";
 import { Direction, TileSubtype } from "../../lib/map/constants";
-import { platformTile } from "../../lib/map/machinery";
+import { platformTile, platformTiles } from "../../lib/map/machinery";
 import { movePlayer, performWait, type GameState } from "../../lib/map/game-state";
 import { createEmptyByKind } from "../../lib/enemies/registry";
 
@@ -198,34 +198,64 @@ describe("walkthroughs", () => {
     throw new Error(`slab ${id} never reached ${tile} within ${maxTurns} turns`);
   }
 
+  /**
+   * Cross southward the way a player actually would: step down when the tile below is safe to stand
+   * on, otherwise wait for the deck.
+   *
+   * This is what the wide deck teaches, and writing it made the reason concrete. A rider KEEPS their
+   * offset along the deck — stand at the stern and you stay at the stern — so a rider who only ever
+   * waits just ping-pongs along with the raft and never arrives. Crossing means riding while walking
+   * forward along the deck, which is precisely the "this is a vehicle, not a stepping stone" idea a
+   * one-tile slab cannot express.
+   */
+  function crossSouth(state: GameState, targetRow: number, maxTurns = 24): GameState {
+    let s = state;
+    for (let i = 0; i < maxTurns && at(s)[0] < targetRow; i++) {
+      const [y, x] = at(s);
+      const below = s.mapData.subtypes[y + 1]?.[x] ?? [];
+      const safe =
+        below.includes(TileSubtype.MOVING_PLATFORM) ||
+        (!below.includes(TileSubtype.DEEP_WATER) && !below.includes(TileSubtype.LAVA));
+      s = safe ? movePlayer(s, Direction.DOWN) : performWait(s);
+      expect(s.heroHealth).toBeGreaterThan(0);
+    }
+    return s;
+  }
+
   it("The Ferry can be crossed and finished", () => {
     let s = load("The Ferry");
     expect(at(s)).toEqual([1, 1]);
 
-    // Grab the key on the near bank, then line up above the rail at column 5.
+    // Grab the key on the near bank, then step onto the dry end of the rail at (2,5).
     s = go(s, Direction.RIGHT, 8);
     expect(s.hasExitKey).toBe(true);
     s = go(s, Direction.LEFT, 4);
     s = go(s, Direction.DOWN, 1);
-    expect(at(s)).toEqual([2, 5]);
-
-    // Wait for the slab to come back to the near end of the rail, THEN step on. Arriving and
-    // stepping straight down walks into the lava the slab has already left.
-    s = waitForSlab(s, "1", [3, 5]);
-    s = go(s, Direction.DOWN, 1);
-    // Boarding costs a turn, so the slab carries the hero one tile on the same move.
-    expect(at(s)).toEqual([4, 5]);
+    // Stepping onto the dry dock at (2,5) boards the deck resting there, so the same turn's advance
+    // carries the hero one tile further before they have pressed anything else.
+    expect(at(s)[1]).toBe(5);
+    expect(at(s)[0]).toBeGreaterThanOrEqual(2);
     expect(s.heroHealth).toBe(5);
 
-    // One more wait carries them to the far end of the rail.
-    s = performWait(s);
-    expect(at(s)).toEqual([5, 5]);
-
-    // Off onto the far bank, then to the exit.
-    s = go(s, Direction.DOWN, 2);
+    // Ride and walk across. Never takes a scratch: the lava is only ever crossed on deck.
+    s = crossSouth(s, 7);
     expect(at(s)).toEqual([7, 5]);
+    expect(s.heroHealth).toBe(5);
+
     s = go(s, Direction.RIGHT, 4);
     expect(s.win).toBe(true);
+  });
+
+  it("The Ferry's deck spans two tiles, so boarding leaves deck ahead of you", () => {
+    // The teaching property. A one-tile slab looks like a stepping stone and invites the player to
+    // keep walking; a deck with room ahead of it reads as a vehicle.
+    const s = load("The Ferry");
+    const deck = s.platforms!.find((p) => p.id === "1")!;
+    expect(deck.length).toBe(2);
+    expect(platformTiles(deck)).toHaveLength(2);
+    for (const [ty, tx] of platformTiles(deck)) {
+      expect(s.mapData.subtypes[ty][tx]).toContain(TileSubtype.MOVING_PLATFORM);
+    }
   });
 
   it("The Ferry kills a hero who walks into the lava beside the rail", () => {
@@ -278,21 +308,26 @@ describe("walkthroughs", () => {
 
   it("The Raft can be crossed dry, or swum wet", () => {
     // Riding keeps the torch; swimming the same channel does not. That contrast IS the room.
-    let dry = load("The Raft");
-    dry = go(dry, Direction.RIGHT, 5);
+    let dry = load("The Raft (teaching)");
+    const deck = dry.platforms!.find((p) => p.id === "4")!;
+    expect(deck.length).toBe(3);
+
+    dry = go(dry, Direction.RIGHT, 4);
     dry = go(dry, Direction.DOWN, 1);
-    expect(at(dry)).toEqual([2, 6]);
-    dry = waitForSlab(dry, "4", [3, 6]);
-    dry = go(dry, Direction.DOWN, 1);
-    expect(dry.heroTorchLit).toBe(true);
-    dry = performWait(dry);
-    expect(dry.heroTorchLit).toBe(true);
-    // Still dry all the way to the far bank.
-    dry = go(dry, Direction.DOWN, 1);
+    // Stepping onto the dry dock boards the raft immediately — the deck is already resting there,
+    // so the same turn's advance carries the hero aboard. No timing at all, which is the point of
+    // the teaching room.
+    expect(dry.mapData.subtypes[at(dry)[0]][at(dry)[1]]).toContain(
+      TileSubtype.MOVING_PLATFORM
+    );
+    // Ride and walk across. The rail docks on both banks, so boarding needs no timing at all.
+    dry = crossSouth(dry, 7);
+    expect(at(dry)).toEqual([7, 5]);
+    // Never got wet, so the torch survived — the whole proposition of a raft over water.
     expect(dry.heroTorchLit).toBe(true);
 
     // The same channel, swum two columns over: the torch goes out. That contrast is the room.
-    let wet = load("The Raft");
+    let wet = load("The Raft (teaching)");
     wet = go(wet, Direction.RIGHT, 2);
     wet = go(wet, Direction.DOWN, 2);
     expect(at(wet)).toEqual([3, 3]);

@@ -10,6 +10,7 @@ import {
   advanceMachinery,
   nextPlatformTile,
   platformTile,
+  platformTiles,
   stampPlatform,
   throwToggle,
 } from "../../lib/map/machinery";
@@ -89,6 +90,7 @@ function lavaCrossing(): { state: GameState; platform: Platform } {
     index: 0,
     dir: 1,
     running: true,
+    length: 1,
   };
   stampPlatform(map, platform);
   const state = baseState(map, { platforms: [platform] });
@@ -192,6 +194,7 @@ describe("moving platforms", () => {
       index: 0,
       dir: 1,
       running: true,
+      length: 1,
     };
     stampPlatform(map, platform);
     const state = baseState(map, { platforms: [platform] });
@@ -255,6 +258,7 @@ function toggleRoom(): GameState {
     index: 0,
     dir: 1,
     running: false,
+    length: 1,
   };
   return baseState(map, { toggleGroups: [group], platforms: [platform] });
 }
@@ -374,5 +378,128 @@ describe("performWait", () => {
     const dead = { ...state, heroHealth: 0 };
     const after = performWait(dead);
     expect(platformTile(after.platforms![0])).toEqual([4, 2]);
+  });
+});
+
+/**
+ * Multi-tile decks. A wider deck is the answer to the teaching problem — board a 3-tile raft and
+ * there is deck ahead of you, so it reads as a vehicle rather than a stepping stone — and it brings
+ * its own invariants: the deck must move as ONE object, a rider must keep their place on it, and the
+ * overlapping old/new spans must not punch a hole in the raft.
+ */
+describe("multi-tile decks", () => {
+  /** A 3-tile raft on a 5-tile rail across a lava band, docked on dry land at both ends. */
+  function wideFerry(): GameState {
+    const map = blankMap(10, 10);
+    for (let y = 3; y <= 5; y++) map.subtypes[y][4].push(TileSubtype.LAVA);
+    const platform: Platform = {
+      id: "raft",
+      track: [
+        [2, 4],
+        [3, 4],
+        [4, 4],
+        [5, 4],
+        [6, 4],
+      ],
+      index: 0,
+      dir: 1,
+      running: true,
+      length: 3,
+    };
+    stampPlatform(map, platform);
+    return baseState(map, { platforms: [platform] });
+  }
+
+  it("occupies its whole length, and only that", () => {
+    const state = wideFerry();
+    const p = state.platforms![0];
+    expect(platformTiles(p)).toEqual([
+      [2, 4],
+      [3, 4],
+      [4, 4],
+    ]);
+    for (const [y, x] of platformTiles(p)) {
+      expect(state.mapData.subtypes[y][x]).toContain(TileSubtype.MOVING_PLATFORM);
+    }
+    // The rail beyond the deck is bare.
+    expect(state.mapData.subtypes[5][4]).not.toContain(TileSubtype.MOVING_PLATFORM);
+    expect(state.mapData.subtypes[6][4]).not.toContain(TileSubtype.MOVING_PLATFORM);
+  });
+
+  it("moves as one object, with no hole where the spans overlap", () => {
+    // The bug this guards: painting the new span before clearing the old one erases the tiles they
+    // share, leaving the raft with a gap through its middle.
+    const state = wideFerry();
+    for (let turn = 0; turn < 8; turn++) {
+      advanceMachinery(state, null);
+      const covered = state.mapData.subtypes
+        .flatMap((row, y) => row.map((cell, x) => ({ y, x, cell })))
+        .filter(({ cell }) => cell.includes(TileSubtype.MOVING_PLATFORM));
+      expect(covered).toHaveLength(3);
+      // Contiguous down one column.
+      const rows = covered.map((c) => c.y).sort((a, b) => a - b);
+      expect(rows[2] - rows[0]).toBe(2);
+    }
+  });
+
+  it("reverses when the DECK runs out of rail, not when its leading edge does", () => {
+    const state = wideFerry();
+    const seen: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      seen.push(state.platforms![0].index);
+      advanceMachinery(state, null);
+    }
+    // maxIndex is 5 - 3 = 2, so it turns around at 2 rather than running to 4.
+    expect(Math.max(...seen)).toBe(2);
+    expect(seen).toEqual([0, 1, 2, 1, 0, 1, 2, 1]);
+  });
+
+  it("keeps a rider's place on the deck rather than sliding them along it", () => {
+    const state = wideFerry();
+    // Stand at the deck's trailing tile (2,4), the dry dock.
+    putHero(state.mapData, 2, 4);
+    advanceMachinery(state, [2, 4]);
+    // Deck moved 0 -> 1, so its tiles are now rows 3-5 and the rider went with it, still at the
+    // trailing edge.
+    expect(heroAt(state)).toEqual([3, 4]);
+    expect(platformTiles(state.platforms![0])[0]).toEqual([3, 4]);
+  });
+
+  it("lets the rider walk forward along the deck while it travels", () => {
+    // The whole point of a wide deck: waiting alone just ping-pongs with the raft, because a rider
+    // keeps their offset. Crossing means riding AND walking, which is the paradigm a one-tile slab
+    // cannot teach.
+    let s = wideFerry();
+    putHero(s.mapData, 1, 4);
+    for (let i = 0; i < 20 && (heroAt(s) ?? [0])[0] < 7; i++) {
+      const [y, x] = heroAt(s)!;
+      const below = s.mapData.subtypes[y + 1]?.[x] ?? [];
+      const safe =
+        below.includes(TileSubtype.MOVING_PLATFORM) || !below.includes(TileSubtype.LAVA);
+      s = safe ? movePlayer(s, Direction.DOWN) : performWait(s);
+      expect(s.heroHealth).toBeGreaterThan(0);
+    }
+    expect(heroAt(s)![0]).toBeGreaterThanOrEqual(7);
+    expect(s.heroHealth).toBe(5);
+  });
+
+  it("refuses to move a deck that fills its whole rail", () => {
+    // An authoring mistake; stalling beats thrashing in place.
+    const map = blankMap();
+    const platform: Platform = {
+      id: "stuck",
+      track: [
+        [4, 2],
+        [4, 3],
+      ],
+      index: 0,
+      dir: 1,
+      running: true,
+      length: 2,
+    };
+    stampPlatform(map, platform);
+    const state = baseState(map, { platforms: [platform] });
+    advanceMachinery(state, null);
+    expect(state.platforms![0].index).toBe(0);
   });
 });

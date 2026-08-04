@@ -22,44 +22,84 @@
 import { TileSubtype } from "./constants";
 import type { MapData, Platform, ToggleGroup } from "./types";
 
-/** Where a platform is standing this instant, or null if its track is empty. */
+/** The deck's length in track tiles, tolerating a platform authored before `length` existed. */
+function deckLength(p: Platform): number {
+  return Math.max(1, p.length ?? 1);
+}
+
+/** Highest `index` the deck can sit at without hanging off the end of its track. */
+function maxIndex(p: Platform): number {
+  return p.track.length - deckLength(p);
+}
+
+/** The platform's leading-edge tile — the first track tile its deck covers. */
 export function platformTile(p: Platform): [number, number] | null {
   return p.track[p.index] ?? null;
 }
 
-/** The tile a platform will occupy after its next advance, without moving it. */
+/**
+ * Every tile the deck currently covers, in track order.
+ *
+ * This is the tile set for everything that cares where the platform IS — rendering, hazard
+ * suppression, and whether a given tile is safe to stand on. A one-tile deck returns one tile, so
+ * callers need no special case.
+ */
+export function platformTiles(p: Platform): Array<[number, number]> {
+  const len = deckLength(p);
+  return p.track.slice(p.index, p.index + len);
+}
+
+/** Is this tile part of the deck right now? */
+export function platformCovers(p: Platform, y: number, x: number): boolean {
+  return platformTiles(p).some(([ty, tx]) => ty === y && tx === x);
+}
+
+/** Where the leading edge will be after the next advance, without moving anything. */
 export function nextPlatformTile(p: Platform): [number, number] | null {
-  if (!p.running || p.track.length < 2) return platformTile(p);
-  const { index, dir } = stepIndex(p);
-  void dir;
+  if (!p.running || maxIndex(p) < 1) return platformTile(p);
+  const { index } = stepIndex(p);
   return p.track[index] ?? null;
 }
 
 /**
  * Advance one step along the track, bouncing at either end.
  *
- * The bounce REFLECTS rather than wrapping: at the last tile the slab turns around and its next
- * position is the second-to-last, so it never teleports from one end to the other. A wrap would
- * be cheaper to write and would strand a rider in the middle of the hazard.
+ * The bounce REFLECTS rather than wrapping: at the far end the deck turns around and its next
+ * position is one step back, so it never teleports from one end to the other. A wrap would be
+ * cheaper to write and would strand a rider in the middle of the hazard.
+ *
+ * The limit is maxIndex, NOT the last track index, because a deck longer than one tile runs out of
+ * track that much sooner — a 3-long deck on a 5-tile track reverses at index 2.
  */
 function stepIndex(p: Platform): { index: number; dir: 1 | -1 } {
-  const last = p.track.length - 1;
+  const max = maxIndex(p);
   let dir = p.dir;
   let index = p.index + dir;
-  if (index > last) {
+  if (index > max) {
     dir = -1;
-    index = Math.max(0, last - 1);
+    index = Math.max(0, max - 1);
   } else if (index < 0) {
     dir = 1;
-    index = Math.min(last, 1);
+    index = Math.min(max, 1);
   }
   return { index, dir };
 }
 
-/** Is the hero riding this platform right now? */
-function heroIsAboard(p: Platform, hero: [number, number] | null): boolean {
-  const at = platformTile(p);
-  return !!at && !!hero && at[0] === hero[0] && at[1] === hero[1];
+/**
+ * Which track index the hero is standing on, or -1 if they are not aboard.
+ *
+ * Returned as an INDEX rather than a boolean because a rider has to keep their place on the deck:
+ * someone standing at the stern must still be at the stern after the platform moves, or walking
+ * along a moving raft would slide them around underfoot.
+ */
+function riderTrackIndex(p: Platform, hero: [number, number] | null): number {
+  if (!hero) return -1;
+  const len = deckLength(p);
+  for (let i = p.index; i < p.index + len; i++) {
+    const t = p.track[i];
+    if (t && t[0] === hero[0] && t[1] === hero[1]) return i;
+  }
+  return -1;
 }
 
 function has(mapData: MapData, y: number, x: number, sub: TileSubtype): boolean {
@@ -79,23 +119,26 @@ function removeSub(mapData: MapData, y: number, x: number, sub: TileSubtype): vo
 }
 
 /**
- * Move the platform's slab from one tile to another, carrying its rider.
+ * Repaint the deck from one span of track tiles to another, carrying any rider with it.
  *
- * The PLAYER subtype is moved with the slab rather than the hero being re-placed afterwards,
- * because the hero's position IS their PLAYER tag on the map (see findPlayerPosition) — there is
- * no separate coordinate to update, so carrying and moving are the same operation.
+ * Cleared BEFORE it is redrawn, and that order matters once the deck is longer than one tile: the
+ * old and new spans overlap, so painting first and clearing second would erase the tiles they share
+ * and leave the raft with a hole in it.
+ *
+ * The rider is moved by rewriting their PLAYER tag, because the hero's position IS that tag (see
+ * findPlayerPosition) — there is no separate coordinate, so carrying and moving are one operation.
  */
-function relocateSlab(
+function repaintDeck(
   mapData: MapData,
-  from: [number, number],
-  to: [number, number],
-  carryRider: boolean
+  oldSpan: Array<[number, number]>,
+  newSpan: Array<[number, number]>,
+  rider: { from: [number, number]; to: [number, number] } | null
 ): void {
-  removeSub(mapData, from[0], from[1], TileSubtype.MOVING_PLATFORM);
-  addSub(mapData, to[0], to[1], TileSubtype.MOVING_PLATFORM);
-  if (carryRider) {
-    removeSub(mapData, from[0], from[1], TileSubtype.PLAYER);
-    addSub(mapData, to[0], to[1], TileSubtype.PLAYER);
+  for (const [y, x] of oldSpan) removeSub(mapData, y, x, TileSubtype.MOVING_PLATFORM);
+  for (const [y, x] of newSpan) addSub(mapData, y, x, TileSubtype.MOVING_PLATFORM);
+  if (rider) {
+    removeSub(mapData, rider.from[0], rider.from[1], TileSubtype.PLAYER);
+    addSub(mapData, rider.to[0], rider.to[1], TileSubtype.PLAYER);
   }
 }
 
@@ -113,21 +156,41 @@ export function advanceMachinery(
   if (!state.platforms || state.platforms.length === 0) return { carried: false };
   let carried = false;
   for (const p of state.platforms) {
-    if (!p.running || p.track.length < 2) continue;
-    const from = platformTile(p);
-    if (!from) continue;
-    const rider = heroIsAboard(p, hero);
+    // maxIndex < 1 means the deck fills its whole track and has nowhere to go. That is an authoring
+    // mistake (a 3-long raft on a 3-tile rail), and stalling beats thrashing in place.
+    if (!p.running || maxIndex(p) < 1) continue;
+    const oldSpan = platformTiles(p);
     const { index, dir } = stepIndex(p);
-    const to = p.track[index];
-    if (!to) continue;
-    // A slab never shoves an entity off its destination. Enemies do not path onto hazard tiles,
-    // so in practice this only fires if a room is authored with something parked on the track;
-    // stalling for a turn is a far better failure than deleting whatever was standing there.
-    if (has(state.mapData, to[0], to[1], TileSubtype.PLAYER) && !rider) continue;
-    relocateSlab(state.mapData, from, to, rider);
+    if (index === p.index) continue;
+
+    const riderIdx = riderTrackIndex(p, hero);
+    const riderFrom = riderIdx >= 0 ? p.track[riderIdx] : null;
+    // The rider keeps their offset along the deck, so they travel exactly one track step — the
+    // same distance the deck does. Derived from the track rather than from a delta so a bent track
+    // would carry them round the corner too.
+    const riderTo = riderIdx >= 0 ? p.track[riderIdx + dir] : null;
+
+    const newSpan = p.track.slice(index, index + deckLength(p));
+    // The deck never shoves anything off a tile it is moving onto. Only tiles it is NOT already
+    // covering can be blocked — the rider's own tile is part of the deck and must not count.
+    const blocked = newSpan.some(
+      ([ny, nx]) =>
+        !oldSpan.some(([oy, ox]) => oy === ny && ox === nx) &&
+        has(state.mapData, ny, nx, TileSubtype.PLAYER) &&
+        !(riderTo && riderTo[0] === ny && riderTo[1] === nx)
+    );
+    if (blocked) continue;
+    if (riderIdx >= 0 && !riderTo) continue; // would carry the rider off the end of the rail
+
+    repaintDeck(
+      state.mapData,
+      oldSpan,
+      newSpan,
+      riderFrom && riderTo ? { from: riderFrom, to: riderTo } : null
+    );
     p.index = index;
     p.dir = dir;
-    if (rider) carried = true;
+    if (riderIdx >= 0) carried = true;
   }
   return { carried };
 }
@@ -216,6 +279,7 @@ export function stampPlatform(mapData: MapData, p: Platform): void {
   for (const [ty, tx] of p.track) {
     addSub(mapData, ty, tx, TileSubtype.PLATFORM_TRACK);
   }
-  const at = platformTile(p);
-  if (at) addSub(mapData, at[0], at[1], TileSubtype.MOVING_PLATFORM);
+  for (const [ty, tx] of platformTiles(p)) {
+    addSub(mapData, ty, tx, TileSubtype.MOVING_PLATFORM);
+  }
 }

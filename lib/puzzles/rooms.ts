@@ -58,6 +58,25 @@ export interface PuzzleRoomSpec {
   }>;
   /** Platform ids that start PARKED. Everything else runs from turn one. */
   parked?: string[];
+  /**
+   * Deck length per platform id, in track tiles. Default 1.
+   *
+   * A deck must be SHORTER than its track or it fills the rail and cannot move, so a room with a
+   * 3-tile rail can carry a deck of at most 2. parsePuzzleRoom rejects the mistake rather than
+   * shipping a raft that sits still.
+   */
+  lengths?: Record<string, number>;
+  /**
+   * Track tiles that stay DRY — a rail that runs up onto the bank instead of stopping at the water's
+   * edge. Given as [y,x]; each must be a track tile.
+   *
+   * This is what makes a multi-tile deck usable at all. A deck reverses the moment it reaches the
+   * end of its rail, which is the same turn its far edge arrives — so with the rail ending at the
+   * water's edge the rider is dragged back before they ever get a turn to step off. Docking the rail
+   * on land gives the deck a resting position flush with dry ground at each end, so boarding and
+   * disembarking need no timing whatsoever.
+   */
+  dryRail?: Array<[number, number]>;
   /** Rocks the hero walks in with. Puzzle rooms hand these out rather than scattering them. */
   rocks?: number;
 }
@@ -75,15 +94,25 @@ export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
     map: [
       "###########",
       "#H.......k#",
-      "#.........#",
+      "#....1....#",
       "#LLLL1LLLL#",
       "#LLLL1LLLL#",
       "#LLLL1LLLL#",
-      "#.........#",
+      "#....1....#",
       "#........E#",
       "###########",
     ],
     trackOver: "lava",
+    // The rail runs up onto both banks. Without that the deck reverses on the very turn its far
+    // edge arrives and yanks the rider back before they get a turn to step off — see `dryRail`.
+    dryRail: [
+      [2, 5],
+      [6, 5],
+    ],
+    // Two tiles of deck on a three-tile rail. Boarding lands you on an edge with deck still ahead,
+    // which is the whole point: a one-tile slab looks like a stepping stone and teaches players to
+    // keep walking, which over lava kills them.
+    lengths: { "1": 2 },
   },
   {
     name: "The Trade",
@@ -111,23 +140,31 @@ export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
     ],
   },
   {
-    name: "The Raft",
+    name: "The Raft (teaching)",
     asks:
-      "Over DEEP WATER the slab is not the only way across — you can always swim. So is a raft " +
-      "worth it just to arrive with your torch still lit? Swim it once and ride it once, and see " +
-      "whether the dry crossing felt like a reward or like a slower version of the same thing.",
+      "THE TEACHING ROOM. Widest deck, gentlest hazard: a 3-tile raft over water, where a mistimed " +
+      "step costs a torch rather than the run. Watch whether the deck ahead of you makes waiting " +
+      "feel obvious without being told. You can still swim it — the raft is the way to arrive dry.",
+    // A five-tile rail so a three-tile deck has somewhere to go. The far two rails sit on the banks
+    // rather than the water, which is deliberate: the raft docks flush with dry land at each end, so
+    // boarding never needs timing at all in the room that is meant to teach the idea.
     map: [
       "##############",
       "#H..........k#",
-      "#............#",
-      "#~~~~~4~~~~~~#",
-      "#~~~~~4~~~~~~#",
-      "#~~~~~4~~~~~~#",
-      "#............#",
+      "#....4.......#",
+      "#~~~~4~~~~~~~#",
+      "#~~~~4~~~~~~~#",
+      "#~~~~4~~~~~~~#",
+      "#....4.......#",
       "#...........E#",
       "##############",
     ],
     trackOver: "water",
+    lengths: { "4": 3 },
+    dryRail: [
+      [2, 5],
+      [6, 5],
+    ],
   },
   {
     name: "The Parked Raft",
@@ -147,6 +184,10 @@ export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
     ],
     trackOver: "water",
     toggles: [{ switchAt: [4, 10], platforms: ["2"], on: true }],
+    // A long deck running ALONG the channel rather than across it. Chris's note stands: parking is
+    // still weakly motivated here because the switch sits past the obstacle, so this room is about
+    // whether a long deck reads as one object in motion, not about whether parking is fun yet.
+    lengths: { "2": 3 },
     rocks: 3,
   },
 ];
@@ -226,10 +267,14 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
           break;
         default:
           if (/[1-9]/.test(ch)) {
-            // A track tile, and it carries the hazard: see the note on `trackOver`.
-            put(
-              spec.trackOver === "lava" ? TileSubtype.LAVA : TileSubtype.DEEP_WATER
-            );
+            // A track tile. It carries the hazard (see `trackOver`) unless the room docked it on
+            // land via `dryRail`.
+            const dry = (spec.dryRail ?? []).some(([dy, dx]) => dy === y && dx === x);
+            if (!dry) {
+              put(
+                spec.trackOver === "lava" ? TileSubtype.LAVA : TileSubtype.DEEP_WATER
+              );
+            }
             const list = tracks.get(ch) ?? [];
             list.push([y, x]);
             tracks.set(ch, list);
@@ -248,7 +293,14 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
     if (track.length < 2) {
       throw new Error(`${spec.name}: platform ${id} needs at least 2 track tiles`);
     }
-    platforms.push({ id, track, index: 0, dir: 1, running: !parked.has(id) });
+    const length = spec.lengths?.[id] ?? 1;
+    if (length >= track.length) {
+      throw new Error(
+        `${spec.name}: platform ${id} has a deck of ${length} on a ${track.length}-tile rail — ` +
+          `it would fill the rail and never move`
+      );
+    }
+    platforms.push({ id, track, index: 0, dir: 1, running: !parked.has(id), length });
   }
 
   const toggleGroups: ToggleGroup[] = (spec.toggles ?? []).map((t) => {

@@ -105,9 +105,24 @@ export interface ToggleGroup {
 export interface Platform {
   id: string;
   track: Array<[number, number]>;
+  /**
+   * Index of the platform's FIRST occupied track tile. It occupies `length` consecutive track
+   * tiles from here, so the valid range is 0 .. track.length - length.
+   */
   index: number;
   dir: 1 | -1;
   running: boolean;
+  /**
+   * How many track tiles the deck spans. 1 is a single slab; 2-3 is a raft.
+   *
+   * A LONGER DECK IS A TEACHING DEVICE, not decoration. The hard part of this mechanic is not the
+   * timing, it is getting players to understand that you board and then WAIT rather than keep
+   * walking — and a one-tile slab actively teaches the wrong thing, because it looks like a
+   * stepping stone. Board a three-tile raft and there is deck ahead of you: you can walk along it
+   * while it moves, which reads as a vehicle without a word of instruction. It also widens the
+   * boarding window, which is where a one-tile slab is meanest.
+   */
+  length: number;
 }
 
 export interface RoomTransition {
