@@ -1401,8 +1401,11 @@
      tile is what makes the ordering ("everything else moves, then platforms move") visible. */
   position: absolute;
   inset: 0;
-  /* Above the floor and the rail decal, below items (1030) and the hero. */
-  z-index: 1015;
+  /* 1025: ABOVE a lava or water tile's own animated overlay, which sits at 1020 and was painting
+     over the old per-tile slab wherever it overhung a neighbour. Below items (1030), enemies (10500),
+     the hero (11000) and walls (12000) — so cargo and riders sit on the deck, and a wall still
+     occludes it. This single number replaces the per-tile stacking fight entirely. */
+  z-index: 1025;
   pointer-events: none;
   background-color: #6b6f76;
   background-image: linear-gradient(

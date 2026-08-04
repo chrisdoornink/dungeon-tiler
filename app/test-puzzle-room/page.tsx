@@ -150,8 +150,10 @@ function TestPuzzleRoomInner() {
         </p>
         <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
           Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}
-          <b>wait a turn</b>. A slab moves once per turn and you have to be standing on it —
-          waiting is how you ride. No mobile button for it yet.
+          <b>wait a turn</b>, or tap either <b>hourglass</b> in the top corners of the on-screen
+          d-pad. A deck moves once per turn and carries whoever is standing on it — but a rider
+          keeps their place on the deck, so crossing means riding <i>and</i> walking forward along
+          it, not waiting alone.
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center mt-3">

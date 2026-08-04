@@ -2193,21 +2193,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (snap) continue; // moved, but rendered without a tween
       // A deck only ever steps one tile; anything longer is a room swap and should snap.
       if (Math.abs(dy) + Math.abs(dx) !== 1) continue;
-      // EVERY tile of the deck gets the slide, not just the leading edge. With a multi-tile raft the
-      // old and new spans overlap, so animating only the newly-covered tile would read as the deck
-      // stretching forward while the rest sat still. Giving all of them the same offset makes the
-      // whole raft travel, and the union of the animating tiles covers the vacated tile at the start
-      // of the tween, so nothing flickers off.
-      for (const [ty, tx] of platformTiles(p)) {
-        steps.set(`p:${ty},${tx}`, {
-          dy,
-          dx,
-          dur: PLATFORM_SLIDE.durMs,
-          ease: "ease-in-out",
-          seq,
-          delay: PLATFORM_SLIDE.delayMs,
-        });
-      }
+      // One entry per PLATFORM, keyed by its anchor tile — the deck is a single element now, so it
+      // takes a single slide. The old version emitted a step per deck tile and had each translate
+      // itself backwards, which is what produced the direction-dependent flicker.
+      steps.set(`p:${at[0]},${at[1]}`, {
+        dy,
+        dx,
+        dur: PLATFORM_SLIDE.durMs,
+        ease: "ease-in-out",
+        seq,
+        delay: PLATFORM_SLIDE.delayMs,
+      });
     }
 
     platformPrevRef.current = next;
@@ -2224,6 +2220,36 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     const m = new Map<string, number>();
     for (const g of groups) {
       m.set(`${g.switchAt[0]},${g.switchAt[1]}`, g.on ? 1 : 0);
+    }
+    return m;
+  })();
+
+  // One deck descriptor per platform, keyed by its ANCHOR tile: the topmost tile of a vertical rail
+  // or the leftmost of a horizontal one, since the element grows down/right from there.
+  const platformDecks:
+    | Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>
+    | undefined = (() => {
+    const list = gameState.platforms;
+    if (!list || list.length === 0) return undefined;
+    const m = new Map<
+      string,
+      { length: number; axis: "col" | "row"; step?: SmoothEntityStep }
+    >();
+    for (const p of list) {
+      const tiles = platformTiles(p);
+      if (tiles.length === 0) continue;
+      // Rail orientation, read off the track itself rather than assumed.
+      const axis: "col" | "row" =
+        p.track.length > 1 && p.track[0][0] !== p.track[1][0] ? "col" : "row";
+      // Anchor is the lowest coordinate along the axis, so the element extends the right way.
+      const anchor = tiles.reduce((best, t) =>
+        (axis === "col" ? t[0] < best[0] : t[1] < best[1]) ? t : best
+      );
+      m.set(`${anchor[0]},${anchor[1]}`, {
+        length: tiles.length,
+        axis,
+        step: smoothPlatformSteps?.get(`p:${platformTile(p)?.[0]},${platformTile(p)?.[1]}`),
+      });
     }
     return m;
   })();
@@ -5886,7 +5912,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     combatLunges,
                     torchSnuffing,
                     smoothPlatformSteps,
-                    toggleStates
+                    toggleStates,
+                    platformDecks
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6486,7 +6513,9 @@ function renderTileGrid(
   // hero/enemy slides — see smoothPlatformSteps in the component.
   platformSteps?: Map<string, SmoothEntityStep>,
   // Toggle switch state per tile, keyed "y,x". Drives which colour the switch shows.
-  toggleStates?: Map<string, number>
+  toggleStates?: Map<string, number>,
+  // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
+  decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -6892,7 +6921,7 @@ function renderTileGrid(
             npcStep={
               npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined
             }
-            platformStep={platformSteps?.get(`p:${rowIndex},${colIndex}`)}
+            deck={decks?.get(`${rowIndex},${colIndex}`)}
             toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={

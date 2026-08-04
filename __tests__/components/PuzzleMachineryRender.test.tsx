@@ -21,18 +21,51 @@ import { TOGGLE_STATE_COLORS, toggleStateColor } from "../../lib/map/machinery";
 const FLOOR_TYPE = { id: 0, name: "floor", color: "#ccc", walkable: true };
 
 describe("moving platform rendering", () => {
-  it("renders a slab element for a MOVING_PLATFORM tile", () => {
+  it("draws the deck ONCE, on its anchor tile, sized to its whole length", () => {
+    // One element for the whole deck. The per-tile version had each slab translate itself backwards
+    // to fake a slide, which is what produced direction-dependent flicker and visible seams.
     render(
       <Tile
         tileId={0}
         tileType={FLOOR_TYPE}
         subtype={[TileSubtype.LAVA, TileSubtype.PLATFORM_TRACK, TileSubtype.MOVING_PLATFORM]}
         isVisible={true}
+        deck={{ length: 3, axis: "col" }}
+      />
+    );
+    const el = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(el).toBeInTheDocument();
+    expect(el.getAttribute("data-deck-length")).toBe("3");
+    expect(el.style.height).toContain("* 3");
+  });
+
+  it("draws no deck on a covered tile that is not the anchor", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
+        isVisible={true}
       />
     );
     expect(
-      screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`)
-    ).toBeInTheDocument();
+      screen.queryByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`)
+    ).not.toBeInTheDocument();
+  });
+
+  it("grows rightward on a horizontal rail", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.DEEP_WATER, TileSubtype.MOVING_PLATFORM]}
+        isVisible={true}
+        deck={{ length: 2, axis: "row" }}
+      />
+    );
+    const el = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(el.style.width).toContain("* 2");
+    expect(el.getAttribute("data-deck-axis")).toBe("row");
   });
 
   it("hides the rail decal under the slab and shows it everywhere else", () => {
@@ -70,13 +103,17 @@ describe("moving platform rendering", () => {
         tileType={FLOOR_TYPE}
         subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
         isVisible={true}
-        platformStep={{
-          dy: 0,
-          dx: -1,
-          dur: PLATFORM_SLIDE.durMs,
-          ease: "ease-in-out",
-          seq: 1,
-          delay: PLATFORM_SLIDE.delayMs,
+        deck={{
+          length: 1,
+          axis: "col",
+          step: {
+            dy: 0,
+            dx: -1,
+            dur: PLATFORM_SLIDE.durMs,
+            ease: "ease-in-out",
+            seq: 1,
+            delay: PLATFORM_SLIDE.delayMs,
+          },
         }}
       />
     );
@@ -92,13 +129,14 @@ describe("moving platform rendering", () => {
     expect(slab.style.getPropertyValue("--smooth-step-from")).toContain("translate(-40px");
   });
 
-  it("carries no animation when the slab did not move", () => {
+  it("carries no animation when the deck did not move", () => {
     render(
       <Tile
         tileId={0}
         tileType={FLOOR_TYPE}
         subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
         isVisible={true}
+        deck={{ length: 1, axis: "col" }}
       />
     );
     const slab = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
@@ -177,12 +215,10 @@ describe("wait control", () => {
 
 describe("slide direction symmetry", () => {
   /**
-   * The slab is drawn in its DESTINATION tile and translated back toward where it came from, so
-   * mid-slide it overhangs a neighbour. `.fov-tier-1/-2` put `filter: brightness()` on every tile,
-   * which makes each tile its own stacking context — so a z-index on the slab element cannot paint
-   * outside its parent, and tiles just resolve in DOM order. That made DOWNWARD slides look right
-   * (destination is later in the DOM) while UPWARD ones stayed hidden until they crossed their own
-   * border. The fix lifts the whole TILE, so these assert the tile is lifted in both directions.
+   * The old fix for upward slides lifted the whole TILE, which trapped the hero's z-index inside it
+   * and drew riders over walls that should occlude them. A single deck element needs no lift at all:
+   * it carries one z-index (1025 — above a lava or water tile's own 1020 overlay, below items,
+   * enemies, the hero and walls), so both directions behave the same by construction.
    */
   const renderSliding = (dy: number) =>
     render(
@@ -191,43 +227,37 @@ describe("slide direction symmetry", () => {
         tileType={FLOOR_TYPE}
         subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
         isVisible={true}
-        platformStep={{
-          dy,
-          dx: 0,
-          dur: PLATFORM_SLIDE.durMs,
-          ease: "ease-in-out",
-          seq: 1,
-          delay: PLATFORM_SLIDE.delayMs,
+        deck={{
+          length: 2,
+          axis: "col",
+          step: {
+            dy,
+            dx: 0,
+            dur: PLATFORM_SLIDE.durMs,
+            ease: "ease-in-out",
+            seq: 1,
+            delay: PLATFORM_SLIDE.delayMs,
+          },
         }}
       />
     );
 
-  it("lifts the tile for an UPWARD slide (dy = +1, overhang below)", () => {
+  it("animates an UPWARD slide from below", () => {
     renderSliding(1);
-    const tile = screen.getByTestId("tile-0");
-    expect(tile.style.zIndex).not.toBe("");
-    expect(Number(tile.style.zIndex)).toBeGreaterThan(0);
-    const slab = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
-    expect(slab.style.getPropertyValue("--smooth-step-from")).toContain("40px");
+    const el = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(el.style.getPropertyValue("--smooth-step-from")).toContain("40px");
+    expect(el.style.animation).toContain(`${PLATFORM_SLIDE.delayMs}ms`);
   });
 
-  it("lifts the tile for a DOWNWARD slide too", () => {
+  it("animates a DOWNWARD slide from above, identically", () => {
     renderSliding(-1);
-    const tile = screen.getByTestId("tile-0");
-    expect(Number(tile.style.zIndex)).toBeGreaterThan(0);
-    const slab = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
-    expect(slab.style.getPropertyValue("--smooth-step-from")).toContain("-40px");
+    const el = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(el.style.getPropertyValue("--smooth-step-from")).toContain("-40px");
+    expect(el.style.animation).toContain(`${PLATFORM_SLIDE.delayMs}ms`);
   });
 
-  it("does not lift a tile whose slab is standing still", () => {
-    render(
-      <Tile
-        tileId={0}
-        tileType={FLOOR_TYPE}
-        subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
-        isVisible={true}
-      />
-    );
+  it("never lifts the tile, so walls still occlude a rider", () => {
+    renderSliding(1);
     expect(screen.getByTestId("tile-0").style.zIndex).toBe("");
   });
 });

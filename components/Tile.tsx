@@ -278,11 +278,25 @@ interface TileProps {
   enemyStep?: SmoothEntityStep;
   npcStep?: SmoothEntityStep;
   /**
-   * The slab's slide for this turn, if one arrived on this tile. Carries a `delay` so the platform
-   * visibly moves AFTER the hero and enemies — see SmoothEntityStep.delay for why that ordering
-   * has to be visible rather than merely true.
+   * The deck of a moving platform whose ANCHOR tile this is — its topmost tile for a vertical rail,
+   * its leftmost for a horizontal one. Absent on every other tile, including the rest of the deck.
+   *
+   * ONE ELEMENT FOR THE WHOLE DECK, and that is the point. The first version drew a slab per tile
+   * and translated each one backwards to fake a slide, which broke in three separate ways at once:
+   * every tile needed to out-paint its neighbours (so the slide worked going one way and flickered
+   * going the other, since a neighbouring lava or water tile paints its own overlay at z-index 1020,
+   * above the old slab's 1015); a per-tile border cut the raft into visible boxes; and the fix for
+   * the first problem — lifting the whole tile — put the hero on the deck above walls that should
+   * occlude them. A single element has one z-index and one animation, so none of those exist.
    */
-  platformStep?: SmoothEntityStep;
+  deck?: {
+    /** Tiles spanned, along `axis`. */
+    length: number;
+    /** "col" extends downward from the anchor, "row" extends rightward. */
+    axis: "col" | "row";
+    /** This turn's slide, delayed so the deck moves after the hero and enemies. */
+    step?: SmoothEntityStep;
+  };
   /**
    * Which state the TOGGLE_SWITCH on this tile is currently in, if any.
    *
@@ -389,7 +403,7 @@ export const Tile: React.FC<TileProps> = ({
   suppressHeroSprite = false,
   enemyStep,
   npcStep,
-  platformStep,
+  deck,
   toggleState,
   smoothMode = false,
   enemyRingUnder = false,
@@ -1121,20 +1135,27 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* The slab. An OVERLAY rather than the tile's background, which is what it used to be: a
-            background cannot be translated independently of its tile, and the slab has to be seen
-            sliding from where it was to where it is. It covers the tile completely, so the hazard
-            underneath is hidden exactly while the slab is standing here.
+        {/* The deck, drawn ONCE on its anchor tile and sized to span its whole length. See the
+            `deck` prop for why this is a single element rather than one slab per tile.
 
-            `platformStep` carries a delay so this slide lands AFTER the hero and enemies have
-            finished theirs — that sequencing is the only thing that makes the turn order legible,
-            and without it players read "the slab will be there next turn" and step into lava. */}
-        {hasMovingPlatform(subtypes) && (
+            The step carries a delay so the slide lands AFTER the hero and enemies have finished
+            theirs — that sequencing is the only thing that makes the turn order legible, and without
+            it players read "the deck will be there next turn" and step into the lava. */}
+        {deck && (
           <div
-            key={`moving-platform-${platformStep?.seq ?? 0}`}
+            key={`deck-${deck.step?.seq ?? 0}`}
             data-testid={`subtype-icon-${TileSubtype.MOVING_PLATFORM}`}
+            data-deck-length={deck.length}
+            data-deck-axis={deck.axis}
             className={styles.movingPlatform}
-            style={smoothStepStyle(platformStep, "none") ?? undefined}
+            style={{
+              // Grows out of the anchor tile along the rail. `inset: 0` from the class pins the
+              // other three sides, so only the extent along the axis needs setting.
+              ...(deck.axis === "col"
+                ? { height: `calc(var(--tile-size) * ${deck.length})`, bottom: "auto" }
+                : { width: `calc(var(--tile-size) * ${deck.length})`, right: "auto" }),
+              ...(smoothStepStyle(deck.step, "none") ?? {}),
+            }}
           />
         )}
 
@@ -2309,21 +2330,11 @@ export const Tile: React.FC<TileProps> = ({
             backgroundRepeat: "no-repeat",
             position: "relative", // Ensure relative positioning for absolute children
             backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent',
-            // LIFT THE WHOLE TILE while a slab is sliding into it, not just the slab.
-            //
-            // The slab is drawn in its DESTINATION tile and translated back toward where it came
-            // from, so mid-slide it overhangs a neighbouring tile. A z-index on the slab element
-            // cannot help: .fov-tier-1/-2 put `filter: brightness()` on every tile, which makes
-            // each tile its own stacking context, so the slab can never paint outside its own
-            // parent. Tiles then simply paint in DOM order — which is why DOWNWARD slides looked
-            // right (destination is later in the DOM, so it overlaps the tile above) and UPWARD
-            // ones vanished until they crossed their own border (destination is earlier, so the
-            // tile below painted over the overhang).
-            // 1100 specifically: above every terrain overlay a neighbouring tile can paint
-            // (.lavaFlame is 1020, .roadOverlay 1010), since a tier-3 neighbour has no filter and so
-            // no stacking context of its own — its bubbles would otherwise cover the overhang. Still
-            // well below enemies (10500) and the hero (11000), which must stay on top of a slab.
-            zIndex: platformStep ? 1100 : undefined
+            // No z-index here. Lifting the tile was the old fix for a per-tile slab needing to
+            // out-paint its neighbours, and it caused its own bug: the lift made the tile a stacking
+            // context, which trapped the hero's z-index inside it and drew them over walls that
+            // should have occluded them. The deck is one element now and carries its own z-index.
+            zIndex: undefined
           }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
