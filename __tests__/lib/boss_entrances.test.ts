@@ -7,7 +7,9 @@ import {
   buildMoatApproach,
   buildDousePortalApproach,
   buildBombSealApproach,
+  stampBossEntranceOnFloor,
 } from "../../lib/bosses/boss_entrances";
+import { generateCompleteMapForFloor, rollWaterPlan } from "../../lib/map/map-features";
 
 const SHAPER_ARENA_SIZE = 25;
 
@@ -255,6 +257,147 @@ describe("douse portal in an L3-sized room, with ghosts", () => {
   test("both moat types also carry 3 ghosts", () => {
     expect(ghostCount(buildMoatApproach("lava"))).toBe(3);
     expect(ghostCount(buildMoatApproach("water"))).toBe(3);
+  });
+
+  test("the room keeps its real wall torches", () => {
+    // It used to be built with wallTorches: 0, which made it dark by construction and so
+    // the one arrangement that cannot reproduce a torch pinning the portal off.
+    const lit = Array.from({ length: 6 }, () => buildDousePortalApproach()).filter((s) =>
+      s.mapData.subtypes.flat().some((c) => c.includes(TileSubtype.WALL_TORCH))
+    );
+    expect(lit.length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * Would ending a move on (y,x) relight a doused torch? An INDEPENDENT restatement of the
+ * two rules in movePlayer (orthogonally adjacent to a WALL_TORCH; anywhere inside a LAVA
+ * tile's glow octagon — Chebyshev 2 minus the far corners), deliberately not sharing code
+ * with the generator so this fails if the generator's own predicate is wrong. Deep water
+ * snuffs the torch and overrides every relight source.
+ */
+function relightsAt(map: GameState["mapData"], y: number, x: number): boolean {
+  const at = (yy: number, xx: number) => map.subtypes[yy]?.[xx] ?? [];
+  if (at(y, x).includes(TileSubtype.DEEP_WATER)) return false;
+  for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+    if (at(y + dy, x + dx).includes(TileSubtype.WALL_TORCH)) return true;
+  }
+  for (let dy = -2; dy <= 2; dy++) {
+    for (let dx = -2; dx <= 2; dx++) {
+      if (dy === 0 && dx === 0) continue;
+      if (Math.abs(dy) === 2 && Math.abs(dx) === 2) continue; // octagon, not a 5x5 square
+      if (at(y + dy, x + dx).includes(TileSubtype.LAVA)) return true;
+    }
+  }
+  return false;
+}
+
+/** Tiles reachable from `seeds` without ever ending a step somewhere that relights. */
+function darkReachable(
+  map: GameState["mapData"],
+  seeds: Array<[number, number]>
+): Set<string> {
+  const H = map.tiles.length;
+  const W = map.tiles[0].length;
+  const pass = (y: number, x: number) => {
+    if (y < 0 || x < 0 || y >= H || x >= W) return false;
+    if (map.tiles[y][x] === 1) return false; // wall
+    const c = map.subtypes[y]?.[x] ?? [];
+    if (c.includes(TileSubtype.LAVA) || c.includes(TileSubtype.OPEN_ABYSS)) return false;
+    return !relightsAt(map, y, x);
+  };
+  const seen = new Set<string>();
+  const q: Array<[number, number]> = [];
+  for (const [y, x] of seeds) {
+    if (!pass(y, x) || seen.has(`${y},${x}`)) continue;
+    seen.add(`${y},${x}`);
+    q.push([y, x]);
+  }
+  while (q.length) {
+    const [y, x] = q.shift()!;
+    for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+      const k = `${y + dy},${x + dx}`;
+      if (seen.has(k) || !pass(y + dy, x + dx)) continue;
+      seen.add(k);
+      q.push([y + dy, x + dx]);
+    }
+  }
+  return seen;
+}
+
+function findAll(map: GameState["mapData"], sub: number): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let y = 0; y < map.subtypes.length; y++)
+    for (let x = 0; x < map.subtypes[y].length; x++)
+      if (map.subtypes[y][x].includes(sub)) out.push([y, x]);
+  return out;
+}
+
+/**
+ * The invariant that makes a douse day playable at all.
+ *
+ * A DARK_PORTAL only warps while the torch is OUT, the pool is the only REPEATABLE way to
+ * put it out (an adjacent ghost snuffs the torch and then vanishes, so the three ghosts are
+ * one-shot douses a player can spend anywhere), and a single wall torch beside the only
+ * corridor back relights the hero and leaves the portal inert. So: there must be a route
+ * from the water to the portal on which the torch never comes back.
+ *
+ * This is the bug that shipped — the old placement only checked the portal's own 3x3.
+ */
+describe("a douse day's portal is reachable IN THE DARK", () => {
+  function assertDarkPathToPortal(map: GameState["mapData"]) {
+    const water = findAll(map, TileSubtype.DEEP_WATER);
+    expect(water.length).toBeGreaterThan(0);
+    const portals = findAll(map, TileSubtype.DARK_PORTAL);
+    expect(portals).toHaveLength(1);
+
+    // The hero must be able to get to the pool in the first place (torch lit, wading ok).
+    const hero = findAll(map, TileSubtype.PLAYER)[0];
+    const wet = dryReachableFrom({ mapData: map } as GameState, hero);
+    const touchesPool = water.some(([wy, wx]) =>
+      [[-1, 0], [1, 0], [0, -1], [0, 1]].some(([dy, dx]) => wet.has(`${wy + dy},${wx + dx}`))
+    );
+    expect(touchesPool).toBe(true);
+
+    // ...and then walk pool -> portal without ever relighting.
+    const dark = darkReachable(map, water);
+    const [py, px] = portals[0];
+    expect(dark.has(`${py},${px}`)).toBe(true);
+  }
+
+  // Both sweeps are deliberately long. The rule this replaced left the portal
+  // unreachable on ~6% of generated floor 3s, so a handful of iterations would catch a
+  // regression only about half the time; 40 + 60 puts detection over 99%.
+  test("holds for the harness room, torches and all", () => {
+    for (let i = 0; i < 40; i++) {
+      assertDarkPathToPortal(buildDousePortalApproach().mapData);
+    }
+  });
+
+  test("holds when stamped onto a daily floor 3, water and lava and all", () => {
+    for (let i = 0; i < 60; i++) {
+      // Same terrain options the daily passes (game-state.ts): floor 3 always rolls for
+      // lava, and water is a weighted size tier. Both change the pool geometry the dark
+      // route has to thread, so a sweep without them is not the production case.
+      const map = generateCompleteMapForFloor(
+        { chests: 0, keys: 0, chestContents: [] },
+        3,
+        { includeLava: true, waterPlan: rollWaterPlan(3) ?? undefined }
+      );
+      const { placed } = stampBossEntranceOnFloor(map, "douse");
+      // Never bail: a bossless day would rewrite what past dates replay to
+      // (lib/stats/boss_day.ts reads entranceKind straight off the regenerated floor).
+      expect(placed).toBe(true);
+      assertDarkPathToPortal(map);
+    }
+  });
+
+  test("the portal itself never sits on a tile that relights", () => {
+    for (let i = 0; i < 8; i++) {
+      const map = buildDousePortalApproach().mapData;
+      const [py, px] = findAll(map, TileSubtype.DARK_PORTAL)[0];
+      expect(relightsAt(map, py, px)).toBe(false);
+    }
   });
 });
 
