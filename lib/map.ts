@@ -52,6 +52,8 @@ export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/en
 
 export {
   advanceMachinery,
+  TOGGLE_STATE_COLORS,
+  toggleStateColor,
   nextPlatformTile,
   platformCovers,
   platformTile,

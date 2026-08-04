@@ -2215,6 +2215,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return steps;
   })();
 
+  // Toggle switch states, keyed "y,x". Built from toggleGroups because the state lives on the
+  // group, not on the tile — without this the renderer has no way to know whether a switch has been
+  // thrown, which is why every toggle looked identical in both states.
+  const toggleStates: Map<string, number> | undefined = (() => {
+    const groups = gameState.toggleGroups;
+    if (!groups || groups.length === 0) return undefined;
+    const m = new Map<string, number>();
+    for (const g of groups) {
+      m.set(`${g.switchAt[0]},${g.switchAt[1]}`, g.on ? 1 : 0);
+    }
+    return m;
+  })();
+
   // Diff entity positions against the previous gameState; entries keyed by
   // destination tile ("e:y,x" / "n:y,x") describe the one-tile slide-in.
   const smoothEntitySteps: Map<string, SmoothEntityStep> | undefined = (() => {
@@ -5872,7 +5885,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothEntitySteps,
                     combatLunges,
                     torchSnuffing,
-                    smoothPlatformSteps
+                    smoothPlatformSteps,
+                    toggleStates
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6470,7 +6484,9 @@ function renderTileGrid(
   heroTorchSnuffing: boolean = false,
   // Platform slab slides, keyed "p:y,x" by destination tile. Delayed so they land after the
   // hero/enemy slides — see smoothPlatformSteps in the component.
-  platformSteps?: Map<string, SmoothEntityStep>
+  platformSteps?: Map<string, SmoothEntityStep>,
+  // Toggle switch state per tile, keyed "y,x". Drives which colour the switch shows.
+  toggleStates?: Map<string, number>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -6877,6 +6893,7 @@ function renderTileGrid(
               npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined
             }
             platformStep={platformSteps?.get(`p:${rowIndex},${colIndex}`)}
+            toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

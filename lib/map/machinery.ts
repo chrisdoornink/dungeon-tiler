@@ -22,6 +22,39 @@
 import { TileSubtype } from "./constants";
 import type { MapData, Platform, ToggleGroup } from "./types";
 
+/**
+ * The colour a toggle switch shows in each of its states, indexed by state.
+ *
+ * WHY AN EXPLICIT COLOUR RATHER THAN A CSS FILTER: the switch sprite is a near-black desaturated
+ * green (hue ~120deg, value 0.16), and `hue-rotate` on something that dark changes almost nothing
+ * you can see. The first version rotated the hue by 165deg and the only colour that actually read
+ * was the drop-shadow glow behind it, which is why the state was impossible to tell — and why it
+ * looked like it might be blue OR green. State colour is now carried by the glow and an indicator
+ * lamp, both of which are drawn rather than filtered.
+ *
+ * ORDERED FOR DISTINGUISHABILITY, not prettiness. Adjacent states differ in lightness as well as
+ * hue so they stay separable with colour-vision deficiency, and the renderer additionally flips the
+ * lever for odd states so colour is never the only channel carrying the information.
+ *
+ * Amber is deliberately absent: a LATCHING pressure plate already glows amber (.plateArmed), and a
+ * toggle that borrowed that colour would read as the one thing it is not — spent.
+ *
+ * Add a state by adding a colour. Indexing wraps, so a group with more states than colours degrades
+ * to reused colours rather than to no colour at all.
+ */
+export const TOGGLE_STATE_COLORS = [
+  "#35c8ff", // 0 — cold blue
+  "#3ff08a", // 1 — bright green
+  "#b07cff", // 2 — violet
+  "#ff6f9d", // 3 — rose
+] as const;
+
+/** The colour for a given state, wrapping if a group has more states than colours. */
+export function toggleStateColor(state: number): string {
+  const n = TOGGLE_STATE_COLORS.length;
+  return TOGGLE_STATE_COLORS[((state % n) + n) % n];
+}
+
 /** The deck's length in track tiles, tolerating a platform authored before `length` existed. */
 function deckLength(p: Platform): number {
   return Math.max(1, p.length ?? 1);

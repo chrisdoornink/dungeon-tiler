@@ -1350,21 +1350,41 @@
 
 /* ---- Puzzle machinery, ALL PLACEHOLDER ART (see lib/map/machinery.ts) --------------------- */
 
-/* Toggle switch. Reuses the switch sprite but hue-rotated to a cold blue, because the one thing
-   the player must read without experimenting is "latching plate (spent once thrown)" vs "toggle
-   (throw it as often as you like)". Colour is doing that work: warm brass = one-shot, cold blue =
-   re-armable. It keeps its glow in both states — a toggle is never spent, so it must never look
-   spent, which is the whole reason .platePressed cannot be reused here. */
+/* Toggle switch. The STATE is carried by a coloured glow plus an indicator lamp, both driven by
+   --toggle-color (set inline per state, see TOGGLE_STATE_COLORS).
+
+   NOT a hue-rotate. The first version rotated the sprite's hue and it was impossible to tell one
+   state from another, because the sprite is a near-black desaturated green — rotating the hue of
+   something that dark changes almost nothing, and the only colour that actually read was the glow
+   behind it. Which is also why it looked like it might be blue or green.
+
+   The renderer additionally flips the lever on odd states, so state never depends on colour alone. */
 .toggleSwitch {
-  filter: hue-rotate(165deg) saturate(1.5)
-    drop-shadow(0 0 4px rgba(96, 190, 255, 0.9));
+  filter: drop-shadow(0 0 5px var(--toggle-color, #35c8ff))
+    drop-shadow(0 0 2px var(--toggle-color, #35c8ff)) brightness(1.35) saturate(1.15);
   animation: toggleIdle 2.2s ease-in-out infinite;
+}
+
+/* The indicator lamp: a small bright dot in the state's colour, sitting proud of the sprite. This is
+   the part that actually reads at tile size — the glow alone is easy to miss against a lit floor,
+   and a dungeon this dark swallows subtle tints. */
+.toggleSwitch::after {
+  content: "";
+  position: absolute;
+  top: -1px;
+  right: -1px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--toggle-color, #35c8ff);
+  box-shadow: 0 0 4px 1px var(--toggle-color, #35c8ff),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.65);
 }
 
 @keyframes toggleIdle {
   0%,
   100% {
-    opacity: 0.85;
+    opacity: 0.88;
   }
   50% {
     opacity: 1;

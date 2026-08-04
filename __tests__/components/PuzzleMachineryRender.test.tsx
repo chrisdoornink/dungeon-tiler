@@ -5,6 +5,7 @@ import { Tile } from "../../components/Tile";
 import MobileControls from "../../components/MobileControls";
 import { TileSubtype } from "../../lib/map";
 import { PLATFORM_SLIDE } from "../../lib/smooth_movement";
+import { TOGGLE_STATE_COLORS, toggleStateColor } from "../../lib/map/machinery";
 
 /**
  * These exist because of a specific failure, not for coverage.
@@ -269,5 +270,58 @@ describe("riding cancels submersion", () => {
     const hero = document.querySelector('[class*="heroImage"]') as HTMLElement | null;
     expect(hero).not.toBeNull();
     expect(hero!.style.clipPath).not.toBe("");
+  });
+});
+
+describe("toggle switch state is visible", () => {
+  /**
+   * The complaint this fixes: every toggle looked identical whichever way it was thrown, so there
+   * was no way to read a room's state without experimenting on the switch. The state lives on the
+   * ToggleGroup rather than on the tile, so it has to be passed in.
+   */
+  it("shows a different colour in each state", () => {
+    const { rerender } = render(
+      <Tile tileId={0} tileType={FLOOR_TYPE} subtype={[TileSubtype.TOGGLE_SWITCH]} isVisible={true} toggleState={0} />
+    );
+    const read = () =>
+      screen.getByTestId(`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`).style.getPropertyValue("--toggle-color");
+    const s0 = read();
+    expect(s0).toBe(TOGGLE_STATE_COLORS[0]);
+
+    rerender(
+      <Tile tileId={0} tileType={FLOOR_TYPE} subtype={[TileSubtype.TOGGLE_SWITCH]} isVisible={true} toggleState={1} />
+    );
+    expect(read()).toBe(TOGGLE_STATE_COLORS[1]);
+    expect(read()).not.toBe(s0);
+  });
+
+  it("supports more than two states, wrapping past the palette", () => {
+    for (let state = 0; state < TOGGLE_STATE_COLORS.length + 2; state++) {
+      const { unmount } = render(
+        <Tile tileId={0} tileType={FLOOR_TYPE} subtype={[TileSubtype.TOGGLE_SWITCH]} isVisible={true} toggleState={state} />
+      );
+      const el = screen.getByTestId(`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`);
+      expect(el.style.getPropertyValue("--toggle-color")).toBe(toggleStateColor(state));
+      expect(el.getAttribute("data-toggle-state")).toBe(String(state));
+      unmount();
+    }
+  });
+
+  it("also flips the lever on odd states, so colour is not the only tell", () => {
+    // Deliberate redundancy: the dungeon dims tiles to 55-80% brightness by FOV tier, and colour
+    // alone is a poor single channel for anyone with colour-vision deficiency.
+    const { rerender } = render(
+      <Tile tileId={0} tileType={FLOOR_TYPE} subtype={[TileSubtype.TOGGLE_SWITCH]} isVisible={true} toggleState={0} />
+    );
+    const el = () => screen.getByTestId(`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`);
+    expect(el().style.transform).toBe("");
+    rerender(
+      <Tile tileId={0} tileType={FLOOR_TYPE} subtype={[TileSubtype.TOGGLE_SWITCH]} isVisible={true} toggleState={1} />
+    );
+    expect(el().style.transform).toContain("scaleX(-1)");
+  });
+
+  it("every palette colour is distinct", () => {
+    expect(new Set(TOGGLE_STATE_COLORS).size).toBe(TOGGLE_STATE_COLORS.length);
   });
 });

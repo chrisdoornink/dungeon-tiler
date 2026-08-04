@@ -1,5 +1,5 @@
 import React from "react";
-import { TileType, TileSubtype, Direction } from "../lib/map";
+import { TileType, TileSubtype, Direction, toggleStateColor } from "../lib/map";
 import { assetUrl } from "../lib/asset_url";
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
@@ -283,6 +283,14 @@ interface TileProps {
    * has to be visible rather than merely true.
    */
   platformStep?: SmoothEntityStep;
+  /**
+   * Which state the TOGGLE_SWITCH on this tile is currently in, if any.
+   *
+   * Passed in rather than read from the subtype because the state lives on the ToggleGroup, not on
+   * the tile — and it has to be visible, or the player cannot tell a thrown switch from an unthrown
+   * one without experimenting on it.
+   */
+  toggleState?: number;
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -382,6 +390,7 @@ export const Tile: React.FC<TileProps> = ({
   enemyStep,
   npcStep,
   platformStep,
+  toggleState,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1087,7 +1096,17 @@ export const Tile: React.FC<TileProps> = ({
           <div
             key="toggle-switch"
             data-testid={`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`}
+            data-toggle-state={toggleState ?? 0}
             className={`${styles.assetIcon} ${styles.switchIcon} ${styles.toggleSwitch}`}
+            style={{
+              // State colour is carried by a drawn glow and lamp rather than a CSS filter: the
+              // sprite is a near-black desaturated green, and hue-rotating something that dark
+              // changes nothing you can see. See TOGGLE_STATE_COLORS.
+              ['--toggle-color' as string]: toggleStateColor(toggleState ?? 0),
+              // A geometric tell as well as a colour one, so state survives colour-vision
+              // deficiency and a dim FOV tier: the lever visibly sits the other way on odd states.
+              transform: (toggleState ?? 0) % 2 === 1 ? 'scaleX(-1)' : undefined,
+            }}
           />
         )}
 
