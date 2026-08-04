@@ -328,7 +328,13 @@ const MobileControls: React.FC<MobileControlsProps> = ({
           </button>
         ) : (
           <div key={`spacer-${i}`} className="flex items-center justify-center">
-            {i === 4 ? centerContent : null}
+            {i === 4
+              ? centerContent
+              : i === 0
+              ? waitButtonFor("left")
+              : i === 2
+              ? waitButtonFor("right")
+              : null}
           </div>
         )
       )}
@@ -336,34 +342,42 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   );
 
   /**
-   * Wait one turn. An hourglass rather than a word: the strip is icon-only and a text button
-   * would be the one odd control on the row.
+   * Wait one turn, in BOTH top corners of the dpad.
+   *
+   * Two of them, one per corner, because a single button beside the pad could sit off the edge of a
+   * narrow phone screen with no hint it was ever there — and because whichever thumb is on the pad
+   * should be able to reach one without moving. Borderless like the drag grabber: this is a
+   * secondary control and an outlined box competed with the direction keys for attention.
+   *
+   * Sized h-full/w-full so it takes the grid cell it is in rather than a fixed height. The first
+   * version hard-coded h-14, which on desktop (h-9 keys) rendered oversized and visibly off-centre.
    */
-  const waitButton = onWait ? (
-    <button
-      type="button"
-      data-testid="mobile-control-wait"
-      aria-label="Wait one turn"
-      title="Wait one turn"
-      onPointerDown={(e) => {
-        e.preventDefault();
-        onWait();
-      }}
-      onContextMenu={(e) => e.preventDefault()}
-      className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/25 bg-black/40 text-white/80 active:bg-white/20"
-      style={NO_SELECT_TOUCH}
-    >
-      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none">
-        <path
-          d="M6 3 h8 M6 17 h8 M7 3 v3 l3 4 -3 4 v3 M13 3 v3 l-3 4 3 4 v3"
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-    </button>
-  ) : null;
+  const waitButtonFor = (side: "left" | "right") =>
+    onWait ? (
+      <button
+        type="button"
+        data-testid={`mobile-control-wait-${side}`}
+        aria-label="Wait one turn"
+        title="Wait one turn"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onWait();
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        className="flex h-full w-full items-center justify-center rounded-xl bg-transparent text-white/25 transition-colors hover:text-white/50 active:text-white/60"
+        style={NO_SELECT_TOUCH}
+      >
+        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none">
+          <path
+            d="M6 3 h8 M6 17 h8 M7 3 v3 l3 4 -3 4 v3 M13 3 v3 l-3 4 3 4 v3"
+            stroke="currentColor"
+            strokeWidth="1.6"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+    ) : null;
 
   if (!isMobile) {
     // Desktop: subtle outline controls pinned bottom-right
@@ -396,7 +410,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
               </button>
             ))}
           </div>
-          {renderDpad(desktopDpadClass, 'gap-1', waitButton)}
+          {renderDpad(desktopDpadClass, 'gap-1')}
         </div>
         {showKbdTip && (
           <div
@@ -586,10 +600,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
               willChange: 'transform',
             }}
           >
-            <div className="flex items-end gap-2">
-              {renderDpad(mobileDpadClass, 'gap-1.5', grabber)}
-              {waitButton}
-            </div>
+            {renderDpad(mobileDpadClass, 'gap-1.5', grabber)}
           </div>
         </div>
       </div>

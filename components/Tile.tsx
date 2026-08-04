@@ -956,6 +956,12 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.BERRY &&
         // The Amber Moth rewind charm has its own sprite overlay
         subtype !== TileSubtype.AMBER_MOTH &&
+        // Puzzle machinery draws its own overlays above. Missing from this list, each of these got
+        // a generic icon on TOP of its real one — two elements with the same test id and, on
+        // screen, a stray placeholder pip sitting over the slab.
+        subtype !== TileSubtype.TOGGLE_SWITCH &&
+        subtype !== TileSubtype.MOVING_PLATFORM &&
+        subtype !== TileSubtype.PLATFORM_TRACK &&
         // Sealed doorway: a crack decal on the wall face
         subtype !== TileSubtype.WALL_SEAL
     );
@@ -1093,6 +1099,23 @@ export const Tile: React.FC<TileProps> = ({
             key="platform-track"
             data-testid={`subtype-icon-${TileSubtype.PLATFORM_TRACK}`}
             className={styles.platformTrack}
+          />
+        )}
+
+        {/* The slab. An OVERLAY rather than the tile's background, which is what it used to be: a
+            background cannot be translated independently of its tile, and the slab has to be seen
+            sliding from where it was to where it is. It covers the tile completely, so the hazard
+            underneath is hidden exactly while the slab is standing here.
+
+            `platformStep` carries a delay so this slide lands AFTER the hero and enemies have
+            finished theirs — that sequencing is the only thing that makes the turn order legible,
+            and without it players read "the slab will be there next turn" and step into lava. */}
+        {hasMovingPlatform(subtypes) && (
+          <div
+            key={`moving-platform-${platformStep?.seq ?? 0}`}
+            data-testid={`subtype-icon-${TileSubtype.MOVING_PLATFORM}`}
+            className={styles.movingPlatform}
+            style={smoothStepStyle(platformStep, "none") ?? undefined}
           />
         )}
 
@@ -2183,8 +2206,6 @@ export const Tile: React.FC<TileProps> = ({
       const isSteppingStone = hasSteppingStone(subtype);
       const isSpikes = hasSpikes(subtype);
       const isSpikeHoles = hasSpikeHoles(subtype);
-      const isMovingPlatform = hasMovingPlatform(subtype);
-      const isPlatformTrack = hasPlatformTrack(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
