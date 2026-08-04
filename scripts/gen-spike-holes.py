@@ -3,8 +3,13 @@
 Generate the SPIKE_HOLES tile from the SPIKES tile, so the sockets land exactly where the
 spikes stood.
 
-Reads the base64 PNG embedded in `.spikes` in components/Tile.module.css, and writes a new
-base64 PNG into `.spikeHoles` in the same file.
+Reads the base64 PNG embedded in `.spikes` in components/Tile.module.css and rebuilds
+`.spikeHoles` in the same file.
+
+    python3 scripts/gen-spike-holes.py --write
+
+Run this after ANY change to `.spikes` (see scripts/gen-spikes.py) or the sockets stop lining
+up with the spikes that made them. Without --write it only prints the base64.
 
 Method:
   1. Mask the spikes by SATURATION. The bed's palette splits cleanly: the iron is desaturated
@@ -22,8 +27,9 @@ import base64, io, re, pathlib, sys
 from PIL import Image
 
 CSS = pathlib.Path(__file__).resolve().parents[1] / "components" / "Tile.module.css"
-if len(sys.argv) > 1:
-    CSS = pathlib.Path(sys.argv[1])
+for _arg in sys.argv[1:]:
+    if not _arg.startswith("--"):
+        CSS = pathlib.Path(_arg)
 
 # The ground the spikes vacated: the pit's own interior colour, so the erased iron leaves NO
 # trace. A lighter fill was tried to give the near-black sockets something to contrast
@@ -144,9 +150,14 @@ def main():
         for x, y, _nx, ny in ellipse(cx, cy, 1.0):
             dst[x, y] = SOCKET_DARK if ny > -0.35 else SOCKET_SHADE
 
+    # 1.72, not 1.42. At 1.42 the collar's vertical growth was 1.3 * 0.42 = 0.55px, which rounds
+    # to nothing on most columns, so the ring only ever appeared on the left and right and each
+    # socket read as a pair of brackets rather than a hole. 1.72 buys a full pixel top and bottom
+    # and the rings close. Sockets are kept far enough apart by MIN_SEP that the wider collars
+    # still do not eat each other.
     for cx, cy, _wd in sockets:
         inner = {(x, y) for x, y, _, _ in ellipse(cx, cy, 1.0)}
-        for x, y, nx, ny in ellipse(cx, cy, 1.42):
+        for x, y, nx, ny in ellipse(cx, cy, 1.72):
             if (x, y) in inner:
                 continue
             dst[x, y] = SOCKET_RIM_LIT if (ny + nx) < 0 else SOCKET_RIM_DIM
@@ -157,7 +168,15 @@ def main():
     for cx, cy, wd in sockets:
         print(f"  socket x={cx:5.1f} y={cy:2d} width={wd}")
     print(f"{len(sockets)} sockets; png {len(buf.getvalue())} bytes")
-    print("BASE64:" + b64)
+
+    if "--write" in sys.argv:
+        pat = re.compile(r"(\.spikeHoles \{.*?base64,)([A-Za-z0-9+/=]+)", re.S)
+        if not pat.search(css):
+            raise SystemExit("could not find the .spikeHoles base64 in " + str(CSS))
+        CSS.write_text(pat.sub(lambda m: m.group(1) + b64, css, count=1))
+        print(f"wrote .spikeHoles in {CSS}")
+    else:
+        print("BASE64:" + b64)
 
 
 if __name__ == "__main__":

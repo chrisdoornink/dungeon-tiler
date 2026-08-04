@@ -871,16 +871,23 @@
 }
 
 /* Bed of spikes: the outdoor world's impassable hazard (TileSubtype.SPIKES). A 32x32
-   pixel-art tile — iron spikes standing in a shallow pit, with a lit ground lip on the
-   top/left and a shaded one on the bottom/right so it reads as sunk INTO the ground
-   rather than sitting on it. Static on purpose: it is a wall, and a wall shouldn't draw
-   the eye the way lava's bubbles do. The inset shadow deepens the depression and
-   visually seals the tile off from the grass beside it.
-   Regenerate with scratchpad/gen_spikes.js if the palette needs retuning. */
+   pixel-art tile — iron spikes standing in a shallow pit, ringed by a ground lip so it reads
+   as sunk INTO the ground rather than sitting on it. Static on purpose: it is a wall, and a
+   wall shouldn't draw the eye the way lava's bubbles do. The inset shadow deepens the
+   depression and visually seals the tile off from the grass beside it.
+
+   GENERATED — `python3 scripts/gen-spikes.py --write`, then
+   `python3 scripts/gen-spike-holes.py --write` to rebuild .spikeHoles from it. Do not
+   hand-edit the base64; the geometry lives in that script's ROWS table.
+
+   Three rows of blades in forced perspective, filling rows 3-27 of the tile. The version
+   before this one drew its spikes over rows 6-29 against the same 2-29 pit, so the back edge
+   had four empty rows and the whole bed looked like it was sliding off the bottom of its own
+   tile — in game that was the first thing anyone noticed about it. */
 .spikes {
   position: relative;
   background-color: #211a14;
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAABOElEQVR42u2XPQ7CMAyFuyMxIKYKBkaWTh05A0MHBk7AIRAj50GMXA6USkauazvOTxsGhgcifXl8BNvQ6nI6vEuqcg/tfltEA4DVcjGrWIBdvZ5FfwAzwOP58obFeLIAQDFNBnC93Xs1TSsGx3qCAeAa/SQSAPZlAZCOUgOAvGwA9ETgddede9F1bp8JQArHQVrhgc95JEgVgKtYGoSPWPI5D64fcxdY2kqrekt3iAD0e+botXDYo3ng9LwAU/Q+DC4AcPIC5Op9uh4FwFU19WkeFUDayAVw4bTvJcggAGmo0HDsiwKwDJ8QALhOs9wzXhvVgFbN9M01UK49sQdPRTNAyuDhfkvYLuA2cN9l6nDKChDqKwLAeX4X4Lipv8LVjtdDALQ/LyOAEFlAfbdmA4BSqlJvr1MBPvsBlJsIzu6jAAAAAElFTkSuQmCC");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABeklEQVR42mPMCLNhoCVgYqAxYIFQZy4/pLrRJrryCAsYGBievf6MLJ2Qkr1gzlRMbUSKS4ny0imIkCxgRKCElOz7Dx7wC0kgC5ImjhYHDCiCDPgFSRKnZxDBQHxy9v0HDxgYGMTExfkEJcgWRw8iBkYc/qZMnAkzjtFAdWM3VnFGmBSmOCN2H8DAonnTsLqMVHGiIrmqsfva1asCIrIkSWGPA0a86hjJkiIQyZUNXdeuXmVgYJCVk2dgYPj49gkxUoMgH9CkuMYMyoqGLmQuJCg+vX2CX4rYwm7S7BW4IpSAFJ7CDg10NJaRIUVUHEyateLMmTMCYkpUkUKOA0YMTzPiTvvEStE8FTGbaMsxMDA8e/Xx28/fDIwME2ctP3PmDAMDw98/f7/9/Pfz2wd4vJEkxc3BKiUuQH6NRrwUShBNmLkcmauiosYnqkiJFFoyZaR2QYde2NHCfAZGSNv0zOWHbz9+p2LiEebnRG/ZCfNz0rCwg9g2JItrAIzMpLtOOcYgAAAAAElFTkSuQmCC");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;
@@ -895,7 +902,9 @@
    stood. The generator masks the iron by saturation (the bed's palette splits cleanly: iron is
    grey, the pit is brown), erases it back to the pit colour, then finds every spike FOOT — an
    iron pixel with bare ground directly beneath — and stamps a socket at each. Regenerate with
-   `python3 scripts/gen-spike-holes.py` if .spikes is ever retouched.
+   `python3 scripts/gen-spike-holes.py --write` whenever .spikes changes; skip that and the
+   sockets keep recording where the OLD spikes stood, which is exactly how this tile came to be
+   bottom-heavy while the bed above it was not.
 
    The sockets are SQUASHED ovals, roughly 2:1. The camera looks at the floor from a shallow
    angle, so a round hole presents as a horizontally-stretched one; drawn circular they read as
@@ -913,7 +922,7 @@
 .spikeHoles {
   position: relative;
   background-color: #211a14;
-  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABwUlEQVR42mPMCLNhoCVgYWBgOHP5IY1MN9GVZ4Gw7j19R3XTlaSFoD6AAH4eTiqa/vHLdwiDiYHGYERZ8PHLd3jIkpZMiQTkpQImYlICrYKISCfjdwcTqekaU4SfhzM+zOXnr19wZKijhN0CTFPgOjnYmNF0wv0XH+bSNnXNm4/f4GjL/nMOFtpYLEAOk49fvmPVCbED2SkLV+2pyg5BNsfH0ejAiasEgoifhxOrzvNX7mFGz8JVe6RFBeAIogZnMoW4DmIERCdcClknsjLS8gGRiQerMjRbz1x+yELdggFuNJxBr7KIupUBugU+7tbIOcVQRwk5veMBePIXeiS3TV0DF9qy/5yPoxHcCAYGhllLtkG4FkYa8LQEySXIZkE06mkpQdQ/e/0LEURwE9HYELuRMxr+/KWnpYSWNxkzwmzOXH547+k7rNEQH+Zy6do9uLkQu5FzA1YtyD4jYAGptTzckI9fvqO3KqiVA+hUJ8PtY8EMQVzJhmCSxdT46PFzFB/oMrFhTTYQcYgpeHIM1vTGhBxLRz59xJpkj3z6+PHLdzzWQ2IYa1qHpiIiQ9bH3Roz1T56/ByPFkZSm++kNsUBPodNiIEX8JEAAAAASUVORK5CYII=");
+  background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAAB60lEQVR42tVWTUvDQBCdSdb0oIIiigoqSAURrFKKCHoRxF56FvQiiIK/xH/gRbwI4qH0KIJQ8KxGW9verAVbsOIHIn6Atk08bJtskk1Ig626BDJ5b3Yn2X1vN7ixOAuNbAI0uBF6k9M3Pz50aHxILwAAtw+vLO2TyOdX2drNJd7f3d6kKWIKoH75JEJfigXrw01rAAYQnMG68GapiG1SC1lZnKfxbjT+VSp7wy0FEAFgfTkMANt7hxSbDo4CwEnyql5cH5U6WU7f3D29rS2HAWBzK8a+QmQuGBgbrgsHgHyhSH1gWIOd/SMtg822w3ejcS5+avcFGjo1OUKDRCZHg1K5wuKnyasWImoUi9Ogt6vN7GRWYWe1PFIbBY04GqXJxfmLbOBEfQIJEcsVxQ31B3zANlbg7il+AdMErS4tWAUuX2adKbebHR1icyv2+PJBr4PjCwAITfgdKFEUrJsdfw3sBC6nsg4Uf/vTfHD//E4hUahWrShKKOCvHnmprHsKAHo6W60+QMvei+epay7rTP2WTBEAQGDsJgioqKr+6InyeKK5pwxGQ0STgxBRVVUPFLcA0iSTgy7SOa2/eypfKJplGgnP2J0eDgeLA9XTIRlUZOegRCbngeJ8gZYxONBHAy3JG0WNhv/+7/obxvUk1x/1qioAAAAASUVORK5CYII=");
   background-size: 100% 100%;
   background-repeat: no-repeat;
   image-rendering: pixelated;

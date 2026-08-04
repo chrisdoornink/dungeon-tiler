@@ -51,6 +51,19 @@ export { addPlayerToMap, addPlayerToMapAwayFromObjectives, findPlayerPosition } 
 export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/enemy-features";
 
 export {
+  SWITCH_GATE_START_DATE,
+  SWITCH_GATE_FLOOR_CHANCE,
+  maybePlaceSwitchGate,
+  planSwitchGate,
+  planSwitchGateBestEffort,
+  applySwitchGate,
+  injectSwitchGate,
+  occupiedTiles,
+  type PlateAccess,
+  type SwitchGatePlan,
+} from "./map/switch-gates";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,

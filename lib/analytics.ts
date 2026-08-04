@@ -36,6 +36,15 @@ export function trackGameComplete(params: {
   reachedOutsideWorld?: boolean;
   reachedPinkRealm?: boolean;
   collectedChestItems?: string[];
+  reachedBossRoom?: boolean;
+  bossDefeated?: boolean;
+  bossesDefeated?: number;
+  bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
+  bossKind?: string;
+  dailyBossKind?: string;
+  switchGateFloor?: number;
+  switchGateAccess?: "open" | "behind-bed";
+  switchGateThrownBy?: "rock" | "boot";
 }) {
   posthogAnalytics.trackGameComplete(params);
 }

@@ -58,6 +58,11 @@ import { recordRewindStep, type RewindSnapshot } from "./rewind";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
+import {
+  maybePlaceSwitchGate,
+  occupiedTiles,
+  type DailySwitchGate,
+} from "./switch-gates";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
@@ -911,14 +916,16 @@ export function performThrowRockCore(gameState: GameState): GameState {
     {
       const plateSubs = newMapData.subtypes[ty][tx] || [];
       if (plateSubs.includes(TileSubtype.PRESSURE_PLATE)) {
-        const wiring: { gateGroups?: GateGroup[] } = {
+        const wiring: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate } = {
           gateGroups: preTickState.gateGroups,
+          switchGate: preTickState.switchGate,
         };
-        pressPlate(wiring, newMapData, ty, tx);
+        pressPlate(wiring, newMapData, ty, tx, "rock");
         return {
           ...preTickState,
           mapData: newMapData,
           gateGroups: wiring.gateGroups,
+          switchGate: wiring.switchGate,
           rockCount: count - 1,
           stats: {
             ...preTickState.stats,
@@ -1910,6 +1917,18 @@ export interface GameState {
    * Absent on maps without the puzzle.
    */
   gateGroups?: GateGroup[];
+  /**
+   * Daily switch gates: is the feature on for this run, and what did the day end up with?
+   *
+   * Both are set when floor 1 is built and carried forward by advanceToNextFloor's spread, which
+   * is what makes the cascade work across floors generated minutes apart in separate RNG
+   * streams. `switchGate` doubles as the "already spent" flag and as the analytics record — its
+   * presence is what stops a second floor claiming one. `switchGatesEnabled` is left undefined
+   * rather than false when off, so it stays absent from the serialized save for every run that
+   * predates the feature.
+   */
+  switchGatesEnabled?: boolean;
+  switchGate?: DailySwitchGate;
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -2246,7 +2265,17 @@ function enemyCountForFloor(floor: number): number {
  * Initialize a new game state for floor 1 of multi-tier daily mode.
  * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
  */
-export function initializeGameStateForMultiTier(floor: number = 1): GameState {
+/**
+ * @param opts.switchGates Opt in to the daily's switch-gate feature (see
+ *   lib/map/switch-gates.ts). Defaults to OFF so that every other caller — tests, story mode,
+ *   endless, and the historical replays in lib/stats — is unaffected by construction. The two
+ *   daily entry points turn it on, gated on SWITCH_GATE_START_DATE, because they are the only
+ *   callers that know what date's map they are building.
+ */
+export function initializeGameStateForMultiTier(
+  floor: number = 1,
+  opts: { switchGates?: boolean } = {}
+): GameState {
   // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
 
@@ -2314,6 +2343,20 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
   const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
 
+  // The day's switch gate gets its first shot here. LAST in the floor's RNG stream on purpose —
+  // after the map, the seals, the enemies, the runes and the snakes — so switching the feature
+  // on moves none of those draws on any date. See maybePlaceSwitchGate.
+  const gateWiring: {
+    mapData: MapData;
+    gateGroups?: GateGroup[];
+    switchGate?: DailySwitchGate;
+  } = { mapData: withRunes };
+  if (opts.switchGates) {
+    maybePlaceSwitchGate(gateWiring, floor, findPlayerPosition(withRunes), {
+      avoid: occupiedTiles(snakesAdded),
+    });
+  }
+
   return {
     hasKey: false,
     hasExitKey: false,
@@ -2327,6 +2370,11 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     maxFloors: 3,
     mapData: withRunes,
     sealPayloads,
+    // Carried across floors: whether the feature is on for this run, and whether the day's one
+    // gate has already been spent. advanceToNextFloor reads both.
+    switchGatesEnabled: opts.switchGates ? true : undefined,
+    switchGate: gateWiring.switchGate,
+    gateGroups: gateWiring.gateGroups,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN,
@@ -2589,6 +2637,29 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
   );
 
+  // This floor's shot at the day's switch gate, if floor 1 (and on floor 3, floor 2) did not
+  // already claim it. LAST in `rng`'s stream on purpose — see maybePlaceSwitchGate; every draw
+  // it makes lands after the map, boss, enemy, rune and snake draws above, so turning the
+  // feature on cannot change what any past date replays to.
+  // gateGroups deliberately starts EMPTY rather than carrying currentState's. It is per-map
+  // wiring: the previous floor's beds died with the previous floor, and a stale plate coordinate
+  // would have pressPlate matching a tile on a map that never had a switch on it.
+  const gateWiring: {
+    mapData: MapData;
+    gateGroups?: GateGroup[];
+    switchGate?: DailySwitchGate;
+  } = {
+    mapData: withRunes,
+    switchGate: currentState.switchGate,
+  };
+  if (currentState.switchGatesEnabled) {
+    withPatchedMathRandom(rng, () =>
+      maybePlaceSwitchGate(gateWiring, nextFloor, findPlayerPosition(withRunes), {
+        avoid: occupiedTiles(snakesAdded),
+      })
+    );
+  }
+
   // Create new game state preserving hero stats and inventory
   return {
     ...currentState,
@@ -2596,6 +2667,11 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     maxFloors,
     mapData: withRunes,
     enemies: snakesAdded,
+    switchGate: gateWiring.switchGate,
+    // Replaced, not merged: gateGroups is per-map wiring and the previous floor's beds are gone
+    // with the previous floor. Carrying them forward would leave pressPlate matching a plate
+    // coordinate on a map that no longer has it.
+    gateGroups: gateWiring.gateGroups,
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
@@ -3365,15 +3441,23 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
  * Mutates in place; safe to call on a tile with no group wired to it (no-op).
  */
 function pressPlate(
-  state: { gateGroups?: GateGroup[] },
+  state: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate },
   mapData: MapData,
   y: number,
-  x: number
+  x: number,
+  by: "rock" | "boot"
 ): void {
   const cell = mapData.subtypes[y]?.[x];
   if (cell) {
     const i = cell.indexOf(TileSubtype.PRESSURE_PLATE);
     if (i >= 0) cell[i] = TileSubtype.PRESSURE_PLATE_PRESSED;
+  }
+  // Record engagement with THE DAILY'S gate only, matched by plate coordinate. A daily run that
+  // finds the floor-3 boss door presses up to four Quarrymaster plates, and those are the
+  // arena's puzzle, not this feature — counting them would inflate every number in the report.
+  const daily = state.switchGate;
+  if (daily && !daily.thrownBy && daily.plate[0] === y && daily.plate[1] === x) {
+    state.switchGate = { ...daily, thrownBy: by };
   }
   const group = state.gateGroups?.find(
     (g) => g.plate[0] === y && g.plate[1] === x && !g.open
@@ -4515,7 +4599,7 @@ function movePlayerCore(
     // cage gate in its group drops to bare floor. Like the lightswitch, the plate stays
     // on the tile and coexists with the player (it just changes to the pressed art).
     if (subtype.includes(TileSubtype.PRESSURE_PLATE)) {
-      pressPlate(newGameState, newMapData, newY, newX);
+      pressPlate(newGameState, newMapData, newY, newX, "boot");
     }
 
     // If it's a chest, handle opening logic (supports optional lock)

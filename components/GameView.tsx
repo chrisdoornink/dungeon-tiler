@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateForEndless, initializeGameStateFromMap, type GameState, tileTypes } from "../lib/map";
+import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateForEndless, initializeGameStateFromMap, SWITCH_GATE_START_DATE, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies, type PlainEnemy } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
 import { DateUtils } from "../lib/date_utils";
@@ -134,8 +134,13 @@ function GameViewInner({
             generateCompleteMap();
           }
           if (slot === 'daily-new') {
-            // Multi-tier daily mode uses its own initializer with floor-based generation
-            return initializeGameStateForMultiTier(1);
+            // Multi-tier daily mode uses its own initializer with floor-based generation.
+            // Switch gates are date-gated: this is one of only two callers that knows which
+            // day's map it is building, so the version check has to live here rather than
+            // inside the generator. See SWITCH_GATE_START_DATE.
+            return initializeGameStateForMultiTier(1, {
+              switchGates: localToday >= SWITCH_GATE_START_DATE,
+            });
           }
           const gs = initializeGameState();
           return gs;
