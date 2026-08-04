@@ -10,6 +10,7 @@ import {
   performThrowBomb,
   performUseFood,
   performWait,
+  platformTile,
   performUsePotion,
   performUsePinkHeart,
   performUseBerry,
@@ -73,6 +74,7 @@ import {
   SECOND_RING_GLOW,
 } from "../lib/torch_glow";
 import {
+  PLATFORM_SLIDE,
   SMOOTH_TUNING,
   isSmoothMovementEnabled,
   heroSpritePath,
@@ -2114,6 +2116,67 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     steps: Map<string, SmoothEntityStep>;
   }>({ state: null, steps: new Map() });
   const smoothEntitySeqRef = useRef(0);
+
+  // --- Moving platforms slide LAST ---------------------------------------------------------
+  // Keyed by destination tile ("p:y,x"). Separate from smoothEntitySteps because a platform is not
+  // an entity — it is a tile subtype — and because its slide is deliberately delayed so it happens
+  // after the hero and the enemies have finished moving. That sequencing is the fix for a real
+  // legibility bug: with everything animating at once, players read "the slab will be on that tile
+  // next turn" and stepped into lava it had not reached.
+  const platformPrevRef = useRef<Map<string, [number, number]>>(new Map());
+  const platformCacheRef = useRef<{
+    state: GameState | null;
+    steps: Map<string, SmoothEntityStep>;
+  }>({ state: null, steps: new Map() });
+  const platformSeqRef = useRef(0);
+  // When the last platform slide started, so a fast run of turns can skip the tween entirely.
+  const platformLastMoveAtRef = useRef(0);
+
+  const smoothPlatformSteps: Map<string, SmoothEntityStep> | undefined = (() => {
+    if (!smoothEnabled) return undefined;
+    const cache = platformCacheRef.current;
+    if (cache.state === gameState) return cache.steps;
+    const prev = platformPrevRef.current;
+    const next = new Map<string, [number, number]>();
+    const steps = new Map<string, SmoothEntityStep>();
+    platformSeqRef.current += 1;
+    const seq = platformSeqRef.current;
+
+    // Turns arriving faster than the tween can finish (a held direction key, or mashed waits) would
+    // leave the slab permanently lagging the real game state, which is worse than not animating.
+    // Above the rate cap, snap.
+    const now = performance.now();
+    const since = now - platformLastMoveAtRef.current;
+    const minGap = 1000 / PLATFORM_SLIDE.snapAboveRateHz;
+    const snap = platformLastMoveAtRef.current > 0 && since < minGap;
+
+    for (const p of gameState.platforms ?? []) {
+      const at = platformTile(p);
+      if (!at) continue;
+      next.set(p.id, at);
+      const was = prev.get(p.id);
+      if (!was) continue;
+      const dy = was[0] - at[0];
+      const dx = was[1] - at[1];
+      if (dy === 0 && dx === 0) continue;
+      platformLastMoveAtRef.current = now;
+      if (snap) continue; // moved, but rendered without a tween
+      // A slab only ever steps one tile; anything longer is a room swap and should snap.
+      if (Math.abs(dy) + Math.abs(dx) !== 1) continue;
+      steps.set(`p:${at[0]},${at[1]}`, {
+        dy,
+        dx,
+        dur: PLATFORM_SLIDE.durMs,
+        ease: "ease-in-out",
+        seq,
+        delay: PLATFORM_SLIDE.delayMs,
+      });
+    }
+
+    platformPrevRef.current = next;
+    platformCacheRef.current = { state: gameState, steps };
+    return steps;
+  })();
 
   // Diff entity positions against the previous gameState; entries keyed by
   // destination tile ("e:y,x" / "n:y,x") describe the one-tile slide-in.
@@ -5771,7 +5834,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothEnabled,
                     smoothEntitySteps,
                     combatLunges,
-                    torchSnuffing
+                    torchSnuffing,
+                    smoothPlatformSteps
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6112,6 +6176,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       <MobileControls
         onMove={handleMobileMoveStart}
         onMoveEnd={handleMobileMoveEnd}
+        // Only offered where waiting is actually a move: a map carrying platforms. Passing it
+        // unconditionally would add a permanent control to the daily's phone layout for a mechanic
+        // that map has no way to use.
+        onWait={
+          (gameState.platforms?.length ?? 0) > 0 ? handleWait : undefined
+        }
         onThrowRock={handleThrowRock}
         rockCount={gameState.rockCount ?? 0}
         onUseRune={handleThrowRune}
@@ -6353,7 +6423,10 @@ function renderTileGrid(
   // Combat lunges keyed "hero" / "e:y,x" (see combatLunges in the component).
   combatLunges?: Map<string, CombatLunge>,
   // One-shot blue snuff-flame VFX window for the in-tile hero (?smooth=0).
-  heroTorchSnuffing: boolean = false
+  heroTorchSnuffing: boolean = false,
+  // Platform slab slides, keyed "p:y,x" by destination tile. Delayed so they land after the
+  // hero/enemy slides — see smoothPlatformSteps in the component.
+  platformSteps?: Map<string, SmoothEntityStep>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -6759,6 +6832,7 @@ function renderTileGrid(
             npcStep={
               npcAtTile ? entitySteps?.get(`n:${rowIndex},${colIndex}`) : undefined
             }
+            platformStep={platformSteps?.get(`p:${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

@@ -277,6 +277,12 @@ interface TileProps {
   // tile (set only on the turn the entity moved exactly one tile).
   enemyStep?: SmoothEntityStep;
   npcStep?: SmoothEntityStep;
+  /**
+   * The slab's slide for this turn, if one arrived on this tile. Carries a `delay` so the platform
+   * visibly moves AFTER the hero and enemies — see SmoothEntityStep.delay for why that ordering
+   * has to be visible rather than merely true.
+   */
+  platformStep?: SmoothEntityStep;
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -375,6 +381,7 @@ export const Tile: React.FC<TileProps> = ({
   suppressHeroSprite = false,
   enemyStep,
   npcStep,
+  platformStep,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1660,7 +1667,10 @@ export const Tile: React.FC<TileProps> = ({
     return {
       ['--smooth-step-from' as string]: `translate(${step.dx * 40}px, ${step.dy * 40}px)${baseSuffix}`,
       ['--smooth-step-to' as string]: !base || base === 'none' ? 'none' : base,
-      animation: `smoothStepSlide ${step.dur}ms ${step.ease} both`,
+      // `both` is load-bearing with a delay: without it the sprite would sit at its DESTINATION
+      // during the delay and then jump back to the start to animate, which is the opposite of what
+      // a delayed slide should look like. `backwards` fill holds the from-state until it begins.
+      animation: `smoothStepSlide ${step.dur}ms ${step.ease} ${step.delay ?? 0}ms both`,
     } as React.CSSProperties;
   };
 
@@ -2179,11 +2189,6 @@ export const Tile: React.FC<TileProps> = ({
         ? styles.darkness
         : isOpenAbyss
         ? styles.openAbyss
-        // The slab is drawn INSTEAD of the hazard it is sitting on, because that is exactly what
-        // it means mechanically: while it is here the tile is floor. The hazard tag stays on the
-        // tile and takes over again the moment the slab moves off.
-        : isMovingPlatform
-        ? styles.movingPlatform
         : isSpikes
         ? styles.spikes
         : isSpikeHoles

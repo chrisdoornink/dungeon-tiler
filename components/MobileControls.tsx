@@ -22,6 +22,13 @@ interface MobileControlsProps {
   runeCount?: number;
   onThrowBomb?: () => void;
   bombCount?: number;
+  /**
+   * Wait a turn. OPTIONAL, and absent means no button is rendered at all — the daily has no use
+   * for waiting yet, and a permanent extra control on a layout that was tuned for phone-first
+   * play is not something to add on spec. The puzzle-room prototype passes it because riding a
+   * moving platform is impossible without it (see performWait).
+   */
+  onWait?: () => void;
   inventoryItems?: MobileInventoryItem[];
 }
 
@@ -105,6 +112,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
   onMove,
   onMoveEnd,
   onThrowRock,
+  onWait,
   rockCount,
   onUseRune,
   runeCount,
@@ -327,6 +335,36 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     </div>
   );
 
+  /**
+   * Wait one turn. An hourglass rather than a word: the strip is icon-only and a text button
+   * would be the one odd control on the row.
+   */
+  const waitButton = onWait ? (
+    <button
+      type="button"
+      data-testid="mobile-control-wait"
+      aria-label="Wait one turn"
+      title="Wait one turn"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        onWait();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+      className="flex h-14 w-14 items-center justify-center rounded-xl border border-white/25 bg-black/40 text-white/80 active:bg-white/20"
+      style={NO_SELECT_TOUCH}
+    >
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none">
+        <path
+          d="M6 3 h8 M6 17 h8 M7 3 v3 l3 4 -3 4 v3 M13 3 v3 l-3 4 3 4 v3"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  ) : null;
+
   if (!isMobile) {
     // Desktop: subtle outline controls pinned bottom-right
     const desktopDpadClass = (direction: string) =>
@@ -358,7 +396,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
               </button>
             ))}
           </div>
-          {renderDpad(desktopDpadClass, 'gap-1')}
+          {renderDpad(desktopDpadClass, 'gap-1', waitButton)}
         </div>
         {showKbdTip && (
           <div
@@ -548,7 +586,10 @@ const MobileControls: React.FC<MobileControlsProps> = ({
               willChange: 'transform',
             }}
           >
-            {renderDpad(mobileDpadClass, 'gap-1.5', grabber)}
+            <div className="flex items-end gap-2">
+              {renderDpad(mobileDpadClass, 'gap-1.5', grabber)}
+              {waitButton}
+            </div>
           </div>
         </div>
       </div>

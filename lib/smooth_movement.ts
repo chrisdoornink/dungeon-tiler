@@ -119,4 +119,32 @@ export type SmoothEntityStep = {
   // straight glide. Set for a snake the Fisher has thrown across the spikes — without it
   // the snake simply blinked to its landing tile and the throw was unreadable.
   arc?: boolean;
+  /**
+   * ms to hold before the slide starts. Used by moving platforms so the slab visibly moves AFTER
+   * the hero and the enemies have finished theirs.
+   *
+   * This is the fix for a real legibility problem, not polish. A platform advances at the end of
+   * the turn, after the player's move resolves — but with everything animating at once the player
+   * could not see that, so they read "the slab will be there next turn, I'll step onto that tile"
+   * and stepped into lava the slab had not reached yet. Sequencing the slide last makes the rule
+   * visible: everything else moves, then the platform moves.
+   */
+  delay?: number;
 };
+
+/**
+ * How platform slides are paced.
+ *
+ * `delayMs` sequences the slab after the hero/enemy slides rather than alongside them. `durMs` is
+ * deliberately shorter than a footstep: the slide is already starting late, so a full-length tween
+ * on top of that would make every ride feel sluggish.
+ *
+ * `snapAboveRateHz`: if turns are arriving faster than this — someone holding a direction down, or
+ * mashing wait — the tween is abandoned and the slab snaps. Animating in that case would put the
+ * slab permanently behind the game state, which is worse than not animating at all.
+ */
+export const PLATFORM_SLIDE = {
+  delayMs: 90,
+  durMs: 130,
+  snapAboveRateHz: 5,
+} as const;

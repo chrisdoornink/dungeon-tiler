@@ -1376,6 +1376,14 @@
    water beneath it (see Tile.tsx's floorVariantClass) because while it is here the tile is, for
    every gameplay purpose, floor. */
 .movingPlatform {
+  /* An absolutely-positioned OVERLAY, not a floor background. It has to be its own element so it
+     can be translated independently of the tile it is standing on — the slide from the previous
+     tile is what makes the ordering ("everything else moves, then platforms move") visible. */
+  position: absolute;
+  inset: 0;
+  /* Above the floor and the rail decal, below items (1030) and the hero. */
+  z-index: 1015;
+  pointer-events: none;
   background-color: #6b6f76;
   background-image: linear-gradient(
       180deg,
