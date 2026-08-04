@@ -5935,6 +5935,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                                 gameState.mapData.subtypes[playerPosition[0]]?.[
                                   playerPosition[1]
                                 ] ?? [];
+                              // Riding a slab cancels submersion — the hero is on the water, not in
+                              // it. This is the SMOOTH-MODE hero, which is a viewport overlay rather
+                              // than the in-tile sprite, so it needs the same exemption separately;
+                              // fixing only the tile copy leaves the bug in place for every player,
+                              // since smooth mode is the default.
+                              if (subs.includes(TileSubtype.MOVING_PLATFORM))
+                                return undefined;
                               if (subs.includes(TileSubtype.DEEP_WATER))
                                 return WATER_SUBMERSION_CLIP.deep;
                               if (subs.includes(TileSubtype.SHALLOW_WATER))

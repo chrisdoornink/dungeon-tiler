@@ -230,3 +230,44 @@ describe("slide direction symmetry", () => {
     expect(screen.getByTestId("tile-0").style.zIndex).toBe("");
   });
 });
+
+describe("riding cancels submersion", () => {
+  /**
+   * Standing on a slab means being ON the water, not in it. Deep water otherwise clips the hero
+   * down to a head, which is what made the rider look like it was wading through the raft.
+   *
+   * There are THREE submersion sites — the in-tile hero, the in-tile enemy, and the smooth-mode
+   * hero overlay in TilemapGrid — and smooth mode is the default, so fixing only the tile copy
+   * leaves the bug visible to everyone. These cover the two in-tile ones; the overlay lives in
+   * TilemapGrid and is exempted alongside them.
+   */
+  it("does not clip the hero when a slab is under them", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.DEEP_WATER, TileSubtype.MOVING_PLATFORM, TileSubtype.PLAYER]}
+        isVisible={true}
+        heroTorchLit={true}
+      />
+    );
+    const hero = document.querySelector('[class*="heroImage"]') as HTMLElement | null;
+    expect(hero).not.toBeNull();
+    expect(hero!.style.clipPath).toBe("");
+  });
+
+  it("still clips a hero swimming the same water", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.DEEP_WATER, TileSubtype.PLAYER]}
+        isVisible={true}
+        heroTorchLit={true}
+      />
+    );
+    const hero = document.querySelector('[class*="heroImage"]') as HTMLElement | null;
+    expect(hero).not.toBeNull();
+    expect(hero!.style.clipPath).not.toBe("");
+  });
+});

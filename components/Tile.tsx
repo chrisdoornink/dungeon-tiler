@@ -2124,7 +2124,9 @@ export const Tile: React.FC<TileProps> = ({
               // half only), head-deep in deep water, and knee-deep in lava (only
               // stone goblins cross it). Keyed off this tile's own subtypes; the
               // slide animation only drives `transform`, so the clip survives it.
-              clipPath: hasDeepWater(subtype)
+              clipPath: hasMovingPlatform(subtype)
+                ? undefined
+                : hasDeepWater(subtype)
                 ? ENEMY_WATER_SUBMERSION_CLIP.deep
                 : hasShallowWater(subtype)
                 ? enemyKind === 'snake'
@@ -2434,7 +2436,10 @@ export const Tile: React.FC<TileProps> = ({
                 visibility: suppressHeroSprite ? 'hidden' : undefined,
                 // Submersion: wading hides the hero below the waist, swimming below
                 // the head. Suppressed while dying so death transforms play whole.
-                clipPath: heroDeathState
+                // A MOVING_PLATFORM cancels submersion: the hero is riding ON the water, not
+                // standing in it. Without this the tile's DEEP_WATER tag clipped the rider down to
+                // a head even though a slab was plainly under their feet.
+                clipPath: heroDeathState || hasMovingPlatform(subtype)
                   ? undefined
                   : isDeepWater
                   ? WATER_SUBMERSION_CLIP.deep
