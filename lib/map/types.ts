@@ -61,6 +61,55 @@ export interface GateGroup {
   open: boolean;
 }
 
+/**
+ * One TOGGLE_SWITCH and what it controls. Unlike a GateGroup this NEVER latches — every throw
+ * flips `on`, so a room can be reconfigured as many times as the puzzle needs.
+ *
+ * A toggle can drive two different things at once, and usually should:
+ *  - `gates`: spike beds that raise when `on` is false and retract when it is true, so one
+ *    switch opens one route while closing another. That trade is the puzzle.
+ *  - `platforms`: platform ids this switch starts and stops. Stopping a platform is how the
+ *    player PARKS it somewhere useful instead of waiting for its cycle to come round again.
+ */
+export interface ToggleGroup {
+  /** The switch tile. */
+  switchAt: [number, number];
+  /** Spike beds retracted while `on` and raised while off. */
+  gates: Array<[number, number]>;
+  /**
+   * Beds with the OPPOSITE polarity: raised while `on`, retracted while off.
+   *
+   * This is what makes a toggle a puzzle piece rather than a slower key. With only `gates` a
+   * switch can do nothing but open more of the map, so throwing it is never a decision — you
+   * always throw it. Pair a bed here with one in `gates` and the switch becomes a TRADE: this
+   * route opens, that one closes, and which of the two you want depends on where you are and
+   * what you still need to reach.
+   */
+  invertedGates: Array<[number, number]>;
+  /** Ids of platforms this switch starts and stops. Running while `on`. */
+  platforms: string[];
+  on: boolean;
+}
+
+/**
+ * A slab that ferries the hero across a hazard, one tile per turn.
+ *
+ * `track` is the full route in order, and the slab PING-PONGS along it: it walks to the end,
+ * reverses, and comes back. A loop would need the track to close on itself, which authored
+ * rooms never do, and ping-pong has the property a puzzle wants — the platform always comes
+ * back, so a missed boarding costs turns rather than the run.
+ *
+ * `index` is where on the track the slab is right now; `dir` is which way it is heading.
+ * `running` is false while a toggle switch has it parked.
+ */
+export interface Platform {
+  id: string;
+  track: Array<[number, number]>;
+  index: number;
+  dir: 1 | -1;
+  running: boolean;
+}
+
 export interface RoomTransition {
   from: RoomId;
   to: RoomId;

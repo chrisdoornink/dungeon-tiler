@@ -177,6 +177,29 @@ export enum TileSubtype {
   // organic-mystical, and amber is literally preserved time. See lib/map/rewind.ts for the
   // snapshot ring buffer and .claude/features/amber-moth-rewind/index.md for the design.
   AMBER_MOTH = 71,
+  // ---- Puzzle machinery (see lib/map/machinery.ts) -----------------------------------------
+  // A TOGGLE_SWITCH is the re-armable cousin of PRESSURE_PLATE. The plate latches: it turns
+  // into PRESSURE_PLATE_PRESSED once and its spikes never come back, because in the
+  // Quarrymaster's arena the point is banked, irreversible progress. A toggle instead flips its
+  // group every time it is thrown, so the same switch can be used to solve a room one way, then
+  // thrown again to solve it another. That difference is what turns a barrier into a puzzle.
+  //
+  // Kept as its own subtype rather than a flag on PRESSURE_PLATE so the two read differently at
+  // a glance — the player must be able to tell "this is spent" from "this can be thrown again"
+  // without trying it. Latching plates are warm/brass, toggles are cold/blue.
+  TOGGLE_SWITCH = 72,
+  // A MOVING_PLATFORM is a stone slab that rides a fixed track across LAVA or DEEP_WATER,
+  // one tile per turn. It is a FLOOR overlay that coexists with the hazard beneath it and
+  // suppresses it, exactly the way OBSIDIAN makes a lava tile safe — the difference is that
+  // obsidian is permanent and where you threw it, and this moves on without you.
+  //
+  // The hero standing on one is carried with it. That is the whole mechanic: crossing costs
+  // TURNS rather than an item, so the cost is paid in enemy actions and torch burn.
+  MOVING_PLATFORM = 73,
+  // The platform's route, drawn on every hazard tile the slab will pass over. Purely cosmetic
+  // and non-blocking, and NOT optional: a platform whose path cannot be read is a platform the
+  // player has to learn by dying in lava. The track is what makes the timing fair.
+  PLATFORM_TRACK = 74,
 }
 
 /**

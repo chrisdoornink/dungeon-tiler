@@ -37,10 +37,12 @@ import {
 import type {
   GateGroup,
   MapData,
+  Platform,
   PotOverrides,
   RoomSnapshot,
   RoomTransition,
   SealPayloads,
+  ToggleGroup,
 } from "./types";
 import {
   cloneMapData,
@@ -58,6 +60,7 @@ import { recordRewindStep, type RewindSnapshot } from "./rewind";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
+import { advanceMachinery, throwToggle, tileIsPlatformed } from "./machinery";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
@@ -178,14 +181,24 @@ function orUndefined(payloads: SealPayloads): SealPayloads | undefined {
   return Object.keys(payloads).length > 0 ? payloads : undefined;
 }
 
-function incrementStepsAndTime(state: GameState, amount: number = 1): void {
-  if (amount <= 0) return;
-  const currentStats = state.stats;
-  const nextStats = {
-    ...currentStats,
-    steps: currentStats.steps + amount,
-  };
-  state.stats = nextStats;
+/**
+ * END OF TURN. Called once by every turn-consuming action, AFTER the player's action has fully
+ * resolved — which is what makes it the right and only place to advance puzzle machinery.
+ *
+ * Ordering is the whole point and it was wrong once: machinery used to advance alongside enemy
+ * movement, which happens BEFORE the player acts. A platform would therefore slide away in the
+ * same turn the player stepped toward it, so boarding a slab you could plainly see put the hero
+ * in the lava it had just left. Enemies act first, the player acts, then the world moves.
+ *
+ * `amount` only scales the step counter; machinery advances once per turn regardless, because a
+ * turn is a turn no matter how many steps it is booked as.
+ */
+function endTurn(state: GameState, amount: number = 1): void {
+  if (amount > 0) {
+    const currentStats = state.stats;
+    state.stats = { ...currentStats, steps: currentStats.steps + amount };
+  }
+  advanceMachinery(state, findPlayerPosition(state.mapData));
 }
 
 /**
@@ -291,6 +304,60 @@ function recordEnemyDeathCause(
   }
 }
 
+/**
+ * Pass a turn without acting.
+ *
+ * REQUIRED BY MOVING PLATFORMS, not a convenience. A platform advances once per turn and the
+ * hero has to be standing on it to be carried — with no way to spend a turn in place there is
+ * literally no way to ride one. Before this existed the only way to burn a turn was to walk into
+ * a wall, which works (enemies have already acted by then) but is undiscoverable and reads as a
+ * bug rather than a move.
+ *
+ * Deliberately costs everything a real turn costs: enemies act, hazards reap, machinery
+ * advances, the step counter ticks. Waiting next to a goblin is a decision, not a free skip.
+ */
+export function performWait(gameState: GameState): GameState {
+  gameState = detonateLiveBombs(gameState);
+  if (gameState.heroHealth <= 0) return gameState;
+
+  const preTickState: GameState = { ...gameState };
+  preTickState.recentDeaths = [];
+  if (preTickState.enemies && Array.isArray(preTickState.enemies)) {
+    const pos = findPlayerPosition(preTickState.mapData);
+    if (pos) {
+      const [py, px] = pos;
+      const result = updateEnemies(
+        preTickState.mapData.tiles,
+        preTickState.mapData.subtypes,
+        preTickState.enemies,
+        { y: py, x: px },
+        {
+          rng: preTickState.combatRng ?? Math.random,
+          defense: preTickState.hasShield ? 1 : 0,
+          playerTorchLit: preTickState.heroTorchLit ?? true,
+          setPlayerTorchLit: (lit: boolean) => {
+            preTickState.heroTorchLit = lit;
+          },
+          skipEnemy: mistBlindSkip(preTickState),
+        }
+      );
+      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      if (result.damage > 0) {
+        const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
+        applyHeroDamage(preTickState, applied);
+        preTickState.stats.damageTaken += applied;
+        recordEnemyDeathCause(preTickState, result.attackingEnemies);
+      }
+    }
+  }
+
+  onTurnElapsed(preTickState);
+
+  const newGameState = { ...preTickState };
+  endTurn(newGameState);
+  return newGameState;
+}
+
 export function performUseFood(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
@@ -336,7 +403,7 @@ export function performUseFood(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Use the food: heal 1 HP (capped at heroMaxHealth) and consume 1 food
   const newGameState = { ...preTickState };
@@ -347,7 +414,7 @@ export function performUseFood(gameState: GameState): GameState {
     foodUsed: (newGameState.stats.foodUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  incrementStepsAndTime(newGameState);
+  endTurn(newGameState);
 
   // debug: used food
   
@@ -401,7 +468,7 @@ export function performUsePotion(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Use the potion: heal 2 HP (capped at heroMaxHealth) and consume 1 potion
   const newGameState = { ...preTickState };
@@ -412,7 +479,7 @@ export function performUsePotion(gameState: GameState): GameState {
     potionsUsed: (newGameState.stats.potionsUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  incrementStepsAndTime(newGameState);
+  endTurn(newGameState);
 
   // Cure poison condition
   if (newGameState.conditions?.poisoned?.active) {
@@ -476,7 +543,7 @@ export function performUsePinkHeart(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Consume the heart: full heal + 3 temporary pink bonus hearts.
   const newGameState = { ...preTickState };
@@ -488,7 +555,7 @@ export function performUsePinkHeart(gameState: GameState): GameState {
     pinkHeartsUsed: (newGameState.stats.pinkHeartsUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  incrementStepsAndTime(newGameState);
+  endTurn(newGameState);
 
   return newGameState;
 }
@@ -541,7 +608,7 @@ export function performUseBerry(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Consume the berry: heal a variable 2-3 hearts (capped at heroMaxHealth).
   const healRng = preTickState.combatRng ?? Math.random;
@@ -557,7 +624,7 @@ export function performUseBerry(gameState: GameState): GameState {
     berriesUsed: (newGameState.stats.berriesUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  incrementStepsAndTime(newGameState);
+  endTurn(newGameState);
 
   return newGameState;
 }
@@ -708,7 +775,7 @@ export function performThrowRockCore(gameState: GameState): GameState {
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn. Without this, throwing lets
   // them walk over pits unharmed and simply step back off on the next turn.
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Determine direction vector
   let vx = 0,
@@ -927,6 +994,42 @@ export function performThrowRockCore(gameState: GameState): GameState {
         };
       }
     }
+    // A rock landing on a TOGGLE_SWITCH throws it, for the same reason it throws a latching
+    // plate: the switch may be somewhere the hero cannot stand. Unlike a plate this can be done
+    // repeatedly, so a toggle across a lava channel is a switch you operate entirely by rock.
+    {
+      const toggleSubs = newMapData.subtypes[ty][tx] || [];
+      if (toggleSubs.includes(TileSubtype.TOGGLE_SWITCH)) {
+        const wiring: {
+          mapData: MapData;
+          toggleGroups?: ToggleGroup[];
+          platforms?: Platform[];
+        } = {
+          mapData: newMapData,
+          toggleGroups: preTickState.toggleGroups,
+          platforms: preTickState.platforms,
+        };
+        const { crushed } = throwToggle(
+          wiring,
+          ty,
+          tx,
+          new Set((preTickState.enemies ?? []).map((e) => `${e.y},${e.x}`))
+        );
+        const after: GameState = {
+          ...preTickState,
+          mapData: newMapData,
+          toggleGroups: wiring.toggleGroups,
+          platforms: wiring.platforms,
+          rockCount: count - 1,
+          stats: {
+            ...preTickState.stats,
+            rocksThrown: (preTickState.stats.rocksThrown ?? 0) + 1,
+          },
+        };
+        killEnemiesAt(after, crushed);
+        return after;
+      }
+    }
     // Floor tile: check for pot collision
     const subs = newMapData.subtypes[ty][tx] || [];
     if (subs.includes(TileSubtype.POT)) {
@@ -1068,7 +1171,7 @@ function performThrowRuneCore(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   const newMapData = JSON.parse(
     JSON.stringify(preTickState.mapData)
@@ -1638,7 +1741,7 @@ function performThrowBombCore(gameState: GameState): GameState {
 
   // A turn elapsed: enemies that stepped onto faulty floor this tick fall into
   // the abyss now, exactly as on a movement turn (see performThrowRock).
-  applyEnemyHazardDeaths(preTickState);
+  onTurnElapsed(preTickState);
 
   // Direction vector
   let vx = 0,
@@ -1910,6 +2013,13 @@ export interface GameState {
    * Absent on maps without the puzzle.
    */
   gateGroups?: GateGroup[];
+  /**
+   * Puzzle machinery (lib/map/machinery.ts): re-armable toggle switches and the platforms they
+   * park. Absent on every map without a puzzle, which is currently all of them outside the
+   * authored rooms in app/test-puzzle-room.
+   */
+  toggleGroups?: ToggleGroup[];
+  platforms?: Platform[];
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -2167,6 +2277,45 @@ function applyEnemyHazardDeaths(state: GameState): void {
     const updated = processEnemyDefeat(state, info);
     Object.assign(state, updated);
   }
+}
+
+/**
+ * Kill whatever enemies are standing on `coords`, with the same bookkeeping a hazard death gets.
+ *
+ * Used by the spike beds a TOGGLE_SWITCH raises. Separate from applyEnemyHazardDeaths because
+ * that one reaps enemies that walked ONTO a hazard, whereas this is the hazard arriving under
+ * an enemy that never moved — same outcome, opposite cause, and only the toggle can cause it.
+ */
+function killEnemiesAt(state: GameState, coords: Array<[number, number]>): void {
+  if (!state.enemies || coords.length === 0) return;
+  const doomed = new Set(coords.map(([y, x]) => `${y},${x}`));
+  const survivors: Enemy[] = [];
+  for (const enemy of state.enemies) {
+    if (!doomed.has(`${enemy.y},${enemy.x}`)) {
+      survivors.push(enemy);
+      continue;
+    }
+    cleanupPinkRing(enemy, state.mapData.subtypes);
+    if (!state.recentDeaths) state.recentDeaths = [];
+    state.recentDeaths.push([enemy.y, enemy.x]);
+    state.stats.enemiesDefeated += 1;
+    trackEnemyKill(state.stats, enemy.kind as EnemyKind, state.currentFloor ?? 1);
+    if (!state.defeatedEnemies) state.defeatedEnemies = [];
+    state.defeatedEnemies.push(createDefeatedEnemyInfo(enemy));
+    const updated = processEnemyDefeat(state, createDefeatedEnemyInfo(enemy));
+    Object.assign(state, updated);
+  }
+  state.enemies = survivors;
+}
+
+/**
+ * The ENEMY-PHASE hook: enemies have just acted, so reap whoever stepped into a hazard.
+ *
+ * Runs BEFORE the player's action. Puzzle machinery deliberately does NOT advance here — see
+ * endTurn for why that ordering matters.
+ */
+function onTurnElapsed(state: GameState): void {
+  applyEnemyHazardDeaths(state);
 }
 
 /**
@@ -3476,14 +3625,23 @@ function applyHeroChaseHit(
 // Lava that appears UNDER the hero (e.g. the Shaper's fire raining down onto the
 // tile they're standing on) is lethal even without a step. Stepping onto lava is
 // already fatal in the movement resolver; this catches lava that materialized
-// beneath a hero who didn't move. A living hero can only be on a lava tile if it
-// spawned under them, so this never false-fires.
+// beneath a hero who didn't move.
+//
+// This used to say "a living hero can only be on a lava tile if it spawned under them, so this
+// never false-fires." MOVING_PLATFORM broke that: riding a slab means legitimately standing on a
+// lava tile for several turns, and without the platform guard below this killed the hero on the
+// very turn they boarded. Any future way of standing safely on lava has to be excused here too —
+// the movement resolver's check is NOT the only one.
 function killIfStandingOnLava(state: GameState): GameState {
   if (state.heroHealth <= 0) return state;
   const pos = findPlayerPosition(state.mapData);
   if (!pos) return state;
   const subs = state.mapData.subtypes[pos[0]]?.[pos[1]] ?? [];
-  if (subs.includes(TileSubtype.LAVA) && !subs.includes(TileSubtype.OBSIDIAN)) {
+  if (
+    subs.includes(TileSubtype.LAVA) &&
+    !subs.includes(TileSubtype.OBSIDIAN) &&
+    !subs.includes(TileSubtype.MOVING_PLATFORM)
+  ) {
     state.heroHealth = 0;
     if (!state.deathCause) state.deathCause = { type: "lava" };
   }
@@ -3798,7 +3956,7 @@ function movePlayerCore(
     }
 
     // After enemies move, apply hazard deaths (stone-goblins falling into faulty floor)
-    applyEnemyHazardDeaths(newGameState);
+    onTurnElapsed(newGameState);
 
     // console.log(`[ENEMY TURN] After enemy turn. Enemies now at:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x}) dist:${Math.abs(e.y - currentY) + Math.abs(e.x - currentX)}`).join(', '));
 
@@ -3877,7 +4035,7 @@ function movePlayerCore(
     }
 
     if (moved) {
-      incrementStepsAndTime(newGameState);
+      endTurn(newGameState);
       const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
       if (transition) {
         newGameState = applyRoomTransition(newGameState, transition);
@@ -3949,7 +4107,7 @@ function movePlayerCore(
 
     // For regular walls, do nothing - player cannot move there
     if (moved) {
-      incrementStepsAndTime(newGameState);
+      endTurn(newGameState);
       const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
       if (transition) {
         newGameState = applyRoomTransition(newGameState, transition);
@@ -4478,7 +4636,13 @@ function movePlayerCore(
     // the destination lava tile is empty. OBSIDIAN (a rock-cooled lava tile) is safe and does not
     // trigger this. The tile keeps its LAVA tag (kept alive by the coexist whitelist below) so the
     // hero is rendered sinking on the glowing tile.
-    if (subtype.includes(TileSubtype.LAVA) && !subtype.includes(TileSubtype.OBSIDIAN)) {
+    // A MOVING_PLATFORM overhead makes the tile safe exactly as OBSIDIAN does. The LAVA tag
+    // stays put, so the tile still glows and still kills the moment the slab moves on.
+    if (
+      subtype.includes(TileSubtype.LAVA) &&
+      !subtype.includes(TileSubtype.OBSIDIAN) &&
+      !tileIsPlatformed(newMapData, newY, newX)
+    ) {
       newGameState.heroHealth = 0;
       if (!newGameState.deathCause) newGameState.deathCause = { type: "lava" };
     }
@@ -4516,6 +4680,18 @@ function movePlayerCore(
     // on the tile and coexists with the player (it just changes to the pressed art).
     if (subtype.includes(TileSubtype.PRESSURE_PLATE)) {
       pressPlate(newGameState, newMapData, newY, newX);
+    }
+
+    // A toggle switch is thrown the same way but never latches — see throwToggle. Spike beds it
+    // raises can crush an enemy standing on one, which is why the enemy list is passed in.
+    if (subtype.includes(TileSubtype.TOGGLE_SWITCH)) {
+      const { crushed } = throwToggle(
+        newGameState,
+        newY,
+        newX,
+        new Set((newGameState.enemies ?? []).map((e) => `${e.y},${e.x}`))
+      );
+      killEnemiesAt(newGameState, crushed);
     }
 
     // If it's a chest, handle opening logic (supports optional lock)
@@ -4580,6 +4756,11 @@ function movePlayerCore(
       // Pressure plates are floor switches the hero stands ON to hold/throw them.
       destSubtypes.includes(TileSubtype.PRESSURE_PLATE) ||
       destSubtypes.includes(TileSubtype.PRESSURE_PLATE_PRESSED) ||
+      // A toggle stays on its tile so it can be thrown again — that is the whole difference
+      // from a latching plate. The slab and its track decal are floor the hero stands on.
+      destSubtypes.includes(TileSubtype.TOGGLE_SWITCH) ||
+      destSubtypes.includes(TileSubtype.MOVING_PLATFORM) ||
+      destSubtypes.includes(TileSubtype.PLATFORM_TRACK) ||
       // Retracted spike beds are walkable floor decals. Without this the hero standing on
       // one replaces the tile's subtypes with just PLAYER, so the sockets are erased for
       // good the first time anyone walks the opened lane — the mark that records a thrown
@@ -4696,8 +4877,15 @@ function movePlayerCore(
 
     // The torch cannot burn while swimming: ending a move in DEEP water snuffs it and
     // overrides every relight source above (wall torches, lava glow) until the hero is
-    // back on land. Stepping stones and shallow water are dry enough — no snuff.
-    if (newMapData.subtypes[newY]?.[newX]?.includes(TileSubtype.DEEP_WATER)) {
+    // back on land. Stepping stones and shallow water are dry enough — no snuff, and neither
+    // is a MOVING_PLATFORM: the hero is riding ON the water, not in it. That matters more than
+    // it sounds, because a lit torch is what keeps a douse-day portal shut and what several
+    // enemy kinds react to — a slab crossing has to be a real alternative to swimming, not the
+    // same toll with extra steps.
+    if (
+      newMapData.subtypes[newY]?.[newX]?.includes(TileSubtype.DEEP_WATER) &&
+      !tileIsPlatformed(newMapData, newY, newX)
+    ) {
       newGameState.heroTorchLit = false;
     }
   }
@@ -4705,7 +4893,7 @@ function movePlayerCore(
   // Enemies have already been updated at the start of this turn
   // Increment steps if a move occurred
   if (moved) {
-    incrementStepsAndTime(newGameState);
+    endTurn(newGameState);
     const transition = findRoomTransitionForPosition(newGameState, [newY, newX]);
     if (transition) {
       newGameState = applyRoomTransition(newGameState, transition);

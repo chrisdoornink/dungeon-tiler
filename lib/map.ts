@@ -51,6 +51,15 @@ export { addPlayerToMap, addPlayerToMapAwayFromObjectives, findPlayerPosition } 
 export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/enemy-features";
 
 export {
+  advanceMachinery,
+  nextPlatformTile,
+  platformTile,
+  stampPlatform,
+  throwToggle,
+  tileIsPlatformed,
+} from "./map/machinery";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,
@@ -65,6 +74,7 @@ export {
 
 export {
   performUseFood,
+  performWait,
   performUsePotion,
   performUsePinkHeart,
   performUseBerry,

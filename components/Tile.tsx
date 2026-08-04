@@ -704,6 +704,18 @@ export const Tile: React.FC<TileProps> = ({
   const hasSpikeHoles = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.SPIKE_HOLES) || false;
   };
+  // Puzzle machinery. PLACEHOLDER ART, all three drawn in CSS: a toggle is a cold blue switch
+  // (deliberately unlike the warm brass of a latching plate, so "can be thrown again" reads at a
+  // glance), the slab is cut stone, and the track is a faint dashed rail on the hazard beneath.
+  const hasToggleSwitch = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.TOGGLE_SWITCH) || false;
+  };
+  const hasMovingPlatform = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.MOVING_PLATFORM) || false;
+  };
+  const hasPlatformTrack = (subtypes: number[] | undefined): boolean => {
+    return subtypes?.includes(TileSubtype.PLATFORM_TRACK) || false;
+  };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
@@ -1052,6 +1064,28 @@ export const Tile: React.FC<TileProps> = ({
             key="pressure-plate-pressed"
             data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
             className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
+          />
+        )}
+
+        {/* Toggle switch. Cold blue where a latching plate is warm brass, and it keeps its glow
+            whichever way it is thrown, because "spent" is a state a toggle never reaches. The
+            lever tips to show which way it currently sits. */}
+        {hasToggleSwitch(subtypes) && (
+          <div
+            key="toggle-switch"
+            data-testid={`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`}
+            className={`${styles.assetIcon} ${styles.switchIcon} ${styles.toggleSwitch}`}
+          />
+        )}
+
+        {/* The platform's route. Drawn UNDER everything else on the tile and never over the slab
+            itself — a rail you can trace with your eye from bank to bank is what makes the timing
+            readable, and a puzzle you cannot read is a puzzle you learn by dying. */}
+        {hasPlatformTrack(subtypes) && !hasMovingPlatform(subtypes) && (
+          <div
+            key="platform-track"
+            data-testid={`subtype-icon-${TileSubtype.PLATFORM_TRACK}`}
+            className={styles.platformTrack}
           />
         )}
 
@@ -2139,10 +2173,17 @@ export const Tile: React.FC<TileProps> = ({
       const isSteppingStone = hasSteppingStone(subtype);
       const isSpikes = hasSpikes(subtype);
       const isSpikeHoles = hasSpikeHoles(subtype);
+      const isMovingPlatform = hasMovingPlatform(subtype);
+      const isPlatformTrack = hasPlatformTrack(subtype);
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
         ? styles.openAbyss
+        // The slab is drawn INSTEAD of the hazard it is sitting on, because that is exactly what
+        // it means mechanically: while it is here the tile is floor. The hazard tag stays on the
+        // tile and takes over again the moment the slab moves off.
+        : isMovingPlatform
+        ? styles.movingPlatform
         : isSpikes
         ? styles.spikes
         : isSpikeHoles

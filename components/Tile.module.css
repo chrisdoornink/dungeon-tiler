@@ -1347,3 +1347,70 @@
   z-index: 1;
   pointer-events: none;
 }
+
+/* ---- Puzzle machinery, ALL PLACEHOLDER ART (see lib/map/machinery.ts) --------------------- */
+
+/* Toggle switch. Reuses the switch sprite but hue-rotated to a cold blue, because the one thing
+   the player must read without experimenting is "latching plate (spent once thrown)" vs "toggle
+   (throw it as often as you like)". Colour is doing that work: warm brass = one-shot, cold blue =
+   re-armable. It keeps its glow in both states — a toggle is never spent, so it must never look
+   spent, which is the whole reason .platePressed cannot be reused here. */
+.toggleSwitch {
+  filter: hue-rotate(165deg) saturate(1.5)
+    drop-shadow(0 0 4px rgba(96, 190, 255, 0.9));
+  animation: toggleIdle 2.2s ease-in-out infinite;
+}
+
+@keyframes toggleIdle {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The slab. Cut stone with a lit top edge and a dark underside, so it reads as a solid thing
+   floating ON the hazard rather than a patch of different floor. Drawn INSTEAD of the lava or
+   water beneath it (see Tile.tsx's floorVariantClass) because while it is here the tile is, for
+   every gameplay purpose, floor. */
+.movingPlatform {
+  background-color: #6b6f76;
+  background-image: linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.22) 0 12%,
+      rgba(255, 255, 255, 0) 12% 100%
+    ),
+    linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.45) 0 14%,
+      rgba(0, 0, 0, 0) 14% 100%
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.18) 0 1px,
+      rgba(0, 0, 0, 0) 1px 33%
+    );
+  box-shadow: inset 0 0 0 1px rgba(20, 22, 26, 0.85),
+    /* A hard drop shadow sells "hovering over something lethal" far better than any amount of
+       texture on the slab itself. */ 0 3px 5px rgba(0, 0, 0, 0.55);
+  image-rendering: pixelated;
+}
+
+/* The route. A faint dashed rail laid over the hazard, on every tile the slab will reach.
+   NOT decoration: without it the platform's path is invisible and its timing can only be learned
+   by stepping into lava, which turns a puzzle into a memory test. Kept dim enough that the slab
+   and the hazard both still read. */
+.platformTrack {
+  position: absolute;
+  inset: 38%;
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(214, 226, 240, 0.55) 0 22%,
+    rgba(214, 226, 240, 0) 22% 50%
+  );
+  box-shadow: 0 0 3px rgba(214, 226, 240, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}

@@ -9,6 +9,7 @@ import {
   performThrowRune,
   performThrowBomb,
   performUseFood,
+  performWait,
   performUsePotion,
   performUsePinkHeart,
   performUseBerry,
@@ -747,6 +748,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
     setGameState((prev) => {
       const newState = consumeOnce(prev, performUseFood);
+      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
+      return newState;
+    });
+  }, [resolvedStorageSlot, consumeOnce]);
+
+  /**
+   * Wait a turn.
+   *
+   * Goes through consumeOnce like every other turn-advancing action, for the reason recorded on
+   * that helper: perform* runs inside a setGameState updater, StrictMode double-invokes updaters,
+   * and a turn advanced twice moves every enemy twice. Waiting is the purest case of the bug —
+   * there is no visible effect of its own, so a doubled wait would be invisible except that the
+   * platform you were timing has moved two tiles.
+   */
+  const handleWait = useCallback(() => {
+    if (actionsLockedRef.current) return;
+    setGameState((prev) => {
+      const newState = consumeOnce(prev, performWait);
       CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
       return newState;
     });
@@ -4211,6 +4230,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         case "E":
           handleInteract();
           return;
+        case ".":
+        case "5":
+          // Wait a turn. Roguelike convention (`.`, and numpad 5 for the keypad crowd).
+          // REQUIRED to ride a moving platform: the slab advances once per turn and the hero has
+          // to be aboard for it, so with no way to spend a turn in place there is no way to
+          // cross. See performWait.
+          handleWait();
+          return;
       }
 
       if (direction !== null) {
@@ -4266,6 +4293,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     handleThrowRune,
     handleThrowBomb,
     handleUseFood,
+    handleWait,
     handleUsePotion,
     handleUsePinkHeart,
     handleUseBerry,
