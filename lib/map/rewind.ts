@@ -9,8 +9,9 @@
  *    through — and only when the hero actually MOVED, so wall-bumps and standing
  *    actions never burn a history slot. "Rewind five steps" then means five real steps.
  *  - A rewind restores the whole world (map, enemies, NPCs, health, items) but
- *    deliberately does NOT restore cumulative stats or the charm's own charge. See
- *    CARRY_FORWARD_KEYS below for why each exception exists.
+ *    deliberately does NOT restore cumulative stats, the charm's own charge, or the
+ *    state of the hero's torch. See CARRY_FORWARD_KEYS below for why each exception
+ *    exists, and for the rule that decides whether a NEW field belongs there.
  *
  * This module imports the enemy/NPC serializers from ./utils directly and takes
  * GameState as a TYPE-only import, so game-state.ts -> rewind.ts stays a one-way edge
@@ -55,6 +56,15 @@ type RewindPayload = Omit<
 /**
  * Fields the present keeps when winding back. Everything else comes from the snapshot.
  *
+ * THE RULE, for whatever gets added next: **a condition carries forward, a quantity
+ * reverts.** A condition has no counter and no source sitting on the map, so keeping it
+ * cannot be farmed. A quantity does: the map rolls back with the snapshot, so a chest is
+ * closed and still holding its sword again (movePlayer only strips the CHEST marker and
+ * leaves the item subtype on the tile). Carry a quantity forward and every pickup inside
+ * the rewound window can be collected a second time — the same duplication hole
+ * recordRewindStep already guards for the charm itself. Anything with a number beside it
+ * in the HUD therefore stays OUT of this list.
+ *
  *  - `stats`: cumulative counters stay monotonic. The fiction says those steps never
  *    happened, but `steps` is the daily score and lib/endless_validation.ts shadow-flags
  *    any run whose steps/kills/damage regress (`stats:regressed`). Monotonic stats mean
@@ -62,12 +72,20 @@ type RewindPayload = Omit<
  *  - `rewindCharges`: the caller sets this explicitly to the post-spend value. Taking it
  *    from a snapshot recorded BEFORE the charm was spent would refund the charge and
  *    make the rewind infinitely reusable.
+ *  - `heroTorchLit`: a condition, not a possession — the amber rewinds the world, and a
+ *    moth cannot take your flame. Mechanically this is what makes the DOUSE boss entrance
+ *    playable: douse in the water, wind back to the portal, and arrive still dark. It
+ *    works in both directions (relight at a wall torch, wind back to where you wanted to
+ *    be lit) because a rewind restores POSITION from the past and torch state from the
+ *    present. Safe to carry because being dark twice is still just being dark: the douse
+ *    sources it re-exposes (a vanished ghost, the pool) have nothing to re-collect.
  *  - `lastCheckpoint`: a checkpoint is progress you earned; a rewind shouldn't revoke it.
  *  - The `reached*`/`bossDefeated` latches: run-level achievement flags. You did find the
  *    pink realm, whatever time says.
  */
 const CARRY_FORWARD_KEYS = [
   "stats",
+  "heroTorchLit",
   "lastCheckpoint",
   "reachedPinkRealm",
   "reachedOutsideWorld",
