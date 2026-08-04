@@ -249,6 +249,12 @@ function runProgressProps(gs: GameState) {
     bossEntranceKind: gs.bossEntranceKind,
     bossKind: gs.bossKind,
     dailyBossKind: gs.dailyBossKind,
+    // Switch gate: what the day offered, and whether the player threw it by rock or by boot.
+    // Left undefined on a day with no gate so those runs stay out of the throw-rate
+    // denominator rather than counting as "offered but ignored".
+    switchGateFloor: gs.switchGate?.floor,
+    switchGateAccess: gs.switchGate?.access,
+    switchGateThrownBy: gs.switchGate?.thrownBy,
   };
 }
 
