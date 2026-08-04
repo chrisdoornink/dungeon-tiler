@@ -20,6 +20,7 @@ import { FLOOR, WALL, FLOWERS, Direction, TileSubtype } from "../map/constants";
 import type { MapData, SealPayload, SealPayloads } from "../map/types";
 import type { GameState } from "../map/game-state";
 import { generateCompleteMapForFloor } from "../map/map-features";
+import { computeTorchGlow } from "../torch_glow";
 import { Enemy } from "../enemy";
 
 export type MoatElement = "lava" | "water";
@@ -190,6 +191,24 @@ function cloneMap(map: MapData): MapData {
   };
 }
 
+const ORTHO: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+
+/**
+ * Can the hero stand on (y,x)? Lava + abyss always block; deep water blocks unless
+ * `wadeable` (the hero can swim it, losing the torch). Shared by every flood below so
+ * "reachable" and "reachable in the dark" can never disagree about the terrain.
+ */
+function isWalkable(map: MapData, y: number, x: number, wadeable: boolean): boolean {
+  const H = map.tiles.length;
+  const W = map.tiles[0].length;
+  if (y < 0 || x < 0 || y >= H || x >= W) return false;
+  if (map.tiles[y][x] !== FLOOR && map.tiles[y][x] !== FLOWERS) return false;
+  const s = map.subtypes[y]?.[x] ?? [];
+  if (s.includes(TileSubtype.LAVA) || s.includes(TileSubtype.OPEN_ABYSS)) return false;
+  if (s.includes(TileSubtype.DEEP_WATER) && !wadeable) return false;
+  return true;
+}
+
 /**
  * Tiles the hero can reach on foot. Lava + abyss always block; deep water blocks
  * unless `wadeable` (the hero can swim it, losing the torch).
@@ -200,23 +219,15 @@ function floodReachable(
   sx: number,
   opts?: { wadeable?: boolean }
 ): Set<string> {
-  const H = map.tiles.length;
-  const W = map.tiles[0].length;
-  const passable = (y: number, x: number) => {
-    if (y < 0 || x < 0 || y >= H || x >= W) return false;
-    if (map.tiles[y][x] !== FLOOR && map.tiles[y][x] !== FLOWERS) return false;
-    const s = map.subtypes[y]?.[x] ?? [];
-    if (s.includes(TileSubtype.LAVA) || s.includes(TileSubtype.OPEN_ABYSS)) return false;
-    if (s.includes(TileSubtype.DEEP_WATER) && !opts?.wadeable) return false;
-    return true;
-  };
+  const passable = (y: number, x: number) =>
+    isWalkable(map, y, x, opts?.wadeable === true);
   const seen = new Set<string>();
   if (!passable(sy, sx)) return seen;
   seen.add(`${sy},${sx}`);
   const q: Array<[number, number]> = [[sy, sx]];
   while (q.length) {
     const [y, x] = q.shift()!;
-    for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+    for (const [dy, dx] of ORTHO) {
       const ny = y + dy;
       const nx = x + dx;
       const k = `${ny},${nx}`;
@@ -469,56 +480,188 @@ function stampCornerWaterPatch(map: MapData, hy: number, hx: number): void {
 }
 
 /**
- * Place the DARK_PORTAL on the reachable floor tile farthest from the hero that has
- * NO relight source (wall torch / lava) beside it, so once the hero douses their
- * torch it stays out and the portal remains visible + usable. Prefers tiles the hero
- * can only get to by wading (past the water).
+ * Would ending a move on (y,x) RELIGHT a doused torch? Mirrors the two relight rules in
+ * movePlayer exactly: orthogonally adjacent to a WALL_TORCH, or anywhere inside a LAVA
+ * tile's glow. Built on the same computeTorchGlow the relight check itself uses (the glow
+ * octagon is symmetric, so "lava in the hero's glow" and "hero in a lava tile's glow" are
+ * the same test), so the generator's idea of safe cannot drift from the engine's.
+ */
+function relightsTorchAt(map: MapData, y: number, x: number): boolean {
+  for (const [dy, dx] of ORTHO) {
+    if ((map.subtypes[y + dy]?.[x + dx] ?? []).includes(TileSubtype.WALL_TORCH)) return true;
+  }
+  for (const key of computeTorchGlow(y, x, map.tiles).keys()) {
+    const [ly, lx] = key.split(",").map(Number);
+    if ((map.subtypes[ly]?.[lx] ?? []).includes(TileSubtype.LAVA)) return true;
+  }
+  return false;
+}
+
+/**
+ * Does a doused torch STAY out when the hero ends a move here? Deep water snuffs it and
+ * overrides every relight source, so a water tile is dark whatever sits beside it.
+ */
+function staysDarkAt(map: MapData, y: number, x: number): boolean {
+  if ((map.subtypes[y]?.[x] ?? []).includes(TileSubtype.DEEP_WATER)) return true;
+  return !relightsTorchAt(map, y, x);
+}
+
+/** Tiles reachable from `seeds` WITHOUT ever ending a step somewhere that relights. */
+function floodDark(map: MapData, seeds: Array<[number, number]>): Set<string> {
+  const seen = new Set<string>();
+  const q: Array<[number, number]> = [];
+  for (const [y, x] of seeds) {
+    const k = `${y},${x}`;
+    if (seen.has(k) || !isWalkable(map, y, x, true) || !staysDarkAt(map, y, x)) continue;
+    seen.add(k);
+    q.push([y, x]);
+  }
+  while (q.length) {
+    const [y, x] = q.shift()!;
+    for (const [dy, dx] of ORTHO) {
+      const ny = y + dy;
+      const nx = x + dx;
+      const k = `${ny},${nx}`;
+      if (seen.has(k)) continue;
+      if (!isWalkable(map, ny, nx, true) || !staysDarkAt(map, ny, nx)) continue;
+      seen.add(k);
+      q.push([ny, nx]);
+    }
+  }
+  return seen;
+}
+
+/** Every deep-water tile the hero can actually get to — the day's douse sources. */
+function reachableWater(map: MapData, reachable: Set<string>): Array<[number, number]> {
+  const out: Array<[number, number]> = [];
+  for (let y = 0; y < map.tiles.length; y++) {
+    for (let x = 0; x < map.tiles[y].length; x++) {
+      if (!reachable.has(`${y},${x}`)) continue;
+      if ((map.subtypes[y][x] ?? []).includes(TileSubtype.DEEP_WATER)) out.push([y, x]);
+    }
+  }
+  return out;
+}
+
+/**
+ * Run the pool toward the nearest tile that DOES stay dark, one tile at a time, and return
+ * whether it got there.
+ *
+ * Only fires when every route out of the water passes a torch — i.e. when the day would
+ * otherwise be the unwinnable one this whole dance exists to prevent. Deterministic
+ * (breadth-first, no RNG) so it cannot disturb the daily stream's draw order, and it only
+ * ever converts BARE floor, so the exit, key, chests, pots and the hero's own tile survive.
+ */
+function extendWaterToDark(map: MapData, water: Array<[number, number]>): boolean {
+  const bare = (y: number, x: number) =>
+    isWalkable(map, y, x, true) && (map.subtypes[y]?.[x]?.length ?? 0) === 0;
+
+  // BFS out from the pool over bare floor, remembering each tile's parent so the winning
+  // route can be walked back and flooded.
+  const parent = new Map<string, string | null>();
+  const q: Array<[number, number]> = [];
+  for (const [y, x] of water) {
+    parent.set(`${y},${x}`, null);
+    q.push([y, x]);
+  }
+  let target: string | null = null;
+  while (q.length && !target) {
+    const [y, x] = q.shift()!;
+    for (const [dy, dx] of ORTHO) {
+      const ny = y + dy;
+      const nx = x + dx;
+      const k = `${ny},${nx}`;
+      if (parent.has(k) || !bare(ny, nx)) continue;
+      parent.set(k, `${y},${x}`);
+      if (staysDarkAt(map, ny, nx)) {
+        target = k;
+        break;
+      }
+      q.push([ny, nx]);
+    }
+  }
+  if (!target) return false;
+
+  // DEEP water only, with no shallow rim like a generated pool has: shallow water and
+  // stepping stones are "dry enough" and do NOT snuff the torch (see movePlayer), so an
+  // edged pool would relight the hero mid-crossing and undo the whole point of this.
+  //
+  // Flood the route BUT NOT the target itself: the target already stays dark, and it is
+  // where the portal is about to go.
+  for (let step = parent.get(target); step; step = parent.get(step) ?? null) {
+    const [sy, sx] = step.split(",").map(Number);
+    if (!bare(sy, sx)) continue; // the pool tiles the walk ends on
+    map.subtypes[sy][sx] = [TileSubtype.DEEP_WATER];
+  }
+  return true;
+}
+
+/**
+ * Place the DARK_PORTAL on the farthest tile the hero can reach FROM THE WATER WITHOUT
+ * RELIGHTING — so dousing in the pool and walking to the portal is actually possible.
+ *
+ * The old rule only checked the portal's own 3x3 for a relight source, which is not the
+ * invariant the entrance needs: the whole ROUTE has to stay dark. On a real daily floor 3
+ * (unlike the /test-boss-entrances harness, which used to build this room with zero wall
+ * torches) a single torch beside the only corridor back relights the torch and makes the
+ * portal inert — an unreachable secret on an otherwise normal day.
+ *
+ * The ghosts are not a substitute: an adjacent ghost snuffs the torch and VANISHES, so
+ * they are three one-shot douses that a player can spend anywhere on the floor. Only the
+ * pool is a repeatable source, so the pool is what the reachable-in-the-dark guarantee is
+ * anchored to.
  */
 function placeDarkPortal(map: MapData, hy: number, hx: number): void {
   const H = map.tiles.length;
   const W = map.tiles[0].length;
   const reachable = floodReachable(map, hy, hx, { wadeable: true });
-  const noRelightNear = (y: number, x: number) => {
-    for (let dy = -1; dy <= 1; dy++)
-      for (let dx = -1; dx <= 1; dx++) {
-        const s = map.subtypes[y + dy]?.[x + dx] ?? [];
-        if (s.includes(TileSubtype.WALL_TORCH) || s.includes(TileSubtype.LAVA)) return false;
-      }
-    return true;
-  };
-  let best: [number, number] | null = null;
-  let bestD = -1;
-  for (let y = 1; y < H - 1; y++) {
-    for (let x = 1; x < W - 1; x++) {
-      if (map.tiles[y][x] !== FLOOR) continue;
-      if ((map.subtypes[y][x]?.length ?? 0) !== 0) continue; // bare floor only
-      if (!reachable.has(`${y},${x}`)) continue;
-      if (!noRelightNear(y, x)) continue;
-      const d = Math.abs(y - hy) + Math.abs(x - hx);
-      if (d > bestD) {
-        bestD = d;
-        best = [y, x];
+  const water = reachableWater(map, reachable);
+  if (water.length === 0) return; // no douse source at all: nothing to anchor to
+
+  let dark = floodDark(map, water);
+  const candidates = () => {
+    let best: [number, number] | null = null;
+    let bestD = -1;
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 1; x < W - 1; x++) {
+        if (map.tiles[y][x] !== FLOOR) continue;
+        if ((map.subtypes[y][x]?.length ?? 0) !== 0) continue; // bare floor only
+        if (!dark.has(`${y},${x}`)) continue;
+        const d = Math.abs(y - hy) + Math.abs(x - hx);
+        if (d > bestD) {
+          bestD = d;
+          best = [y, x];
+        }
       }
     }
+    return best;
+  };
+
+  let best = candidates();
+  if (!best && extendWaterToDark(map, water)) {
+    // The pool now runs to dry dark ground; re-seed from the water it grew into.
+    dark = floodDark(map, reachableWater(map, floodReachable(map, hy, hx, { wadeable: true })));
+    best = candidates();
   }
   if (best) map.subtypes[best[0]][best[1]] = [TileSubtype.DARK_PORTAL];
 }
 
 /**
- * DOUSE approach, in a REAL Level-3-sized room. A dark dungeon (no wall torches, so
- * it stays black once doused) with a forced deep-water pool: wade it to snuff your
- * torch, and the DARK_PORTAL — invisible in the light — lights up as a beacon across
- * the dark and can be entered. Three ghosts prowl (and, being torch-snuffers, may
- * plunge you into the dark themselves).
+ * DOUSE approach, in a REAL Level-3-sized room with the floor's REAL wall torches: wade
+ * the deep-water pool to snuff your torch, and the DARK_PORTAL — invisible in the light —
+ * lights up as a beacon across the dark and can be entered. Three ghosts prowl (and, being
+ * torch-snuffers, may plunge you into the dark themselves).
+ *
+ * The torches are the point of the harness. This used to build the room with
+ * `{ wallTorches: 0 }`, which made the room dark-by-construction and so made it the one
+ * arrangement that CANNOT reproduce the failure that matters: a torch beside the only
+ * corridor back, relighting the hero and leaving the portal inert. placeDarkPortal now
+ * guarantees a route that stays dark, and this harness is where that gets played.
  */
 export function buildDousePortalApproach(): GameState {
-  // The GHOSTS are the way in: they snuff the torch when adjacent (and their presence
-  // signals the secret), revealing the DARK_PORTAL beacon. No wall torches, so it
-  // stays dark once snuffed. Just a few deep-water tiles sit in the far corner.
   const map = generateCompleteMapForFloor(
     { chests: 0, keys: 0, chestContents: [] },
-    3,
-    { wallTorches: 0 }
+    3
   );
   const [hy, hx] = findPlayerPos(map);
   stampCornerWaterPatch(map, hy, hx);
