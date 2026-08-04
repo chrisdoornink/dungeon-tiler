@@ -173,3 +173,60 @@ describe("wait control", () => {
     expect(onWait).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("slide direction symmetry", () => {
+  /**
+   * The slab is drawn in its DESTINATION tile and translated back toward where it came from, so
+   * mid-slide it overhangs a neighbour. `.fov-tier-1/-2` put `filter: brightness()` on every tile,
+   * which makes each tile its own stacking context — so a z-index on the slab element cannot paint
+   * outside its parent, and tiles just resolve in DOM order. That made DOWNWARD slides look right
+   * (destination is later in the DOM) while UPWARD ones stayed hidden until they crossed their own
+   * border. The fix lifts the whole TILE, so these assert the tile is lifted in both directions.
+   */
+  const renderSliding = (dy: number) =>
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
+        isVisible={true}
+        platformStep={{
+          dy,
+          dx: 0,
+          dur: PLATFORM_SLIDE.durMs,
+          ease: "ease-in-out",
+          seq: 1,
+          delay: PLATFORM_SLIDE.delayMs,
+        }}
+      />
+    );
+
+  it("lifts the tile for an UPWARD slide (dy = +1, overhang below)", () => {
+    renderSliding(1);
+    const tile = screen.getByTestId("tile-0");
+    expect(tile.style.zIndex).not.toBe("");
+    expect(Number(tile.style.zIndex)).toBeGreaterThan(0);
+    const slab = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(slab.style.getPropertyValue("--smooth-step-from")).toContain("40px");
+  });
+
+  it("lifts the tile for a DOWNWARD slide too", () => {
+    renderSliding(-1);
+    const tile = screen.getByTestId("tile-0");
+    expect(Number(tile.style.zIndex)).toBeGreaterThan(0);
+    const slab = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    expect(slab.style.getPropertyValue("--smooth-step-from")).toContain("-40px");
+  });
+
+  it("does not lift a tile whose slab is standing still", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.LAVA, TileSubtype.MOVING_PLATFORM]}
+        isVisible={true}
+      />
+    );
+    expect(screen.getByTestId("tile-0").style.zIndex).toBe("");
+  });
+});

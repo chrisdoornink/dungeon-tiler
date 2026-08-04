@@ -2287,7 +2287,22 @@ export const Tile: React.FC<TileProps> = ({
             backgroundPosition: "center",
             backgroundRepeat: "no-repeat",
             position: "relative", // Ensure relative positioning for absolute children
-            backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent'
+            backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent',
+            // LIFT THE WHOLE TILE while a slab is sliding into it, not just the slab.
+            //
+            // The slab is drawn in its DESTINATION tile and translated back toward where it came
+            // from, so mid-slide it overhangs a neighbouring tile. A z-index on the slab element
+            // cannot help: .fov-tier-1/-2 put `filter: brightness()` on every tile, which makes
+            // each tile its own stacking context, so the slab can never paint outside its own
+            // parent. Tiles then simply paint in DOM order — which is why DOWNWARD slides looked
+            // right (destination is later in the DOM, so it overlaps the tile above) and UPWARD
+            // ones vanished until they crossed their own border (destination is earlier, so the
+            // tile below painted over the overhang).
+            // 1100 specifically: above every terrain overlay a neighbouring tile can paint
+            // (.lavaFlame is 1020, .roadOverlay 1010), since a tier-3 neighbour has no filter and so
+            // no stacking context of its own — its bubbles would otherwise cover the overhang. Still
+            // well below enemies (10500) and the hero (11000), which must stay on top of a slab.
+            zIndex: platformStep ? 1100 : undefined
           }}
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}

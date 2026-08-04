@@ -764,14 +764,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
    * there is no visible effect of its own, so a doubled wait would be invisible except that the
    * platform you were timing has moved two tiles.
    */
-  const handleWait = useCallback(() => {
-    if (actionsLockedRef.current) return;
-    setGameState((prev) => {
-      const newState = consumeOnce(prev, performWait);
-      CurrentGameStorage.saveCurrentGame(newState, resolvedStorageSlot);
-      return newState;
-    });
-  }, [resolvedStorageSlot, consumeOnce]);
 
   // Handle using potion from inventory
   const handleUsePotion = useCallback(() => {
@@ -2085,6 +2077,43 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const smoothQueuedRef = useRef<Direction | null>(null);
   // Direction keys currently held (most recent last).
   const smoothHeldRef = useRef<Direction[]>([]);
+
+  const handleWait = useCallback(() => {
+    if (actionsLockedRef.current) return;
+    // Resolved in the handler BODY, not inside a setGameState updater. Two reasons: StrictMode
+    // double-invokes updaters and a doubled turn moves everything twice (see consumeOnce), and the
+    // camera tween below needs the hero's before/after positions, which is a side effect an updater
+    // must not perform. Same shape as handleThrowRock.
+    const before = findPlayerInState(gameState);
+    const next = performWait(gameState);
+    const after = findPlayerInState(next);
+
+    // Waiting can MOVE the hero — that is the whole point of it, since a platform carries its
+    // rider. Without a tween the camera snapped, so the world jumped under a hero who had not
+    // touched a direction key. The glide is started `delayMs` in the future so the hero holds
+    // still, then travels in step with the slab; the rAF loop clamps negative progress to 0, which
+    // is what makes a future start read as a hold.
+    if (
+      smoothEnabled &&
+      before &&
+      after &&
+      Math.abs(after[0] - before[0]) + Math.abs(after[1] - before[1]) === 1
+    ) {
+      const from = smoothVisualRef.current ?? [before[0], before[1]];
+      smoothStepRef.current = {
+        fromR: from[0],
+        fromC: from[1],
+        toR: after[0],
+        toC: after[1],
+        start: performance.now() + PLATFORM_SLIDE.delayMs,
+        dur: PLATFORM_SLIDE.durMs,
+        running: false,
+      };
+    }
+
+    CurrentGameStorage.saveCurrentGame(next, resolvedStorageSlot);
+    setGameState(next);
+  }, [gameState, resolvedStorageSlot, smoothEnabled]);
   // Held-to-run timers for the on-screen d-pad when smooth mode is off (smooth
   // mode chains held inputs via the rAF loop instead).
   const mobileHoldTimeoutRef = useRef<number | null>(null);
