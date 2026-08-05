@@ -233,8 +233,8 @@ describe("moving platforms", () => {
     const { state } = lavaCrossing();
     // Hero aboard at the near end of the rail; an enemy squats on the very next tile.
     putHero(state.mapData, 4, 2);
-    const enemyTile: [number, number] = [4, 3];
-    advanceMachinery(state, [4, 2], new Set([`${enemyTile[0]},${enemyTile[1]}`]));
+    // Enemy squats on the deck's next tile (a blocker — it is NOT on the deck, so not a rider).
+    advanceMachinery(state, [4, 2], [{ y: 4, x: 3, kind: "fire-goblin" }]);
     // Deck did not move (still at column 2), and the hero was not carried onto the enemy tile.
     expect(platformTile(state.platforms![0])).toEqual([4, 2]);
     expect(heroAt(state)).toEqual([4, 2]);
@@ -515,5 +515,66 @@ describe("multi-tile decks", () => {
     const state = baseState(map, { platforms: [platform] });
     advanceMachinery(state, null);
     expect(state.platforms![0].index).toBe(0);
+  });
+});
+
+/**
+ * Enemies riding platforms. A rideable enemy that is standing on the deck when it moves is carried
+ * with it (so a goblin can chase the hero across a hazard on the same raft); one standing in the
+ * deck's path but NOT on it blocks the move instead (no overlap). Ghosts, pink goblins and snakes
+ * never ride.
+ */
+describe("enemies riding platforms", () => {
+  it("carries a rideable enemy standing on the deck", () => {
+    const { state } = lavaCrossing(); // deck at (4,2), rail 4,2..4,5
+    const goblin = { y: 4, x: 2, kind: "fire-goblin" };
+    advanceMachinery(state, null, [goblin]);
+    // Deck advanced 2->3, and the goblin rode with it.
+    expect(platformTile(state.platforms![0])).toEqual([4, 3]);
+    expect([goblin.y, goblin.x]).toEqual([4, 3]);
+  });
+
+  it("keeps two riders' offsets — they never collide", () => {
+    // A 3-tile band would be needed for two deck tiles; use the 4-tile rail with a 1-tile deck is
+    // not enough. Build a 2-tile deck so hero + goblin can both ride.
+    const map = blankMap(9, 9);
+    for (let x = 2; x <= 5; x++) map.subtypes[4][x].push(TileSubtype.LAVA);
+    const platform: Platform = {
+      id: "ferry",
+      track: [[4, 2], [4, 3], [4, 4], [4, 5]],
+      index: 0,
+      dir: 1,
+      running: true,
+      length: 2,
+    };
+    stampPlatform(map, platform);
+    const state = baseState(map, { platforms: [platform] });
+    // Hero on the front deck tile, goblin on the back deck tile.
+    putHero(map, 4, 3);
+    const goblin = { y: 4, x: 2, kind: "fire-goblin" };
+    advanceMachinery(state, [4, 3], [goblin]);
+    // Deck 0->1 (tiles 3,4). Hero 3->4, goblin 2->3. Still one tile apart, no shared tile.
+    expect(heroAt(state)).toEqual([4, 4]);
+    expect([goblin.y, goblin.x]).toEqual([4, 3]);
+  });
+
+  it("does NOT carry a ghost, snake, or pink goblin", () => {
+    for (const kind of ["ghost", "snake", "pink-goblin"]) {
+      const { state } = lavaCrossing();
+      const e = { y: 4, x: 2, kind };
+      advanceMachinery(state, null, [e]);
+      // Deck moved but the non-riding enemy stayed put (it does not ride).
+      expect(platformTile(state.platforms![0])).toEqual([4, 3]);
+      expect([e.y, e.x]).toEqual([4, 2]);
+    }
+  });
+
+  it("a heroOnly deck carries no enemies", () => {
+    const { state } = lavaCrossing();
+    state.platforms![0].heroOnly = true;
+    const goblin = { y: 4, x: 2, kind: "fire-goblin" };
+    advanceMachinery(state, null, [goblin]);
+    expect(platformTile(state.platforms![0])).toEqual([4, 3]);
+    expect([goblin.y, goblin.x]).toEqual([4, 2]); // left behind
   });
 });

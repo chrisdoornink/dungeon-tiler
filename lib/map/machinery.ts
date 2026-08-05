@@ -21,6 +21,7 @@
 // authored puzzle rooms verifiable and replays honest.
 import { TileSubtype } from "./constants";
 import type { MapData, Platform, ToggleGroup } from "./types";
+import { enemyCanRidePlatforms } from "../enemy";
 
 /**
  * The colour a toggle switch shows in each of its states, indexed by state.
@@ -186,18 +187,22 @@ export function advanceMachinery(
   state: { mapData: MapData; platforms?: Platform[] },
   hero: [number, number] | null,
   /**
-   * Tiles ("y,x") occupied by enemies. A deck stalls rather than sliding onto one, the same way it
-   * refuses the non-rider hero — enemies live on the game state, not in `subtypes`, so they are
-   * invisible to this module unless passed in. Omit when there is nothing to avoid.
+   * The enemies on the board. They live on the game state, not in `subtypes`, so this module
+   * cannot see them otherwise. Used two ways: any enemy on a tile the deck is NEWLY covering
+   * BLOCKS it (so a deck stalls at a body rather than sliding over it), and any RIDEABLE enemy
+   * already ON the deck is CARRIED with it — that is how a goblin chases the hero across a hazard
+   * on the same raft. Mutated in place (y,x) when carried. Omit when there are no enemies.
    */
-  occupied?: ReadonlySet<string>
+  enemies?: Array<{ y: number; x: number; kind: string }>
 ): { carried: boolean } {
   if (!state.platforms || state.platforms.length === 0) return { carried: false };
+  const occupied = new Set((enemies ?? []).map((e) => `${e.y},${e.x}`));
   let carried = false;
   for (const p of state.platforms) {
     // maxIndex < 1 means the deck fills its whole track and has nowhere to go. That is an authoring
     // mistake (a 3-long raft on a 3-tile rail), and stalling beats thrashing in place.
     if (!p.running || maxIndex(p) < 1) continue;
+    const prevIndex = p.index;
     const oldSpan = platformTiles(p);
     const { index, dir } = stepIndex(p);
     if (index === p.index) continue;
@@ -230,6 +235,25 @@ export function advanceMachinery(
       newSpan,
       riderFrom && riderTo ? { from: riderFrom, to: riderTo } : null
     );
+
+    // Carry rideable enemies riding the deck. An enemy at oldSpan[k] = track[prevIndex+k] keeps
+    // its offset and moves one track step, exactly like the hero. Non-riders stay put (and blocked
+    // the move if they were in the deck's path). A heroOnly deck carries no enemies. Positions are
+    // mutated in place; uniform +dir shift preserves every rider's separation, so no two entities
+    // can land on one tile.
+    if (!p.heroOnly && enemies) {
+      for (const e of enemies) {
+        const k = oldSpan.findIndex(([oy, ox]) => oy === e.y && ox === e.x);
+        if (k < 0) continue;
+        if (!enemyCanRidePlatforms(e.kind)) continue;
+        const dest = p.track[prevIndex + k + dir];
+        if (dest) {
+          e.y = dest[0];
+          e.x = dest[1];
+        }
+      }
+    }
+
     p.index = index;
     p.dir = dir;
     if (riderIdx >= 0) carried = true;

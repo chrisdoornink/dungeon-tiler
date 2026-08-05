@@ -381,6 +381,18 @@ function isWall(grid: number[][], y: number, x: number): boolean {
 // Variant that allows per-enemy rules: ghosts can traverse faulty floors.
 // Goblins avoid FAULTY_FLOOR when patrolling but not when chasing.
 // All enemies always avoid OPEN_ABYSS.
+/**
+ * Which enemy kinds will board (and be carried by) a moving platform.
+ *
+ * Excluded, by request: GHOSTS (they float over everything and pass through walls — a deck is
+ * meaningless to them), PINK GOBLINS (water is lethal to them and they retreat rather than
+ * commit), and SNAKES (they won't swim and don't chase like goblins). Everything else — the
+ * fire/water/earth goblin family, stone and white goblins — rides. Bosses never reach this path.
+ */
+export function enemyCanRidePlatforms(kind: string): boolean {
+  return kind !== "ghost" && kind !== "pink-goblin" && kind !== "snake";
+}
+
 function isSafeFloorForEnemy(
   grid: number[][],
   subtypes: number[][][] | undefined,
@@ -398,6 +410,11 @@ function isSafeFloorForEnemy(
   if (!isFloor(grid, y, x)) return false;
   if (!subtypes) return true;
   const tileSubs = subtypes[y]?.[x] || [];
+  // A MOVING_PLATFORM deck is solid ground: an enemy that rides platforms may board it even
+  // though the tile beneath is lava or deep water. This is what lets a goblin chase the hero onto
+  // a raft. Kinds that never ride (ghosts float, pink goblins die on water contact, snakes won't)
+  // fall through to the normal hazard checks and refuse it. See enemyCanRidePlatforms.
+  if (tileSubs.includes(73) && enemyCanRidePlatforms(kind)) return true; // MOVING_PLATFORM
   const isFaulty = tileSubs.includes(18); // FAULTY_FLOOR
   const isOpenAbyss = tileSubs.includes(51); // OPEN_ABYSS
   const isLava = tileSubs.includes(60); // LAVA (instant-death terrain)

@@ -198,10 +198,10 @@ function endTurn(state: GameState, amount: number = 1): void {
     const currentStats = state.stats;
     state.stats = { ...currentStats, steps: currentStats.steps + amount };
   }
-  const enemyTiles = new Set(
-    (state.enemies ?? []).map((e) => `${e.y},${e.x}`)
-  );
-  advanceMachinery(state, findPlayerPosition(state.mapData), enemyTiles);
+  // Pass the live enemies so a deck both stalls at any it would run over AND carries the rideable
+  // ones standing on it (they board by pathing onto the deck; see isSafeFloorForEnemy). Mutated in
+  // place when carried, so this must be the real enemy array, not a copy.
+  advanceMachinery(state, findPlayerPosition(state.mapData), state.enemies);
 }
 
 /**

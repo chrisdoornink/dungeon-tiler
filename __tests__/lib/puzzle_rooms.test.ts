@@ -2,6 +2,7 @@ import { PUZZLE_ROOMS, parsePuzzleRoom, describeRoom } from "../../lib/puzzles/r
 import { Direction, TileSubtype } from "../../lib/map/constants";
 import { platformTile, platformTiles } from "../../lib/map/machinery";
 import { movePlayer, performWait, type GameState } from "../../lib/map/game-state";
+import { Enemy } from "../../lib/enemy";
 import { createEmptyByKind } from "../../lib/enemies/registry";
 
 /**
@@ -422,5 +423,79 @@ describe("enemy rooms", () => {
 
     expect(reach(false)).toBe(false); // dry-land only: exit unreachable
     expect(reach(true)).toBe(true); // riding the rail: exit reachable
+  });
+});
+
+describe("enemies ride platforms end-to-end", () => {
+  // The full path, not just the unit pieces: a chasing fire-goblin should PATH onto the raft
+  // (isSafeFloorForEnemy lets a rideable kind step onto a MOVING_PLATFORM tile) and then be
+  // CARRIED by it over the lava (advanceMachinery), through the real performWait turn loop.
+  //
+  // Controlled geometry so it does not depend on room timing: a 3-tile rail with dry docks at each
+  // end over a one-tile lava gap, the goblin on the near dock's approach, the hero on the far dock
+  // as bait. The only path from goblin to hero crosses the rail, so the goblin must board.
+  //
+  //   row2:  # g 1 1 1 H #     cols 1..5 ; rail at 2,3,4 ; (2,3) is lava under the deck
+  function ridingRoom() {
+    const tiles = Array.from({ length: 4 }, () => Array(7).fill(0));
+    const subtypes: number[][][] = Array.from({ length: 4 }, () =>
+      Array.from({ length: 7 }, () => [] as number[])
+    );
+    for (let x = 0; x < 7; x++) {
+      tiles[0][x] = 1;
+      tiles[3][x] = 1;
+    }
+    tiles[1][0] = 1; tiles[1][6] = 1;
+    tiles[2][0] = 1; tiles[2][6] = 1;
+    subtypes[2][3].push(TileSubtype.LAVA); // the gap under the middle of the rail
+    subtypes[2][5].push(TileSubtype.PLAYER); // hero (bait) on the far dock
+    const goblin = new Enemy({ y: 2, x: 1 });
+    const platform = {
+      id: "r",
+      track: [[2, 2], [2, 3], [2, 4]] as Array<[number, number]>,
+      index: 0,
+      dir: 1 as 1 | -1,
+      running: true,
+      length: 2,
+    };
+    // Stamp deck + track like parsePuzzleRoom does.
+    for (const [ty, tx] of platform.track) subtypes[ty][tx].push(TileSubtype.PLATFORM_TRACK);
+    for (const [ty, tx] of platform.track.slice(0, 2)) subtypes[ty][tx].push(TileSubtype.MOVING_PLATFORM);
+    const state = {
+      hasExitKey: false, showFullMap: true, win: false, playerDirection: Direction.LEFT,
+      enemies: [goblin], npcs: [], heroHealth: 5, heroMaxHealth: 5, heroAttack: 1, heroTorchLit: true,
+      rockCount: 0, runeCount: 0, foodCount: 0, potionCount: 0, mode: "normal", allowCheckpoints: false,
+      mapData: { tiles, subtypes }, platforms: [platform],
+      combatRng: () => 0.5,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0, byKind: {} },
+    } as unknown as GameState;
+    return { state, goblin };
+  }
+
+  it("a chasing goblin boards the raft and is ferried over the lava gap", () => {
+    const { state, goblin } = ridingRoom();
+    let s = state;
+    let ferried = false;
+    for (let t = 0; t < 20 && !ferried; t++) {
+      s = performWait(s);
+      // (2,3) is the lava tile under the rail — a goblin can only stand there if the deck carried
+      // it there and is holding it over the gap.
+      if (goblin.y === 2 && goblin.x === 3 && s.mapData.subtypes[2][3].includes(TileSubtype.MOVING_PLATFORM)) {
+        ferried = true;
+      }
+    }
+    expect(ferried).toBe(true);
+  });
+
+  it("never lets the goblin and the hero share a tile during the crossing", () => {
+    const { state, goblin } = ridingRoom();
+    let s = state;
+    for (let t = 0; t < 20; t++) {
+      s = performWait(s);
+      const hero = s.mapData.subtypes
+        .flatMap((row, y) => row.map((cell, x) => (cell.includes(TileSubtype.PLAYER) ? `${y},${x}` : null)))
+        .find(Boolean);
+      if (hero) expect(`${goblin.y},${goblin.x}`).not.toBe(hero);
+    }
   });
 });

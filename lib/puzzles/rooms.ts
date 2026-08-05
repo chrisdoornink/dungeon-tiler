@@ -196,35 +196,36 @@ export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
   {
     name: "Behind Glass",
     asks:
-      "ENEMIES, ISOLATED. A lava river splits the room; you and the exit are on the safe top bank, " +
-      "and fire-goblins pace the bottom bank with a raft sliding through the lava between you. They " +
-      "can't cross the lava and won't board the raft, so nothing here can reach you — this is a " +
-      "bench for watching how goblins behave AROUND a moving platform, not a fight. Ride the raft " +
-      "down among them if you want a closer look.",
+      "ENEMIES, ISOLATED. A full-width lava river seals you and the exit on the top bank away from " +
+      "the fire-goblins below — nothing crosses it, in either direction. Their pen has its own raft " +
+      "running along a lava strip, and now that goblins CAN board a platform you can watch them ride " +
+      "it: boarding as it passes, riding, fighting for space on it. All of it behind glass; the raft " +
+      "is trapped in their pen and can never ferry one up to you.",
     map: [
       "################",
       "#H....E........#",
-      "#......1.......#",
-      "#LLLLLL1LLLLLLL#",
-      "#LLLLLL1LLLLLLL#",
-      "#..g...1...g...#",
-      "#....g.....g...#",
+      "#..............#",
+      "#LLLLLLLLLLLLLL#",
+      "#..g........g..#",
+      "#11111111111111#",
+      "#..g........g..#",
       "################",
     ],
     trackOver: "lava",
+    // Docks at both ends of the goblins' horizontal rail so they can board from the dry banks.
     dryRail: [
-      [2, 7],
-      [5, 7],
+      [5, 1],
+      [5, 14],
     ],
-    lengths: { "1": 2 },
+    lengths: { "1": 3 },
   },
   {
     name: "The Getaway",
     asks:
-      "ENEMIES, CHASING. Fire-goblins are on your side this time and they hunt on sight. The only " +
-      "way across the lava to the exit is the raft — which they can't follow onto. Board it and " +
-      "ride across while they pile up on the near bank. Watch whether the platform reads as a real " +
-      "escape, and what the goblins do when their quarry floats away.",
+      "ENEMIES, CHASING. Fire-goblins are on your side this time and they hunt on sight. The raft is " +
+      "your way across the lava to the exit — but they can board it too now, so expect company. " +
+      "Board and ride, and watch what they do: pile up on the bank, or follow you onto the deck and " +
+      "fight for the crossing.",
     map: [
       "################",
       "#g..g.....H....#",

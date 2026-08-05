@@ -123,6 +123,16 @@ export interface Platform {
    * boarding window, which is where a one-tile slab is meanest.
    */
   length: number;
+  /**
+   * When true, enemies riding this deck are NOT carried (it is the hero's alone).
+   *
+   * PARTIAL as of now: this is honored in CARRYING (advanceMachinery won't ferry an enemy on a
+   * heroOnly deck) but NOT yet in enemy PATHING — a rideable enemy can still step onto a heroOnly
+   * deck and then be left behind when it moves. So do not author a heroOnly platform that enemies
+   * can reach until pathing honors this too; today no room sets it. Kept in the model so a future
+   * hero-only platform has a home.
+   */
+  heroOnly?: boolean;
 }
 
 export interface RoomTransition {
