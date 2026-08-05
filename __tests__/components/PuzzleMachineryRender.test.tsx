@@ -424,3 +424,42 @@ describe("deck stacks above a glowing tile below it", () => {
     expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(10050);
   });
 });
+
+describe("first-platform wait tip", () => {
+  const WALL_TYPE = { id: 1, name: "wall", color: "#333", walkable: false };
+  const tileTypes = { 0: FLOOR_TYPE, 1: WALL_TYPE };
+
+  function stateFor(roomName: string): GameState {
+    const room = parsePuzzleRoom(PUZZLE_ROOMS.find((r) => r.name === roomName)!);
+    return {
+      hasKey: false, hasExitKey: false, hasSword: false, hasShield: false, showFullMap: true,
+      win: false, playerDirection: 2, enemies: room.enemies, npcs: [], heroHealth: 5,
+      heroMaxHealth: 5, heroAttack: 1, heroTorchLit: true, rockCount: room.rocks, runeCount: 0,
+      foodCount: 0, potionCount: 0, mode: "normal", allowCheckpoints: false, mapData: room.mapData,
+      toggleGroups: room.toggleGroups, platforms: room.platforms, recentDeaths: [], diaryEntries: [],
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0, byKind: {} },
+    } as unknown as GameState;
+  }
+
+  beforeEach(() => window.localStorage.clear());
+
+  it("shows once, the first time a platform is on the floor", () => {
+    render(<TilemapGrid tileTypes={tileTypes} initialGameState={stateFor("The Ferry")} forceDaylight storageSlot="test" />);
+    expect(screen.getByTestId("wait-tip")).toBeInTheDocument();
+    // It writes the seen-flag so it will not return.
+    expect(window.localStorage.getItem("tb_wait_tip_seen")).toBe("1");
+  });
+
+  it("does not show again once it has been seen", () => {
+    window.localStorage.setItem("tb_wait_tip_seen", "1");
+    render(<TilemapGrid tileTypes={tileTypes} initialGameState={stateFor("The Ferry")} forceDaylight storageSlot="test" />);
+    expect(screen.queryByTestId("wait-tip")).not.toBeInTheDocument();
+  });
+
+  it("does not show on a floor that has no platform", () => {
+    // The Trade is toggles + spikes, no platform — the tip is about riding, so it must stay quiet.
+    render(<TilemapGrid tileTypes={tileTypes} initialGameState={stateFor("The Trade")} forceDaylight storageSlot="test" />);
+    expect(screen.queryByTestId("wait-tip")).not.toBeInTheDocument();
+    expect(window.localStorage.getItem("tb_wait_tip_seen")).toBeNull();
+  });
+})

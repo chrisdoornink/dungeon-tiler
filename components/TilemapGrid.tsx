@@ -2072,6 +2072,42 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     : false;
   const activeDialogueSpeaker = activeDialogueLine?.speaker ?? dialogueSession?.event.npcName ?? "";
   const activeDialogueFullText = activeDialogueLine?.text ?? "";
+  // One-time hint the first time a moving platform is on the floor: how to wait a turn (which is
+  // how you ride one). Mirrors the keyboard-controls tip in MobileControls — a fixed bottom-center
+  // message that auto-dismisses and never shows again (localStorage). Held as the message string
+  // (null = hidden) so the wording can adapt to the input method.
+  const WAIT_TIP_KEY = "tb_wait_tip_seen";
+  const [waitTip, setWaitTip] = useState<string | null>(null);
+  const waitTipTimer = useRef<number | null>(null);
+  const hasPlatform = (gameState.platforms?.length ?? 0) > 0;
+  useEffect(() => {
+    if (!hasPlatform || typeof window === "undefined") return;
+    try {
+      if (window.localStorage.getItem(WAIT_TIP_KEY)) return;
+    } catch {
+      return;
+    }
+    const coarse =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(pointer: coarse)").matches;
+    const how = coarse ? "tap either hourglass" : "press . (or numpad 5)";
+    setWaitTip(
+      `A moving platform. It shifts one tile each turn — stand on it and ${how} to wait and ride across.`
+    );
+    try {
+      window.localStorage.setItem(WAIT_TIP_KEY, "1");
+    } catch {
+      // ignore persistence failures — worst case the tip shows again next load
+    }
+    if (waitTipTimer.current) window.clearTimeout(waitTipTimer.current);
+    waitTipTimer.current = window.setTimeout(() => setWaitTip(null), 8000);
+    return () => {
+      if (waitTipTimer.current) window.clearTimeout(waitTipTimer.current);
+    };
+    // Fire once when a platform first appears on the floor; the localStorage guard keeps it to a
+    // single lifetime showing regardless of how often this re-runs.
+  }, [hasPlatform]);
+
   // Add state to track if player is currently moving
   const [isMoving, setIsMoving] = useState<boolean>(false);
   // Store the previous game state for smooth transitions
@@ -6333,6 +6369,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         />
       )}
       
+      {/* First-platform hint: how to wait a turn (and thus ride). Auto-dismisses; shown once ever.
+          Same look as the keyboard-controls tip so it reads as part of the same onboarding voice. */}
+      {waitTip && (
+        <div
+          data-testid="wait-tip"
+          role="status"
+          aria-live="polite"
+          className="fixed left-1/2 z-40 -translate-x-1/2 max-w-[90vw] rounded-lg bg-black/85 px-4 py-2 text-center text-sm text-white/90 shadow-lg pointer-events-none"
+          style={{ bottom: "max(4.5rem, calc(env(safe-area-inset-bottom, 1rem) + 4rem))" }}
+        >
+          {waitTip}
+        </div>
+      )}
+
       {/* Mobile controls - Outside ScreenShake to prevent displacement */}
       <MobileControls
         onMove={handleMobileMoveStart}
