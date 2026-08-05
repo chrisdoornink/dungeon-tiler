@@ -1,8 +1,12 @@
 import React from "react";
+jest.mock("next/navigation", () => ({ useRouter: () => ({ push: jest.fn() }) }));
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import { Tile } from "../../components/Tile";
 import MobileControls from "../../components/MobileControls";
+import { TilemapGrid } from "../../components/TilemapGrid";
+import { parsePuzzleRoom, PUZZLE_ROOMS } from "../../lib/puzzles/rooms";
+import type { GameState } from "../../lib/map/game-state";
 import { TileSubtype } from "../../lib/map";
 import { PLATFORM_SLIDE } from "../../lib/smooth_movement";
 import { TOGGLE_STATE_COLORS, toggleStateColor } from "../../lib/map/machinery";
@@ -353,5 +357,67 @@ describe("toggle switch state is visible", () => {
 
   it("every palette colour is distinct", () => {
     expect(new Set(TOGGLE_STATE_COLORS).size).toBe(TOGGLE_STATE_COLORS.length);
+  });
+});
+
+describe("deck stacks above a glowing tile below it", () => {
+  /**
+   * Regression for a very specific bug: the raft's bottom half vanished over LAVA but not over
+   * land or water. Cause — a platform deck is drawn on its ANCHOR tile and overflows DOWNWARD, and
+   * a glowing tile (lava emits light) lifts its wrapper to z-index 10050. So the lava tile beneath
+   * the anchor was a sibling stacking context at 10050 that painted OVER the deck's overflow. Water
+   * and floor do not glow, which is exactly why only lava showed the bug. The fix lifts a deck
+   * anchor's own wrapper to 10060, above that tier.
+   */
+  it("gives a deck-anchor tile's wrapper a z-index above the 10050 glow tier", () => {
+    const room = parsePuzzleRoom(
+      PUZZLE_ROOMS.find((r) => r.name === "The Ferry")!
+    );
+    const state = {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: false,
+      hasShield: false,
+      showFullMap: true,
+      win: false,
+      playerDirection: 2,
+      enemies: [],
+      npcs: [],
+      heroHealth: 5,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      heroTorchLit: true,
+      rockCount: 0,
+      runeCount: 0,
+      foodCount: 0,
+      potionCount: 0,
+      mode: "normal",
+      allowCheckpoints: false,
+      mapData: room.mapData,
+      toggleGroups: room.toggleGroups,
+      platforms: room.platforms,
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0, byKind: {} },
+      recentDeaths: [],
+      diaryEntries: [],
+    } as unknown as GameState;
+
+    render(
+      <TilemapGrid
+        tileTypes={{ 0: FLOOR_TYPE, 1: { id: 1, name: "wall", color: "#333", walkable: false } }}
+        initialGameState={state}
+        forceDaylight={true}
+        storageSlot="test"
+      />
+    );
+
+    const deck = screen.getByTestId(`subtype-icon-${TileSubtype.MOVING_PLATFORM}`);
+    // Walk up to the .tileWrapper (the element carrying data-row/data-col).
+    let wrapper: HTMLElement | null = deck.parentElement;
+    while (wrapper && wrapper.getAttribute("data-row") === null) {
+      wrapper = wrapper.parentElement;
+    }
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.style.zIndex).toBe("10060");
+    expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(10050);
   });
 });

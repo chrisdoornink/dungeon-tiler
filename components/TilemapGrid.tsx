@@ -6753,6 +6753,17 @@ function renderTileGrid(
             if (g != null || isSelfTorch || isDarkPortalBeacon) {
               wrapperStyle.zIndex = 10050;
             }
+            // A platform deck is drawn on its ANCHOR tile and overflows DOWNWARD into the tiles
+            // below it. Those tiles are separate wrappers, and a glowing tile (lava emits light)
+            // lifts its wrapper to the 10050 tier above — so a lava tile beneath the anchor is a
+            // sibling stacking context at 10050 that paints OVER the deck's overflow, and the
+            // bottom half of the raft vanishes. (Water doesn't glow, which is exactly why the bug
+            // only shows over lava.) Lift the anchor's own wrapper just above that tier so its
+            // overflow wins — still below enemies (10500), the hero (11000) and walls (12000), so
+            // those all still occlude the deck correctly.
+            if (decks?.has(`${rowIndex},${colIndex}`)) {
+              wrapperStyle.zIndex = 10060;
+            }
             // Desync each torch tile's flicker so neighbors don't pulse in
             // lockstep. Deterministic from coords (stable across renders); the
             // CSS var cascades into the tile's torch-glow flicker animation.
