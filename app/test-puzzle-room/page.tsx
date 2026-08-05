@@ -23,9 +23,9 @@ import { TileSubtype } from "../../lib/map/constants";
  * the hero must be aboard to be carried, so waiting is how you ride. There is no mobile button for
  * it yet.
  *
- * Deliberately NO enemies in any room. The premise being tested is a floor that is puzzle-heavy
- * and combat-light, and mixing the two in a first prototype would make it impossible to tell
- * which half was carrying the interest.
+ * The first rooms are deliberately enemy-free so the mechanic is judged on its own. The last two
+ * add fire-goblins: one where a hazard keeps them isolated (watch them near a moving platform
+ * without chase pressure) and one where they chase (watch a platform work as an escape route).
  */
 
 function roomToState(index: number, resetCount: number): GameState {
@@ -39,7 +39,7 @@ function roomToState(index: number, resetCount: number): GameState {
     showFullMap: true,
     win: false,
     playerDirection: Direction.DOWN,
-    enemies: [],
+    enemies: room.enemies,
     npcs: [],
     heroHealth: 5,
     heroMaxHealth: 5,
@@ -144,9 +144,10 @@ function TestPuzzleRoomInner() {
       <div className="text-center bg-black/70 rounded-lg p-3 w-full max-w-3xl">
         <h1 className="text-xl font-bold">Puzzle Machinery Prototype</h1>
         <p className="text-xs text-gray-300 mt-1">
-          Toggle switches and moving platforms, in hand-authored rooms with{" "}
-          <b>no enemies</b> — the premise is a puzzle-heavy, combat-light floor, and mixing
-          the two would hide which half is doing the work.
+          Toggle switches and moving platforms in hand-authored rooms. Most are{" "}
+          <b>enemy-free</b> to isolate the mechanic; the last two (<b>Behind Glass</b>,{" "}
+          <b>The Getaway</b>) add fire-goblins to see how they read around a moving platform —
+          isolated by a hazard in one, actively chasing in the other.
         </p>
         <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
           Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}

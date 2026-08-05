@@ -198,7 +198,10 @@ function endTurn(state: GameState, amount: number = 1): void {
     const currentStats = state.stats;
     state.stats = { ...currentStats, steps: currentStats.steps + amount };
   }
-  advanceMachinery(state, findPlayerPosition(state.mapData));
+  const enemyTiles = new Set(
+    (state.enemies ?? []).map((e) => `${e.y},${e.x}`)
+  );
+  advanceMachinery(state, findPlayerPosition(state.mapData), enemyTiles);
 }
 
 /**

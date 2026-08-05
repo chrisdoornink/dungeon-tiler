@@ -184,7 +184,13 @@ function repaintDeck(
  */
 export function advanceMachinery(
   state: { mapData: MapData; platforms?: Platform[] },
-  hero: [number, number] | null
+  hero: [number, number] | null,
+  /**
+   * Tiles ("y,x") occupied by enemies. A deck stalls rather than sliding onto one, the same way it
+   * refuses the non-rider hero — enemies live on the game state, not in `subtypes`, so they are
+   * invisible to this module unless passed in. Omit when there is nothing to avoid.
+   */
+  occupied?: ReadonlySet<string>
 ): { carried: boolean } {
   if (!state.platforms || state.platforms.length === 0) return { carried: false };
   let carried = false;
@@ -205,13 +211,15 @@ export function advanceMachinery(
 
     const newSpan = p.track.slice(index, index + deckLength(p));
     // The deck never shoves anything off a tile it is moving onto. Only tiles it is NOT already
-    // covering can be blocked — the rider's own tile is part of the deck and must not count.
-    const blocked = newSpan.some(
-      ([ny, nx]) =>
-        !oldSpan.some(([oy, ox]) => oy === ny && ox === nx) &&
-        has(state.mapData, ny, nx, TileSubtype.PLAYER) &&
-        !(riderTo && riderTo[0] === ny && riderTo[1] === nx)
-    );
+    // covering can be blocked — the rider's own tile is part of the deck and must not count. Both
+    // the non-rider hero and any enemy count as blockers, so a deck stalls at a body rather than
+    // sliding through it.
+    const blocked = newSpan.some(([ny, nx]) => {
+      if (oldSpan.some(([oy, ox]) => oy === ny && ox === nx)) return false;
+      if (riderTo && riderTo[0] === ny && riderTo[1] === nx) return false;
+      if (has(state.mapData, ny, nx, TileSubtype.PLAYER)) return true;
+      return !!occupied?.has(`${ny},${nx}`);
+    });
     if (blocked) continue;
     if (riderIdx >= 0 && !riderTo) continue; // would carry the rider off the end of the rail
 

@@ -334,3 +334,93 @@ describe("walkthroughs", () => {
     expect(wet.heroTorchLit).toBe(false);
   });
 });
+
+describe("enemy rooms", () => {
+  it("places a fire-goblin for every 'g', on walkable floor and off the tracks", () => {
+    for (const name of ["Behind Glass", "The Getaway"]) {
+      const spec = PUZZLE_ROOMS.find((r) => r.name === name)!;
+      const gCount = spec.map.join("").split("").filter((c) => c === "g").length;
+      const room = parsePuzzleRoom(spec);
+      expect(room.enemies).toHaveLength(gCount);
+      for (const e of room.enemies) {
+        expect(e.kind).toBe("fire-goblin");
+        // On floor, not a wall, and not sharing a tile with the deck.
+        expect(room.mapData.tiles[e.y][e.x]).toBe(0);
+        expect(room.mapData.subtypes[e.y][e.x]).not.toContain(TileSubtype.MOVING_PLATFORM);
+      }
+      expect(describeRoom(room)).toMatch(/enem/);
+    }
+  });
+
+  it("Behind Glass keeps every goblin isolated from the hero by lava", () => {
+    // The whole promise of the isolated room: nothing can reach the hero. A fire-goblin can walk
+    // floor but never lava, so the hero's reachable region (over dry floor only) must contain no
+    // goblin — otherwise it isn't actually a safe observation bench.
+    const room = parsePuzzleRoom(PUZZLE_ROOMS.find((r) => r.name === "Behind Glass")!);
+    const { tiles, subtypes } = room.mapData;
+    const blocksAGoblin = (y: number, x: number) => {
+      if (tiles[y]?.[x] !== 0) return true;
+      const subs = subtypes[y][x];
+      // A goblin refuses lava; a platform over lava is still lava to it.
+      return subs.includes(TileSubtype.LAVA);
+    };
+    // Flood the hero's dry-floor reachable region.
+    const seen = new Set<string>([`${room.hero[0]},${room.hero[1]}`]);
+    let frontier = [room.hero];
+    while (frontier.length) {
+      const next: Array<[number, number]> = [];
+      for (const [y, x] of frontier) {
+        for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+          const ny = y + dy;
+          const nx = x + dx;
+          const key = `${ny},${nx}`;
+          if (seen.has(key) || blocksAGoblin(ny, nx)) continue;
+          seen.add(key);
+          next.push([ny, nx]);
+        }
+      }
+      frontier = next;
+    }
+    // No goblin stands in the region a goblin could walk to from the hero's tile.
+    for (const e of room.enemies) {
+      expect(seen.has(`${e.y},${e.x}`)).toBe(false);
+    }
+  });
+
+  it("The Getaway leaves the exit reachable ONLY across the platform's rail", () => {
+    // The chase escape only works if the exit can't be walked to on dry land — the raft must be
+    // the sole route. Confirm the exit is severed from the hero over dry floor, but joined once the
+    // rail tiles count as walkable (the hero rides across them).
+    const room = parsePuzzleRoom(PUZZLE_ROOMS.find((r) => r.name === "The Getaway")!);
+    const { tiles, subtypes } = room.mapData;
+    const exit = room.mapData.subtypes
+      .flatMap((row, y) => row.map((cell, x) => ({ y, x, cell })))
+      .find(({ cell }) => cell.includes(TileSubtype.EXIT))!;
+
+    const reach = (railWalkable: boolean) => {
+      const seen = new Set<string>([`${room.hero[0]},${room.hero[1]}`]);
+      let frontier = [room.hero];
+      while (frontier.length) {
+        const next: Array<[number, number]> = [];
+        for (const [y, x] of frontier) {
+          for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+            const ny = y + dy;
+            const nx = x + dx;
+            const key = `${ny},${nx}`;
+            if (seen.has(key) || tiles[ny]?.[nx] !== 0) continue;
+            const subs = subtypes[ny][nx];
+            const onRail = subs.includes(TileSubtype.PLATFORM_TRACK);
+            if (subs.includes(TileSubtype.LAVA) && !(railWalkable && onRail)) continue;
+            seen.add(key);
+            next.push([ny, nx]);
+          }
+        }
+        frontier = next;
+      }
+      return seen.has(`${exit.y},${exit.x}`);
+    };
+
+    expect(reach(false)).toBe(false); // dry-land only: exit unreachable
+    expect(reach(true)).toBe(true); // riding the rail: exit reachable
+  });
+});

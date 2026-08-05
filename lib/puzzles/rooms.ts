@@ -13,6 +13,7 @@
 import { FLOOR, TileSubtype, WALL } from "../map/constants";
 import type { MapData, Platform, ToggleGroup } from "../map/types";
 import { stampPlatform } from "../map/machinery";
+import { Enemy } from "../enemy";
 
 /**
  * Map legend — one character per tile, rectangular, fully walled.
@@ -20,6 +21,8 @@ import { stampPlatform } from "../map/machinery";
  *   `#` wall              `.` floor             `H` hero start        `E` exit
  *   `~` deep water        `L` lava              `^` spike bed (up)    `v` spike bed (retracted)
  *   `T` toggle switch     `r` a rock to pick up `k` exit key          `p` pot
+ *   `g` a fire-goblin (a basic chaser: carries its own light, hunts on sight, won't cross lava or
+ *       deep water and so won't board a platform over either — it stays on the bank)
  *   `1`-`9` platform track tiles; the DIGIT is the platform id, and the slab starts on the first
  *           tile of its own track reading left-to-right then top-to-bottom.
  *
@@ -190,6 +193,54 @@ export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
     lengths: { "2": 3 },
     rocks: 3,
   },
+  {
+    name: "Behind Glass",
+    asks:
+      "ENEMIES, ISOLATED. A lava river splits the room; you and the exit are on the safe top bank, " +
+      "and fire-goblins pace the bottom bank with a raft sliding through the lava between you. They " +
+      "can't cross the lava and won't board the raft, so nothing here can reach you — this is a " +
+      "bench for watching how goblins behave AROUND a moving platform, not a fight. Ride the raft " +
+      "down among them if you want a closer look.",
+    map: [
+      "################",
+      "#H....E........#",
+      "#......1.......#",
+      "#LLLLLL1LLLLLLL#",
+      "#LLLLLL1LLLLLLL#",
+      "#..g...1...g...#",
+      "#....g.....g...#",
+      "################",
+    ],
+    trackOver: "lava",
+    dryRail: [
+      [2, 7],
+      [5, 7],
+    ],
+    lengths: { "1": 2 },
+  },
+  {
+    name: "The Getaway",
+    asks:
+      "ENEMIES, CHASING. Fire-goblins are on your side this time and they hunt on sight. The only " +
+      "way across the lava to the exit is the raft — which they can't follow onto. Board it and " +
+      "ride across while they pile up on the near bank. Watch whether the platform reads as a real " +
+      "escape, and what the goblins do when their quarry floats away.",
+    map: [
+      "################",
+      "#g..g.....H....#",
+      "#..........1...#",
+      "#LLLLLLLLLL1LLL#",
+      "#LLLLLLLLLL1LLL#",
+      "#..........1..E#",
+      "################",
+    ],
+    trackOver: "lava",
+    dryRail: [
+      [2, 11],
+      [5, 11],
+    ],
+    lengths: { "1": 2 },
+  },
 ];
 
 export interface ParsedPuzzleRoom {
@@ -198,6 +249,7 @@ export interface ParsedPuzzleRoom {
   hero: [number, number];
   toggleGroups: ToggleGroup[];
   platforms: Platform[];
+  enemies: Enemy[];
   rocks: number;
 }
 
@@ -223,6 +275,7 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
   );
   let hero: [number, number] | null = null;
   const tracks = new Map<string, Array<[number, number]>>();
+  const enemies: Enemy[] = [];
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -237,6 +290,11 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
         case "H":
           hero = [y, x];
           put(TileSubtype.PLAYER);
+          break;
+        case "g":
+          // A fire-goblin on plain floor. Kept OUT of subtypes — enemies live on the game state,
+          // not the tile — so the tile stays walkable and the goblin is a real, updating entity.
+          enemies.push(new Enemy({ y, x }));
           break;
         case "E":
           put(TileSubtype.EXIT);
@@ -361,6 +419,7 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
     hero,
     toggleGroups,
     platforms,
+    enemies,
     rocks: spec.rocks ?? 0,
   };
 }
@@ -371,6 +430,9 @@ export function describeRoom(room: ParsedPuzzleRoom): string {
     `${room.platforms.length} platform${room.platforms.length === 1 ? "" : "s"}`,
     `${room.toggleGroups.length} switch${room.toggleGroups.length === 1 ? "" : "es"}`,
   ];
+  if (room.enemies.length > 0) {
+    bits.push(`${room.enemies.length} enem${room.enemies.length === 1 ? "y" : "ies"}`);
+  }
   if (room.rocks > 0) bits.push(`${room.rocks} rocks`);
   return bits.join(" · ");
 }
