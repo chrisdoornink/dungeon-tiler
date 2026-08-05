@@ -1413,29 +1413,33 @@
   /* Reads as a SLAB OF FLOOR, not metal. A polished-metal deck was out of place against the game's
      stone/earth materials, so the fill is the game's own floor texture — the platform looks like a
      chunk of dungeon floor torn loose and floating on the hazard. The raised-slab READ is kept
-     entirely in the edges: a lit top lip, a dark underside band, and a hard 1px rim (in box-shadow
-     below), which is what gives it the beveled, sitting-proud-of-the-lava look the metal version
-     had. Legibility over bright lava/water still comes from that rim + lip, not from the fill. */
+     entirely in the edges: a matte dark shadow band on ALL FOUR sides plus a hard 1px rim (in
+     box-shadow below), which gives it the beveled, sitting-proud-of-the-lava look without any
+     shine. There is deliberately NO light lip — a bright top edge read as glossy metal, out of
+     place on a stone slab, so every edge now mirrors the others: a plain inward shadow. */
   background-color: var(--floor-bg);
   background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.28) 0 9%,
-      rgba(255, 255, 255, 0.06) 9% 18%,
-      rgba(255, 255, 255, 0) 18% 82%,
+      rgba(0, 0, 0, 0.45) 0 8%,
+      rgba(0, 0, 0, 0) 8% 92%,
       rgba(0, 0, 0, 0.45) 92% 100%
     ),
+    linear-gradient(
+      90deg,
+      rgba(0, 0, 0, 0.45) 0 6%,
+      rgba(0, 0, 0, 0) 6% 94%,
+      rgba(0, 0, 0, 0.45) 94% 100%
+    ),
     url("/images/floor/floor-try-1.png");
-  background-size: 100% 100%, cover;
-  background-position: center, center;
-  background-repeat: no-repeat, no-repeat;
-  /* Shadows: a hard 1px dark rim (inset) draws the silhouette on ANY background, a top-edge inset
-     highlight gives it a lit lip, and — instead of a plain black drop shadow — a CYAN MAGIC GLOW,
-     the same cold blue the toggle switches use. The platform moves on its own by some unknown
-     force, so it reads as powered rather than mechanical, and the glow (not the removed rail
-     decal) is now what marks "something moves here". A faint dark drop shadow stays underneath so
-     it still hovers over the lava rather than floating flat. */
+  background-size: 100% 100%, 100% 100%, cover;
+  background-position: center, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat;
+  /* Shadows: a hard 1px dark rim (inset) draws the silhouette on ANY background, and — instead of
+     a plain black drop shadow — a CYAN MAGIC GLOW, the same cold blue the toggle switches use, so
+     the platform reads as powered by some unseen force rather than mechanical. A faint dark drop
+     shadow stays underneath so it still hovers over the lava. No inset highlight: the edges are
+     all matte shadow now (see the fill above), so nothing on the slab is shiny. */
   box-shadow: inset 0 0 0 1px rgba(18, 20, 24, 0.9),
-    inset 0 2px 0 0 rgba(255, 255, 255, 0.22),
     0 0 8px 2px rgba(53, 200, 255, 0.55), 0 3px 5px rgba(0, 0, 0, 0.5);
 }
 
