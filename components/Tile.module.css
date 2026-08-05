@@ -1398,7 +1398,9 @@
 .movingPlatform {
   /* An absolutely-positioned OVERLAY, not a floor background. It has to be its own element so it
      can be translated independently of the tile it is standing on — the slide from the previous
-     tile is what makes the ordering ("everything else moves, then platforms move") visible. */
+     tile is what makes the ordering ("everything else moves, then platforms move") visible. And it
+     is now ONE element for the whole deck, so a single rim/edge defines the raft cleanly instead of
+     the per-tile border that used to cut a multi-tile deck into boxes. */
   position: absolute;
   inset: 0;
   /* 1025: ABOVE a lava or water tile's own animated overlay, which sits at 1020 and was painting
@@ -1407,31 +1409,38 @@
      occludes it. This single number replaces the per-tile stacking fight entirely. */
   z-index: 1025;
   pointer-events: none;
-  background-color: #6b6f76;
+  image-rendering: pixelated;
+  /* LEGIBILITY ON ANY BACKGROUND is the whole point of this block. A flat mid-grey slab read
+     crisply against the dark dungeon floor but washed out against bright saturated lava, where its
+     soft drop-shadow vanished — so while crossing (the majority of the time the deck is watched) it
+     looked dull and flat. The fix is to make the slab define itself rather than lean on background
+     contrast: a lighter cut-stone fill, a bright top lip, a dark underside, and a HARD dark rim
+     around the whole element so its silhouette is unambiguous over lava, water or floor alike. */
+  background-color: #9aa0aa;
   background-image: linear-gradient(
       180deg,
-      rgba(255, 255, 255, 0.22) 0 12%,
-      rgba(255, 255, 255, 0) 12% 100%
+      rgba(255, 255, 255, 0.38) 0 10%,
+      rgba(255, 255, 255, 0.08) 10% 20%,
+      rgba(255, 255, 255, 0) 20% 100%
     ),
     linear-gradient(
       0deg,
-      rgba(0, 0, 0, 0.45) 0 14%,
-      rgba(0, 0, 0, 0) 14% 100%
+      rgba(0, 0, 0, 0.5) 0 12%,
+      rgba(0, 0, 0, 0) 12% 100%
     ),
-    repeating-linear-gradient(
+    /* Planking: faint vertical seams so a wide deck reads as boards, not a blank panel. */
+      repeating-linear-gradient(
       90deg,
-      rgba(0, 0, 0, 0.18) 0 1px,
+      rgba(0, 0, 0, 0.16) 0 1px,
       rgba(0, 0, 0, 0) 1px 33%
     );
-  /* NO full inset border. A deck can span two or three tiles, each drawn by its own tile, so a
-     1px outline on every one of them cut the raft into visibly separate boxes. The lit top edge and
-     dark underside in the gradients above still give each tile an edge, which across a multi-tile
-     deck reads as planking — a raft made of boards, which is what it should look like anyway.
-     A hard drop shadow sells "hovering over something lethal" better than any amount of texture on
-     the deck itself. */
-  box-shadow: 0 3px 5px rgba(0, 0, 0, 0.55);
-  image-rendering: pixelated;
+  /* Two shadows doing two jobs: a hard 1px dark rim (inset) that draws the silhouette on ANY
+     background, and a soft drop shadow that sells "hovering over something lethal". The rim is what
+     the washed-out-over-lava case was missing. */
+  box-shadow: inset 0 0 0 1px rgba(18, 20, 24, 0.9),
+    inset 0 2px 0 0 rgba(255, 255, 255, 0.22), 0 3px 5px rgba(0, 0, 0, 0.6);
 }
+
 
 /* The route. A faint dashed rail laid over the hazard, on every tile the slab will reach.
    NOT decoration: without it the platform's path is invisible and its timing can only be learned
