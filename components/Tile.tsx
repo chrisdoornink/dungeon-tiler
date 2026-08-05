@@ -743,9 +743,6 @@ export const Tile: React.FC<TileProps> = ({
   const hasMovingPlatform = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.MOVING_PLATFORM) || false;
   };
-  const hasPlatformTrack = (subtypes: number[] | undefined): boolean => {
-    return subtypes?.includes(TileSubtype.PLATFORM_TRACK) || false;
-  };
 
   const hasRoad = (subtypes: number[] | undefined): boolean => {
     return subtypes?.includes(TileSubtype.ROAD) || false;
@@ -1124,16 +1121,10 @@ export const Tile: React.FC<TileProps> = ({
           />
         )}
 
-        {/* The platform's route. Drawn UNDER everything else on the tile and never over the slab
-            itself — a rail you can trace with your eye from bank to bank is what makes the timing
-            readable, and a puzzle you cannot read is a puzzle you learn by dying. */}
-        {hasPlatformTrack(subtypes) && !hasMovingPlatform(subtypes) && (
-          <div
-            key="platform-track"
-            data-testid={`subtype-icon-${TileSubtype.PLATFORM_TRACK}`}
-            className={styles.platformTrack}
-          />
-        )}
+        {/* No rail decal is drawn. The track stays in the data model (platforms still move along it,
+            and the coexist whitelist above still lets the hero stand on PLATFORM_TRACK tiles) but
+            its "path hashes" were removed from the tiles by request — the platform's own magic glow
+            now signals that something moves here, and the dashes read as clutter over lava/water. */}
 
         {/* The deck, drawn ONCE on its anchor tile and sized to span its whole length. See the
             `deck` prop for why this is a single element rather than one slab per tile.

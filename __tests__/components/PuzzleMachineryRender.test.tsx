@@ -72,7 +72,10 @@ describe("moving platform rendering", () => {
     expect(el.getAttribute("data-deck-axis")).toBe("row");
   });
 
-  it("hides the rail decal under the slab and shows it everywhere else", () => {
+  it("never draws the rail decal — the path hashes were removed by request", () => {
+    // The track stays in the data model but is no longer rendered on the tiles; the deck's magic
+    // glow is the only in-world signal now. Assert the decal is absent whether or not the deck
+    // covers the tile.
     const { rerender } = render(
       <Tile
         tileId={0}
@@ -94,8 +97,8 @@ describe("moving platform rendering", () => {
       />
     );
     expect(
-      screen.getByTestId(`subtype-icon-${TileSubtype.PLATFORM_TRACK}`)
-    ).toBeInTheDocument();
+      screen.queryByTestId(`subtype-icon-${TileSubtype.PLATFORM_TRACK}`)
+    ).not.toBeInTheDocument();
   });
 
   it("puts a DELAYED slide on the slab when it arrived this turn", () => {

@@ -1434,11 +1434,15 @@
       rgba(0, 0, 0, 0.16) 0 1px,
       rgba(0, 0, 0, 0) 1px 33%
     );
-  /* Two shadows doing two jobs: a hard 1px dark rim (inset) that draws the silhouette on ANY
-     background, and a soft drop shadow that sells "hovering over something lethal". The rim is what
-     the washed-out-over-lava case was missing. */
+  /* Shadows: a hard 1px dark rim (inset) draws the silhouette on ANY background, a top-edge inset
+     highlight gives it a lit lip, and — instead of a plain black drop shadow — a CYAN MAGIC GLOW,
+     the same cold blue the toggle switches use. The platform moves on its own by some unknown
+     force, so it reads as powered rather than mechanical, and the glow (not the removed rail
+     decal) is now what marks "something moves here". A faint dark drop shadow stays underneath so
+     it still hovers over the lava rather than floating flat. */
   box-shadow: inset 0 0 0 1px rgba(18, 20, 24, 0.9),
-    inset 0 2px 0 0 rgba(255, 255, 255, 0.22), 0 3px 5px rgba(0, 0, 0, 0.6);
+    inset 0 2px 0 0 rgba(255, 255, 255, 0.22),
+    0 0 8px 2px rgba(53, 200, 255, 0.55), 0 3px 5px rgba(0, 0, 0, 0.5);
 }
 
 
