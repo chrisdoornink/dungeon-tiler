@@ -44,10 +44,10 @@ import { enemyCanRidePlatforms } from "../enemy";
  * to reused colours rather than to no colour at all.
  */
 export const TOGGLE_STATE_COLORS = [
-  "#35c8ff", // 0 — cold blue
-  "#3ff08a", // 1 — bright green
-  "#b07cff", // 2 — violet
-  "#ff6f9d", // 3 — rose
+  "#2690b8", // 0 — cold blue
+  "#2dad63", // 1 — green
+  "#7f59b8", // 2 — violet
+  "#b85071", // 3 — rose
 ] as const;
 
 /** The colour for a given state, wrapping if a group has more states than colours. */

@@ -1360,8 +1360,11 @@
 
    The renderer additionally flips the lever on odd states, so state never depends on colour alone. */
 .toggleSwitch {
-  filter: drop-shadow(0 0 5px var(--toggle-color, #35c8ff))
-    drop-shadow(0 0 2px var(--toggle-color, #35c8ff)) brightness(1.35) saturate(1.15);
+  /* Toned down: the glow was blazing next to the dim dungeon. Darker palette (see
+     TOGGLE_STATE_COLORS), a smaller/softer halo, and much less brightness boost. Still readable,
+     no longer the brightest thing on screen. */
+  filter: drop-shadow(0 0 3px var(--toggle-color, #2690b8))
+    drop-shadow(0 0 1px var(--toggle-color, #2690b8)) brightness(1.08) saturate(1.05);
   animation: toggleIdle 2.2s ease-in-out infinite;
 }
 
@@ -1376,9 +1379,9 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--toggle-color, #35c8ff);
-  box-shadow: 0 0 4px 1px var(--toggle-color, #35c8ff),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.65);
+  background: var(--toggle-color, #2690b8);
+  box-shadow: 0 0 3px 1px var(--toggle-color, #2690b8),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
 @keyframes toggleIdle {
