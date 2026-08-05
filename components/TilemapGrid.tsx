@@ -76,6 +76,7 @@ import {
 } from "../lib/torch_glow";
 import {
   PLATFORM_SLIDE,
+  planBoardCarry,
   SMOOTH_TUNING,
   isSmoothMovementEnabled,
   heroSpritePath,
@@ -92,6 +93,16 @@ type SmoothStepTween = {
   start: number;
   dur: number;
   running: boolean;
+  /**
+   * Optional SECOND phase: after this tween ends, the hero is carried by a platform to
+   * (toR,toC). Only set when BOARDING a moving platform — that single turn moves the hero two
+   * tiles (a walk onto the deck, then a ride), and animating it as one tween made the camera snap
+   * to the final tile and then slide the deck under a stationary hero. Splitting it lets the hero
+   * walk on normally and then ride WITH the deck. The ride is timed to start when the walk's
+   * scheduled window ends, which is when the platform's own (delayed) slide begins — so hero and
+   * deck move together.
+   */
+  ride?: { toR: number; toC: number; dur: number };
 };
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
@@ -4024,6 +4035,29 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           chain.count = 0;
           return;
         }
+        // Boarding a moving platform. That single turn walks the hero one tile onto the deck and
+        // the platform then carries him one more — a 2-tile net move that the teleport branch below
+        // would snap. Split it: a quick walk onto the deck (covering the platform's pre-slide delay
+        // window), then a ride that starts exactly when the platform's slide does, so the hero
+        // travels WITH the deck instead of standing on the destination waiting for it to arrive.
+        const endedOnPlatform = !!newState?.mapData.subtypes[after[0]]?.[
+          after[1]
+        ]?.includes(TileSubtype.MOVING_PLATFORM);
+        const board = planBoardCarry({ from, after, direction, endedOnPlatform });
+        if (board) {
+          smoothParityRef.current ^= 1;
+          smoothStepRef.current = {
+            fromR: from[0],
+            fromC: from[1],
+            toR: board.stepped[0],
+            toC: board.stepped[1],
+            start: now,
+            dur: PLATFORM_SLIDE.delayMs,
+            running: false,
+            ride: { toR: after[0], toC: after[1], dur: PLATFORM_SLIDE.durMs },
+          };
+          return;
+        }
         if (dr + dc > 1) {
           // Teleport (portal/warp): snap the camera, don't glide across the map.
           smoothVisualRef.current = [after[0], after[1]];
@@ -4079,24 +4113,45 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         progress = raw;
         running = step.running;
         if (raw >= 1) {
+          const completed = step;
           smoothStepRef.current = null;
           smoothChainRef.current.lastStepEnd = now;
           moving = false;
-          // Chain the next turn immediately while input is held or queued.
-          const held = smoothHeldRef.current;
-          const dir =
-            smoothQueuedRef.current ??
-            (held.length ? held[held.length - 1] : null);
-          smoothQueuedRef.current = null;
-          if (dir !== null) latestMoveInputRef.current(dir);
-          // The dispatch above may have started the next step already; TS's
-          // control-flow narrowing can't see the ref mutation through the
-          // call, so launder the re-read with a cast.
-          const next = smoothStepRef.current as SmoothStepTween | null;
-          if (next) {
+          if (completed.ride) {
+            // Second phase of boarding: the ride. Start at the walk's SCHEDULED end (start+dur),
+            // not `now`, so it lines up with the platform's slide (which began delayMs after the
+            // turn) regardless of which frame the walk happened to finish on. Held input is NOT
+            // chained here — the ride is the continuation of this turn, and the next turn chains
+            // only once the ride lands.
+            smoothStepRef.current = {
+              fromR: completed.toR,
+              fromC: completed.toC,
+              toR: completed.ride.toR,
+              toC: completed.ride.toC,
+              start: completed.start + completed.dur,
+              dur: completed.ride.dur,
+              running: false,
+            };
             moving = true;
             progress = 0;
-            running = next.running;
+            running = false;
+          } else {
+            // Chain the next turn immediately while input is held or queued.
+            const held = smoothHeldRef.current;
+            const dir =
+              smoothQueuedRef.current ??
+              (held.length ? held[held.length - 1] : null);
+            smoothQueuedRef.current = null;
+            if (dir !== null) latestMoveInputRef.current(dir);
+            // The dispatch above may have started the next step already; TS's
+            // control-flow narrowing can't see the ref mutation through the
+            // call, so launder the re-read with a cast.
+            const next = smoothStepRef.current as SmoothStepTween | null;
+            if (next) {
+              moving = true;
+              progress = 0;
+              running = next.running;
+            }
           }
         }
       } else {

@@ -148,3 +148,43 @@ export const PLATFORM_SLIDE = {
   durMs: 130,
   snapAboveRateHz: 5,
 } as const;
+
+const DIRECTION_DELTA: Record<Direction, readonly [number, number]> = {
+  [Direction.UP]: [-1, 0],
+  [Direction.DOWN]: [1, 0],
+  [Direction.LEFT]: [0, -1],
+  [Direction.RIGHT]: [0, 1],
+};
+
+/**
+ * Decide whether a completed move was the hero BOARDING a moving platform.
+ *
+ * Boarding is a single turn that moves the hero TWO tiles: one step onto the deck, then a carry as
+ * the platform advances. Animated as one tween that reads as a teleport-then-slide-underneath —
+ * the camera snaps to the final tile and the deck slides in under a stationary hero. Splitting it
+ * into a walk (to the stepped tile) and a ride (the carry) is what lets the hero walk on normally
+ * and then travel with the deck.
+ *
+ * Returns the intermediate "stepped" tile — where the walk ends and the ride begins — or null when
+ * the move was ordinary (or a teleport/warp). Pure geometry, so the decision is unit-tested away
+ * from the rAF loop and the browser's animation clock (which can't be frame-sampled reliably).
+ *
+ * `endedOnPlatform` must be true only when the hero's FINAL tile carries a MOVING_PLATFORM — that
+ * is what distinguishes a platform carry from any other two-tile position change.
+ */
+export function planBoardCarry(opts: {
+  from: readonly [number, number];
+  after: readonly [number, number];
+  direction: Direction;
+  endedOnPlatform: boolean;
+}): { stepped: [number, number] } | null {
+  const { from, after, direction, endedOnPlatform } = opts;
+  if (!endedOnPlatform) return null;
+  const rf: [number, number] = [Math.round(from[0]), Math.round(from[1])];
+  const d = DIRECTION_DELTA[direction];
+  const stepped: [number, number] = [rf[0] + d[0], rf[1] + d[1]];
+  const net = Math.abs(after[0] - rf[0]) + Math.abs(after[1] - rf[1]);
+  const carry = Math.abs(after[0] - stepped[0]) + Math.abs(after[1] - stepped[1]);
+  if (net === 2 && carry === 1) return { stepped };
+  return null;
+}
