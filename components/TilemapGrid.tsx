@@ -103,6 +103,13 @@ type SmoothStepTween = {
    * deck move together.
    */
   ride?: { toR: number; toC: number; dur: number };
+  /**
+   * Force LINEAR interpolation instead of the default ease-in-out. Set on a platform ride so the
+   * camera matches the ridden deck's own linear slide exactly — the hero is pinned to viewport
+   * centre, so any easing difference between camera and deck shows up as the hero drifting across
+   * the deck mid-slide.
+   */
+  linear?: boolean;
 };
 import { useRouter } from "next/navigation";
 // Daily flow is handled by parent via onDailyComplete when isDailyChallenge is true
@@ -2120,6 +2127,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         start: performance.now() + PLATFORM_SLIDE.delayMs,
         dur: PLATFORM_SLIDE.durMs,
         running: false,
+        // Linear to match the ridden deck's linear slide — see the ride tween and `linear`.
+        linear: true,
       };
     }
 
@@ -2190,6 +2199,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     const since = now - platformLastMoveAtRef.current;
     const minGap = 1000 / PLATFORM_SLIDE.snapAboveRateHz;
     const snap = platformLastMoveAtRef.current > 0 && since < minGap;
+    const heroPos = findPlayerInState(gameState);
 
     for (const p of gameState.platforms ?? []) {
       const at = platformTile(p);
@@ -2204,6 +2214,15 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (snap) continue; // moved, but rendered without a tween
       // A deck only ever steps one tile; anything longer is a room swap and should snap.
       if (Math.abs(dy) + Math.abs(dx) !== 1) continue;
+      // A RIDDEN deck slides LINEAR; a solo deck keeps ease-in-out. This is the drift fix: the hero
+      // is pinned to viewport centre and the camera tracks him with its own easing, so if the deck
+      // eases on a different curve it visibly shifts under his feet mid-slide. The camera's ride
+      // phase is also linear (see the ride tween), and two linear motions with the same start and
+      // duration are identical every frame — glued. Solo platforms have no rider to glue to, so
+      // they keep the nicer eased slide.
+      const ridden =
+        !!heroPos &&
+        platformTiles(p).some(([ty, tx]) => ty === heroPos[0] && tx === heroPos[1]);
       // One entry per PLATFORM, keyed by its anchor tile — the deck is a single element now, so it
       // takes a single slide. The old version emitted a step per deck tile and had each translate
       // itself backwards, which is what produced the direction-dependent flicker.
@@ -2211,7 +2230,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         dy,
         dx,
         dur: PLATFORM_SLIDE.durMs,
-        ease: "ease-in-out",
+        ease: ridden ? "linear" : "ease-in-out",
         seq,
         delay: PLATFORM_SLIDE.delayMs,
       });
@@ -4103,8 +4122,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       let running = false;
       if (step) {
         const raw = Math.min(1, Math.max(0, (now - step.start) / step.dur));
-        // Linear while running so back-to-back steps chain without a hitch.
-        const e = step.running ? raw : smoothEaseInOut(raw);
+        // Linear while running (so back-to-back steps chain without a hitch) and while riding a
+        // platform (so the camera matches the deck's linear slide and the hero doesn't drift).
+        const e = step.running || step.linear ? raw : smoothEaseInOut(raw);
         smoothVisualRef.current = [
           step.fromR + (step.toR - step.fromR) * e,
           step.fromC + (step.toC - step.fromC) * e,
@@ -4131,6 +4151,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
               start: completed.start + completed.dur,
               dur: completed.ride.dur,
               running: false,
+              linear: true,
             };
             moving = true;
             progress = 0;
