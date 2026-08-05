@@ -210,14 +210,15 @@ export function advanceMachinery(
     const riderTo = riderIdx >= 0 ? p.track[riderIdx + dir] : null;
 
     const newSpan = p.track.slice(index, index + deckLength(p));
-    // The deck never shoves anything off a tile it is moving onto. Only tiles it is NOT already
-    // covering can be blocked — the rider's own tile is part of the deck and must not count. Both
-    // the non-rider hero and any enemy count as blockers, so a deck stalls at a body rather than
-    // sliding through it.
+    // The deck never shoves anything off a tile it is moving onto, and never lands a rider ON a
+    // body. Only tiles it is NEWLY covering can block. The rider's OWN destination is excused for
+    // the PLAYER tag alone — the hero moves with the deck, so his tag arriving on riderTo is not a
+    // collision. An ENEMY on riderTo is NOT excused: skipping it (the old bug) let the deck carry
+    // the hero straight on top of a goblin standing on the far dock. Now it stalls there instead.
     const blocked = newSpan.some(([ny, nx]) => {
       if (oldSpan.some(([oy, ox]) => oy === ny && ox === nx)) return false;
-      if (riderTo && riderTo[0] === ny && riderTo[1] === nx) return false;
-      if (has(state.mapData, ny, nx, TileSubtype.PLAYER)) return true;
+      const isRiderDest = !!(riderTo && riderTo[0] === ny && riderTo[1] === nx);
+      if (has(state.mapData, ny, nx, TileSubtype.PLAYER) && !isRiderDest) return true;
       return !!occupied?.has(`${ny},${nx}`);
     });
     if (blocked) continue;

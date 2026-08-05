@@ -227,6 +227,20 @@ describe("moving platforms", () => {
     expect(platformTile(state.platforms![0])).toEqual([4, 2]);
   });
 
+  it("stalls rather than carrying its rider on top of an enemy", () => {
+    // The reported bug: the deck carried the hero onto an enemy standing on the rider's own
+    // destination tile, because that tile was excused from the block check. It must stall instead.
+    const { state } = lavaCrossing();
+    // Hero aboard at the near end of the rail; an enemy squats on the very next tile.
+    putHero(state.mapData, 4, 2);
+    const enemyTile: [number, number] = [4, 3];
+    advanceMachinery(state, [4, 2], new Set([`${enemyTile[0]},${enemyTile[1]}`]));
+    // Deck did not move (still at column 2), and the hero was not carried onto the enemy tile.
+    expect(platformTile(state.platforms![0])).toEqual([4, 2]);
+    expect(heroAt(state)).toEqual([4, 2]);
+    expect(state.mapData.subtypes[4][3]).not.toContain(TileSubtype.PLAYER);
+  });
+
   it("does not move while parked", () => {
     const { state } = lavaCrossing();
     state.platforms![0].running = false;
