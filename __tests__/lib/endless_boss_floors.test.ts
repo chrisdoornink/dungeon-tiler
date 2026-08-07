@@ -19,7 +19,7 @@ import {
 import { BOSS_KINDS, rollEndlessBossOrder } from "../../lib/bosses/boss_roster";
 import { Enemy } from "../../lib/enemy";
 import { Direction, TileSubtype } from "../../lib/map/constants";
-import { movePlayer } from "../../lib/map/game-state";
+import { movePlayer, performUseFood } from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
 import { findPlayerPosition } from "../../lib/map/player";
 
@@ -259,6 +259,110 @@ describe("boss payout: key AND a heart", () => {
     expect(second.heroMaxHealth).toBe((first.heroMaxHealth ?? 5) + 1);
     expect(second.heroHealth).toBe(second.heroMaxHealth);
     expect(second.stats.bossesDefeated).toBe(2);
+  });
+
+  it("pays out on an item turn too, when a bomb's fuse lands the killing blow", () => {
+    // Using an item spends a turn, and a turn is all an armed bomb needs. These paths ran
+    // the enemy tick and the fuse without settling the boss, so a fuse kill paid nothing.
+    const state = duel({ mode: "endless", foodCount: 1 });
+    state.mapData.subtypes[2][2].push(TileSubtype.BOMB_LIVE);
+    const after = performUseFood(state);
+    expect((after.enemies ?? []).some((e) => e.kind === "quarrymaster")).toBe(false);
+    expect(after.bossDefeated).toBe(true);
+    expect(after.stats.bossesDefeated).toBe(1);
+  });
+});
+
+/**
+ * The floor under the per-boss payouts. Those are precise about which tile the drop lands on
+ * and which turn it lands, and precision is what leaked: a Coilwyrm killed a turn before its
+ * last body segment died skipped the payout entirely, leaving a player sealed in the arena
+ * with the boss dead, no key, and nothing left to hit. Enforced from the other end here, where
+ * it does not matter which kill path fired.
+ */
+describe("a cleared boss arena is never a dead end", () => {
+  /** An arena the hero is sealed inside: an EXIT that wants a key, and nothing left alive. */
+  function clearedArena(over: Partial<GameState> = {}): GameState {
+    const size = 5;
+    const tiles = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => 1)
+    );
+    for (let y = 1; y < size - 1; y++) for (let x = 1; x < size - 1; x++) tiles[y][x] = 0;
+    const subtypes: number[][][] = Array.from({ length: size }, () =>
+      Array.from({ length: size }, () => [] as number[])
+    );
+    subtypes[2][1].push(TileSubtype.PLAYER);
+    // Off the hero's path: these tests step RIGHT into (2,2), and stepping ONTO the exit is
+    // its own case below.
+    subtypes[1][3].push(TileSubtype.EXIT);
+    return {
+      hasKey: false,
+      hasExitKey: false,
+      hasSword: true,
+      mapData: { tiles, subtypes },
+      showFullMap: true,
+      win: false,
+      playerDirection: Direction.RIGHT,
+      enemies: [],
+      npcs: [],
+      heroHealth: 2,
+      heroMaxHealth: 5,
+      heroAttack: 1,
+      inBossRoom: true,
+      bossKind: "coilwyrm",
+      mode: "endless",
+      stats: { damageDealt: 0, damageTaken: 0, enemiesDefeated: 0, steps: 0 },
+      ...over,
+    } as GameState;
+  }
+
+  it("hands over the key when the boss is gone and none was ever dropped", () => {
+    const after = movePlayer(clearedArena(), Direction.RIGHT);
+    expect(after.hasExitKey).toBe(true);
+    // The rest of the missed payout comes with it.
+    expect(after.bossDefeated).toBe(true);
+    expect(after.heroMaxHealth).toBe(6);
+  });
+
+  it("leaves a dropped key alone rather than handing out a second one", () => {
+    const state = clearedArena();
+    state.mapData.subtypes[1][1].push(TileSubtype.EXITKEY);
+    const after = movePlayer(state, Direction.RIGHT);
+    expect(after.hasExitKey).toBe(false); // still on the floor, to be walked onto
+    expect(after.heroMaxHealth).toBe(5); // and no phantom heart
+  });
+
+  it("keeps quiet while any part of the boss is still standing", () => {
+    // The Coilwyrm case specifically: a headless body is still the boss.
+    const segment = new Enemy({ y: 2, x: 3 });
+    segment.kind = "coilwyrm-coil";
+    const after = movePlayer(clearedArena({ enemies: [segment] }), Direction.RIGHT);
+    expect(after.hasExitKey).toBe(false);
+    expect(after.bossDefeated).toBeFalsy();
+  });
+
+  it("covers a payout that ran but whose key went nowhere", () => {
+    // The other half of the leak: the branch fires, banks the kill, and drops the key on a
+    // tile that is not there (a death recorded off-map). bossDefeated is latched, so the
+    // per-boss branch will never run again — without the net the arena is just as dead.
+    const after = movePlayer(clearedArena({ bossDefeated: true }), Direction.RIGHT);
+    expect(after.hasExitKey).toBe(true);
+    expect(after.heroMaxHealth).toBe(5); // already paid: no second heart
+  });
+
+  it("does not fire outside a boss arena, where a locked exit is the actual puzzle", () => {
+    const after = movePlayer(clearedArena({ inBossRoom: false }), Direction.RIGHT);
+    expect(after.hasExitKey).toBe(false);
+  });
+
+  it("stays out of the way once the key has been spent on the exit", () => {
+    // Stepping onto the arena EXIT consumes the key; the net must not mint a replacement
+    // on the way out, in the daily (win) or in endless (floor transition).
+    const state = clearedArena({ mode: "daily", hasExitKey: true, bossDefeated: true });
+    state.mapData.subtypes[2][2].push(TileSubtype.EXIT); // one step RIGHT, onto the exit
+    const won = movePlayer(state, Direction.RIGHT);
+    expect(won.win).toBe(true);
+    expect(won.hasExitKey).toBe(false);
   });
 });
 

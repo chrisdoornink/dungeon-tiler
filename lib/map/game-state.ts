@@ -73,6 +73,7 @@ import {
   QUARRYMASTER_LAYOUTS,
 } from "../bosses/quarrymaster_arena";
 import {
+  BOSS_KINDS,
   rollDailyBossKind,
   type BossKind,
 } from "../bosses/boss_roster";
@@ -296,7 +297,21 @@ function recordEnemyDeathCause(
   }
 }
 
+/**
+ * Using an item spends a turn, and a turn inside a boss arena can kill the boss without the
+ * player swinging at anything: a bomb's fuse runs out (detonateLiveBombs, below), or a coil
+ * length cut off last turn is reaped by applyEnemyHazardDeaths. Both used to land here with no
+ * payout attached, so the kill paid nothing — see ensureBossArenaSolvable for what that cost.
+ * Wrapped like performThrowRock rather than hooked, for the same reason: many exits.
+ */
 export function performUseFood(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUseFoodCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUseFoodCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.foodCount || 0;
@@ -363,6 +378,13 @@ export function performUseFood(gameState: GameState): GameState {
  * Use potion from inventory to heal 2 HP (costs a move like throwing rocks/runes)
  */
 export function performUsePotion(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUsePotionCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUsePotionCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.potionCount || 0;
@@ -439,6 +461,13 @@ export const PINK_HEART_BONUS_HEARTS = 3;
  * potion). Does nothing if none are held.
  */
 export function performUsePinkHeart(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUsePinkHeartCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUsePinkHeartCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.pinkHeartCount ?? 0;
@@ -504,6 +533,13 @@ export function performUsePinkHeart(gameState: GameState): GameState {
  * none are held.
  */
 export function performUseBerry(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUseBerryCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUseBerryCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.berryCount ?? 0;
@@ -3317,11 +3353,22 @@ export function snapshotBosses(state: GameState): BossSnapshot {
     const e = (state.enemies ?? []).find((en) => en.kind === kind);
     return e ? [e.y, e.x] : null;
   };
+  // The Coilwyrm counts as "still here" while ANY of its parts stands, not just a head:
+  // a decapitated body can spend a turn (or more) headless before it promotes a replacement
+  // or is reaped, and if the snapshot only saw heads those turns would have coilwyrm: null —
+  // so the turn the last segment finally died would skip the payout branch entirely and the
+  // exit key would never drop. Registry-driven (bodyPart) so the next segmented boss inherits it.
+  const findCoilwyrm = (): [number, number] | null => {
+    const head = find("coilwyrm");
+    if (head) return head;
+    const part = (state.enemies ?? []).find((en) => EnemyRegistry[en.kind]?.bodyPart);
+    return part ? [part.y, part.x] : null;
+  };
   return {
     shaper: find("shaper"),
     fisher: find("fisher"),
     quarrymaster: find("quarrymaster"),
-    coilwyrm: find("coilwyrm"),
+    coilwyrm: findCoilwyrm(),
   };
 }
 
@@ -3361,8 +3408,75 @@ function settleBossKill(after: GameState): void {
  *             chamber switch thrown, which is a separate gate (see gateGroups).
  *
  * All four also hand over a heart — see settleBossKill.
+ *
+ * Whatever this decides, `ensureBossArenaSolvable` gets the last word — a boss arena with
+ * nothing left to kill and no way to the exit is a dead run, so the key is guaranteed there
+ * rather than here. Add new bosses to the branches below for the right drop in the right
+ * place; the net is what makes a mistake in one survivable.
  */
 function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
+  awardBossDefeat(after, before);
+  ensureBossArenaSolvable(after);
+}
+
+/**
+ * Is this enemy the fight itself — the thing whose death ends the arena?
+ *
+ * Keyed off BOSS_KINDS, the roster that already defines what a boss IS, rather than the
+ * registry's `boss` flag: that flag was added for the Coilwyrm's regrow check and only ever
+ * reached the two kinds that needed it, so the Fisher and Quarrymaster read as ordinary
+ * enemies through it. Anything that asks "is the boss dead" and gets that wrong pays out
+ * mid-fight or not at all, so the question is asked in exactly one place.
+ *
+ * `bodyPart` comes along for segmented bosses: a headless length of Coilwyrm is still the boss,
+ * and it is registry-driven so the next segmented boss inherits this for free.
+ */
+function isBossPart(enemy: Enemy): boolean {
+  if (BOSS_KINDS.includes(enemy.kind as BossKind)) return true;
+  return Boolean(EnemyRegistry[enemy.kind]?.bodyPart);
+}
+
+/**
+ * Last-resort guarantee: you killed everything in a boss arena, so the exit must be openable.
+ *
+ * The per-boss payouts above are precise — right drop, right tile, right turn — and precision
+ * is exactly what leaks. It has already happened once: a Coilwyrm decapitated a turn earlier
+ * left only body segments, so the turn they finally died had no head in the pre-turn snapshot
+ * and the payout branch was skipped. The player had killed the boss and was sealed in the room
+ * with no key and nothing left to hit — an unwinnable run with no way to tell it was a bug.
+ *
+ * So the invariant is enforced from the other end, where it does not depend on knowing which
+ * kill path fired: in an arena, with no boss and no boss body still standing, if there is no
+ * key on the floor and none in the pack, hand it over. Granted straight to the pack rather than
+ * dropped as a tile because a drop still has to be walked onto, and the whole point here is that
+ * nothing further is required of the player.
+ *
+ * Fires at most once per arena by construction — afterwards `hasExitKey` is set, and on the turn
+ * it is spent the run is already leaving (win or floor transition, both excluded).
+ *
+ * `bossKind` is required alongside `inBossRoom` so this only ever speaks for a room the run
+ * actually entered to fight something. Both are set together (enterBossRoom, endlessBossStateFor),
+ * cleared together, and saved together, so requiring it costs nothing in real play — but a bare
+ * arena built straight from a builder for a test harness has no boss to be owed a key for.
+ */
+function ensureBossArenaSolvable(after: GameState): void {
+  if (!after.inBossRoom || !after.bossKind || after.hasExitKey) return;
+  if (after.win || after.needsFloorTransition) return;
+  if ((after.enemies ?? []).some(isBossPart)) return;
+  let hasExit = false;
+  for (const row of after.mapData.subtypes) {
+    for (const cell of row) {
+      if (cell.includes(TileSubtype.EXITKEY)) return; // reachable on the floor: nothing to do
+      if (cell.includes(TileSubtype.EXIT)) hasExit = true;
+    }
+  }
+  if (!hasExit) return; // no keyed door in here to be stuck behind
+  after.hasExitKey = true;
+  // The heart rides along: a payout this missed the key on missed the rest of the kill too.
+  if (!after.bossDefeated) settleBossKill(after);
+}
+
+function awardBossDefeat(after: GameState, before: BossSnapshot): void {
   if (!after.inBossRoom || after.bossDefeated) return;
   const alive = after.enemies ?? [];
   // Prefer the recorded death tile; fall back to where it stood before the killing blow.
@@ -3393,12 +3507,8 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     // at all — paying out there hands over the exit key mid-fight. Its body parts therefore
     // count as the boss still standing, which is correct for both endings: a body long enough
     // to promote produces a new head, and one too short marks itself severed and is reaped
-    // within a tick. `bodyPart` is registry-driven so the next segmented boss inherits this.
-    const standing = alive.some((e) => {
-      const cfg = EnemyRegistry[e.kind];
-      return Boolean(cfg?.boss || cfg?.bodyPart);
-    });
-    if (standing) return;
+    // within a tick. See isBossPart for what counts as still standing.
+    if (alive.some(isBossPart)) return;
     const [ky, kx] = deathTile(before.coilwyrm);
     const cell = after.mapData.subtypes[ky]?.[kx];
     if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);

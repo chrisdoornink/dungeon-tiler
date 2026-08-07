@@ -126,12 +126,12 @@ export interface EnemyConfig {
    */
   movesInLockstep?: boolean;
   /**
-   * This kind IS the boss of its arena: its death drops the gold key that opens the
-   * arena exit (see dropBossKeyOnDefeat). Only the killable core gets this — a
-   * multi-part boss marks its head, never its limbs, or losing one piece would end
-   * the fight.
+   * NOTE: there is deliberately no `boss` flag here. Whether a kind IS the boss of its arena
+   * is answered by BOSS_KINDS in lib/bosses/boss_roster — the roster is already the one place
+   * a boss is declared, and a second list to keep in sync is how the Coilwyrm key-drop bug
+   * happened: a `boss` flag added for one fight reached only two of the four bosses, so
+   * "is the boss dead" quietly answered yes while a Fisher was still standing.
    */
-  boss?: boolean;
   /**
    * This kind is a PIECE of a larger creature, not an enemy in its own right. Roster-style UI
    * (the "Enemies in sight" panel) skips it and lists only the creature's core, because a
@@ -1317,7 +1317,6 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       back: assetUrl("/images/enemies/bosses/shaper/shaper-back.png"),
     },
     base: { health: SHAPER_HP, attack: 0 },
-    boss: true,
     // Standard melee: once you fight through its terrain and reach it, it dies
     // like anything else (low HP). The challenge is the crossing, not the kill.
     calcMeleeDamage: ({ heroAttack, swordBonus, variance }) =>
@@ -1340,7 +1339,6 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-back.png"),
     },
     base: { health: COILWYRM_HEAD_HP, attack: COILWYRM_HEAD_ATTACK },
-    boss: true, // the head only — a severed segment must not end the fight
     // The head is ALWAYS killable: COILWYRM_HEADSHOT_DAMAGE per hit, so exactly two hits fell
     // it whatever you land them with. It used to be armored until the body was gone, which
     // played badly — see the write-up in .claude/features/boss-coilwyrm/index.md. Killing a
