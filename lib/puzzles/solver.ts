@@ -300,6 +300,23 @@ export function solvePuzzleRoom(
   };
 }
 
+/**
+ * Every state the hero passes through while playing a solution, starting with the fresh start
+ * state — `states.length === solution.length + 1`. For visualising a solve (e.g. animating the
+ * bench minimap through it). Uses the same clone-then-apply the search does, so what you watch is
+ * exactly what the search walked.
+ */
+export function solutionStates(
+  room: ParsedPuzzleRoom,
+  solution: Action[]
+): GameState[] {
+  const states: GameState[] = [cloneState(puzzleRoomToGameState(room))];
+  for (const action of solution) {
+    states.push(applyAction(cloneState(states[states.length - 1]), action));
+  }
+  return states;
+}
+
 /** A compact, replayable rendering of a solution, e.g. "D, wait, D, throwL". For logs/benches. */
 export function formatSolution(solution: Action[]): string {
   const d = (dir: Direction): string =>

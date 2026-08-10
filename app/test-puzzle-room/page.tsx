@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useMemo, useState } from "react";
+import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
 import { tileTypes, type GameState } from "../../lib/map";
 import {
@@ -9,6 +9,7 @@ import {
   parsePuzzleRoom,
   puzzleRoomToGameState,
 } from "../../lib/puzzles/rooms";
+import { solvePuzzleRoom, solutionStates } from "../../lib/puzzles/solver";
 import { TileSubtype } from "../../lib/map/constants";
 
 /**
@@ -101,6 +102,39 @@ function TestPuzzleRoomInner() {
   const room = useMemo(() => parsePuzzleRoom(PUZZLE_ROOMS[index]), [index]);
   const spec = PUZZLE_ROOMS[index];
 
+  // The solver only handles the enemy-free rooms deterministically, so skip the enemy benches —
+  // a heavy enemy search would block the render. The four puzzle rooms solve in well under a second.
+  const solve = useMemo(
+    () =>
+      room.enemies.length === 0
+        ? solvePuzzleRoom(room, { maxStates: 200_000, maxTurns: 150 })
+        : null,
+    [room]
+  );
+  const playback = useMemo(
+    () => (solve?.solvable ? solutionStates(room, solve.solution) : null),
+    [room, solve]
+  );
+  const [playStep, setPlayStep] = useState<number | null>(null);
+
+  // Step the playback one turn at a time until it reaches the final (won) state.
+  useEffect(() => {
+    if (playStep === null || !playback || playStep >= playback.length - 1) return;
+    const t = setTimeout(
+      () => setPlayStep((s) => (s === null ? null : s + 1)),
+      450
+    );
+    return () => clearTimeout(t);
+  }, [playStep, playback]);
+
+  // A room switch or a restart rebuilds the world, so drop any playback in progress.
+  useEffect(() => {
+    setPlayStep(null);
+  }, [index, resetCount]);
+
+  const shownState =
+    playStep !== null && playback ? playback[playStep] : state;
+
   const reset = () => {
     setOutcome("none");
     setResetCount((c) => c + 1);
@@ -169,9 +203,33 @@ function TestPuzzleRoomInner() {
       )}
 
       <div className="flex flex-wrap gap-4 items-start justify-center">
-        <div className="flex flex-col items-center gap-1">
-          <div className="text-xs text-gray-400">whole room</div>
-          <MiniMap state={state} />
+        <div className="flex flex-col items-center gap-2">
+          <div className="text-xs text-gray-400">
+            whole room{playStep !== null ? " · solver playback" : ""}
+          </div>
+          <MiniMap state={shownState} />
+          {solve === null ? (
+            <div className="text-xs text-gray-500">
+              solver: enemy room — out of scope for now
+            </div>
+          ) : solve.solvable ? (
+            <>
+              <button
+                onClick={() => setPlayStep(0)}
+                className="px-3 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600"
+              >
+                {playStep === null ? "▶" : "↻"} Watch the solver solve it ({solve.minTurns} turns)
+              </button>
+              <div className="text-xs text-gray-400 h-4">
+                {playStep !== null ? `turn ${playStep} / ${solve.minTurns}` : ""}
+              </div>
+            </>
+          ) : (
+            <div className="text-xs text-gray-500">
+              solver: no solution within budget (
+              {solve.capped ? "inconclusive" : "unsolvable"})
+            </div>
+          )}
         </div>
         <TilemapGrid
           key={`${index}-${resetCount}`}

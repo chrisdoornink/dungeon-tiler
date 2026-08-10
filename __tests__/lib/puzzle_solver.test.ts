@@ -4,7 +4,12 @@ import {
   puzzleRoomToGameState,
   type PuzzleRoomSpec,
 } from "../../lib/puzzles/rooms";
-import { solvePuzzleRoom, stateKey, type Action } from "../../lib/puzzles/solver";
+import {
+  solvePuzzleRoom,
+  solutionStates,
+  stateKey,
+  type Action,
+} from "../../lib/puzzles/solver";
 import {
   movePlayer,
   performWait,
@@ -87,6 +92,13 @@ describe("puzzle solver — the four deterministic puzzle rooms", () => {
         });
         expect(again.minTurns).toBe(result.minTurns);
         expect(again.solution).toEqual(result.solution);
+      });
+
+      it("solutionStates walks the whole solve and ends on the win (drives the bench playback)", () => {
+        const states = solutionStates(parsePuzzleRoom(spec), result.solution);
+        expect(states).toHaveLength(result.solution.length + 1);
+        expect(states[0].win).toBeFalsy();
+        expect(states[states.length - 1].win).toBe(true);
       });
     });
   }
