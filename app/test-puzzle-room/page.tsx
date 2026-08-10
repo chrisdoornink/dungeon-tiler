@@ -14,14 +14,14 @@ import { TileSubtype } from "../../lib/map/constants";
 /**
  * Prototype bench for TOGGLE SWITCHES and MOVING PLATFORMS.
  *
- * Four hand-authored rooms, each isolating one question about whether these are worth building a
+ * Six hand-authored rooms, each isolating one question about whether these are worth building a
  * puzzle-floor archetype around. The question a room is asking is printed above it — play it with
  * that question in mind rather than trying to "win", because a room that is easy to beat and dull
  * to beat is a failed room.
  *
  * PRESS `.` (or numpad 5) TO WAIT. That is not a convenience: a slab advances once per turn and
- * the hero must be aboard to be carried, so waiting is how you ride. There is no mobile button for
- * it yet.
+ * the hero must be aboard to be carried, so waiting is how you ride. On mobile, tap either
+ * hourglass in the top corners of the d-pad.
  *
  * The first rooms are deliberately enemy-free so the mechanic is judged on its own. The last two
  * add fire-goblins: one where a hazard keeps them isolated (watch them near a moving platform

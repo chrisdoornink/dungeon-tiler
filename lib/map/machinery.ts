@@ -198,14 +198,21 @@ export function advanceMachinery(
   if (!state.platforms || state.platforms.length === 0) return { carried: false };
   const occupied = new Set((enemies ?? []).map((e) => `${e.y},${e.x}`));
   let carried = false;
-  for (const p of state.platforms) {
+  // Copy-on-write, the same standard throwToggle holds for toggleGroups: the platforms array is
+  // shared by reference with the pre-action state (and any snapshot), and performWait / the
+  // consumables only shallow-copy it, so mutating p.index/p.dir in place would rewrite the
+  // committed previous React state's platform records. A platform that MOVES is replaced with a
+  // copy; one that does not is returned untouched (same ref), and the array is only swapped in if
+  // something actually moved. (The map is the caller's concern — see endShallowCopyTurn.)
+  let mutated = false;
+  const nextPlatforms = state.platforms.map((p) => {
     // maxIndex < 1 means the deck fills its whole track and has nowhere to go. That is an authoring
     // mistake (a 3-long raft on a 3-tile rail), and stalling beats thrashing in place.
-    if (!p.running || maxIndex(p) < 1) continue;
+    if (!p.running || maxIndex(p) < 1) return p;
     const prevIndex = p.index;
     const oldSpan = platformTiles(p);
     const { index, dir } = stepIndex(p);
-    if (index === p.index) continue;
+    if (index === p.index) return p;
 
     const riderIdx = riderTrackIndex(p, hero);
     const riderFrom = riderIdx >= 0 ? p.track[riderIdx] : null;
@@ -224,10 +231,10 @@ export function advanceMachinery(
       if (oldSpan.some(([oy, ox]) => oy === ny && ox === nx)) return false;
       const isRiderDest = !!(riderTo && riderTo[0] === ny && riderTo[1] === nx);
       if (has(state.mapData, ny, nx, TileSubtype.PLAYER) && !isRiderDest) return true;
-      return !!occupied?.has(`${ny},${nx}`);
+      return occupied.has(`${ny},${nx}`);
     });
-    if (blocked) continue;
-    if (riderIdx >= 0 && !riderTo) continue; // would carry the rider off the end of the rail
+    if (blocked) return p;
+    if (riderIdx >= 0 && !riderTo) return p; // would carry the rider off the end of the rail
 
     repaintDeck(
       state.mapData,
@@ -254,10 +261,11 @@ export function advanceMachinery(
       }
     }
 
-    p.index = index;
-    p.dir = dir;
     if (riderIdx >= 0) carried = true;
-  }
+    mutated = true;
+    return { ...p, index, dir };
+  });
+  if (mutated) state.platforms = nextPlatforms;
   return { carried };
 }
 

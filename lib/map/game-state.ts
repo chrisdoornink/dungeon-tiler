@@ -205,6 +205,46 @@ function endTurn(state: GameState, amount: number = 1): void {
 }
 
 /**
+ * End a turn for an action that only SHALLOW-copied state — performWait and the four consumables
+ * (food/potion/pink-heart/berry). advanceMachinery rewrites deck tiles and the rider's PLAYER tag
+ * in `mapData` in place, so on a platform map that would corrupt the committed previous React
+ * state's shared map. Clone it first — but only when there is machinery to advance, so the
+ * daily/endless/boss (no platforms) never pay a full map clone on every potion. Movement needs no
+ * wrapper: movePlayerCore already deep-copies its map, and advanceMachinery copies the platforms
+ * array itself.
+ */
+function endShallowCopyTurn(state: GameState): void {
+  if (state.platforms && state.platforms.length > 0) {
+    state.mapData = cloneMapData(state.mapData);
+  }
+  endTurn(state);
+}
+
+/**
+ * Advance moving platforms on a throw turn (rock/rune/bomb).
+ *
+ * A throw consumes a turn — enemies act inside the *Core — so the world must tick too, or a raft
+ * freezes on the turn you throw. Called from the three throw wrappers on the resolved state, AFTER
+ * resolveBossDefeat, so a rock that flipped a toggle advances the platform it just started or
+ * stopped — the same order movePlayer uses (act, then advance the world).
+ *
+ * Gated on whether a throw actually happened. Each *Core returns early — without consuming a turn —
+ * when the hero is dead, has no position, or holds no ammo; advancing machinery on those returns
+ * would slide platforms for free (mash "throw" with an empty pouch to ferry across). We re-check
+ * those guards against the INPUT rather than reading the result, because the result's ammo count is
+ * not a reliable "did a turn happen" signal: throwing a rock at a stone-goblin while holding a rune
+ * spends the rune, not the rock. endTurn(result, 0) advances the world WITHOUT ticking the step
+ * counter — throws have never counted as steps, and daily scoring must not change.
+ *
+ * The cores already deep-copy mapData, so advanceMachinery mutates that fresh copy; and off a
+ * platform map advanceMachinery is a no-op, so this is inert everywhere machinery does not exist.
+ */
+function advanceThrowMachinery(input: GameState, result: GameState, ammo: number): void {
+  const acted = input.heroHealth > 0 && ammo > 0 && !!findPlayerPosition(input.mapData);
+  if (acted) endTurn(result, 0);
+}
+
+/**
  * Update NPCs with special behaviors (e.g., dogs that follow the player)
  */
 function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void {
@@ -320,6 +360,11 @@ function recordEnemyDeathCause(
  * advances, the step counter ticks. Waiting next to a goblin is a decision, not a free skip.
  */
 export function performWait(gameState: GameState): GameState {
+  // The pre-wait world for the Amber Moth ring buffer, captured before anything mutates. A wait is
+  // a genuine turn (enemies act, the world ticks, the step counter advances), so it records a
+  // rewind snapshot exactly as a move does — otherwise "N steps ago" silently skips the waits
+  // between moves. recordRewindStep gates on the step count going up, which a wait does.
+  const before = gameState;
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
 
@@ -357,8 +402,8 @@ export function performWait(gameState: GameState): GameState {
   onTurnElapsed(preTickState);
 
   const newGameState = { ...preTickState };
-  endTurn(newGameState);
-  return newGameState;
+  endShallowCopyTurn(newGameState);
+  return withRewindStep(before, newGameState);
 }
 
 export function performUseFood(gameState: GameState): GameState {
@@ -417,7 +462,7 @@ export function performUseFood(gameState: GameState): GameState {
     foodUsed: (newGameState.stats.foodUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  endTurn(newGameState);
+  endShallowCopyTurn(newGameState);
 
   // debug: used food
   
@@ -482,7 +527,7 @@ export function performUsePotion(gameState: GameState): GameState {
     potionsUsed: (newGameState.stats.potionsUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  endTurn(newGameState);
+  endShallowCopyTurn(newGameState);
 
   // Cure poison condition
   if (newGameState.conditions?.poisoned?.active) {
@@ -558,7 +603,7 @@ export function performUsePinkHeart(gameState: GameState): GameState {
     pinkHeartsUsed: (newGameState.stats.pinkHeartsUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  endTurn(newGameState);
+  endShallowCopyTurn(newGameState);
 
   return newGameState;
 }
@@ -627,7 +672,7 @@ export function performUseBerry(gameState: GameState): GameState {
     berriesUsed: (newGameState.stats.berriesUsed ?? 0) + 1,
     maxHealth: Math.max(newGameState.stats.maxHealth ?? 0, newGameState.heroHealth),
   };
-  endTurn(newGameState);
+  endShallowCopyTurn(newGameState);
 
   return newGameState;
 }
@@ -641,6 +686,7 @@ export function performThrowRock(gameState: GameState): GameState {
   const bossesBefore = snapshotBosses(gameState);
   const result = performThrowRockCore(gameState);
   resolveBossDefeat(result, bossesBefore);
+  advanceThrowMachinery(gameState, result, gameState.rockCount ?? 0);
   return result;
 }
 
@@ -1108,6 +1154,7 @@ export function performThrowRune(gameState: GameState): GameState {
   const bossesBefore = snapshotBosses(gameState);
   const result = performThrowRuneCore(gameState);
   resolveBossDefeat(result, bossesBefore);
+  advanceThrowMachinery(gameState, result, gameState.runeCount ?? 0);
   return result;
 }
 
@@ -1694,6 +1741,7 @@ export function performThrowBomb(gameState: GameState): GameState {
   const bossesBefore = snapshotBosses(gameState);
   const result = performThrowBombCore(gameState);
   resolveBossDefeat(result, bossesBefore);
+  advanceThrowMachinery(gameState, result, gameState.bombCount ?? 0);
   return result;
 }
 

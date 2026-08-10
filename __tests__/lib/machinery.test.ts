@@ -1,5 +1,6 @@
 import {
   movePlayer,
+  performThrowRock,
   performThrowRockCore,
   performWait,
   type GameState,
@@ -392,6 +393,63 @@ describe("performWait", () => {
     const dead = { ...state, heroHealth: 0 };
     const after = performWait(dead);
     expect(platformTile(after.platforms![0])).toEqual([4, 2]);
+  });
+});
+
+/**
+ * A throw is a turn, so the world moves on it too. Without this a raft froze on any turn the hero
+ * threw a rock — a documented inconsistency: enemies acted but the machinery did not. The throw
+ * must NOT slide platforms when nothing was actually thrown (an empty pouch is a free move
+ * otherwise), and must never start counting as a step (throws never have).
+ */
+describe("throwing advances the world", () => {
+  it("advances a running platform on the turn you throw a rock", () => {
+    const { state } = lavaCrossing();
+    putHero(state.mapData, 0, 0); // dry land, clear of the lava row and the rail
+    const before = platformTile(state.platforms![0]);
+    expect(before).toEqual([4, 2]);
+    const s = performThrowRock({
+      ...state,
+      rockCount: 1,
+      playerDirection: Direction.DOWN,
+    });
+    // The rock lands harmlessly down column 0; the point is the raft ferried its one step.
+    expect(platformTile(s.platforms![0])).toEqual([4, 3]);
+  });
+
+  it("does NOT advance a platform when nothing is thrown (empty pouch)", () => {
+    const { state } = lavaCrossing();
+    putHero(state.mapData, 0, 0);
+    const s = performThrowRock({
+      ...state,
+      rockCount: 0,
+      playerDirection: Direction.DOWN,
+    });
+    // Guard return: no turn was consumed, so the raft must not slide for free.
+    expect(platformTile(s.platforms![0])).toEqual([4, 2]);
+  });
+
+  it("does not tick the step counter", () => {
+    const { state } = lavaCrossing();
+    putHero(state.mapData, 0, 0);
+    const before = state.stats.steps;
+    const s = performThrowRock({
+      ...state,
+      rockCount: 1,
+      playerDirection: Direction.DOWN,
+    });
+    expect(s.stats.steps).toBe(before);
+  });
+
+  it("leaves the pre-throw state's platform untouched (no shared mutation)", () => {
+    const { state } = lavaCrossing();
+    putHero(state.mapData, 0, 0);
+    const input = { ...state, rockCount: 1, playerDirection: Direction.DOWN };
+    const before = platformTile(input.platforms![0]);
+    performThrowRock(input);
+    // advanceMachinery copy-on-writes the platforms array, and the core deep-copies the map, so the
+    // object we passed in still reads its pre-throw position.
+    expect(platformTile(input.platforms![0])).toEqual(before);
   });
 });
 

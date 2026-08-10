@@ -1445,21 +1445,3 @@
   box-shadow: inset 0 0 0 1px rgba(18, 20, 24, 0.9),
     0 0 8px 2px rgba(53, 200, 255, 0.55), 0 3px 5px rgba(0, 0, 0, 0.5);
 }
-
-
-/* The route. A faint dashed rail laid over the hazard, on every tile the slab will reach.
-   NOT decoration: without it the platform's path is invisible and its timing can only be learned
-   by stepping into lava, which turns a puzzle into a memory test. Kept dim enough that the slab
-   and the hazard both still read. */
-.platformTrack {
-  position: absolute;
-  inset: 38%;
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgba(214, 226, 240, 0.55) 0 22%,
-    rgba(214, 226, 240, 0) 22% 50%
-  );
-  box-shadow: 0 0 3px rgba(214, 226, 240, 0.35);
-  pointer-events: none;
-  z-index: 2;
-}

@@ -1,6 +1,10 @@
 import { Enemy } from "../../lib/enemy";
 import { TileSubtype, Direction } from "../../lib/map";
-import { movePlayer, createCheckpointSnapshot } from "../../lib/map/game-state";
+import {
+  movePlayer,
+  performWait,
+  createCheckpointSnapshot,
+} from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
 import {
   REWIND_DEATH_DEPTH,
@@ -360,5 +364,39 @@ describe("picking the charm up", () => {
       Direction.RIGHT
     );
     expect(blocked.rewindCharges ?? 0).toBe(0);
+  });
+});
+
+describe("waiting is a real turn for the buffer", () => {
+  it("banks a snapshot on a wait, the same as a step", () => {
+    // The drift the fix closes: a wait ticked the step counter but recorded no snapshot, so
+    // the buffer fell one behind the step count on every wait.
+    const waited = performWait(baseState({ rewindCharges: 1 }));
+    expect(waited.stats.steps).toBe(1); // a wait is a turn, so it still costs a step
+    expect(waited.rewindHistory).toHaveLength(1); // ...and is now recorded
+    expect(rewindDepthAvailable(waited)).toBe(1);
+  });
+
+  it("records nothing on a wait when no charge is held", () => {
+    const waited = performWait(baseState({ rewindCharges: 0 }));
+    expect(waited.stats.steps).toBe(1); // still a turn either way
+    expect(waited.rewindHistory ?? []).toHaveLength(0);
+  });
+
+  it("keeps 'N steps back' aligned across a wait between moves", () => {
+    let s = baseState({ rewindCharges: 1 });
+    s = movePlayer(s, Direction.RIGHT); // step 1
+    s = performWait(s); // step 2 — the wait
+    s = movePlayer(s, Direction.RIGHT); // step 3
+    expect(s.stats.steps).toBe(3);
+    expect(rewindDepthAvailable(s)).toBe(3); // three turns, three reachable snapshots
+  });
+
+  it("winds a wait back to the world as it stood when the wait began", () => {
+    let s = walkRight(baseState({ rewindCharges: 1 }), 3); // hero at (1,3)
+    s = performWait(s); // step 4, hero still (1,3)
+    const back = rewindStateBy(s, 1)!;
+    expect(findPlayerPosition(back.mapData)).toEqual([1, 3]);
+    expect(back.stats.steps).toBe(s.stats.steps); // stats carry forward, never regress
   });
 });
