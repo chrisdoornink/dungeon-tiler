@@ -296,6 +296,23 @@ export function trackRewindUsed(params: {
   captureEvent('rewind_used', { ...params });
 }
 
+/**
+ * The wisp life-regen companion (lib/map/wisp.ts). Two events, one funnel:
+ * `wisp_caught` is a wild wisp joining the hero; `wisp_save` is a carried one
+ * spending itself on the death that would have ended the run. caught vs saved
+ * says how often the insurance is actually cashed in — the first number to watch
+ * when tuning rarity (target was ~1-1.5 sightings/run, carry in ~1/3 of runs).
+ * Sightings themselves aren't tracked: no reliable client signal for "the player
+ * noticed it" exists, so the funnel starts at the catch.
+ */
+export function trackWispCaught(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  captureEvent('wisp_caught', { ...params });
+}
+
+export function trackWispSave(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  captureEvent('wisp_save', { ...params });
+}
+
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
   captureEvent('pink_realm_reached', { ...params });
 }

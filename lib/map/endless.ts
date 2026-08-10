@@ -7,6 +7,7 @@ import type { GateGroup, MapData } from "./types";
 import { findPlayerPosition } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMapForFloor } from "./map-features";
 import { addSnakesPerRules } from "./enemy-features";
+import { stampWispPots, WISP_STANDARD_CONFIG } from "./wisp";
 import { mulberry32, withPatchedMathRandom } from "../rng";
 import { rollEndlessBossOrder, type BossKind } from "../bosses/boss_roster";
 import { buildShaperArena, SHAPER_ENTRIES, SHAPER_LAYOUTS } from "../bosses/shaper_arena";
@@ -417,6 +418,9 @@ function buildEndlessFloor(
       e.kind = "fire-goblin";
     });
     placeCornerGhosts(mapData, enemies, DARK_FLOOR_GHOST_COUNT);
+    // Wisp pots exist on the blind floor too — a stamped pot's glow spilling out
+    // in the dark is the best sighting the mechanic has. Last in the stream.
+    stampWispPots(mapData);
     return { mapData, enemies };
   }
 
@@ -460,6 +464,8 @@ function buildEndlessFloor(
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
   // Snakes get the REAL floor: their spawn rules already scale past floor 6.
   const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
+  // Wisp pots last in the seeded stream (same contract as the daily generators).
+  stampWispPots(withRunes);
   return { mapData: withRunes, enemies: snakesAdded };
 }
 
@@ -486,6 +492,9 @@ export function initializeGameStateForEndless(): GameState {
     chestKeyCount: 0,
     mode: "endless",
     allowCheckpoints: false,
+    // Wisps are live in endless: seeded pot stamps in buildEndlessFloor, plus the
+    // runtime enemy-drop and once-per-floor pity sources this config switches on.
+    wispConfig: WISP_STANDARD_CONFIG,
     currentFloor: 1,
     maxFloors: ENDLESS_MAX_FLOORS,
     endlessSeed,
@@ -556,6 +565,11 @@ export function advanceToNextEndlessFloor(currentState: GameState): GameState {
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false,
+    // Wild wisps, trail and perch are positions on the floor being left behind;
+    // carried companions and the per-floor pity latch ride along via the spread.
+    wisps: undefined,
+    heroTrail: undefined,
+    wispPos: undefined,
     recentDeaths: [],
     recentBombBlasts: [],
     defeatedEnemies: [],

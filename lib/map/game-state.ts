@@ -55,6 +55,13 @@ import {
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { recordRewindStep, type RewindSnapshot } from "./rewind";
+import {
+  advanceWispTurn,
+  stampWispPots,
+  WISP_STANDARD_CONFIG,
+  type WildWisp,
+  type WispConfig,
+} from "./wisp";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
@@ -1812,6 +1819,15 @@ export interface GameState {
   // only recorded while a charge is held. See lib/map/rewind.ts.
   rewindCharges?: number;
   rewindHistory?: RewindSnapshot[];
+  // Wisp life-regen companion (see lib/map/wisp.ts). Live in daily + endless
+  // (WISP_STANDARD_CONFIG) and the /test-wisp room; absent wispConfig keeps the whole
+  // system dormant in story/tutorial/legacy modes.
+  wispConfig?: WispConfig;
+  wisps?: WildWisp[]; // Wild, uncaught wisps drifting on the map
+  wispCompanions?: number; // Caught wisps carried as extra lives
+  wispPos?: [number, number]; // Carried wisp's current perch (render + rescue tug target)
+  heroTrail?: Array<[number, number]>; // Last few tiles the hero vacated, newest last
+  wispPityFloors?: number[]; // Floors whose once-per-floor pity wisp already appeared
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -2387,6 +2403,15 @@ export function initializeGameStateForMultiTier(
     gateGroups?: GateGroup[];
     switchGate?: DailySwitchGate;
   } = { mapData: withRunes };
+  // The day's wisp pots, baked into the map so the SAME pots hold wisps for every
+  // player on this seed. Placed after every other generation draw but immediately
+  // BEFORE the switch gate: the gate must stay the floor's final — and only
+  // conditional — draw, so its on/off toggle can never shift these stamps (the
+  // gates suite pins "enabling gates changes NOTHING else on the floor"). The
+  // draws /stats replays historically (chest allocation, boss kind) all happen
+  // earlier or on separate streams, so they stay true.
+  stampWispPots(withRunes);
+
   if (opts.switchGates) {
     maybePlaceSwitchGate(gateWiring, floor, findPlayerPosition(withRunes), {
       avoid: occupiedTiles(snakesAdded),
@@ -2406,6 +2431,9 @@ export function initializeGameStateForMultiTier(
     maxFloors: 3,
     mapData: withRunes,
     sealPayloads,
+    // Wisps are live in the daily: seeded pot stamps above, plus the runtime
+    // enemy-drop and once-per-floor pity sources this config switches on.
+    wispConfig: WISP_STANDARD_CONFIG,
     // Carried across floors: whether the feature is on for this run, and whether the day's one
     // gate has already been spent. advanceToNextFloor reads both.
     switchGatesEnabled: opts.switchGates ? true : undefined,
@@ -2688,6 +2716,14 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     mapData: withRunes,
     switchGate: currentState.switchGate,
   };
+  // Wisp pots for this floor. Immediately BEFORE the switch gate for the same reason
+  // as in initializeGameStateForMultiTier: the gate must stay the floor's final,
+  // conditional draw so its toggle never shifts these stamps. Gated on the run
+  // carrying a wisp config so legacy multi-floor modes don't grow markers.
+  if (currentState.wispConfig) {
+    withPatchedMathRandom(rng, () => stampWispPots(withRunes));
+  }
+
   if (currentState.switchGatesEnabled) {
     withPatchedMathRandom(rng, () =>
       maybePlaceSwitchGate(gateWiring, nextFloor, findPlayerPosition(withRunes), {
@@ -2719,6 +2755,12 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
     sealPayloads,
     dailyBossKind,
+    // Wild wisps, the hero's trail and the companion's perch are positions on the
+    // floor being left behind — reset. Carried companions and the per-floor pity
+    // latch (wispPityFloors, keyed by floor number) ride along via the spread.
+    wisps: undefined,
+    heroTrail: undefined,
+    wispPos: undefined,
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -3727,12 +3769,15 @@ export function movePlayer(
   // Standing actions (throwing, using items) blind mist-covered enemies but deliberately
   // don't shift the cloud; the hero stirs it by walking through it.
   if (gameState.inPinkRealm && detonated.inPinkRealm) {
-    return withRewindStep(gameState, {
-      ...detonated,
-      mist: advanceMist(detonated.mist ?? [], detonated.mapData),
-    });
+    return withRewindStep(
+      gameState,
+      advanceWispTurn(gameState, {
+        ...detonated,
+        mist: advanceMist(detonated.mist ?? [], detonated.mapData),
+      })
+    );
   }
-  return withRewindStep(gameState, detonated);
+  return withRewindStep(gameState, advanceWispTurn(gameState, detonated));
 }
 
 /**
