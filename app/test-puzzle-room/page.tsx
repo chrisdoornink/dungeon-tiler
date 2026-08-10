@@ -10,7 +10,13 @@ import {
   puzzleRoomToGameState,
 } from "../../lib/puzzles/rooms";
 import { solvePuzzleRoom, solutionStates } from "../../lib/puzzles/solver";
+import { generateFerryRoom, difficultyTier } from "../../lib/puzzles/generate";
 import { TileSubtype } from "../../lib/map/constants";
+
+// A few deterministic, solver-certified generated lava ferries appended after the authored rooms,
+// so the bench can demo generation itself — watch the solver cross a room nobody hand-built.
+const GENERATED_ROOMS = [1, 2, 3].map((s) => generateFerryRoom(s));
+const ROOMS = [...PUZZLE_ROOMS, ...GENERATED_ROOMS];
 
 /**
  * Prototype bench for TOGGLE SWITCHES and MOVING PLATFORMS.
@@ -31,7 +37,7 @@ import { TileSubtype } from "../../lib/map/constants";
 
 function roomToState(index: number, resetCount: number): GameState {
   void resetCount; // a fresh parse per reset already yields a fresh world
-  return puzzleRoomToGameState(parsePuzzleRoom(PUZZLE_ROOMS[index]));
+  return puzzleRoomToGameState(parsePuzzleRoom(ROOMS[index]));
 }
 
 /** Full-room minimap. The camera only shows a window, which is useless for reading a puzzle. */
@@ -99,8 +105,8 @@ function TestPuzzleRoomInner() {
   const [outcome, setOutcome] = useState<"none" | "won" | "lost">("none");
 
   const state = useMemo(() => roomToState(index, resetCount), [index, resetCount]);
-  const room = useMemo(() => parsePuzzleRoom(PUZZLE_ROOMS[index]), [index]);
-  const spec = PUZZLE_ROOMS[index];
+  const room = useMemo(() => parsePuzzleRoom(ROOMS[index]), [index]);
+  const spec = ROOMS[index];
 
   // The solver only handles the enemy-free rooms deterministically, so skip the enemy benches —
   // a heavy enemy search would block the render. The four puzzle rooms solve in well under a second.
@@ -148,7 +154,9 @@ function TestPuzzleRoomInner() {
           Toggle switches and moving platforms in hand-authored rooms. Most are{" "}
           <b>enemy-free</b> to isolate the mechanic; the last two (<b>Behind Glass</b>,{" "}
           <b>The Getaway</b>) add fire-goblins to see how they read around a moving platform —
-          isolated by a hazard in one, actively chasing in the other.
+          isolated by a hazard in one, actively chasing in the other. The last three
+          (<b>Generated Ferry</b>) are <b>procedurally generated</b> — same pipeline, but the solver
+          certified each is solvable and that the raft is genuinely required to cross.
         </p>
         <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
           Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}
@@ -159,7 +167,7 @@ function TestPuzzleRoomInner() {
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center mt-3">
-          {PUZZLE_ROOMS.map((r, i) => (
+          {ROOMS.map((r, i) => (
             <button
               key={r.name}
               onClick={() => {
@@ -189,6 +197,15 @@ function TestPuzzleRoomInner() {
         <div className="font-bold text-amber-300">{spec.name}</div>
         <div className="text-gray-300 mt-1">{spec.asks}</div>
         <div className="text-xs text-gray-500 mt-2">{describeRoom(room)}</div>
+        {solve?.solvable && (
+          <div className="text-xs mt-1">
+            <span className="text-emerald-300">solver:</span> optimal in{" "}
+            <b>{solve.minTurns}</b> turns ·{" "}
+            <span className="uppercase tracking-wide">
+              {difficultyTier(solve.minTurns)}
+            </span>
+          </div>
+        )}
       </div>
 
       {outcome === "lost" && (
