@@ -10,10 +10,12 @@
 // is worth writing until the pieces themselves feel good, which is what these rooms are for.
 //
 // Each room isolates one question. Read the `asks` field before playing it.
-import { FLOOR, TileSubtype, WALL } from "../map/constants";
+import { Direction, FLOOR, TileSubtype, WALL } from "../map/constants";
 import type { MapData, Platform, ToggleGroup } from "../map/types";
 import { stampPlatform } from "../map/machinery";
 import { Enemy } from "../enemy";
+import { createEmptyByKind } from "../enemies/registry";
+import type { GameState } from "../map/game-state";
 
 /**
  * Map legend — one character per tile, rectangular, fully walled.
@@ -423,6 +425,50 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
     enemies,
     rocks: spec.rocks ?? 0,
   };
+}
+
+/**
+ * Build a playable `GameState` from a parsed room.
+ *
+ * Shared by the bench (which renders it) and the solver (which searches it), so both drive the
+ * exact same engine from the exact same starting state — the property the whole "solver reuses the
+ * real engine" approach rests on. A fresh parse produces fresh `mapData`/`platforms`, so each call
+ * is an independent world.
+ */
+export function puzzleRoomToGameState(room: ParsedPuzzleRoom): GameState {
+  return {
+    hasKey: false,
+    hasExitKey: false,
+    hasSword: false,
+    hasShield: false,
+    showFullMap: true,
+    win: false,
+    playerDirection: Direction.DOWN,
+    enemies: room.enemies,
+    npcs: [],
+    heroHealth: 5,
+    heroMaxHealth: 5,
+    heroAttack: 1,
+    heroTorchLit: true,
+    rockCount: room.rocks,
+    runeCount: 0,
+    foodCount: 0,
+    potionCount: 0,
+    mode: "normal",
+    allowCheckpoints: false,
+    mapData: room.mapData,
+    toggleGroups: room.toggleGroups,
+    platforms: room.platforms,
+    stats: {
+      damageDealt: 0,
+      damageTaken: 0,
+      enemiesDefeated: 0,
+      steps: 0,
+      byKind: createEmptyByKind(),
+    },
+    recentDeaths: [],
+    diaryEntries: [],
+  } as unknown as GameState;
 }
 
 /** One-line summary per room, for the harness header and for eyeballing a parse. */

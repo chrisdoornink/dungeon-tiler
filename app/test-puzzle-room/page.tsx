@@ -2,12 +2,12 @@
 
 import React, { Suspense, useMemo, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
-import { tileTypes, Direction, type GameState } from "../../lib/map";
-import { createEmptyByKind } from "../../lib/enemies/registry";
+import { tileTypes, type GameState } from "../../lib/map";
 import {
   PUZZLE_ROOMS,
   describeRoom,
   parsePuzzleRoom,
+  puzzleRoomToGameState,
 } from "../../lib/puzzles/rooms";
 import { TileSubtype } from "../../lib/map/constants";
 
@@ -29,41 +29,8 @@ import { TileSubtype } from "../../lib/map/constants";
  */
 
 function roomToState(index: number, resetCount: number): GameState {
-  const room = parsePuzzleRoom(PUZZLE_ROOMS[index]);
-  void resetCount; // forces a fresh object on reset
-  return {
-    hasKey: false,
-    hasExitKey: false,
-    hasSword: false,
-    hasShield: false,
-    showFullMap: true,
-    win: false,
-    playerDirection: Direction.DOWN,
-    enemies: room.enemies,
-    npcs: [],
-    heroHealth: 5,
-    heroMaxHealth: 5,
-    heroAttack: 1,
-    heroTorchLit: true,
-    rockCount: room.rocks,
-    runeCount: 0,
-    foodCount: 0,
-    potionCount: 0,
-    mode: "normal",
-    allowCheckpoints: false,
-    mapData: room.mapData,
-    toggleGroups: room.toggleGroups,
-    platforms: room.platforms,
-    stats: {
-      damageDealt: 0,
-      damageTaken: 0,
-      enemiesDefeated: 0,
-      steps: 0,
-      byKind: createEmptyByKind(),
-    },
-    recentDeaths: [],
-    diaryEntries: [],
-  } as unknown as GameState;
+  void resetCount; // a fresh parse per reset already yields a fresh world
+  return puzzleRoomToGameState(parsePuzzleRoom(PUZZLE_ROOMS[index]));
 }
 
 /** Full-room minimap. The camera only shows a window, which is useless for reading a puzzle. */
