@@ -2324,7 +2324,7 @@ export function initializeGameStateForMultiTier(
   const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
   const mapData = generateCompleteMapForFloor(floorAlloc, floor);
 
-  // Decoy cracks, 0-2, on every floor including this one. On floor 1 the hero has no
+  // Decoy cracks, 3-5, on every floor including this one. On floor 1 the hero has no
   // bombs at all, so a crack here is pure intrigue — it teaches the motif before it can
   // ever be used. (The real sealed doorway is floor 3 only; see advanceToNextFloor.)
   const sealPayloads = orUndefined(
@@ -2560,9 +2560,9 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         }
       }
     }
-    // Decoy cracks, 0-2, on EVERY floor — independent of the boss roll, so a floor can
-    // carry cracks with no doorway behind any of them and a bomb day can roll none at
-    // all. Placed after the doorway so they keep their distance from it.
+    // Decoy cracks, 3-5, on EVERY floor — independent of the boss roll, so a floor
+    // always carries cracks with no doorway behind most of them. Placed after the
+    // doorway so they keep their distance from it.
     const decoys = stampDecoySeals(
       mapData,
       rollDecoySealCount(),

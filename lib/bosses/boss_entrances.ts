@@ -723,23 +723,23 @@ export function buildBombSealApproach(): GameState {
 // --- Sealed doorway (the BOMB entrance) --------------------------------------
 
 /** Hard ceiling on decoy seals per floor. */
-export const MAX_DECOY_SEALS = 2;
+export const MAX_DECOY_SEALS = 5;
 /** Chebyshev spacing between seals, so two of them never read as one motif. */
 const SEAL_SPACING = 4;
 /** How far from any wall torch a decoy must sit, so a torch PAIR stays the only tell. */
 const DECOY_TORCH_CLEARANCE = 2;
 
 /**
- * How many decoy cracks this floor gets: 0, 1, or 2, rolled per floor on EVERY daily
- * floor — not just floor 3, and not just bomb days. Cracks you can do nothing about are
- * the point: seeing one on floor 1 with no bombs yet teaches the vocabulary, and a floor
- * that rolls zero keeps the motif from becoming furniture.
+ * How many decoy cracks this floor gets: 3, 4, or 5, rolled per floor on EVERY daily
+ * floor — not just floor 3, and not just bomb days. A floor always carries at least 3
+ * cracks so the motif reads as normal dungeon wear: spotting one is never by itself a
+ * giveaway that something is hidden — the torch PAIR around the real doorway is the tell.
  * Must be called inside the daily seeded RNG block.
  */
 export function rollDecoySealCount(): number {
   const r = Math.random();
-  if (r < 0.3) return 0;
-  if (r < 0.75) return 1;
+  if (r < 0.5) return 3;
+  if (r < 0.8) return 4;
   return MAX_DECOY_SEALS;
 }
 
@@ -801,9 +801,10 @@ function farEnough(taken: Array<[number, number]>, y: number, x: number): boolea
  * doorway. Each opens onto a pot: the first holds pink-realm fruit, any further one flips
  * a coin between fruit and ordinary food, so a decoy is never a wasted bomb.
  *
- * Runs on EVERY daily floor, so cracks show up on floors 1 and 2 where the hero has no
- * bombs yet and simply can't act on them. Spaced ≥SEAL_SPACING from `avoid` (the real
- * doorway, when there is one) and from each other.
+ * Runs on EVERY daily floor with a minimum of 3, so cracks show up on floors 1 and 2
+ * where the hero has no bombs yet and the motif never reads as a one-off marker.
+ * Spaced ≥SEAL_SPACING from `avoid` (the real doorway, when there is one) and from
+ * each other.
  *
  * Must be called inside the daily seeded RNG block.
  */
