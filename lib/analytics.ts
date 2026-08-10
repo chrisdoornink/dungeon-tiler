@@ -87,6 +87,14 @@ export function trackRewindUsed(params: {
   posthogAnalytics.trackRewindUsed(params);
 }
 
+export function trackWispCaught(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  posthogAnalytics.trackWispCaught(params);
+}
+
+export function trackWispSave(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  posthogAnalytics.trackWispSave(params);
+}
+
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
   posthogAnalytics.trackPinkRealmReached(params);
 }

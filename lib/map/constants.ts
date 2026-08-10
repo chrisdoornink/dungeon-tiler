@@ -177,6 +177,11 @@ export enum TileSubtype {
   // organic-mystical, and amber is literally preserved time. See lib/map/rewind.ts for the
   // snapshot ring buffer and .claude/features/amber-moth-rewind/index.md for the design.
   AMBER_MOTH = 71,
+  // A wisp curled up inside a pot, stamped at map generation (lib/map/wisp.ts
+  // stampWispPots) so the SAME pots hold wisps for every player on a daily seed.
+  // Never rendered — the marker only means "this pot releases a wisp when smashed";
+  // the wisp turn hook consumes it. Rides on [POT, WISP] like [POT, SNAKE] does.
+  WISP = 72,
 }
 
 /**

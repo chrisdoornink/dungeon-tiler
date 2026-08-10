@@ -25,6 +25,8 @@ import {
   rewindStateBy,
 } from "../lib/map/rewind";
 import { RewindOverlay } from "./RewindOverlay";
+import { wispDeathSave } from "../lib/map/wisp";
+import { WispLayer, type WispBurst } from "./WispOverlay";
 import type { Enemy } from "../lib/enemy";
 import { rehydrateEnemies } from "../lib/enemy";
 import type { NPC, NPCInteractionEvent } from "../lib/npc";
@@ -96,6 +98,8 @@ import {
   trackUse,
   trackPickup,
   trackRewindUsed,
+  trackWispCaught,
+  trackWispSave,
   trackPinkRealmReached,
   trackOutsideWorldReached,
   trackOutsideTreeDestroyed,
@@ -412,6 +416,44 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const [rewindDeathBeat, setRewindDeathBeat] = useState<null | { depth: number }>(
     null
   );
+  // One-shot wisp spins around the hero: "catch" when a wild wisp is caught,
+  // "rescue" when a carried one spends itself on a death save. Rendered by
+  // WispLayer at the given tile; each removes itself when its animation is done.
+  const [wispBursts, setWispBursts] = useState<WispBurst[]>([]);
+  const wispBurstSeq = useRef(0);
+  const spawnWispBurst = useCallback(
+    (y: number, x: number, kind: WispBurst["kind"]) => {
+      const key = ++wispBurstSeq.current;
+      setWispBursts((list) => [...list, { key, y, x, kind }]);
+      // Slightly past the CSS animation (800ms catch / 1250ms rescue) so the
+      // fade completes before unmount.
+      const ttl = kind === "rescue" ? 1350 : 900;
+      setTimeout(() => {
+        setWispBursts((list) => list.filter((b) => b.key !== key));
+      }, ttl);
+    },
+    []
+  );
+  // The catch spin: fires whenever the carried count goes UP (a wild wisp was
+  // caught). Rescue spins fire explicitly from the death-save intercept — that
+  // path DECREASES the count, so it can never double-fire this.
+  const prevWispCompanions = useRef(gameState.wispCompanions ?? 0);
+  useEffect(() => {
+    const cur = gameState.wispCompanions ?? 0;
+    const prev = prevWispCompanions.current;
+    prevWispCompanions.current = cur;
+    if (cur > prev) {
+      const pos = findPlayerPosition(gameState.mapData);
+      if (pos) spawnWispBurst(pos[0], pos[1], "catch");
+      try {
+        trackWispCaught({
+          mode: isDailyChallenge ? "daily" : isEndless ? "endless" : "normal",
+          floor: gameState.currentFloor,
+          dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+        });
+      } catch {}
+    }
+  }, [gameState, spawnWispBurst, isDailyChallenge, isEndless]);
   /**
    * How far back the charm can currently reach. While a preview is open the board holds a
    * PAST state whose buffer is already truncated, so read the depth from the stashed
@@ -3170,6 +3212,34 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
      * repeat. If it somehow restores a state that is still dead, the charge is gone and
      * the ordinary death path takes over on the next pass — no loop either way.
      */
+    /**
+     * A carried wisp is the FIRST save consulted, ahead of the Amber Moth: it is the
+     * cheaper rescue (heal in place + a one-tile tug back onto its perch, world
+     * untouched) so it spends itself before the charm's full five-step rewind is
+     * touched. Same placement rules as the moth below — above the death animation,
+     * analytics, and redirects, so a saved run is never recorded as a death.
+     * Self-limiting the same way too: each save consumes a companion.
+     */
+    {
+      const saved = wispDeathSave(gameState);
+      if (saved && saved.heroHealth > 0) {
+        // The spin happens on the board, centered where the hero wakes up
+        // (the tug may have moved them off the lethal tile).
+        const revivedAt = findPlayerPosition(saved.mapData);
+        if (revivedAt) spawnWispBurst(revivedAt[0], revivedAt[1], "rescue");
+        setGameState(saved);
+        CurrentGameStorage.saveCurrentGame(saved, resolvedStorageSlot);
+        try {
+          trackWispSave({
+            mode: isDailyChallenge ? "daily" : isEndless ? "endless" : "normal",
+            floor: gameState.currentFloor,
+            dateSeed: isDailyChallenge ? DateUtils.getTodayString() : undefined,
+          });
+        } catch {}
+        return;
+      }
+    }
+
     if ((gameState.rewindCharges ?? 0) > 0) {
       const depth = Math.min(REWIND_DEATH_DEPTH, rewindDepthAvailable(gameState));
       const saved = depth > 0 ? rewindStateBy(gameState, depth) : null;
@@ -3438,6 +3508,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     onDeath,
     router,
     resolvedStorageSlot,
+    spawnWispBurst,
     heroDeathPhase,
     shouldAnimateHeroDeath,
   ]);
@@ -5659,6 +5730,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       );
                     });
                   })()}
+                {/* Wisp prototype: wild wisps drifting the floor + the caught
+                    companion(s) perched on the hero's trail. Pure CSS glow orbs,
+                    positioned like the beams/spirits above. */}
+                {((gameState.wisps?.length ?? 0) > 0 ||
+                  (gameState.wispCompanions ?? 0) > 0 ||
+                  wispBursts.length > 0) && (
+                  <WispLayer
+                    wisps={gameState.wisps ?? []}
+                    // While a catch spin is playing, the newest companion IS the
+                    // spinning orb — hold it out of the trailing cluster until
+                    // the loops finish, then it joins.
+                    companions={Math.max(
+                      0,
+                      (gameState.wispCompanions ?? 0) -
+                        wispBursts.filter((b) => b.kind === "catch").length
+                    )}
+                    wispPos={gameState.wispPos}
+                    playerPosition={playerPosition}
+                    bursts={wispBursts}
+                  />
+                )}
                 {heartEffect && (() => {
                   const tileSize = 40;
                   const pxLeft = (heartEffect.x + 0.5) * tileSize;
