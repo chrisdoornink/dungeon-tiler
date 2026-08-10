@@ -744,8 +744,12 @@
   pointer-events: none;
 }
 
+/* cracks-1-pale is cracks-1 with its lines recolored to cracks-2's pale tone. The
+   original cracks-1.png is black-line art, and black is invisible under the screen
+   blend above — variant-A seals rendered as nothing at all until this was caught
+   (2026-08-11). Keep any future variant's line color pale for the same reason. */
 .wallSealVariantA {
-  background-image: url("/images/floor/cracks-1.png");
+  background-image: url("/images/floor/cracks-1-pale.png");
 }
 
 .wallSealVariantB {

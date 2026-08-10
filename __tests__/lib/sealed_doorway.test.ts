@@ -285,21 +285,19 @@ describe("sealed doorway — placement rules", () => {
 });
 
 describe("decoy cracks on every floor", () => {
-  it("rolls 0, 1, or 2 — and actually produces all three over many days", () => {
+  it("rolls 3, 4, or 5 — and actually produces all three over many days", () => {
     const seen = new Set<number>();
     for (let seed = 1; seed <= 200; seed++) {
       const n = withPatchedMathRandom(mulberry32(seed), () => rollDecoySealCount());
-      expect(n).toBeGreaterThanOrEqual(0);
+      expect(n).toBeGreaterThanOrEqual(3);
       expect(n).toBeLessThanOrEqual(MAX_DECOY_SEALS);
       seen.add(n);
     }
-    expect([...seen].sort()).toEqual([0, 1, MAX_DECOY_SEALS]);
+    expect([...seen].sort()).toEqual([3, 4, MAX_DECOY_SEALS]);
   });
 
   it("puts cracks on floor 1, where the hero has no bombs and can do nothing about them", () => {
     // The point of a floor-1 crack: it teaches the motif before it can ever be used.
-    let floorsWithCracks = 0;
-    let sawEmptyFloor = false;
     for (let i = 0; i < 40; i++) {
       const seed = hashStringToSeed(`2026-10-${String((i % 28) + 1).padStart(2, "0")}-${i}`);
       const f1 = withPatchedMathRandom(mulberry32(seed), () =>
@@ -308,16 +306,15 @@ describe("decoy cracks on every floor", () => {
       const cracks = f1.mapData.subtypes
         .flat()
         .filter((c) => c.includes(TileSubtype.WALL_SEAL)).length;
+      // Floors always carry cracks now (min 3 rolled; placement can drop below that
+      // only when a floor is short on eligible walls).
+      expect(cracks).toBeGreaterThanOrEqual(1);
       expect(cracks).toBeLessThanOrEqual(MAX_DECOY_SEALS);
       expect(Object.keys(f1.sealPayloads ?? {}).length).toBe(cracks);
       // Floor 1 never hides the boss — only decoys.
       expect(Object.values(f1.sealPayloads ?? {})).not.toContain("boss");
       expect(f1.bombCount ?? 0).toBe(0);
-      if (cracks > 0) floorsWithCracks++;
-      else sawEmptyFloor = true;
     }
-    expect(floorsWithCracks).toBeGreaterThan(0);
-    expect(sawEmptyFloor).toBe(true); // variance is the point: some floors have none
   });
 
   it("puts cracks on floor 2 as well, alongside the day's chests", () => {
@@ -339,9 +336,8 @@ describe("decoy cracks on every floor", () => {
     expect(floorsWithCracks).toBeGreaterThan(0);
   });
 
-  it("floor 3 carries at most one boss seal, and 0-2 decoys on top of it", () => {
+  it("floor 3 carries at most one boss seal, and decoys on top of it", () => {
     let bombDays = 0;
-    let bombDayDecoyCounts = new Set<number>();
     for (let i = 0; i < 40; i++) {
       const seed = hashStringToSeed(`2026-12-${String((i % 28) + 1).padStart(2, "0")}-${i}`);
       const f1 = withPatchedMathRandom(mulberry32(seed), () =>
@@ -358,14 +354,14 @@ describe("decoy cracks on every floor", () => {
       expect(bosses.length).toBeLessThanOrEqual(1);
       const decoys = Object.values(payloads).length - bosses.length;
       expect(decoys).toBeLessThanOrEqual(MAX_DECOY_SEALS);
+      // On a bomb day the doorway's crack must never be the only crack on the floor —
+      // decoys are what keep a lone crack from being a giveaway.
       if (bosses.length === 1) {
         bombDays++;
-        bombDayDecoyCounts.add(decoys);
+        expect(decoys).toBeGreaterThanOrEqual(1);
         expect(f3.bossEntranceKind).toBe("bomb");
       }
     }
     expect(bombDays).toBeGreaterThan(0);
-    // A bomb day can roll zero decoys (only the bracketed doorway) or up to the max.
-    expect(Math.min(...bombDayDecoyCounts)).toBe(0);
   });
 });
