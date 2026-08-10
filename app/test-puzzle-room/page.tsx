@@ -11,12 +11,14 @@ import {
 } from "../../lib/puzzles/rooms";
 import { solvePuzzleRoom, solutionStates } from "../../lib/puzzles/solver";
 import { generateFerryRoom, difficultyTier } from "../../lib/puzzles/generate";
+import { CHAIN_ROOMS } from "../../lib/puzzles/chain_rooms";
 import { TileSubtype } from "../../lib/map/constants";
 
 // A few deterministic, solver-certified generated lava ferries appended after the authored rooms,
 // so the bench can demo generation itself — watch the solver cross a room nobody hand-built.
 const GENERATED_ROOMS = [1, 2, 3].map((s) => generateFerryRoom(s));
-const ROOMS = [...PUZZLE_ROOMS, ...GENERATED_ROOMS];
+// Hand-authored multi-element calibration rooms (chaining switches/platforms/gates) for playtest.
+const ROOMS = [...PUZZLE_ROOMS, ...CHAIN_ROOMS, ...GENERATED_ROOMS];
 
 /**
  * Prototype bench for TOGGLE SWITCHES and MOVING PLATFORMS.
