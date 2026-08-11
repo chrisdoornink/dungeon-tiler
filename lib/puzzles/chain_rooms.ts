@@ -46,4 +46,35 @@ export const CHAIN_ROOMS: PuzzleRoomSpec[] = [
     ],
     lengths: { "1": 2 },
   },
+  {
+    name: "The Relay (two switches · crossed wiring)",
+    asks:
+      "TWO SWITCHES, CROSSED. The near switch opens the KEY gate on the FAR bank; the far switch " +
+      "opens the EXIT gate on the NEAR bank. Neither helps the side it sits on, so you flip the near " +
+      "one, ride over, flip the far one and grab the key, then ride back to the (now-open) exit. Does " +
+      "operating a switch on each side add real thinking, or is it just more walking?",
+    // S1 T(1,4) opens far key-gate B2(7,10). S2 T(7,1) opens near exit-gate B1(1,10). Both beds start
+    // UP. The ferry always runs (bidirectional), so nothing strands you mid-plan.
+    map: [
+      "#############",
+      "#H..T.....^E#",
+      "#..........##",
+      "#.....1.....#",
+      "#LLLLL1LLLLL#",
+      "#LLLLL1LLLLL#",
+      "#.....1....##",
+      "#T........^k#",
+      "#############",
+    ],
+    trackOver: "lava",
+    toggles: [
+      { switchAt: [1, 4], gates: [[7, 10]], on: false }, // near switch -> far key gate
+      { switchAt: [7, 1], gates: [[1, 10]], on: false }, // far switch -> near exit gate
+    ],
+    dryRail: [
+      [3, 6],
+      [6, 6],
+    ],
+    lengths: { "1": 2 },
+  },
 ];

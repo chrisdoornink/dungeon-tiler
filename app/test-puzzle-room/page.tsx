@@ -10,31 +10,39 @@ import {
   puzzleRoomToGameState,
 } from "../../lib/puzzles/rooms";
 import { solvePuzzleRoom, solutionStates } from "../../lib/puzzles/solver";
-import { generateFerryRoom, difficultyTier } from "../../lib/puzzles/generate";
+import { difficultyTier } from "../../lib/puzzles/generate";
 import { CHAIN_ROOMS } from "../../lib/puzzles/chain_rooms";
 import { TileSubtype } from "../../lib/map/constants";
 
-// A few deterministic, solver-certified generated lava ferries appended after the authored rooms,
-// so the bench can demo generation itself — watch the solver cross a room nobody hand-built.
-const GENERATED_ROOMS = [1, 2, 3].map((s) => generateFerryRoom(s));
-// Hand-authored multi-element calibration rooms (chaining switches/platforms/gates) for playtest.
-const ROOMS = [...PUZZLE_ROOMS, ...CHAIN_ROOMS, ...GENERATED_ROOMS];
+// Curated bench: the multi-element calibration rooms first (the current frontier), then the authored
+// rooms worth keeping around — one real logic room, one water design, and the two enemy benches. The
+// bare ferries and the generated ferry seeds were trivial, so they're off the bench; the generator
+// and all its tests stay in the codebase.
+const KEEP_AUTHORED = [
+  "The Trade",
+  "The Raft (teaching)",
+  "Behind Glass",
+  "The Getaway",
+];
+const authored = PUZZLE_ROOMS.filter((r) => KEEP_AUTHORED.includes(r.name));
+const ROOMS = [...CHAIN_ROOMS, ...authored];
 
 /**
  * Prototype bench for TOGGLE SWITCHES and MOVING PLATFORMS.
  *
- * Six hand-authored rooms, each isolating one question about whether these are worth building a
- * puzzle-floor archetype around. The question a room is asking is printed above it — play it with
- * that question in mind rather than trying to "win", because a room that is easy to beat and dull
- * to beat is a failed room.
+ * A curated set: the multi-element CALIBRATION rooms first (the ones being tuned by playtest right
+ * now), then a few authored keepers — one real logic room (The Trade), one water design, and the two
+ * enemy benches. The question a room is asking is printed above it — play it with that question in
+ * mind rather than trying to "win", because a room that is easy to beat and dull to beat is a failed
+ * room.
  *
  * PRESS `.` (or numpad 5) TO WAIT. That is not a convenience: a slab advances once per turn and
  * the hero must be aboard to be carried, so waiting is how you ride. On mobile, tap either
  * hourglass in the top corners of the d-pad.
  *
- * The first rooms are deliberately enemy-free so the mechanic is judged on its own. The last two
- * add fire-goblins: one where a hazard keeps them isolated (watch them near a moving platform
- * without chase pressure) and one where they chase (watch a platform work as an escape route).
+ * The two enemy benches (Behind Glass, The Getaway) keep fire-goblins around: one where a hazard
+ * isolates them from the hero, one where they chase — so the solver skips those (see below) and
+ * they are there to watch, not to auto-solve.
  */
 
 function roomToState(index: number, resetCount: number): GameState {
@@ -153,12 +161,11 @@ function TestPuzzleRoomInner() {
       <div className="text-center bg-black/70 rounded-lg p-3 w-full max-w-3xl">
         <h1 className="text-xl font-bold">Puzzle Machinery Prototype</h1>
         <p className="text-xs text-gray-300 mt-1">
-          Toggle switches and moving platforms in hand-authored rooms. Most are{" "}
-          <b>enemy-free</b> to isolate the mechanic; the last two (<b>Behind Glass</b>,{" "}
-          <b>The Getaway</b>) add fire-goblins to see how they read around a moving platform —
-          isolated by a hazard in one, actively chasing in the other. The last three
-          (<b>Generated Ferry</b>) are <b>procedurally generated</b> — same pipeline, but the solver
-          certified each is solvable and that the raft is genuinely required to cross.
+          The first rooms chain several elements into one puzzle — these are the ones being{" "}
+          <b>tuned by playtest</b> right now. After them: <b>The Trade</b> (a real order-of-operations
+          logic room), one <b>water</b> design, and two enemy benches (<b>Behind Glass</b>,{" "}
+          <b>The Getaway</b>) showing fire-goblins around a moving platform — isolated by a hazard in
+          one, actively chasing in the other.
         </p>
         <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
           Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}
