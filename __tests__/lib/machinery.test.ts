@@ -9,12 +9,17 @@ import { Direction, FLOOR, TileSubtype } from "../../lib/map/constants";
 import type { MapData, Platform, ToggleGroup } from "../../lib/map/types";
 import {
   advanceMachinery,
+  applyColorLock,
+  colorLockSatisfied,
+  isColorSwitch,
   nextPlatformTile,
   platformTile,
   platformTiles,
   stampPlatform,
   throwToggle,
+  turnColorSwitch,
 } from "../../lib/map/machinery";
+import type { ColorLock } from "../../lib/map/types";
 import { Enemy } from "../../lib/enemy";
 import { createEmptyByKind } from "../../lib/enemies/registry";
 
@@ -634,5 +639,116 @@ describe("enemies riding platforms", () => {
     advanceMachinery(state, null, [goblin]);
     expect(platformTile(state.platforms![0])).toEqual([4, 3]);
     expect([goblin.y, goblin.x]).toEqual([4, 2]); // left behind
+  });
+});
+
+/**
+ * Colour locks. Turning a switch cycles its colour; a platform runs only while the lock's switches
+ * satisfy its rule. The property a puzzle leans on: the platform's running is a pure function of the
+ * switch colours, and turning is re-armable (never latches).
+ */
+describe("colour locks", () => {
+  /** Two colour switches wired to run a ferry only while their colours are equal; start mismatched. */
+  function colourRoom(): GameState {
+    const map = blankMap();
+    map.subtypes[1][1].push(TileSubtype.TOGGLE_SWITCH);
+    map.subtypes[1][3].push(TileSubtype.TOGGLE_SWITCH);
+    const platform: Platform = {
+      id: "ferry",
+      track: [
+        [4, 2],
+        [4, 3],
+        [4, 4],
+      ],
+      index: 0,
+      dir: 1,
+      running: false, // mismatched at the start, so it begins parked
+      length: 1,
+    };
+    const lock: ColorLock = {
+      id: "cl0",
+      switches: [
+        [1, 1],
+        [1, 3],
+      ],
+      colors: 4,
+      states: [0, 1],
+      rule: "allEqual",
+      platforms: ["ferry"],
+      gates: [],
+      invertedGates: [],
+    };
+    return baseState(map, { platforms: [platform], colorLocks: [lock] });
+  }
+
+  it("allEqual is satisfied only when every switch shows the same colour", () => {
+    const base: ColorLock = {
+      id: "x",
+      switches: [[0, 0], [0, 1]],
+      colors: 4,
+      states: [2, 2],
+      rule: "allEqual",
+      platforms: [],
+      gates: [],
+      invertedGates: [],
+    };
+    expect(colorLockSatisfied(base)).toBe(true);
+    expect(colorLockSatisfied({ ...base, states: [2, 3] })).toBe(false);
+  });
+
+  it("match is satisfied only against the target colour pattern", () => {
+    const m: ColorLock = {
+      id: "x",
+      switches: [[0, 0], [0, 1]],
+      colors: 4,
+      states: [1, 3],
+      rule: "match",
+      target: [1, 3],
+      platforms: [],
+      gates: [],
+      invertedGates: [],
+    };
+    expect(colorLockSatisfied(m)).toBe(true);
+    expect(colorLockSatisfied({ ...m, states: [3, 1] })).toBe(false);
+  });
+
+  it("turning a switch cycles its colour and wraps at `colors`", () => {
+    const state = colourRoom(); // switch (1,1) starts on colour 0
+    for (let i = 0; i < 4; i++) turnColorSwitch(state, 1, 1, new Set());
+    // 0 -> 1 -> 2 -> 3 -> 0
+    expect(state.colorLocks![0].states[0]).toBe(0);
+  });
+
+  it("runs the platform when the colours match and parks it when they diverge", () => {
+    const state = colourRoom(); // states [0,1], ferry parked
+    expect(state.platforms![0].running).toBe(false);
+    turnColorSwitch(state, 1, 1, new Set()); // (1,1) 0 -> 1, now [1,1] — a match
+    expect(state.platforms![0].running).toBe(true);
+    turnColorSwitch(state, 1, 1, new Set()); // (1,1) 1 -> 2, now [2,1] — mismatch again
+    expect(state.platforms![0].running).toBe(false);
+  });
+
+  it("copy-on-writes the locks, leaving the pre-turn state's lock untouched", () => {
+    const state = colourRoom();
+    const before = state.colorLocks!;
+    const beforeStates = before[0].states;
+    turnColorSwitch(state, 1, 1, new Set());
+    expect(state.colorLocks).not.toBe(before); // a new array...
+    expect(beforeStates).toEqual([0, 1]); // ...and the old states array is untouched
+  });
+
+  it("isColorSwitch tells a colour switch from a plain tile", () => {
+    const state = colourRoom();
+    expect(isColorSwitch(state, 1, 1)).toBe(true);
+    expect(isColorSwitch(state, 4, 4)).toBe(false);
+  });
+
+  it("applyColorLock syncs the platform to the initial colours without turning anything", () => {
+    const state = colourRoom();
+    state.platforms![0].running = true; // pretend it was authored running
+    applyColorLock(state, state.colorLocks![0], new Set());
+    // [0,1] is a mismatch, so the sync parks it — and the switch colours are unchanged.
+    expect(state.platforms![0].running).toBe(false);
+    expect(state.colorLocks![0].states).toEqual([0, 1]);
   });
 });

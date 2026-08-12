@@ -2281,11 +2281,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // group, not on the tile — without this the renderer has no way to know whether a switch has been
   // thrown, which is why every toggle looked identical in both states.
   const toggleStates: Map<string, number> | undefined = (() => {
-    const groups = gameState.toggleGroups;
-    if (!groups || groups.length === 0) return undefined;
+    const groups = gameState.toggleGroups ?? [];
+    const locks = gameState.colorLocks ?? [];
+    if (groups.length === 0 && locks.length === 0) return undefined;
     const m = new Map<string, number>();
+    // A binary toggle reads as colour 0 (off) or 1 (on)...
     for (const g of groups) {
       m.set(`${g.switchAt[0]},${g.switchAt[1]}`, g.on ? 1 : 0);
+    }
+    // ...a colour switch reads as its actual colour index, so a four-colour switch shows all four.
+    for (const l of locks) {
+      l.switches.forEach(([sy, sx], i) => m.set(`${sy},${sx}`, l.states[i] ?? 0));
+    }
+    return m;
+  })();
+
+  // How many colours each COLOUR switch cycles through, keyed "y,x". Only colour switches appear
+  // here; a binary toggle is absent, so the renderer keeps its single-lamp look for those and shows
+  // the full four-corner palette only for a real colour switch.
+  const toggleColors: Map<string, number> | undefined = (() => {
+    const locks = gameState.colorLocks ?? [];
+    if (locks.length === 0) return undefined;
+    const m = new Map<string, number>();
+    for (const l of locks) {
+      for (const [sy, sx] of l.switches) m.set(`${sy},${sx}`, l.colors);
     }
     return m;
   })();
@@ -6025,6 +6044,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     torchSnuffing,
                     smoothPlatformSteps,
                     toggleStates,
+                    toggleColors,
                     platformDecks
                   )}
                 </div>
@@ -6640,6 +6660,9 @@ function renderTileGrid(
   platformSteps?: Map<string, SmoothEntityStep>,
   // Toggle switch state per tile, keyed "y,x". Drives which colour the switch shows.
   toggleStates?: Map<string, number>,
+  // Colour count per COLOUR switch, keyed "y,x". Present only for colour switches; drives the
+  // four-corner palette display (absent => keep the binary toggle's single lamp).
+  toggleColors?: Map<string, number>,
   // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
   decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>
 ) {
@@ -7060,6 +7083,7 @@ function renderTileGrid(
             }
             deck={decks?.get(`${rowIndex},${colIndex}`)}
             toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
+            toggleColors={toggleColors?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

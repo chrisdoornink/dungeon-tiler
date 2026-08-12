@@ -103,6 +103,12 @@ export function stateKey(s: GameState): string {
       (p) => `${p.id}:${p.index}:${p.dir}:${p.running ? 1 : 0}`
     ),
     toggles: (s.toggleGroups ?? []).map((g) => (g.on ? 1 : 0)),
+    // Colour-switch states live off the map, so they MUST be in the key — otherwise two configs
+    // that differ only in switch colours (and thus in which platforms run) would merge and the
+    // search could prune a distinct, sometimes-solving state.
+    // Comma-joined, not bare-concatenated: with a delimiter, colours >= 10 can't alias (e.g.
+    // [1,12] vs [11,2]). Colours are capped at 4 today, but the key stays sound if that ever lifts.
+    colorLocks: (s.colorLocks ?? []).map((l) => l.states.join(",")),
     exitKey: !!s.hasExitKey,
     rocks: s.rockCount ?? 0,
     runes: s.runeCount ?? 0,

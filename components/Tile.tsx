@@ -305,6 +305,13 @@ interface TileProps {
    * one without experimenting on it.
    */
   toggleState?: number;
+  /**
+   * How many colours this switch cycles through, when it is a COLOUR switch (>= 3). Present only for
+   * colour switches; when set, the switch shows all its colours as corner dots with the current one
+   * lit, so a player can read at a glance how far the colour is from the one they want. Absent for a
+   * binary toggle, which keeps its single indicator lamp.
+   */
+  toggleColors?: number;
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -405,6 +412,7 @@ export const Tile: React.FC<TileProps> = ({
   npcStep,
   deck,
   toggleState,
+  toggleColors,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1103,23 +1111,47 @@ export const Tile: React.FC<TileProps> = ({
         {/* Toggle switch. Cold blue where a latching plate is warm brass, and it keeps its glow
             whichever way it is thrown, because "spent" is a state a toggle never reaches. The
             lever tips to show which way it currently sits. */}
-        {hasToggleSwitch(subtypes) && (
-          <div
-            key="toggle-switch"
-            data-testid={`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`}
-            data-toggle-state={toggleState ?? 0}
-            className={`${styles.assetIcon} ${styles.switchIcon} ${styles.toggleSwitch}`}
-            style={{
-              // State colour is carried by a drawn glow and lamp rather than a CSS filter: the
-              // sprite is a near-black desaturated green, and hue-rotating something that dark
-              // changes nothing you can see. See TOGGLE_STATE_COLORS.
-              ['--toggle-color' as string]: toggleStateColor(toggleState ?? 0),
-              // A geometric tell as well as a colour one, so state survives colour-vision
-              // deficiency and a dim FOV tier: the lever visibly sits the other way on odd states.
-              transform: (toggleState ?? 0) % 2 === 1 ? 'scaleX(-1)' : undefined,
-            }}
-          />
-        )}
+        {hasToggleSwitch(subtypes) && (() => {
+          const state = toggleState ?? 0;
+          // A COLOUR switch (>= 3 colours) shows its whole palette in the corners; a binary toggle
+          // keeps its single lamp (palette = 0).
+          const palette = (toggleColors ?? 0) >= 3 ? Math.min(toggleColors ?? 0, 4) : 0;
+          return (
+            <div
+              key="toggle-switch"
+              data-testid={`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`}
+              data-toggle-state={state}
+              className={`${styles.assetIcon} ${styles.switchIcon} ${styles.toggleSwitch}${
+                palette ? ` ${styles.paletteSwitch}` : ""
+              }`}
+              style={{
+                // State colour is carried by a drawn glow and lamp rather than a CSS filter: the
+                // sprite is a near-black desaturated green, and hue-rotating something that dark
+                // changes nothing you can see. See TOGGLE_STATE_COLORS.
+                ["--toggle-color" as string]: toggleStateColor(state),
+                // The lever flip is the BINARY toggle's geometric tell. A colour switch reads its
+                // state off the corner palette instead, and flipping would mirror those dots, so it
+                // is skipped there.
+                transform: !palette && state % 2 === 1 ? "scaleX(-1)" : undefined,
+              }}
+            >
+              {/* One dot per colour, in a corner, clockwise from the top-left in cycle order, so the
+                  lit dot advances one corner per turn and the distance to any colour is countable. */}
+              {palette > 0 &&
+                Array.from({ length: palette }).map((_, i) => (
+                  <span
+                    key={i}
+                    data-testid={`palette-dot-${i}`}
+                    data-active={i === state ? "true" : "false"}
+                    className={`${styles.paletteDot} ${styles[`paletteDot${i}`]}${
+                      i === state ? ` ${styles.paletteDotActive}` : ""
+                    }`}
+                    style={{ ["--dot-color" as string]: toggleStateColor(i) }}
+                  />
+                ))}
+            </div>
+          );
+        })()}
 
         {/* No rail decal is drawn. The track stays in the data model (platforms still move along it,
             and the coexist whitelist above still lets the hero stand on PLATFORM_TRACK tiles) but

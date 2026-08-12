@@ -17,3 +17,45 @@ describe("chain rooms", () => {
     });
   }
 });
+
+/** Colour-lock authoring is validated at parse — a bad lock throws rather than shipping a dead or
+ *  unsolvable room (the gaps the mechanic's verification pass flagged). */
+describe("colour lock parse validation", () => {
+  const base = {
+    name: "bad",
+    asks: "",
+    trackOver: "lava" as const,
+    map: ["#####", "#HCE#", "#####"], // C colour switch at (1,2)
+  };
+
+  it("rejects a rule:match lock with no target", () => {
+    expect(() =>
+      parsePuzzleRoom({
+        ...base,
+        colorLocks: [{ switches: [[1, 2]], rule: "match", platforms: [] }],
+      })
+    ).toThrow(/match/);
+  });
+
+  it("rejects the same switch wired to two locks", () => {
+    expect(() =>
+      parsePuzzleRoom({
+        ...base,
+        colorLocks: [
+          { switches: [[1, 2]], rule: "allEqual" },
+          { switches: [[1, 2]], rule: "allEqual" },
+        ],
+      })
+    ).toThrow(/more than one lock/);
+  });
+
+  it("rejects a binary toggle wired onto a colour switch", () => {
+    expect(() =>
+      parsePuzzleRoom({
+        ...base,
+        toggles: [{ switchAt: [1, 2] }],
+        colorLocks: [{ switches: [[1, 2]], rule: "allEqual" }],
+      })
+    ).toThrow(/colour switch/);
+  });
+});

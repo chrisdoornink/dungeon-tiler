@@ -92,6 +92,38 @@ export interface ToggleGroup {
 }
 
 /**
+ * A COLOUR LOCK: several turning switches whose combined COLOURS drive a platform/gates through a
+ * predicate, instead of a single on/off flip. Turning a switch cycles its colour (0..colors-1); the
+ * lock is SATISFIED when the switch colours meet `rule`, and while satisfied its platforms run and
+ * its gates retract (invertedGates rise) — the exact same wiring semantics as a ToggleGroup's `on`,
+ * just driven by a many-switch condition rather than one boolean.
+ *
+ *  - rule "allEqual": satisfied when every switch shows the SAME colour ("all one colour").
+ *  - rule "match":    satisfied when the colours equal `target` position-for-position (a pattern).
+ *
+ * `states[i]` is the current colour of `switches[i]` — the two arrays run in parallel. A single
+ * switch belongs to one lock. The switches render as ordinary TOGGLE_SWITCH tiles; their colour is
+ * read from here, so the existing multi-colour switch art needs no change.
+ */
+export interface ColorLock {
+  id: string;
+  switches: Array<[number, number]>;
+  /** Colours each switch cycles through, >= 2. Four is the natural max (four switch colours exist). */
+  colors: number;
+  /** Current colour per switch, parallel to `switches`. */
+  states: number[];
+  rule: "allEqual" | "match";
+  /** Required colour per switch when `rule === "match"`. */
+  target?: number[];
+  /** Platforms that run while the lock is satisfied. */
+  platforms: string[];
+  /** Spike beds that retract while satisfied and rise while not. */
+  gates: Array<[number, number]>;
+  /** Beds with opposite polarity: rise while satisfied, retract while not. */
+  invertedGates: Array<[number, number]>;
+}
+
+/**
  * A slab that ferries the hero across a hazard, one tile per turn.
  *
  * `track` is the full route in order, and the slab PING-PONGS along it: it walks to the end,

@@ -11,8 +11,8 @@
 //
 // Each room isolates one question. Read the `asks` field before playing it.
 import { Direction, FLOOR, TileSubtype, WALL } from "../map/constants";
-import type { MapData, Platform, ToggleGroup } from "../map/types";
-import { stampPlatform } from "../map/machinery";
+import type { ColorLock, MapData, Platform, ToggleGroup } from "../map/types";
+import { stampPlatform, applyColorLock } from "../map/machinery";
 import { Enemy } from "../enemy";
 import { createEmptyByKind } from "../enemies/registry";
 import type { GameState } from "../map/game-state";
@@ -23,6 +23,7 @@ import type { GameState } from "../map/game-state";
  *   `#` wall              `.` floor             `H` hero start        `E` exit
  *   `~` deep water        `L` lava              `^` spike bed (up)    `v` spike bed (retracted)
  *   `T` toggle switch     `r` a rock to pick up `k` exit key          `p` pot
+ *   `C` colour switch (turns through colours; wired by a `colorLocks` entry, not on/off)
  *   `g` a fire-goblin (a basic chaser: carries its own light, hunts on sight, won't cross lava or
  *       deep water and so won't board a platform over either — it stays on the bank)
  *   `1`-`9` platform track tiles; the DIGIT is the platform id, and the slab starts on the first
@@ -84,6 +85,22 @@ export interface PuzzleRoomSpec {
   dryRail?: Array<[number, number]>;
   /** Rocks the hero walks in with. Puzzle rooms hand these out rather than scattering them. */
   rocks?: number;
+  /**
+   * Colour locks. Each names the `C` switches it reads, the `rule` over their colours, and what it
+   * drives while satisfied. `initial` is the starting colour per switch (default all 0); `colors`
+   * is how many each cycles through (default 4). Positions must land on `C` tiles / real beds /
+   * known platform ids, or parsePuzzleRoom throws.
+   */
+  colorLocks?: Array<{
+    switches: Array<[number, number]>;
+    colors?: number;
+    rule: "allEqual" | "match";
+    target?: number[];
+    initial?: number[];
+    platforms?: string[];
+    gates?: Array<[number, number]>;
+    invertedGates?: Array<[number, number]>;
+  }>;
 }
 
 export const PUZZLE_ROOMS: PuzzleRoomSpec[] = [
@@ -251,6 +268,7 @@ export interface ParsedPuzzleRoom {
   mapData: MapData;
   hero: [number, number];
   toggleGroups: ToggleGroup[];
+  colorLocks: ColorLock[];
   platforms: Platform[];
   enemies: Enemy[];
   rocks: number;
@@ -279,6 +297,7 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
   let hero: [number, number] | null = null;
   const tracks = new Map<string, Array<[number, number]>>();
   const enemies: Enemy[] = [];
+  const colorSwitches = new Set<string>();
 
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -319,6 +338,11 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
           break;
         case "T":
           put(TileSubtype.TOGGLE_SWITCH);
+          break;
+        case "C":
+          // A colour switch renders as a TOGGLE_SWITCH tile; its colour lives on a ColorLock.
+          put(TileSubtype.TOGGLE_SWITCH);
+          colorSwitches.add(`${y},${x}`);
           break;
         case "r":
           put(TileSubtype.ROCK);
@@ -369,6 +393,13 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
     if (!subtypes[sy]?.[sx]?.includes(TileSubtype.TOGGLE_SWITCH)) {
       throw new Error(`${spec.name}: no toggle switch at ${sy},${sx}`);
     }
+    // A `C` tile also carries TOGGLE_SWITCH, so guard against wiring a binary toggle onto a colour
+    // switch: the colour path would always win the dispatch and this toggle group would be dead.
+    if (colorSwitches.has(`${sy},${sx}`)) {
+      throw new Error(
+        `${spec.name}: ${sy},${sx} is a colour switch (C) — wire it via colorLocks, not toggles`
+      );
+    }
     const beds = [...(t.gates ?? []), ...(t.invertedGates ?? [])];
     for (const [gy, gx] of beds) {
       const cell = subtypes[gy]?.[gx] ?? [];
@@ -413,15 +444,88 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
     }
   }
 
+  const seenColorSwitch = new Set<string>();
+  const colorLocks: ColorLock[] = (spec.colorLocks ?? []).map((cl, i) => {
+    const colors = cl.colors ?? 4;
+    if (colors < 2) {
+      throw new Error(`${spec.name}: colour lock ${i} needs colors >= 2, got ${colors}`);
+    }
+    for (const [sy, sx] of cl.switches) {
+      if (!colorSwitches.has(`${sy},${sx}`)) {
+        throw new Error(`${spec.name}: colour lock references no C switch at ${sy},${sx}`);
+      }
+      // A switch drives exactly one lock — turnColorSwitch only re-evaluates the first that owns it,
+      // so a shared switch would leave the other lock stale.
+      if (seenColorSwitch.has(`${sy},${sx}`)) {
+        throw new Error(`${spec.name}: colour switch ${sy},${sx} is wired to more than one lock`);
+      }
+      seenColorSwitch.add(`${sy},${sx}`);
+    }
+    const states = cl.initial ?? cl.switches.map(() => 0);
+    if (states.length !== cl.switches.length) {
+      throw new Error(
+        `${spec.name}: colour lock initial has ${states.length} entries for ${cl.switches.length} switches`
+      );
+    }
+    for (const s of states) {
+      if (s < 0 || s >= colors) {
+        throw new Error(`${spec.name}: colour lock ${i} initial colour ${s} out of range 0..${colors - 1}`);
+      }
+    }
+    if (cl.rule === "match") {
+      if (!cl.target || cl.target.length !== cl.switches.length) {
+        throw new Error(
+          `${spec.name}: colour lock ${i} rule "match" needs a target of ${cl.switches.length} colours`
+        );
+      }
+      for (const t of cl.target) {
+        if (t < 0 || t >= colors) {
+          throw new Error(`${spec.name}: colour lock ${i} target colour ${t} out of range 0..${colors - 1}`);
+        }
+      }
+    }
+    for (const id of cl.platforms ?? []) {
+      if (!tracks.has(id)) {
+        throw new Error(`${spec.name}: colour lock wired to unknown platform ${id}`);
+      }
+    }
+    for (const [gy, gx] of [...(cl.gates ?? []), ...(cl.invertedGates ?? [])]) {
+      const cell = subtypes[gy]?.[gx] ?? [];
+      if (
+        !cell.includes(TileSubtype.SPIKES) &&
+        !cell.includes(TileSubtype.SPIKE_HOLES)
+      ) {
+        throw new Error(`${spec.name}: colour lock wired to a non-bed at ${gy},${gx}`);
+      }
+    }
+    return {
+      id: `cl${i}`,
+      switches: cl.switches,
+      colors,
+      states,
+      rule: cl.rule,
+      target: cl.target,
+      platforms: cl.platforms ?? [],
+      gates: cl.gates ?? [],
+      invertedGates: cl.invertedGates ?? [],
+    };
+  });
+
   const mapData: MapData = { tiles, subtypes };
   for (const p of platforms) stampPlatform(mapData, p);
+
+  // Sync the room to each lock's initial colours: beds and platform running start consistent with
+  // whether the lock is already satisfied, not with however the map/`parked` happened to author them.
+  const holder = { mapData, platforms };
+  for (const lock of colorLocks) applyColorLock(holder, lock, new Set());
 
   return {
     spec,
     mapData,
     hero,
     toggleGroups,
-    platforms,
+    colorLocks,
+    platforms: holder.platforms,
     enemies,
     rocks: spec.rocks ?? 0,
   };
@@ -458,6 +562,7 @@ export function puzzleRoomToGameState(room: ParsedPuzzleRoom): GameState {
     allowCheckpoints: false,
     mapData: room.mapData,
     toggleGroups: room.toggleGroups,
+    colorLocks: room.colorLocks,
     platforms: room.platforms,
     stats: {
       damageDealt: 0,

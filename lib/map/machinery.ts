@@ -20,7 +20,7 @@
 // whole system is a deterministic function of how many turns have elapsed. That is what makes
 // authored puzzle rooms verifiable and replays honest.
 import { TileSubtype } from "./constants";
-import type { MapData, Platform, ToggleGroup } from "./types";
+import type { ColorLock, MapData, Platform, ToggleGroup } from "./types";
 import { enemyCanRidePlatforms } from "../enemy";
 
 /**
@@ -284,6 +284,70 @@ export function advanceMachinery(
  * Returns the ids of any enemies-at-coordinates the caller should kill (the caller owns the
  * enemy list; this module deliberately knows nothing about it).
  */
+/**
+ * Set a spike bed up (raise) or down. Raising is REFUSED under the hero — a bed that impaled the
+ * player for a switch thrown across the room reads as the game cheating, which a puzzle must never
+ * do. Raising it under an ENEMY is fair, and the coordinate is pushed to `crushed` for the caller to
+ * kill. Retracting is always safe. Shared by every wiring driver below.
+ */
+function setBed(
+  mapData: MapData,
+  gy: number,
+  gx: number,
+  raise: boolean,
+  occupied: ReadonlySet<string>,
+  crushed: Array<[number, number]>
+): void {
+  if (raise) {
+    if (has(mapData, gy, gx, TileSubtype.PLAYER)) return; // never rise under the hero
+    if (!has(mapData, gy, gx, TileSubtype.SPIKE_HOLES)) return;
+    if (occupied.has(`${gy},${gx}`)) crushed.push([gy, gx]);
+    removeSub(mapData, gy, gx, TileSubtype.SPIKE_HOLES);
+    addSub(mapData, gy, gx, TileSubtype.SPIKES);
+  } else {
+    if (!has(mapData, gy, gx, TileSubtype.SPIKES)) return;
+    removeSub(mapData, gy, gx, TileSubtype.SPIKES);
+    addSub(mapData, gy, gx, TileSubtype.SPIKE_HOLES);
+  }
+}
+
+/**
+ * Drive a set of beds and platforms from ONE boolean — `on` for a toggle, `satisfied` for a colour
+ * lock. gates retract while true and rise while false; invertedGates do the opposite; platforms run
+ * while true. Platforms are REPLACED with copies rather than mutated in place (the array is shared
+ * with the pre-action state, same as advanceMachinery). Returns the beds that crushed an enemy.
+ */
+function applyWiring(
+  state: { mapData: MapData; platforms?: Platform[] },
+  wiring: {
+    gates: Array<[number, number]>;
+    invertedGates?: Array<[number, number]>;
+    platforms?: string[];
+  },
+  on: boolean,
+  occupied: ReadonlySet<string>
+): Array<[number, number]> {
+  const crushed: Array<[number, number]> = [];
+  for (const [gy, gx] of wiring.gates) setBed(state.mapData, gy, gx, !on, occupied, crushed);
+  for (const [gy, gx] of wiring.invertedGates ?? [])
+    setBed(state.mapData, gy, gx, on, occupied, crushed);
+  if (wiring.platforms && wiring.platforms.length > 0) {
+    const ids = new Set(wiring.platforms);
+    state.platforms = (state.platforms ?? []).map((p) =>
+      ids.has(p.id) ? { ...p, running: on } : p
+    );
+  }
+  return crushed;
+}
+
+/**
+ * Throw a toggle switch: flip its `on` and drive everything wired to it (see applyWiring). A toggle
+ * NEVER latches — every throw flips it — which is what lets a puzzle be reconfigured repeatedly.
+ *
+ * `toggleGroups` is REPLACED rather than mutated: it is shared by reference with the pre-move state
+ * and any checkpoint snapshot, and a mutated group would corrupt a restore (same reason gateGroups
+ * is replaced in pressPlate).
+ */
 export function throwToggle(
   state: { mapData: MapData; toggleGroups?: ToggleGroup[]; platforms?: Platform[] },
   y: number,
@@ -294,41 +358,68 @@ export function throwToggle(
     (g) => g.switchAt[0] === y && g.switchAt[1] === x
   );
   if (!group) return { crushed: [] };
-
   const on = !group.on;
-  // Replaced rather than mutated in place: toggleGroups is shared by reference with the pre-move
-  // state and with any checkpoint snapshot, and a mutated group would corrupt a restore. Same
-  // reason gateGroups is replaced in pressPlate.
   state.toggleGroups = (state.toggleGroups ?? []).map((g) =>
     g === group ? { ...g, on } : g
   );
+  return { crushed: applyWiring(state, group, on, occupied) };
+}
 
-  const crushed: Array<[number, number]> = [];
-  const setBed = (gy: number, gx: number, raise: boolean): void => {
-    if (raise) {
-      if (has(state.mapData, gy, gx, TileSubtype.PLAYER)) return; // never rise under the hero
-      if (!has(state.mapData, gy, gx, TileSubtype.SPIKE_HOLES)) return;
-      if (occupied.has(`${gy},${gx}`)) crushed.push([gy, gx]);
-      removeSub(state.mapData, gy, gx, TileSubtype.SPIKE_HOLES);
-      addSub(state.mapData, gy, gx, TileSubtype.SPIKES);
-    } else {
-      // Retracting is always safe.
-      if (!has(state.mapData, gy, gx, TileSubtype.SPIKES)) return;
-      removeSub(state.mapData, gy, gx, TileSubtype.SPIKES);
-      addSub(state.mapData, gy, gx, TileSubtype.SPIKE_HOLES);
-    }
-  };
-  for (const [gy, gx] of group.gates) setBed(gy, gx, !on);
-  for (const [gy, gx] of group.invertedGates ?? []) setBed(gy, gx, on);
+/** Is a colour lock satisfied by its switches' current colours? */
+export function colorLockSatisfied(lock: ColorLock): boolean {
+  if (lock.states.length === 0) return false;
+  if (lock.rule === "allEqual") return lock.states.every((s) => s === lock.states[0]);
+  const target = lock.target ?? [];
+  return lock.states.every((s, i) => s === target[i]);
+}
 
-  if (group.platforms.length > 0) {
-    const ids = new Set(group.platforms);
-    state.platforms = (state.platforms ?? []).map((p) =>
-      ids.has(p.id) ? { ...p, running: on } : p
-    );
-  }
+/** True if a colour switch sits at (y,x) — the dispatch signal between turnColorSwitch and throwToggle. */
+export function isColorSwitch(
+  state: { colorLocks?: ColorLock[] },
+  y: number,
+  x: number
+): boolean {
+  return (state.colorLocks ?? []).some((l) =>
+    l.switches.some(([sy, sx]) => sy === y && sx === x)
+  );
+}
 
-  return { crushed };
+/**
+ * Apply a colour lock's CURRENT satisfaction to its beds and platforms WITHOUT turning anything.
+ * Used at authoring time so a room starts consistent with the lock's initial colours.
+ */
+export function applyColorLock(
+  state: { mapData: MapData; platforms?: Platform[] },
+  lock: ColorLock,
+  occupied: ReadonlySet<string>
+): { crushed: Array<[number, number]> } {
+  return { crushed: applyWiring(state, lock, colorLockSatisfied(lock), occupied) };
+}
+
+/**
+ * Turn the colour switch at (y,x): cycle its colour one step, re-evaluate the lock it belongs to,
+ * and drive that lock's beds/platforms from whether it is now satisfied. Never latches, and
+ * copy-on-writes the locks array (shared with the pre-action state). No-op if (y,x) is not a colour
+ * switch.
+ */
+export function turnColorSwitch(
+  state: { mapData: MapData; colorLocks?: ColorLock[]; platforms?: Platform[] },
+  y: number,
+  x: number,
+  occupied: ReadonlySet<string>
+): { crushed: Array<[number, number]> } {
+  const locks = state.colorLocks ?? [];
+  const lockIdx = locks.findIndex((l) =>
+    l.switches.some(([sy, sx]) => sy === y && sx === x)
+  );
+  if (lockIdx < 0) return { crushed: [] };
+  const lock = locks[lockIdx];
+  const swIdx = lock.switches.findIndex(([sy, sx]) => sy === y && sx === x);
+  const states = lock.states.slice();
+  states[swIdx] = (states[swIdx] + 1) % Math.max(2, lock.colors);
+  const next = { ...lock, states };
+  state.colorLocks = locks.map((l, i) => (i === lockIdx ? next : l));
+  return { crushed: applyWiring(state, next, colorLockSatisfied(next), occupied) };
 }
 
 /**

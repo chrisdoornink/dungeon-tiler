@@ -77,4 +77,43 @@ export const CHAIN_ROOMS: PuzzleRoomSpec[] = [
     ],
     lengths: { "1": 2 },
   },
+  {
+    name: "Colour Match (two colour switches · same colour runs the ferry)",
+    asks:
+      "COLOUR SWITCHES. Each C turns through four colours. The ferry runs ONLY while the two show the " +
+      "SAME colour — mismatched, it is stuck. They start on different colours, so turn them to agree, " +
+      "then ride across for the key and the exit. First room of the colour mechanic: does matching " +
+      "colours read as a puzzle, or does it want more to it?",
+    // Two colour switches C(1,3) and C(1,7). The lock runs ferry "1" while their colours are equal;
+    // they start at 0 and 2, so the ferry begins stuck until you turn one to match the other.
+    map: [
+      "###########",
+      "#H.C...C..#",
+      "#.........#",
+      "#....1....#",
+      "#LLLL1LLLL#",
+      "#LLLL1LLLL#",
+      "#....1....#",
+      "#..k.....E#",
+      "###########",
+    ],
+    trackOver: "lava",
+    colorLocks: [
+      {
+        switches: [
+          [1, 3],
+          [1, 7],
+        ],
+        colors: 4,
+        initial: [0, 2],
+        rule: "allEqual",
+        platforms: ["1"],
+      },
+    ],
+    dryRail: [
+      [3, 5],
+      [6, 5],
+    ],
+    lengths: { "1": 2 },
+  },
 ];

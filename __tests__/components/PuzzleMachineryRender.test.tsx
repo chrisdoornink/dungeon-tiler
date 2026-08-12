@@ -463,3 +463,42 @@ describe("first-platform wait tip", () => {
     expect(window.localStorage.getItem("tb_wait_tip_seen")).toBeNull();
   });
 })
+
+describe("colour switch palette", () => {
+  it("shows all four colours in the corners with the current one active", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.TOGGLE_SWITCH]}
+        isVisible={true}
+        toggleState={2}
+        toggleColors={4}
+      />
+    );
+    for (let i = 0; i < 4; i++) {
+      const dot = screen.getByTestId(`palette-dot-${i}`);
+      expect(dot).toBeInTheDocument();
+      // Each corner carries its own fixed colour...
+      expect(dot.style.getPropertyValue("--dot-color")).toBe(toggleStateColor(i));
+      // ...and only the current colour (2) is lit.
+      expect(dot.getAttribute("data-active")).toBe(i === 2 ? "true" : "false");
+    }
+  });
+
+  it("leaves a binary toggle with no palette dots (keeps its single lamp)", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.TOGGLE_SWITCH]}
+        isVisible={true}
+        toggleState={1}
+      />
+    );
+    expect(screen.queryByTestId("palette-dot-0")).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId(`subtype-icon-${TileSubtype.TOGGLE_SWITCH}`)
+    ).toBeInTheDocument();
+  });
+})

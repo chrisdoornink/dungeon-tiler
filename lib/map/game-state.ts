@@ -43,6 +43,7 @@ import type {
   RoomTransition,
   SealPayloads,
   ToggleGroup,
+  ColorLock,
 } from "./types";
 import {
   cloneMapData,
@@ -60,7 +61,13 @@ import { recordRewindStep, type RewindSnapshot } from "./rewind";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
-import { advanceMachinery, throwToggle, tileIsPlatformed } from "./machinery";
+import {
+  advanceMachinery,
+  throwToggle,
+  turnColorSwitch,
+  isColorSwitch,
+  tileIsPlatformed,
+} from "./machinery";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
@@ -1045,29 +1052,31 @@ export function performThrowRockCore(gameState: GameState): GameState {
     }
     // A rock landing on a TOGGLE_SWITCH throws it, for the same reason it throws a latching
     // plate: the switch may be somewhere the hero cannot stand. Unlike a plate this can be done
-    // repeatedly, so a toggle across a lava channel is a switch you operate entirely by rock.
+    // repeatedly, so a toggle across a lava channel is a switch you operate entirely by rock. A
+    // colour switch across the channel is turned by rock the same way (dispatch on which owns it).
     {
       const toggleSubs = newMapData.subtypes[ty][tx] || [];
       if (toggleSubs.includes(TileSubtype.TOGGLE_SWITCH)) {
         const wiring: {
           mapData: MapData;
           toggleGroups?: ToggleGroup[];
+          colorLocks?: ColorLock[];
           platforms?: Platform[];
         } = {
           mapData: newMapData,
           toggleGroups: preTickState.toggleGroups,
+          colorLocks: preTickState.colorLocks,
           platforms: preTickState.platforms,
         };
-        const { crushed } = throwToggle(
-          wiring,
-          ty,
-          tx,
-          new Set((preTickState.enemies ?? []).map((e) => `${e.y},${e.x}`))
-        );
+        const occ = new Set((preTickState.enemies ?? []).map((e) => `${e.y},${e.x}`));
+        const { crushed } = isColorSwitch(wiring, ty, tx)
+          ? turnColorSwitch(wiring, ty, tx, occ)
+          : throwToggle(wiring, ty, tx, occ);
         const after: GameState = {
           ...preTickState,
           mapData: newMapData,
           toggleGroups: wiring.toggleGroups,
+          colorLocks: wiring.colorLocks,
           platforms: wiring.platforms,
           rockCount: count - 1,
           stats: {
@@ -2070,6 +2079,11 @@ export interface GameState {
    * authored rooms in app/test-puzzle-room.
    */
   toggleGroups?: ToggleGroup[];
+  /**
+   * Colour locks (lib/map/machinery.ts): groups of turning colour switches whose combined colours
+   * drive a platform/gates through a predicate. Puzzle-bench only, like toggleGroups.
+   */
+  colorLocks?: ColorLock[];
   platforms?: Platform[];
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
@@ -4733,15 +4747,15 @@ function movePlayerCore(
       pressPlate(newGameState, newMapData, newY, newX);
     }
 
-    // A toggle switch is thrown the same way but never latches — see throwToggle. Spike beds it
-    // raises can crush an enemy standing on one, which is why the enemy list is passed in.
+    // A toggle switch is thrown the same way but never latches — see throwToggle. A colour switch
+    // shares the same tile but TURNS its colour instead of flipping, so dispatch on which system
+    // owns this position. Spike beds either can raise can crush an enemy standing on one, which is
+    // why the enemy list is passed in.
     if (subtype.includes(TileSubtype.TOGGLE_SWITCH)) {
-      const { crushed } = throwToggle(
-        newGameState,
-        newY,
-        newX,
-        new Set((newGameState.enemies ?? []).map((e) => `${e.y},${e.x}`))
-      );
+      const occ = new Set((newGameState.enemies ?? []).map((e) => `${e.y},${e.x}`));
+      const { crushed } = isColorSwitch(newGameState, newY, newX)
+        ? turnColorSwitch(newGameState, newY, newX, occ)
+        : throwToggle(newGameState, newY, newX, occ);
       killEnemiesAt(newGameState, crushed);
     }
 

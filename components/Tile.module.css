@@ -1384,6 +1384,46 @@
     inset 0 0 0 1px rgba(255, 255, 255, 0.4);
 }
 
+/* A COLOUR switch replaces the single lamp with its whole palette: one dot per colour in a corner,
+   the current colour lit and the rest dim. Seeing all four at once is what makes it clear how many
+   turns a switch is from the colour you want — and it puts a colour in every corner. */
+.paletteSwitch::after {
+  display: none;
+}
+.paletteDot {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dot-color, #2690b8);
+  opacity: 0.32; /* dim for the colours the switch is NOT currently on */
+  transition: opacity 120ms ease, width 120ms ease, height 120ms ease;
+}
+/* Clockwise cycle order from the top-left: colour 0 TL, 1 TR, 2 BR, 3 BL. */
+.paletteDot0 {
+  top: -1px;
+  left: -1px;
+}
+.paletteDot1 {
+  top: -1px;
+  right: -1px;
+}
+.paletteDot2 {
+  bottom: -1px;
+  right: -1px;
+}
+.paletteDot3 {
+  bottom: -1px;
+  left: -1px;
+}
+.paletteDotActive {
+  opacity: 1;
+  width: 8px;
+  height: 8px;
+  box-shadow: 0 0 4px 1px var(--dot-color, #2690b8),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
 @keyframes toggleIdle {
   0%,
   100% {
