@@ -194,6 +194,58 @@ function buildSpec(rng: Rng, name: string): { spec: PuzzleRoomSpec; meta: Genera
     throw new Error("no free cell"); // regions are >= 2x9 with a handful of entities; can't happen
   };
 
+  // ---- WALLS (variety + impassability), placed BEFORE entities so placeIn avoids them ----
+  // (a) Band shoulders: cap 0-2 columns at each end of every hazard band with wall. A walled tile
+  //     and a hazard tile are equally impassable, and the rail column is never touched, so this
+  //     changes only the LOOK — the hazard no longer runs wall-to-wall, and each band caps
+  //     differently — with zero effect on solvability or on the "mechanic required" proof.
+  for (let b = 0; b < crossings; b++) {
+    const bandFirst = regionRows[b][1] + 1;
+    const bandLast = regionRows[b + 1][0] - 1;
+    const railC = railCols[b];
+    const leftCap = randInt(rng, 0, 2);
+    const rightCap = randInt(rng, 0, 2);
+    for (let y = bandFirst; y <= bandLast; y++) {
+      for (let c = 1; c <= leftCap; c++) if (c !== railC) grid[y][c] = "#";
+      for (let c = W - 2; c >= W - 1 - rightCap; c--) if (c !== railC) grid[y][c] = "#";
+    }
+  }
+
+  // (b) Region pillars: a wall tile inside a region to force a small detour. Reverted if it splits
+  //     the region's walkable floor in two; certification is the backstop for anything subtler.
+  const regionFloorConnected = (r: number): boolean => {
+    const [r0, r1] = regionRows[r];
+    const floor: Array<[number, number]> = [];
+    for (let y = r0; y <= r1; y++)
+      for (let x = 1; x <= W - 2; x++) if (grid[y][x] === ".") floor.push([y, x]);
+    if (floor.length === 0) return true;
+    const seen = new Set<string>([`${floor[0][0]},${floor[0][1]}`]);
+    const stack = [floor[0]];
+    while (stack.length) {
+      const [y, x] = stack.pop() as [number, number];
+      for (const [ny, nx] of [
+        [y - 1, x],
+        [y + 1, x],
+        [y, x - 1],
+        [y, x + 1],
+      ] as Array<[number, number]>) {
+        if (ny < r0 || ny > r1 || nx < 1 || nx > W - 2) continue;
+        if (grid[ny][nx] !== ".") continue;
+        const k = `${ny},${nx}`;
+        if (seen.has(k)) continue;
+        seen.add(k);
+        stack.push([ny, nx]);
+      }
+    }
+    return seen.size === floor.length;
+  };
+  for (let r = 0; r <= crossings; r++) {
+    if (rng() < 0.5) continue; // roughly half the regions get a pillar
+    const [py, px] = placeIn(r);
+    grid[py][px] = "#";
+    if (!regionFloorConnected(r)) grid[py][px] = ".";
+  }
+
   const [hy, hx] = placeIn(0);
   grid[hy][hx] = "H";
 
