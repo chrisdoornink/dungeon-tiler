@@ -284,6 +284,65 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
       toggles.push({ switchAt: b.switchAt, gates: [b.at], on: false });
     }
 
+    // ---- HAZARD TERRAIN: some room floor becomes LAVA (a hard barrier you route around) or DEEP
+    // WATER (swimmable, snuffs the torch) — the "some walls can be lava/water" step, and groundwork
+    // for hazard-crossing mechanics. Placed only on INTERIOR room floor away from doorways so a
+    // pool can't seal a corridor, and every hazard tile is checked to keep the room's floor one
+    // connected piece; the solver backstop below is the final guarantee.
+    const isDoorwayAdjacent = (y: number, x: number): boolean => {
+      for (const [ny, nx] of [
+        [y - 1, x],
+        [y + 1, x],
+        [y, x - 1],
+        [y, x + 1],
+      ] as Array<[number, number]>) {
+        // A corridor tile is floor that lies outside every room.
+        if (chars[ny]?.[nx] === "." && !inAnyRoom(rooms, ny, nx)) return true;
+      }
+      return false;
+    };
+    const roomFloorStaysConnected = (r: DRoom): boolean => {
+      const cells: Array<[number, number]> = [];
+      for (let y = r.y; y < r.y + r.h; y++)
+        for (let x = r.x; x < r.x + r.w; x++)
+          if (chars[y][x] === "." || chars[y][x] === "~") cells.push([y, x]);
+      if (cells.length === 0) return true;
+      const seen = new Set<string>([`${cells[0][0]},${cells[0][1]}`]);
+      const stack = [cells[0]];
+      while (stack.length) {
+        const [y, x] = stack.pop() as [number, number];
+        for (const [ny, nx] of [
+          [y - 1, x],
+          [y + 1, x],
+          [y, x - 1],
+          [y, x + 1],
+        ] as Array<[number, number]>) {
+          if (ny < r.y || ny >= r.y + r.h || nx < r.x || nx >= r.x + r.w) continue;
+          if (chars[ny][nx] !== "." && chars[ny][nx] !== "~") continue;
+          const key = `${ny},${nx}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          stack.push([ny, nx]);
+        }
+      }
+      return seen.size === cells.length;
+    };
+    for (const r of rooms) {
+      if (rng() < 0.35) continue; // not every room gets a hazard
+      const kind = rng() < 0.55 ? "L" : "~"; // lava more often than water
+      const patch = ri(rng, 2, 4);
+      let placed = 0;
+      for (let tries = 0; tries < 20 && placed < patch; tries++) {
+        const y = ri(rng, r.y + 1, r.y + r.h - 2);
+        const x = ri(rng, r.x + 1, r.x + r.w - 2);
+        if (chars[y]?.[x] !== "." || isDoorwayAdjacent(y, x)) continue;
+        chars[y][x] = kind;
+        // Lava is a hard cut, so it must not split the room; water is passable, so it never does.
+        if (kind === "L" && !roomFloorStaysConnected(r)) chars[y][x] = ".";
+        else placed++;
+      }
+    }
+
     // Crop the dead wall margin (rooms sit inside a larger grid, leaving big empty borders) to a
     // one-tile wall ring, and shift every wired coordinate with it so the toggles still line up.
     let minY = chars.length;
