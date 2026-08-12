@@ -6396,8 +6396,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           data-testid="wait-tip"
           role="status"
           aria-live="polite"
-          className="fixed left-1/2 z-40 -translate-x-1/2 max-w-[90vw] rounded-lg bg-black/85 px-4 py-2 text-center text-sm text-white/90 shadow-lg pointer-events-none"
-          style={{ bottom: "max(4.5rem, calc(env(safe-area-inset-bottom, 1rem) + 4rem))" }}
+          // A slim banner pinned to the TOP edge (usually just the wall border), never the centre of
+          // the board — the old bottom-centre box covered the whole lower half of the puzzle. Font is
+          // forced small to defeat the game's large pixel font, which made it a giant block.
+          className="fixed left-1/2 top-1 z-40 -translate-x-1/2 rounded-md bg-black/85 px-3 py-1 text-center text-white/90 shadow-lg pointer-events-none"
+          style={{ maxWidth: "min(92vw, 22rem)", fontSize: "0.7rem", lineHeight: 1.25 }}
         >
           {waitTip}
         </div>

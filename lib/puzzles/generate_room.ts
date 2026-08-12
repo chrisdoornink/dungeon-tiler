@@ -207,7 +207,12 @@ function buildSpec(rng: Rng, name: string): { spec: PuzzleRoomSpec; meta: Genera
   // Colour lock (rule 6): one switch stranded in the region just before the locked band (forces
   // the crossing order), the other either back at the start (pre-settable — the planning reward)
   // or stranded alongside it.
-  const lockRule: "allEqual" | "match" = rng() < 0.5 ? "allEqual" : "match";
+  //
+  // ALWAYS "allEqual" — an agreement rule reads intuitively ("make the switches the same colour"),
+  // whereas a specific-pattern "match" lock is unguessable without an in-room clue we do not yet
+  // draw. Playtest confirmed the mismatch-to-open version just read as confusing. The engine still
+  // supports "match" for authored rooms; the generator simply never emits it.
+  const lockRule = "allEqual" as const;
   const colorLocks: PuzzleRoomSpec["colorLocks"] = [];
   if (lockedBand >= 0) {
     const sFar = placeIn(lockedBand);
@@ -215,23 +220,15 @@ function buildSpec(rng: Rng, name: string): { spec: PuzzleRoomSpec; meta: Genera
     const nearRegion = rng() < 0.5 ? 0 : lockedBand;
     const sNear = placeIn(nearRegion);
     grid[sNear[0]][sNear[1]] = "C";
-    let initial: number[];
-    let target: number[] | undefined;
-    if (lockRule === "match") {
-      target = [randInt(rng, 0, 3), randInt(rng, 0, 3)];
-      do {
-        initial = [randInt(rng, 0, 3), randInt(rng, 0, 3)];
-      } while (initial[0] === target[0] && initial[1] === target[1]);
-    } else {
-      initial = [randInt(rng, 0, 3), 0];
-      initial[1] = (initial[0] + randInt(rng, 1, 3)) % 4; // guaranteed mismatched at the start
-    }
+    // Start mismatched, so the puzzle is "turn one to agree with the other". Equal at the start
+    // would mean the lock is already satisfied and there is nothing to solve.
+    const a = randInt(rng, 0, 3);
+    const initial = [a, (a + randInt(rng, 1, 3)) % 4];
     colorLocks.push({
       switches: [sNear, sFar],
       colors: 4,
       initial,
-      rule: lockRule,
-      target,
+      rule: "allEqual",
       platforms: [String(lockedBand + 1)],
     });
   }
@@ -267,9 +264,9 @@ function buildSpec(rng: Rng, name: string): { spec: PuzzleRoomSpec; meta: Genera
   let spec: PuzzleRoomSpec = {
     name,
     asks:
-      `Generated: ${crossings} crossings (${hazards.join(", ")}), a ${lockRule} colour lock, and a ` +
-      `${plan} chamber swap. The key and the exit are sealed behind opposite beds — the toggle ` +
-      `trades one for the other${plan === "round-trip" ? ", and it is NOT next to them" : ""}. ` +
+      `Generated: ${crossings} crossings (${hazards.join(", ")}). Turn the two colour switches to ` +
+      `the SAME colour to start the far ferry. The key and the exit are sealed behind opposite ` +
+      `beds — one switch trades one for the other${plan === "round-trip" ? ", and it is NOT beside them" : ""}. ` +
       `Water is swimmable; goblins can't swim but they CAN ride the ferries.`,
     map: grid.map((r) => r.join("")),
     trackOver: "lava",

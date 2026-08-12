@@ -84,10 +84,14 @@ describe("generateCertifiedRoom", () => {
 
   it("covers the variety the ruleset promises across the seed set", () => {
     const metas = SEEDS.map((s) => gen(s).meta);
+    // Locks are always "agreement" now — a specific-pattern match is unguessable without an
+    // in-room clue we don't draw yet (playtest 2026-08-12).
+    expect(metas.every((m) => m.lockRule === "allEqual")).toBe(true);
+    // Structural variety still comes through: both orientations and both trip plans appear, and
+    // the crossing count is not fixed. (Water needs a 3-crossing room AND a coin flip, so it is
+    // not required to appear in a five-seed sample — its generation is covered by the sweep.)
     expect(new Set(metas.map((m) => m.orientation)).size).toBe(2);
     expect(new Set(metas.map((m) => m.plan)).size).toBe(2);
-    expect(new Set(metas.map((m) => m.lockRule)).size).toBe(2);
-    expect(metas.some((m) => m.waterBands > 0)).toBe(true);
     expect(new Set(metas.map((m) => m.crossings)).size).toBeGreaterThan(1);
   });
 });
