@@ -46,10 +46,13 @@ describe("generateDungeonRoom", () => {
       expect(r.spec.map[0]).toMatch(/^#+$/);
       expect(r.spec.map[r.spec.map.length - 1]).toMatch(/^#+$/);
 
-      // Each gate is one bed driven by one switch.
+      // Every gate is a bed (spike gates are '^'; a trade adds a closed '^' + an open 'v').
       expect(r.meta.gates).toBeGreaterThanOrEqual(1);
-      expect(r.spec.toggles?.length).toBe(r.meta.gates);
-      expect((flat.match(/\^/g) ?? []).length).toBe(r.meta.gates);
+      const bedCount =
+        (flat.match(/\^/g) ?? []).length + (flat.match(/v/g) ?? []).length;
+      expect(bedCount).toBe(r.meta.gates);
+      // One toggle per plain gate, plus one for the trade if present (it drives two beds).
+      expect(r.spec.toggles?.length).toBe(r.meta.gates - (r.meta.trade ? 1 : 0));
 
       // The hero is armed (kit carries forward to when enemies arrive).
       expect(r.spec.sword).toBe(true);

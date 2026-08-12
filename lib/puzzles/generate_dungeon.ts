@@ -88,6 +88,8 @@ export interface DungeonMeta {
   rooms: number;
   gates: number;
   keyDetour: boolean;
+  /** A mutual-exclusion trade drives the key door and the exit door from one switch. */
+  trade: boolean;
 }
 
 export interface GeneratedDungeon {
@@ -141,6 +143,8 @@ function buildLayout(rng: Rng): Built | null {
     // branch hangs off a MIDDLE room, never the hero's.
     let parent: number;
     if (i === 1) parent = 0;
+    else if (i === rooms.length - 1)
+      parent = ri(rng, 1, i - 1); // the LAST room is always a branch — the key's side passage
     else if (rng() < 0.75) parent = i - 1;
     else parent = ri(rng, 1, i - 1);
     const cut = carveCorridor(grid, rooms, rooms[parent], rooms[i], rng);
@@ -216,24 +220,13 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
     // Roles. Hero at room 0. Exit is the deepest room. The key is the deepest OTHER room whose path
     // branches off the exit's path (a real detour) — else the deepest remaining room.
     const hero = 0;
+    const key = rooms.length - 1; // the forced branch (see buildLayout) — the key's side passage
     let exit = 0;
-    for (let i = 1; i < rooms.length; i++) if (depth[i] > depth[exit]) exit = i;
+    for (let i = 1; i < rooms.length; i++) if (i !== key && depth[i] > depth[exit]) exit = i;
+    if (exit === 0) continue; // needs a non-key destination room
     const exitPath = new Set(
       edgesToRoot(exit, parent, parentEdge).map((e) => e.child)
     );
-    let key = -1;
-    for (let i = 1; i < rooms.length; i++) {
-      if (i === exit) continue;
-      if (key === -1) {
-        key = i;
-        continue;
-      }
-      const iBranch = !exitPath.has(i); // off the hero->exit spine — a real detour
-      const kBranch = !exitPath.has(key);
-      if (iBranch && !kBranch) key = i; // prefer a branching room
-      else if (iBranch === kBranch && depth[i] > depth[key]) key = i; // else the deeper one
-    }
-    if (key === -1) continue; // need at least 3 rooms; buildLayout guarantees it, belt-and-braces
 
     const keyDetour = !exitPath.has(key);
 
@@ -256,17 +249,49 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
     const keyPos = freeInRoom(key);
     if (!heroPos || !exitPos || !keyPos) continue;
 
-    // Gate the edges on the hero->exit and hero->key paths. Each gate: a bed on a corridor cut tile,
-    // and a switch in the room on the HERO side of that edge (its parent), which is reachable before
-    // the bed by opening the edges above it first.
-    const gateEdges = new Map<DEdge, boolean>();
-    for (const e of edgesToRoot(exit, parent, parentEdge)) gateEdges.set(e, true);
-    for (const e of edgesToRoot(key, parent, parentEdge)) gateEdges.set(e, true);
+    // Edges to gate: everything on the hero->exit and hero->key paths. Each plain gate is a bed on a
+    // corridor cut, opened by a switch in the room on the HERO side (its parent) — reachable before
+    // the bed by opening the doors above it first.
+    const exitChain = edgesToRoot(exit, parent, parentEdge);
+    const keyChain = edgesToRoot(key, parent, parentEdge);
+    const gateEdges = new Set<DEdge>([...exitChain, ...keyChain]);
+
+    // A TRADE — the interlock the playtests liked. When the key is down a branch, drive the branch
+    // door and the exit's FINAL door from ONE switch in OPPOSITE polarity, so they can never both be
+    // open: take the key with the branch open (exit sealed), then flip to open the exit (branch
+    // sealed). The switch sits at the branch point, reachable before either door. Re-armable, so
+    // there is no way to strand yourself.
+    let trade: {
+      branch: [number, number];
+      exit: [number, number];
+      switchAt: [number, number];
+    } | null = null;
+    const exitFinalEdge = exitChain[exitChain.length - 1] ?? null;
+    const branchEdge = keyDetour
+      ? keyChain.find((e) => !exitPath.has(e.child)) ?? null
+      : null;
+    if (branchEdge && exitFinalEdge && branchEdge !== exitFinalEdge && rng() < 0.7) {
+      const branchBed = branchEdge.cut.find((t) => !claimed.has(`${t[0]},${t[1]}`));
+      // Must be a DIFFERENT tile from the branch bed — the two corridors can overlap, and one tile
+      // driven as both gate and invertedGate would cancel out (and render as a single bed).
+      const exitBed = exitFinalEdge.cut.find(
+        (t) =>
+          !claimed.has(`${t[0]},${t[1]}`) &&
+          !(branchBed && t[0] === branchBed[0] && t[1] === branchBed[1])
+      );
+      const sw = freeInRoom(branchEdge.parent);
+      if (branchBed && exitBed && sw) {
+        claimed.add(`${branchBed[0]},${branchBed[1]}`);
+        claimed.add(`${exitBed[0]},${exitBed[1]}`);
+        trade = { branch: branchBed, exit: exitBed, switchAt: sw };
+        gateEdges.delete(branchEdge);
+        gateEdges.delete(exitFinalEdge);
+      }
+    }
 
     const beds: Array<{ at: [number, number]; switchAt: [number, number] }> = [];
     let ok = true;
-    for (const e of gateEdges.keys()) {
-      // A cut tile with a free room cell on the parent side for its switch.
+    for (const e of gateEdges) {
       const bedTile = e.cut.find((t) => !claimed.has(`${t[0]},${t[1]}`));
       const sw = freeInRoom(e.parent);
       if (!bedTile || !sw) {
@@ -290,6 +315,17 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
       chars[b.at[0]][b.at[1]] = "^"; // bed UP (blocking) until its switch is thrown
       chars[b.switchAt[0]][b.switchAt[1]] = "T";
       toggles.push({ switchAt: b.switchAt, gates: [b.at], on: false });
+    }
+    if (trade) {
+      chars[trade.branch[0]][trade.branch[1]] = "^"; // branch door CLOSED (opens when switch on)
+      chars[trade.exit[0]][trade.exit[1]] = "v"; // exit door OPEN (closes when switch on)
+      chars[trade.switchAt[0]][trade.switchAt[1]] = "T";
+      toggles.push({
+        switchAt: trade.switchAt,
+        gates: [trade.branch], // retracts (opens) while on
+        invertedGates: [trade.exit], // rises (closes) while on
+        on: false,
+      });
     }
 
     // ---- HAZARD TERRAIN: some room floor becomes LAVA (a hard barrier you route around) or DEEP
@@ -376,15 +412,18 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
     for (const t of toggles) {
       t.switchAt = off(t.switchAt);
       t.gates = (t.gates ?? []).map(off);
+      if (t.invertedGates) t.invertedGates = t.invertedGates.map(off);
     }
 
     const spec: PuzzleRoomSpec = {
       name: `Dungeon #${seed}`,
       asks:
         `A dungeon of ${rooms.length} rooms. Each barred door drops when you throw its switch (in a ` +
-        `room you can already reach). Fetch the key${keyDetour ? " down the side passage" : ""}, ` +
-        `then reach the exit. First pass of the layout-first generator — does it read as a room, ` +
-        `not a stack of moats?`,
+        `room you can already reach), so you open the way one door at a time. ` +
+        (trade
+          ? `The key is down a side passage sealed by a TRADE switch — opening it seals the exit, so ` +
+            `take the key, then flip back to leave.`
+          : `Fetch the key${keyDetour ? " down the side passage" : ""}, then reach the exit.`),
       map: cropped.map((r) => r.join("")),
       trackOver: "lava",
       toggles,
@@ -405,7 +444,12 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
 
     return {
       spec,
-      meta: { rooms: rooms.length, gates: beds.length, keyDetour },
+      meta: {
+        rooms: rooms.length,
+        gates: beds.length + (trade ? 2 : 0),
+        keyDetour,
+        trade: !!trade,
+      },
       seed,
       minTurns: solved.minTurns,
       tier: difficultyTier(solved.minTurns),
