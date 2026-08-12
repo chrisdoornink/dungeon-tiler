@@ -5,7 +5,7 @@ import {
   performWait,
   type GameState,
 } from "../../lib/map/game-state";
-import type { Action } from "../../lib/puzzles/solver";
+import { solvePuzzleRoom, type Action } from "../../lib/puzzles/solver";
 
 /**
  * The layout-first dungeon generator: a normal room+corridor dungeon with puzzle blockades fitted
@@ -65,4 +65,27 @@ describe("generateDungeonRoom", () => {
       expect(final.heroHealth ?? 0).toBeGreaterThan(0);
     });
   }
+
+  it("every switch is load-bearing — removing any one leaves the room unsolvable", () => {
+    // The soundness guarantee: no pointless switches. Dropping a toggle leaves its door frozen in
+    // its authored state (a spike gate stays shut; the trade's branch stays shut). If the room is
+    // still solvable without that switch, the switch gated nothing — which the generator's cut-check
+    // is meant to prevent.
+    for (const seed of [1, 2, 3, 4, 6]) {
+      const r = generateDungeonRoom(seed);
+      const toggles = r.spec.toggles ?? [];
+      expect(toggles.length).toBeGreaterThan(0);
+      toggles.forEach((_, i) => {
+        const stripped = {
+          ...r.spec,
+          toggles: toggles.filter((_, j) => j !== i),
+        };
+        const solved = solvePuzzleRoom(parsePuzzleRoom(stripped), {
+          maxStates: 80_000,
+          maxTurns: 200,
+        });
+        expect(solved.solvable).toBe(false);
+      });
+    }
+  });
 });

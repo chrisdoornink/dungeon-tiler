@@ -84,6 +84,39 @@ function carveCorridor(
   return tiles;
 }
 
+function roomCenter(r: DRoom): [number, number] {
+  return [Math.floor(r.y + r.h / 2), Math.floor(r.x + r.w / 2)];
+}
+
+/** Floor tiles reachable from `start` with `blocked` treated as a wall — the cut-check primitive. */
+function reachableFloor(
+  grid: number[][],
+  start: [number, number],
+  blocked: [number, number]
+): Set<string> {
+  const seen = new Set<string>();
+  const bk = `${blocked[0]},${blocked[1]}`;
+  if (grid[start[0]]?.[start[1]] !== FLOOR || `${start[0]},${start[1]}` === bk) return seen;
+  seen.add(`${start[0]},${start[1]}`);
+  const stack = [start];
+  while (stack.length) {
+    const [y, x] = stack.pop() as [number, number];
+    for (const [ny, nx] of [
+      [y - 1, x],
+      [y + 1, x],
+      [y, x - 1],
+      [y, x + 1],
+    ] as Array<[number, number]>) {
+      if (grid[ny]?.[nx] !== FLOOR) continue;
+      const k = `${ny},${nx}`;
+      if (k === bk || seen.has(k)) continue;
+      seen.add(k);
+      stack.push([ny, nx]);
+    }
+  }
+  return seen;
+}
+
 export interface DungeonMeta {
   rooms: number;
   gates: number;
@@ -289,7 +322,11 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
       }
     }
 
-    const beds: Array<{ at: [number, number]; switchAt: [number, number] }> = [];
+    const beds: Array<{
+      at: [number, number];
+      switchAt: [number, number];
+      child: number;
+    }> = [];
     let ok = true;
     for (const e of gateEdges) {
       const bedTile = e.cut.find((t) => !claimed.has(`${t[0]},${t[1]}`));
@@ -299,9 +336,27 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
         break;
       }
       claimed.add(`${bedTile[0]},${bedTile[1]}`);
-      beds.push({ at: bedTile, switchAt: sw });
+      beds.push({ at: bedTile, switchAt: sw, child: e.child });
     }
     if (!ok) continue;
+
+    // SOUND-LOGIC CHECK: every gate must be a genuine CUT — walling its door must disconnect the
+    // hero from the room beyond it, with all OTHER corridors open. A gate that is NOT a cut is a
+    // pointless switch (it opens a redundant path, or closes one you don't need), which corridor
+    // crossings quietly create. Reject the whole layout if any gate fails; a clean one is a cheap
+    // retry, and this is what keeps the logic sound as the mechanics get richer.
+    const heroCenter = roomCenter(rooms[hero]);
+    const gateIsCut = (bed: [number, number], childRoom: number): boolean =>
+      !reachableFloor(grid, heroCenter, bed).has(
+        `${roomCenter(rooms[childRoom]).join(",")}`
+      );
+    let sound = beds.every((b) => gateIsCut(b.at, b.child));
+    if (sound && trade && branchEdge && exitFinalEdge) {
+      sound =
+        gateIsCut(trade.branch, branchEdge.child) &&
+        gateIsCut(trade.exit, exitFinalEdge.child);
+    }
+    if (!sound) continue;
 
     // ---- render to ASCII ----
     const chars: string[][] = grid.map((row) =>
