@@ -116,4 +116,80 @@ export const CHAIN_ROOMS: PuzzleRoomSpec[] = [
     ],
     lengths: { "1": 2 },
   },
+  {
+    name: "The Deep End (everything at once)",
+    asks:
+      "THE BIG ONE — two colour switches, a binary toggle, two ferries, spike-gated chambers and " +
+      "goblins, wired so each piece gates the next. Two lava bands to cross, and the exit is in a " +
+      "sealed chamber under the far bank. Things to work out: the second colour switch is STRANDED " +
+      "on the middle island (so the first crossing gates the second one), and the toggle that opens " +
+      "the exit chamber SEALS the key chamber — and it lives back up on the island, so the key and " +
+      "the exit cannot be collected on the same trip. Watch the goblins: they can ride the ferries " +
+      "too. Is it a satisfying tangle, or just a lot of walking?",
+    //  row 1     top bank: hero, one rock, colour switch A
+    //  rows 3-4  lava band 1, ferry "1" (ALWAYS running — the one crossing you start with)
+    //  rows 5-7  middle island: colour switch B (stranded), the toggle, two fire-goblins
+    //  rows 8-9  lava band 2, ferry "2" (parked until the two colours agree)
+    //  row 10    far bank
+    //  row 11    gate row — solid except two spike beds of OPPOSITE polarity
+    //  row 12    two sealed chambers: exit (west, behind the bed that opens when the toggle is ON),
+    //            key (east, behind the bed that is open while the toggle is OFF)
+    map: [
+      "###############",
+      "#H..r...C.....#",
+      "#.....1.......#",
+      "#LLLLL1LLLLLLL#",
+      "#LLLLL1LLLLLLL#",
+      "#.....1.......#",
+      "#..g..C...g.T.#",
+      "#.......2.....#",
+      "#LLLLLLL2LLLLL#",
+      "#LLLLLLL2LLLLL#",
+      "#.......2.....#",
+      "#####^#####v###",
+      "#.E.....#....k#",
+      "###############",
+    ],
+    trackOver: "lava",
+    // Ferry 2 runs only while BOTH colour switches show the same colour. They start mismatched
+    // (blue vs violet) and switch B is across band 1, so the first crossing gates the second — or
+    // you notice you can turn switch A to violet BEFORE you cross, and save the trip back.
+    colorLocks: [
+      {
+        switches: [
+          [1, 8],
+          [6, 6],
+        ],
+        colors: 4,
+        initial: [0, 2],
+        rule: "allEqual",
+        platforms: ["2"],
+      },
+    ],
+    // The toggle sits on the middle island, two lava bands away from the chambers it controls.
+    // OFF (start): key chamber open, exit chamber sealed. ON: the reverse. So the run is
+    // cross-cross-key, then all the way BACK up to the island to flip it, then down again to leave.
+    toggles: [
+      {
+        switchAt: [6, 12],
+        gates: [[11, 5]], // exit chamber — raised while OFF, opens when the toggle goes ON
+        invertedGates: [[11, 11]], // key chamber — open while OFF, seals when the toggle goes ON
+        on: false,
+      },
+    ],
+    parked: ["2"],
+    // Both rails dock on dry ground at each end, so boarding and stepping off need no timing; the
+    // two lava rows in between are what make it a ride rather than a step.
+    dryRail: [
+      [2, 6],
+      [5, 6],
+      [7, 8],
+      [10, 8],
+    ],
+    lengths: { "1": 2, "2": 2 },
+    // One rock only. Enough for a ranged option against a goblin or a remote switch turn, but a
+    // deliberate single: two would let you melt a two-tile obsidian bridge across a band and skip
+    // the colour lock entirely.
+    rocks: 1,
+  },
 ];
