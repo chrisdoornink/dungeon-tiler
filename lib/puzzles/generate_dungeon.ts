@@ -284,6 +284,33 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
       toggles.push({ switchAt: b.switchAt, gates: [b.at], on: false });
     }
 
+    // Crop the dead wall margin (rooms sit inside a larger grid, leaving big empty borders) to a
+    // one-tile wall ring, and shift every wired coordinate with it so the toggles still line up.
+    let minY = chars.length;
+    let maxY = 0;
+    let minX = chars[0].length;
+    let maxX = 0;
+    for (let y = 0; y < chars.length; y++) {
+      for (let x = 0; x < chars[0].length; x++) {
+        if (chars[y][x] !== "#") {
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+        }
+      }
+    }
+    const cy = Math.max(0, minY - 1);
+    const cx = Math.max(0, minX - 1);
+    const ey = Math.min(chars.length - 1, maxY + 1);
+    const ex = Math.min(chars[0].length - 1, maxX + 1);
+    const cropped = chars.slice(cy, ey + 1).map((row) => row.slice(cx, ex + 1));
+    const off = ([y, x]: [number, number]): [number, number] => [y - cy, x - cx];
+    for (const t of toggles) {
+      t.switchAt = off(t.switchAt);
+      t.gates = (t.gates ?? []).map(off);
+    }
+
     const spec: PuzzleRoomSpec = {
       name: `Dungeon #${seed}`,
       asks:
@@ -291,7 +318,7 @@ export function generateDungeonRoom(seed: number): GeneratedDungeon {
         `room you can already reach). Fetch the key${keyDetour ? " down the side passage" : ""}, ` +
         `then reach the exit. First pass of the layout-first generator — does it read as a room, ` +
         `not a stack of moats?`,
-      map: chars.map((r) => r.join("")),
+      map: cropped.map((r) => r.join("")),
       trackOver: "lava",
       toggles,
       sword: true,
