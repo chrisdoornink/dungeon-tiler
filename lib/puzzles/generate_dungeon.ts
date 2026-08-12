@@ -134,7 +134,15 @@ function buildLayout(rng: Rng): Built | null {
   // cycles, so every corridor is a bridge.
   const edges: DEdge[] = [];
   for (let i = 1; i < rooms.length; i++) {
-    const parent = ri(rng, 0, i - 1);
+    // Bias toward a CHAIN, not a star. A star (several rooms hanging off room 0) dumps several gate
+    // switches into the hero's starting room, all usable at once — the "two switches next to the
+    // hero" pattern. A chain sequences them: each switch is behind the door the previous one
+    // dropped, so only one is reachable until you hit it. Room 0 keeps exactly one child, and any
+    // branch hangs off a MIDDLE room, never the hero's.
+    let parent: number;
+    if (i === 1) parent = 0;
+    else if (rng() < 0.75) parent = i - 1;
+    else parent = ri(rng, 1, i - 1);
     const cut = carveCorridor(grid, rooms, rooms[parent], rooms[i], rng);
     edges.push({ parent, child: i, cut });
   }
