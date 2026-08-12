@@ -85,12 +85,16 @@ const SOLVER_RNG = () => 0.5;
  * states share a key, the search prunes one and can inflate minTurns, miss a solution, or wrongly
  * report a room unsolvable.
  *
- * It keys on the WHOLE map (tiles + subtypes), which subsumes the hero (PLAYER tag), spike beds,
- * platform footprint, remaining pickups (EXITKEY / ROCK tiles), and — the subtlety a first
+ * It keys on the full SUBTYPES grid, which subsumes the hero (PLAYER tag), spike beds, platform
+ * footprint, remaining pickups (EXITKEY / ROCK tiles), and — the subtlety a first
  * hero-and-beds-only version got wrong and adversarial verification caught — the terrain a THROWN
  * rock leaves behind: a ROCK on floor (re-pickuppable), a STEPPING_STONE on deep water (a new dry
  * crossing), OBSIDIAN on lava (newly walkable). Two throws in different directions from one tile
  * leave different worlds while everything off-map is identical, so the map has to be in the key.
+ *
+ * `tiles` is deliberately NOT keyed: the only engine features that mutate a tile are wall-LOCKs
+ * and wall-EXITs, and every puzzle room uses floor EXITs and no LOCKs. A room that adds either
+ * needs tiles back in the key.
  *
  * Added on top of the map is the dynamic state the map does NOT hold: platform (index, dir,
  * running) — a slab at the same tile heading the other way has a different future; toggle `on` —
@@ -106,27 +110,40 @@ const SOLVER_RNG = () => 0.5;
  * does snuff it). A puzzle that adds a survivable hazard or a torch gate must add these to the key.
  */
 export function stateKey(s: GameState): string {
-  return JSON.stringify({
-    tiles: s.mapData.tiles,
-    sub: s.mapData.subtypes,
-    platforms: (s.platforms ?? []).map(
-      (p) => `${p.id}:${p.index}:${p.dir}:${p.running ? 1 : 0}`
-    ),
-    toggles: (s.toggleGroups ?? []).map((g) => (g.on ? 1 : 0)),
-    // Colour-switch states live off the map, so they MUST be in the key — otherwise two configs
-    // that differ only in switch colours (and thus in which platforms run) would merge and the
-    // search could prune a distinct, sometimes-solving state.
-    // Comma-joined, not bare-concatenated: with a delimiter, colours >= 10 can't alias (e.g.
-    // [1,12] vs [11,2]). Colours are capped at 4 today, but the key stays sound if that ever lifts.
-    colorLocks: (s.colorLocks ?? []).map((l) => l.states.join(",")),
-    exitKey: !!s.hasExitKey,
-    rocks: s.rockCount ?? 0,
-    runes: s.runeCount ?? 0,
-    bombs: s.bombCount ?? 0,
-    enemies: (s.enemies ?? [])
-      .map((e) => `${e.y},${e.x},${e.kind},${e.health ?? ""}`)
-      .sort(),
-  });
+  // Hand-rolled hot-path serialization: one tight pass over the NON-EMPTY subtype cells instead of
+  // JSON.stringify of the whole structure, which profiled ~10x slower and dominated the search on
+  // generated rooms. Same fidelity — every non-empty cell is in the key, so nothing the audit
+  // taught us about projectile terrain is lost.
+  const sub = s.mapData.subtypes;
+  let key = "";
+  for (let y = 0; y < sub.length; y++) {
+    const row = sub[y];
+    for (let x = 0; x < row.length; x++) {
+      const c = row[x];
+      if (c.length > 0) key += y + "," + x + ":" + c.join(".") + ";";
+    }
+  }
+  key += "|p";
+  for (const p of s.platforms ?? []) key += `${p.id}:${p.index}:${p.dir}:${p.running ? 1 : 0};`;
+  key += "|t";
+  for (const g of s.toggleGroups ?? []) key += g.on ? 1 : 0;
+  // Colour-switch states live off the map, so they MUST be in the key — otherwise two configs that
+  // differ only in switch colours (and thus in which platforms run) would merge and the search
+  // could prune a distinct, sometimes-solving state. Comma-joined, not bare-concatenated: with a
+  // delimiter, colours >= 10 can't alias (e.g. [1,12] vs [11,2]).
+  key += "|c";
+  for (const l of s.colorLocks ?? []) key += l.states.join(",") + ";";
+  key += `|${s.hasExitKey ? 1 : 0},${s.rockCount ?? 0},${s.runeCount ?? 0},${s.bombCount ?? 0}`;
+  const enemies = s.enemies ?? [];
+  if (enemies.length > 0) {
+    key +=
+      "|e" +
+      enemies
+        .map((e) => `${e.y},${e.x},${e.kind},${e.health ?? ""}`)
+        .sort()
+        .join(";");
+  }
+  return key;
 }
 
 /**
@@ -286,8 +303,14 @@ export function solvePuzzleRoom(
       continue;
     }
 
+    // Enemy-free states skip the defensive clone: every turn-consuming transition is copy-on-write
+    // after the machinery review hardening (movePlayerCore deep-copies its map; platforms, toggle
+    // groups and colour locks are replaced, never mutated; performWait clones the map on platform
+    // maps) — the ONLY in-place mutation left in the engine is the enemies array, so states that
+    // carry enemies still pay for isolation. This halves the per-child cost of the search.
+    const mustClone = (node.state.enemies?.length ?? 0) > 0;
     for (const action of candidateActions(node.state)) {
-      const next = applyAction(cloneState(node.state), action);
+      const next = applyAction(mustClone ? cloneState(node.state) : node.state, action);
       if ((next.heroHealth ?? 0) <= 0) continue; // died — a dead branch, never a solution
       if (next.win) {
         return {

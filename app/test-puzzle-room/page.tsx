@@ -4,51 +4,30 @@ import React, { Suspense, useEffect, useMemo, useState } from "react";
 import { TilemapGrid } from "../../components/TilemapGrid";
 import { tileTypes, type GameState } from "../../lib/map";
 import {
-  PUZZLE_ROOMS,
   describeRoom,
   parsePuzzleRoom,
   puzzleRoomToGameState,
 } from "../../lib/puzzles/rooms";
-import { solvePuzzleRoom, solutionStates } from "../../lib/puzzles/solver";
-import { difficultyTier } from "../../lib/puzzles/generate";
-import { CHAIN_ROOMS } from "../../lib/puzzles/chain_rooms";
+import { solutionStates } from "../../lib/puzzles/solver";
+import {
+  generateCertifiedRoom,
+  type GeneratedPuzzleRoom,
+} from "../../lib/puzzles/generate_room";
 import { TileSubtype } from "../../lib/map/constants";
 
-// Curated bench: the multi-element calibration rooms first (the current frontier), then the authored
-// rooms worth keeping around — one real logic room, one water design, and the two enemy benches. The
-// bare ferries and the generated ferry seeds were trivial, so they're off the bench; the generator
-// and all its tests stay in the codebase.
-const KEEP_AUTHORED = [
-  "The Trade",
-  "The Raft (teaching)",
-  "Behind Glass",
-  "The Getaway",
-];
-const authored = PUZZLE_ROOMS.filter((r) => KEEP_AUTHORED.includes(r.name));
-const ROOMS = [...CHAIN_ROOMS, ...authored];
-
 /**
- * Prototype bench for TOGGLE SWITCHES and MOVING PLATFORMS.
+ * RANDOMLY GENERATED puzzle rooms — a fresh one on every refresh.
  *
- * A curated set: the multi-element CALIBRATION rooms first (the ones being tuned by playtest right
- * now), then a few authored keepers — one real logic room (The Trade), one water design, and the two
- * enemy benches. The question a room is asking is printed above it — play it with that question in
- * mind rather than trying to "win", because a room that is easy to beat and dull to beat is a failed
- * room.
+ * Each room is built by lib/puzzles/generate_room.ts from the ruleset the hand-authored
+ * calibration rooms taught us, then CERTIFIED before it is shown: the goblin-stripped room is
+ * proven solvable by the real-engine solver, and proven UNsolvable with its platforms stripped —
+ * so the machinery is always genuinely required. The seed is displayed so a good room can be
+ * shared and reproduced exactly.
  *
- * PRESS `.` (or numpad 5) TO WAIT. That is not a convenience: a slab advances once per turn and
- * the hero must be aboard to be carried, so waiting is how you ride. On mobile, tap either
- * hourglass in the top corners of the d-pad.
- *
- * The two enemy benches (Behind Glass, The Getaway) keep fire-goblins around: one where a hazard
- * isolates them from the hero, one where they chase — so the solver skips those (see below) and
- * they are there to watch, not to auto-solve.
+ * PRESS `.` (or numpad 5) TO WAIT — a deck moves once per turn and carries whoever stands on it.
+ * On mobile, tap either hourglass in the top corners of the d-pad. Goblins can ride the ferries
+ * too; you are armed (sword + shield).
  */
-
-function roomToState(index: number, resetCount: number): GameState {
-  void resetCount; // a fresh parse per reset already yields a fresh world
-  return puzzleRoomToGameState(parsePuzzleRoom(ROOMS[index]));
-}
 
 /** Full-room minimap. The camera only shows a window, which is useless for reading a puzzle. */
 function MiniMap({ state, cell = 12 }: { state: GameState; cell?: number }) {
@@ -58,7 +37,7 @@ function MiniMap({ state, cell = 12 }: { state: GameState; cell?: number }) {
     if (subs.includes(TileSubtype.MOVING_PLATFORM))
       return { bg: "#d4d8de", title: "SLAB (safe to stand on)" };
     if (subs.includes(TileSubtype.TOGGLE_SWITCH))
-      return { bg: "#38bdf8", title: "toggle switch" };
+      return { bg: "#38bdf8", title: "switch" };
     if (subs.includes(TileSubtype.SPIKES)) return { bg: "#e11d48", title: "spikes (up)" };
     if (subs.includes(TileSubtype.SPIKE_HOLES))
       return { bg: "#7f1d1d", title: "spikes (retracted — walkable)" };
@@ -70,7 +49,7 @@ function MiniMap({ state, cell = 12 }: { state: GameState; cell?: number }) {
     if (subs.includes(TileSubtype.DEEP_WATER)) {
       return subs.includes(TileSubtype.PLATFORM_TRACK)
         ? { bg: "#17384f", title: "deep water on the platform's route" }
-        : { bg: "#1e4e7a", title: "deep water" };
+        : { bg: "#1e4e7a", title: "deep water (swimmable)" };
     }
     if (subs.includes(TileSubtype.PLATFORM_TRACK))
       return { bg: "#5b6472", title: "platform route" };
@@ -110,165 +89,190 @@ function MiniMap({ state, cell = 12 }: { state: GameState; cell?: number }) {
 }
 
 function TestPuzzleRoomInner() {
-  const [index, setIndex] = useState(0);
+  // Seed is chosen client-side AFTER mount (SSR renders the "rolling" placeholder), both to avoid a
+  // hydration mismatch and so every refresh genuinely rolls a new room.
+  const [seed, setSeed] = useState<number | null>(null);
+  const [seedField, setSeedField] = useState("");
   const [resetCount, setResetCount] = useState(0);
   const [outcome, setOutcome] = useState<"none" | "won" | "lost">("none");
 
-  const state = useMemo(() => roomToState(index, resetCount), [index, resetCount]);
-  const room = useMemo(() => parsePuzzleRoom(ROOMS[index]), [index]);
-  const spec = ROOMS[index];
+  useEffect(() => {
+    if (seed === null) setSeed(1 + Math.floor(Math.random() * 999_999));
+  }, [seed]);
 
-  // The solver only handles the enemy-free rooms deterministically, so skip the enemy benches —
-  // a heavy enemy search would block the render. The four puzzle rooms solve in well under a second.
-  // The state cap is kept modest because this runs on the main thread AND the visited set is
-  // memory-hungry (whole-map keys); every room that solves at all does so in a few thousand states.
-  const solve = useMemo(
-    () =>
-      room.enemies.length === 0
-        ? solvePuzzleRoom(room, { maxStates: 60_000, maxTurns: 150 })
-        : null,
-    [room]
-  );
+  // Generation + certification runs the real solver a couple of times, so a room can take a few
+  // seconds — the placeholder below covers it. Deterministic: the same seed always rebuilds the
+  // identical room, which is what makes the seed shareable.
+  const generated: GeneratedPuzzleRoom | { error: string } | null = useMemo(() => {
+    if (seed === null) return null;
+    try {
+      return generateCertifiedRoom(seed);
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) };
+    }
+  }, [seed]);
+  const room = generated && !("error" in generated) ? generated : null;
+
+  const parsed = useMemo(() => (room ? parsePuzzleRoom(room.spec) : null), [room]);
+  const state = useMemo(() => {
+    void resetCount; // a restart re-parses the same spec into a fresh, unplayed world
+    return room ? puzzleRoomToGameState(parsePuzzleRoom(room.spec)) : null;
+  }, [room, resetCount]);
+  // The intended line, replayed on the goblin-stripped variant the solver certified. Goblins are
+  // not rendered by the minimap anyway (they live on the game state, not the tiles), so the
+  // playback looks identical to the real room.
   const playback = useMemo(
-    () => (solve?.solvable ? solutionStates(room, solve.solution) : null),
-    [room, solve]
+    () =>
+      room ? solutionStates(parsePuzzleRoom(room.strippedSpec), room.solution) : null,
+    [room]
   );
   const [playStep, setPlayStep] = useState<number | null>(null);
 
-  // Step the playback one turn at a time until it reaches the final (won) state.
   useEffect(() => {
     if (playStep === null || !playback || playStep >= playback.length - 1) return;
-    const t = setTimeout(
-      () => setPlayStep((s) => (s === null ? null : s + 1)),
-      450
-    );
+    const t = setTimeout(() => setPlayStep((s) => (s === null ? null : s + 1)), 450);
     return () => clearTimeout(t);
   }, [playStep, playback]);
 
-  // A room switch or a restart rebuilds the world, so drop any playback in progress.
   useEffect(() => {
     setPlayStep(null);
-  }, [index, resetCount]);
+  }, [seed, resetCount]);
 
-  const shownState =
-    playStep !== null && playback ? playback[playStep] : state;
+  const shownState = playStep !== null && playback ? playback[playStep] : state;
 
-  const reset = () => {
+  const reroll = () => {
     setOutcome("none");
-    setResetCount((c) => c + 1);
+    setSeed(1 + Math.floor(Math.random() * 999_999));
+  };
+  const loadSeed = () => {
+    const n = parseInt(seedField, 10);
+    if (Number.isFinite(n) && n > 0) {
+      setOutcome("none");
+      setSeed(n);
+    }
   };
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 text-white bg-black/90 gap-4">
       <div className="text-center bg-black/70 rounded-lg p-3 w-full max-w-3xl">
-        <h1 className="text-xl font-bold">Puzzle Machinery Prototype</h1>
+        <h1 className="text-xl font-bold">Generated Puzzle Rooms</h1>
         <p className="text-xs text-gray-300 mt-1">
-          The first rooms chain several elements into one puzzle — these are the ones being{" "}
-          <b>tuned by playtest</b> right now. After them: <b>The Trade</b> (a real order-of-operations
-          logic room), one <b>water</b> design, and two enemy benches (<b>Behind Glass</b>,{" "}
-          <b>The Getaway</b>) showing fire-goblins around a moving platform — isolated by a hazard in
-          one, actively chasing in the other.
+          A <b>new room on every refresh</b>, built from the puzzle ruleset and certified by the
+          solver before you see it: always solvable, and never beatable without its machinery. The
+          seed reproduces a room exactly — note it down if one is worth talking about.
         </p>
         <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
           Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}
-          <b>wait a turn</b>, or tap either <b>hourglass</b> in the top corners of the on-screen
-          d-pad. A deck moves once per turn and carries whoever is standing on it — but a rider
-          keeps their place on the deck, so crossing means riding <i>and</i> walking forward along
-          it, not waiting alone.
+          <b>wait a turn</b>, or tap either <b>hourglass</b> on the d-pad. Water is swimmable —
+          goblins can&apos;t swim, but they <i>can</i> ride the ferries. You carry a sword and
+          shield.
         </p>
 
-        <div className="flex flex-wrap gap-2 justify-center mt-3">
-          {ROOMS.map((r, i) => (
-            <button
-              key={r.name}
-              onClick={() => {
-                setIndex(i);
-                setOutcome("none");
-              }}
-              className={`px-3 py-1 rounded text-sm ${
-                i === index
-                  ? "bg-sky-700 text-white"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
-              }`}
-            >
-              {r.name}
-            </button>
-          ))}
-          <span className="w-px bg-gray-600 mx-1 self-stretch" />
+        <div className="flex flex-wrap gap-2 justify-center items-center mt-3">
           <button
-            onClick={reset}
+            onClick={reroll}
+            className="px-3 py-1 rounded text-sm bg-emerald-700 hover:bg-emerald-600 font-bold"
+          >
+            New room
+          </button>
+          <button
+            onClick={() => {
+              setOutcome("none");
+              setResetCount((c) => c + 1);
+            }}
             className="px-3 py-1 rounded text-sm bg-red-700 hover:bg-red-600"
           >
-            Restart
+            Restart this room
+          </button>
+          <span className="w-px bg-gray-600 mx-1 self-stretch" />
+          <input
+            value={seedField}
+            onChange={(e) => setSeedField(e.target.value)}
+            placeholder="seed"
+            inputMode="numeric"
+            className="w-24 px-2 py-1 rounded text-sm bg-gray-800 border border-gray-600 text-white"
+          />
+          <button
+            onClick={loadSeed}
+            className="px-3 py-1 rounded text-sm bg-gray-700 hover:bg-gray-600"
+          >
+            Load seed
           </button>
         </div>
       </div>
 
-      <div className="bg-black/60 rounded-lg p-3 max-w-3xl text-sm">
-        <div className="font-bold text-amber-300">{spec.name}</div>
-        <div className="text-gray-300 mt-1">{spec.asks}</div>
-        <div className="text-xs text-gray-500 mt-2">{describeRoom(room)}</div>
-        {solve?.solvable && (
-          <div className="text-xs mt-1">
-            <span className="text-emerald-300">solver:</span> optimal in{" "}
-            <b>{solve.minTurns}</b> turns ·{" "}
-            <span className="uppercase tracking-wide">
-              {difficultyTier(solve.minTurns)}
+      {generated === null && (
+        <div className="bg-black/60 rounded-lg px-4 py-3 text-sm text-gray-300">
+          Rolling a room…
+        </div>
+      )}
+      {generated && "error" in generated && (
+        <div className="bg-red-900/80 rounded-lg px-4 py-3 text-sm max-w-2xl">
+          <div className="font-bold">Generation failed for this seed.</div>
+          <div className="text-xs mt-1 text-red-200">{generated.error}</div>
+        </div>
+      )}
+
+      {room && parsed && (
+        <div className="bg-black/60 rounded-lg p-3 max-w-3xl text-sm">
+          <div className="font-bold text-amber-300">
+            {room.spec.name}{" "}
+            <span className="text-xs font-normal text-gray-400">
+              seed {room.seed} · {room.meta.orientation} · {room.meta.plan} ·{" "}
+              {room.meta.lockRule} lock
             </span>
           </div>
-        )}
-      </div>
+          <div className="text-gray-300 mt-1">{room.spec.asks}</div>
+          <div className="text-xs text-gray-500 mt-2">{describeRoom(parsed)}</div>
+          <div className="text-xs mt-1">
+            <span className="text-emerald-300">certified:</span> solvable in{" "}
+            <b>{room.minTurns}</b> turns (goblins aside) ·{" "}
+            <span className="uppercase tracking-wide">{room.tier}</span> · machinery required
+          </div>
+        </div>
+      )}
 
       {outcome === "lost" && (
         <div className="bg-red-900/90 rounded-lg px-4 py-2 text-sm font-bold">
-          Died. Restart to try the room again.
+          Died. Restart to try the room again — or roll a new one.
         </div>
       )}
       {outcome === "won" && (
         <div className="bg-green-900/90 rounded-lg px-4 py-2 text-sm font-bold">
-          Solved — was it interesting, or just fiddly?
+          Solved — how did it rate? Note the seed if it&apos;s worth discussing.
         </div>
       )}
 
-      <div className="flex flex-wrap gap-4 items-start justify-center">
-        <div className="flex flex-col items-center gap-2">
-          <div className="text-xs text-gray-400">
-            whole room{playStep !== null ? " · solver playback" : ""}
+      {room && shownState && state && (
+        <div className="flex flex-wrap gap-4 items-start justify-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-xs text-gray-400">
+              whole room{playStep !== null ? " · solver playback" : ""}
+            </div>
+            <MiniMap state={shownState} />
+            <button
+              onClick={() => setPlayStep(0)}
+              className="px-3 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600"
+            >
+              {playStep === null ? "▶" : "↻"} Watch the intended line ({room.minTurns} turns)
+            </button>
+            <div className="text-xs text-gray-400 h-4">
+              {playStep !== null
+                ? `turn ${playStep} / ${room.minTurns} (goblins hidden)`
+                : ""}
+            </div>
           </div>
-          <MiniMap state={shownState} />
-          {solve === null ? (
-            <div className="text-xs text-gray-500">
-              solver: enemy room — out of scope for now
-            </div>
-          ) : solve.solvable ? (
-            <>
-              <button
-                onClick={() => setPlayStep(0)}
-                className="px-3 py-1 rounded text-xs bg-emerald-700 hover:bg-emerald-600"
-              >
-                {playStep === null ? "▶" : "↻"} Watch the solver solve it ({solve.minTurns} turns)
-              </button>
-              <div className="text-xs text-gray-400 h-4">
-                {playStep !== null ? `turn ${playStep} / ${solve.minTurns}` : ""}
-              </div>
-            </>
-          ) : (
-            <div className="text-xs text-gray-500">
-              solver: no solution within budget (
-              {solve.capped ? "inconclusive" : "unsolvable"})
-            </div>
-          )}
+          <TilemapGrid
+            key={`${room.seed}-${resetCount}`}
+            tileTypes={tileTypes}
+            initialGameState={state}
+            forceDaylight={true}
+            storageSlot="test"
+            onWin={() => setOutcome("won")}
+            onDeath={() => setOutcome("lost")}
+          />
         </div>
-        <TilemapGrid
-          key={`${index}-${resetCount}`}
-          tileTypes={tileTypes}
-          initialGameState={state}
-          forceDaylight={true}
-          storageSlot="test"
-          onWin={() => setOutcome("won")}
-          onDeath={() => setOutcome("lost")}
-        />
-      </div>
+      )}
     </div>
   );
 }

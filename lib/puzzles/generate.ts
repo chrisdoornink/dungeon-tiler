@@ -18,7 +18,7 @@ import { solvePuzzleRoom, type SolveResult } from "./solver";
  * same room, which is what lets a generated daily be replayed and a generated bench be shared.
  * Kept local rather than touching lib/rng.ts (whose sequence the daily seeds depend on).
  */
-function mulberry32(seed: number): () => number {
+export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
   return () => {
     a |= 0;
@@ -121,7 +121,18 @@ export function stripPlatforms(spec: PuzzleRoomSpec): PuzzleRoomSpec {
       .map((ch, x) => (/[1-9]/.test(ch) ? (dry.has(`${y},${x}`) ? "." : hazard) : ch))
       .join("")
   );
-  return { ...spec, map, dryRail: undefined, lengths: undefined, parked: undefined };
+  return {
+    ...spec,
+    map,
+    dryRail: undefined,
+    lengths: undefined,
+    parked: undefined,
+    // The platforms are gone, so nothing may still be wired to them — parsePuzzleRoom rejects a
+    // lock or toggle pointing at an unknown platform id, which is right for authoring and wrong
+    // for this deliberately-mutilated probe room.
+    toggles: spec.toggles?.map((t) => ({ ...t, platforms: [] })),
+    colorLocks: spec.colorLocks?.map((l) => ({ ...l, platforms: [] })),
+  };
 }
 
 export type DifficultyTier = "gentle" | "tricky" | "fiendish";
