@@ -51,7 +51,17 @@ export interface SolveResult {
 }
 
 export interface SolveOptions {
-  /** Abort once this many states have been dequeued. Default 300k. */
+  /**
+   * Abort once this many states have been dequeued.
+   *
+   * The default is MEMORY-bound, not time-bound: every visited state is kept as a key that
+   * serializes the whole map (see stateKey), which runs to a kilobyte or two apiece, so the visited
+   * set — not the search — is what gets expensive. 300k of them exhausted a default Node heap on a
+   * 19-row room with three colour switches. 120k is comfortably safe and still an order of magnitude
+   * more than any room we have solved needs (the worst so far explored ~4k). Raise it deliberately,
+   * with `node --max-old-space-size` if you mean it; hitting the cap reports `capped`, never a false
+   * "unsolvable".
+   */
   maxStates?: number;
   /** Abort a branch once it reaches this many turns. Default 200. */
   maxTurns?: number;
@@ -249,7 +259,7 @@ export function solvePuzzleRoom(
   room: ParsedPuzzleRoom,
   opts: SolveOptions = {}
 ): SolveResult {
-  const maxStates = opts.maxStates ?? 300_000;
+  const maxStates = opts.maxStates ?? 120_000;
   const maxTurns = opts.maxTurns ?? 200;
 
   const start = cloneState(puzzleRoomToGameState(room));

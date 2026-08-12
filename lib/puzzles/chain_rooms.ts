@@ -191,5 +191,176 @@ export const CHAIN_ROOMS: PuzzleRoomSpec[] = [
     // deliberate single: two would let you melt a two-tile obsidian bridge across a band and skip
     // the colour lock entirely.
     rocks: 1,
+    // Armed. Bare-handed (attack 1, no defence) two goblins turned this from a logic problem into a
+    // survival one; with a sword a goblin dies in one or two hits and the puzzle stays the puzzle.
+    sword: true,
+    shield: true,
+  },
+  {
+    name: "The Combination (Deep End variation · pattern lock)",
+    asks:
+      "VARIATION: the lock is a COMBINATION, not just agreement. Three colour switches, and the " +
+      "ferry across the second band runs only on one exact pattern: top switch BLUE, island-left " +
+      "GREEN, island-right VIOLET. They start all wrong (violet / blue / green). Corner dots on each " +
+      "switch show its colour, so count your turns. Is a specific combination more interesting than " +
+      "'make them agree', or just more bookkeeping?",
+    map: [
+      "###############",
+      "#H..C.....r...#",
+      "#.....1.......#",
+      "#LLLLL1LLLLLLL#",
+      "#LLLLL1LLLLLLL#",
+      "#.....1.......#",
+      "#..C....g..C..#",
+      "#.......2.....#",
+      "#LLLLLLL2LLLLL#",
+      "#LLLLLLL2LLLLL#",
+      "#.......2.....#",
+      "#.k.........E.#",
+      "###############",
+    ],
+    trackOver: "lava",
+    // Switch A is on the near bank, B and C are stranded across band 1 — so you can set A before or
+    // after crossing, but the other two force the first crossing either way. Ferry 1 always runs.
+    colorLocks: [
+      {
+        switches: [
+          [1, 4], // A — top bank
+          [6, 3], // B — island, left
+          [6, 11], // C — island, right
+        ],
+        colors: 4,
+        initial: [2, 0, 1],
+        rule: "match",
+        target: [0, 1, 2], // blue, green, violet
+        platforms: ["2"],
+      },
+    ],
+    parked: ["2"],
+    dryRail: [
+      [2, 6],
+      [5, 6],
+      [7, 8],
+      [10, 8],
+    ],
+    lengths: { "1": 2, "2": 2 },
+    rocks: 1,
+    sword: true,
+    shield: true,
+  },
+  {
+    name: "Crossed Purposes (Deep End variation · matched vs mismatched)",
+    asks:
+      "VARIATION, AND THE MEANEST ONE. The two colour switches do THREE things at once: while their " +
+      "colours AGREE the ferry runs and the exit chamber is open but the key chamber is sealed — and " +
+      "while they DISAGREE it is exactly the reverse. The key needs disagreement, the exit needs " +
+      "agreement, so you cannot have both, and the second switch is on the far bank with you. Cross " +
+      "while they agree, break the match to take the key, then put it back to leave. Four colours " +
+      "means breaking a match is cheap and restoring one costs you three turns.",
+    map: [
+      "#############",
+      "#H....C.....#",
+      "#.....1.....#",
+      "#LLLLL1LLLLL#",
+      "#LLLLL1LLLLL#",
+      "#.....1.....#",
+      "#..g....C...#",
+      "###v#####^###",
+      "#.E.....#..k#",
+      "#############",
+    ],
+    trackOver: "lava",
+    // One lock driving all three: the ferry (runs while matched), the exit chamber (gates — open
+    // while matched) and the key chamber (invertedGates — sealed while matched). Starting matched,
+    // so the crossing is available immediately and the trap is on the far side.
+    colorLocks: [
+      {
+        switches: [
+          [1, 6], // near bank
+          [6, 8], // far bank — the one you will actually be reconfiguring
+        ],
+        colors: 4,
+        initial: [1, 1],
+        rule: "allEqual",
+        platforms: ["1"],
+        gates: [[7, 3]], // exit chamber: open while matched
+        invertedGates: [[7, 9]], // key chamber: sealed while matched
+      },
+    ],
+    dryRail: [
+      [2, 6],
+      [5, 6],
+    ],
+    lengths: { "1": 2 },
+    sword: true,
+    shield: true,
+  },
+  {
+    name: "The Long Haul (Deep End variation · three bands)",
+    asks:
+      "VARIATION: the gauntlet. THREE lava bands, three ferries, a colour lock and two toggles, each " +
+      "unlocking the next leg — colour lock opens band 2, the island toggle starts the band-3 ferry, " +
+      "and the toggle on the bottom bank swaps the key chamber for the exit chamber. No backtracking " +
+      "this time, just a long chained descent with goblins on both islands. Does the length earn " +
+      "itself, or does a chain this long stop being a puzzle and start being a commute?",
+    map: [
+      "###############",
+      "#H.......C....#",
+      "#.....1.......#",
+      "#LLLLL1LLLLLLL#",
+      "#LLLLL1LLLLLLL#",
+      "#.....1.......#",
+      "#..g..C.......#",
+      "#.......2.....#",
+      "#LLLLLLL2LLLLL#",
+      "#LLLLLLL2LLLLL#",
+      "#.......2.....#",
+      "#..r.....g..T.#",
+      "#...3.........#",
+      "#LLL3LLLLLLLLL#",
+      "#LLL3LLLLLLLLL#",
+      "#...3.......T.#",
+      "###^#######v###",
+      "#.E.....#....k#",
+      "###############",
+    ],
+    trackOver: "lava",
+    colorLocks: [
+      {
+        switches: [
+          [1, 9], // top bank
+          [6, 6], // island 1 — stranded behind band 1
+        ],
+        colors: 4,
+        initial: [0, 2],
+        rule: "allEqual",
+        platforms: ["2"],
+      },
+    ],
+    toggles: [
+      // Island 2: starts the last ferry. Nothing turns it off from below, so descending is safe.
+      { switchAt: [11, 12], platforms: ["3"], on: false },
+      // Bottom bank: the chamber swap. OFF = key chamber open, exit sealed; ON = the reverse. Both
+      // chambers are down here with the switch, so this leg needs no climb back.
+      {
+        switchAt: [15, 12],
+        gates: [[16, 3]],
+        invertedGates: [[16, 11]],
+        on: false,
+      },
+    ],
+    parked: ["2", "3"],
+    dryRail: [
+      [2, 6],
+      [5, 6],
+      [7, 8],
+      [10, 8],
+      [12, 4],
+      [15, 4],
+    ],
+    lengths: { "1": 2, "2": 2, "3": 2 },
+    rocks: 1,
+    sword: true,
+    shield: true,
   },
 ];

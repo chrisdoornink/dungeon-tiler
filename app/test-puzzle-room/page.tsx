@@ -120,10 +120,12 @@ function TestPuzzleRoomInner() {
 
   // The solver only handles the enemy-free rooms deterministically, so skip the enemy benches —
   // a heavy enemy search would block the render. The four puzzle rooms solve in well under a second.
+  // The state cap is kept modest because this runs on the main thread AND the visited set is
+  // memory-hungry (whole-map keys); every room that solves at all does so in a few thousand states.
   const solve = useMemo(
     () =>
       room.enemies.length === 0
-        ? solvePuzzleRoom(room, { maxStates: 200_000, maxTurns: 150 })
+        ? solvePuzzleRoom(room, { maxStates: 60_000, maxTurns: 150 })
         : null,
     [room]
   );

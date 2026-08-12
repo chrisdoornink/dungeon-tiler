@@ -86,6 +86,13 @@ export interface PuzzleRoomSpec {
   /** Rocks the hero walks in with. Puzzle rooms hand these out rather than scattering them. */
   rocks?: number;
   /**
+   * Kit the hero walks in with. A puzzle room is about the puzzle, so any room with enemies in it
+   * should usually arm the hero — bare-handed (attack 1, no defence) a couple of goblins turn a
+   * logic problem into a survival one. `sword` is +2 attack (1 -> 3), `shield` is -1 damage per hit.
+   */
+  sword?: boolean;
+  shield?: boolean;
+  /**
    * Colour locks. Each names the `C` switches it reads, the `rule` over their colours, and what it
    * drives while satisfied. `initial` is the starting colour per switch (default all 0); `colors`
    * is how many each cycles through (default 4). Positions must land on `C` tiles / real beds /
@@ -543,8 +550,8 @@ export function puzzleRoomToGameState(room: ParsedPuzzleRoom): GameState {
   return {
     hasKey: false,
     hasExitKey: false,
-    hasSword: false,
-    hasShield: false,
+    hasSword: !!room.spec.sword,
+    hasShield: !!room.spec.shield,
     showFullMap: true,
     win: false,
     playerDirection: Direction.DOWN,
@@ -582,9 +589,16 @@ export function describeRoom(room: ParsedPuzzleRoom): string {
     `${room.platforms.length} platform${room.platforms.length === 1 ? "" : "s"}`,
     `${room.toggleGroups.length} switch${room.toggleGroups.length === 1 ? "" : "es"}`,
   ];
+  if (room.colorLocks.length > 0) {
+    bits.push(
+      `${room.colorLocks.length} colour lock${room.colorLocks.length === 1 ? "" : "s"}`
+    );
+  }
   if (room.enemies.length > 0) {
     bits.push(`${room.enemies.length} enem${room.enemies.length === 1 ? "y" : "ies"}`);
   }
   if (room.rocks > 0) bits.push(`${room.rocks} rocks`);
+  const kit = [room.spec.sword && "sword", room.spec.shield && "shield"].filter(Boolean);
+  if (kit.length > 0) bits.push(kit.join(" + "));
   return bits.join(" · ");
 }
