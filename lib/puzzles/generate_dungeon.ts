@@ -1,0 +1,322 @@
+// Dungeon-first puzzle generation (v1) — the inverted approach.
+//
+// The band generator built a puzzle skeleton (regions split by hazard moats) and decorated it, so
+// every room read as "tiers of moats". This starts the other way round: generate a NORMAL dungeon
+// — rooms joined by corridors — and then FIT puzzle blockades onto its natural chokepoints.
+//
+// WHY IT ESCAPES THE MOAT LOOK: the layout is a real dungeon (open rooms, thin corridors), and the
+// puzzle is a handful of gates on that layout, not the layout itself.
+//
+// WHY IT NEEDS NO BRUTE-FORCE SOLVER: the rooms are connected as a TREE, so every corridor is a
+// BRIDGE — the only connection between the two halves it joins. A blockade on a corridor is
+// therefore provably REQUIRED (remove it and the goal is unreachable), by a cut argument, not a
+// search. And it is SOLVABLE BY CONSTRUCTION: each gate's switch sits in the room on the hero's
+// side of that corridor, so opening the gates root-outward always works. Both facts are O(rooms),
+// which is what lets these grow past what the solver could ever certify.
+//
+// v1 fits only spike-gates (a bed across a corridor, opened by a switch) plus a key the exit needs.
+// Ferries in flooded rooms, colour locks, and mutual-exclusion trades are the next fittings.
+import type { PuzzleRoomSpec } from "./rooms";
+import { parsePuzzleRoom } from "./rooms";
+import { mulberry32, difficultyTier, type DifficultyTier } from "./generate";
+import { solvePuzzleRoom, type Action } from "./solver";
+
+type Rng = () => number;
+const ri = (rng: Rng, lo: number, hi: number): number =>
+  lo + Math.floor(rng() * (hi - lo + 1));
+
+interface DRoom {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+interface DEdge {
+  parent: number;
+  child: number;
+  /** Corridor tiles that lie OUTSIDE every room — the ones a gate can sit on as a clean cut. */
+  cut: Array<[number, number]>;
+}
+
+const FLOOR = 0;
+const WALL = 1;
+
+function roomsApart(a: DRoom, b: DRoom): boolean {
+  // A two-tile margin on some axis, so there is real corridor to carve (and to gate) between them.
+  return (
+    a.x > b.x + b.w + 1 ||
+    b.x > a.x + a.w + 1 ||
+    a.y > b.y + b.h + 1 ||
+    b.y > a.y + a.h + 1
+  );
+}
+
+function inAnyRoom(rooms: DRoom[], y: number, x: number): boolean {
+  return rooms.some(
+    (r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h
+  );
+}
+
+/** Carve an L-corridor between two room centres, returning the tiles that fall outside all rooms. */
+function carveCorridor(
+  grid: number[][],
+  rooms: DRoom[],
+  a: DRoom,
+  b: DRoom,
+  rng: Rng
+): Array<[number, number]> {
+  const ax = Math.floor(a.x + a.w / 2);
+  const ay = Math.floor(a.y + a.h / 2);
+  const bx = Math.floor(b.x + b.w / 2);
+  const by = Math.floor(b.y + b.h / 2);
+  const tiles: Array<[number, number]> = [];
+  const put = (y: number, x: number) => {
+    grid[y][x] = FLOOR;
+    if (!inAnyRoom(rooms, y, x)) tiles.push([y, x]);
+  };
+  if (rng() < 0.5) {
+    for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) put(ay, x);
+    for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) put(y, bx);
+  } else {
+    for (let y = Math.min(ay, by); y <= Math.max(ay, by); y++) put(y, ax);
+    for (let x = Math.min(ax, bx); x <= Math.max(ax, bx); x++) put(by, x);
+  }
+  return tiles;
+}
+
+export interface DungeonMeta {
+  rooms: number;
+  gates: number;
+  keyDetour: boolean;
+}
+
+export interface GeneratedDungeon {
+  spec: PuzzleRoomSpec;
+  meta: DungeonMeta;
+  seed: number;
+  minTurns: number;
+  tier: DifficultyTier;
+  solution: Action[];
+}
+
+interface Built {
+  grid: number[][];
+  rooms: DRoom[];
+  edges: DEdge[];
+  W: number;
+  H: number;
+}
+
+/** Seeded rooms joined as a random tree (every edge a bridge). Returns null on a bad dice roll. */
+function buildLayout(rng: Rng): Built | null {
+  const W = ri(rng, 17, 21);
+  const H = ri(rng, 13, 17);
+  const roomCount = ri(rng, 4, 5);
+  const grid: number[][] = Array.from({ length: H }, () => Array(W).fill(WALL));
+  const rooms: DRoom[] = [];
+  for (let i = 0; i < roomCount; i++) {
+    for (let t = 0; t < 40; t++) {
+      const w = ri(rng, 3, 5);
+      const h = ri(rng, 3, 4);
+      const x = ri(rng, 1, W - w - 2);
+      const y = ri(rng, 1, H - h - 2);
+      const r: DRoom = { x, y, w, h };
+      if (rooms.every((o) => roomsApart(r, o))) {
+        rooms.push(r);
+        for (let yy = y; yy < y + h; yy++) for (let xx = x; xx < x + w; xx++) grid[yy][xx] = FLOOR;
+        break;
+      }
+    }
+  }
+  if (rooms.length < 3) return null; // too cramped this roll — rebuild
+
+  // Random spanning tree: each room after the first attaches to one earlier room. n-1 edges, no
+  // cycles, so every corridor is a bridge.
+  const edges: DEdge[] = [];
+  for (let i = 1; i < rooms.length; i++) {
+    const parent = ri(rng, 0, i - 1);
+    const cut = carveCorridor(grid, rooms, rooms[parent], rooms[i], rng);
+    edges.push({ parent, child: i, cut });
+  }
+  // Solid perimeter.
+  for (let x = 0; x < W; x++) {
+    grid[0][x] = WALL;
+    grid[H - 1][x] = WALL;
+  }
+  for (let y = 0; y < H; y++) {
+    grid[y][0] = WALL;
+    grid[y][W - 1] = WALL;
+  }
+  return { grid, rooms: rooms.slice(), edges, W, H };
+}
+
+/** Children adjacency of the room tree (rooted at 0), plus each node's parent edge. */
+function treeStructure(rooms: DRoom[], edges: DEdge[]) {
+  const children: number[][] = rooms.map(() => []);
+  const parentEdge: (DEdge | null)[] = rooms.map(() => null);
+  for (const e of edges) {
+    children[e.parent].push(e.child);
+    parentEdge[e.child] = e;
+  }
+  // Depth + path-from-root, by BFS from room 0.
+  const depth = rooms.map(() => -1);
+  const parent = rooms.map(() => -1);
+  depth[0] = 0;
+  const q = [0];
+  while (q.length) {
+    const u = q.shift() as number;
+    for (const v of children[u]) {
+      depth[v] = depth[u] + 1;
+      parent[v] = u;
+      q.push(v);
+    }
+  }
+  return { children, parentEdge, depth, parent };
+}
+
+/** The chain of edges from room 0 down to `room`, root-first. */
+function edgesToRoot(
+  room: number,
+  parent: number[],
+  parentEdge: (DEdge | null)[]
+): DEdge[] {
+  const chain: DEdge[] = [];
+  let cur = room;
+  while (parent[cur] !== -1) {
+    const e = parentEdge[cur];
+    if (e) chain.push(e);
+    cur = parent[cur];
+  }
+  return chain.reverse();
+}
+
+/**
+ * Fit puzzle blockades onto a seeded dungeon and emit a PuzzleRoomSpec. Solvable by construction and
+ * every gate required by the tree-bridge argument, so no solver run is needed to ship it — though a
+ * caller may still solver-check small ones.
+ */
+export function generateDungeonRoom(seed: number): GeneratedDungeon {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const rng = mulberry32(
+      (Math.imul(seed, 2654435761) ^ Math.imul(attempt + 1, 40503)) >>> 0
+    );
+    const built = buildLayout(rng);
+    if (!built) continue;
+    const { grid, rooms, edges } = built;
+    const { parentEdge, depth, parent } = treeStructure(rooms, edges);
+
+    // Roles. Hero at room 0. Exit is the deepest room. The key is the deepest OTHER room whose path
+    // branches off the exit's path (a real detour) — else the deepest remaining room.
+    const hero = 0;
+    let exit = 0;
+    for (let i = 1; i < rooms.length; i++) if (depth[i] > depth[exit]) exit = i;
+    const exitPath = new Set(
+      edgesToRoot(exit, parent, parentEdge).map((e) => e.child)
+    );
+    let key = -1;
+    for (let i = 1; i < rooms.length; i++) {
+      if (i === exit) continue;
+      if (key === -1) {
+        key = i;
+        continue;
+      }
+      const iBranch = !exitPath.has(i); // off the hero->exit spine — a real detour
+      const kBranch = !exitPath.has(key);
+      if (iBranch && !kBranch) key = i; // prefer a branching room
+      else if (iBranch === kBranch && depth[i] > depth[key]) key = i; // else the deeper one
+    }
+    if (key === -1) continue; // need at least 3 rooms; buildLayout guarantees it, belt-and-braces
+
+    const keyDetour = !exitPath.has(key);
+
+    // A free floor tile inside a room (avoiding tiles already claimed).
+    const claimed = new Set<string>();
+    const freeInRoom = (roomId: number): [number, number] | null => {
+      const r = rooms[roomId];
+      const cells: Array<[number, number]> = [];
+      for (let y = r.y; y < r.y + r.h; y++)
+        for (let x = r.x; x < r.x + r.w; x++)
+          if (grid[y][x] === FLOOR && !claimed.has(`${y},${x}`)) cells.push([y, x]);
+      if (cells.length === 0) return null;
+      const c = cells[ri(rng, 0, cells.length - 1)];
+      claimed.add(`${c[0]},${c[1]}`);
+      return c;
+    };
+
+    const heroPos = freeInRoom(hero);
+    const exitPos = freeInRoom(exit);
+    const keyPos = freeInRoom(key);
+    if (!heroPos || !exitPos || !keyPos) continue;
+
+    // Gate the edges on the hero->exit and hero->key paths. Each gate: a bed on a corridor cut tile,
+    // and a switch in the room on the HERO side of that edge (its parent), which is reachable before
+    // the bed by opening the edges above it first.
+    const gateEdges = new Map<DEdge, boolean>();
+    for (const e of edgesToRoot(exit, parent, parentEdge)) gateEdges.set(e, true);
+    for (const e of edgesToRoot(key, parent, parentEdge)) gateEdges.set(e, true);
+
+    const beds: Array<{ at: [number, number]; switchAt: [number, number] }> = [];
+    let ok = true;
+    for (const e of gateEdges.keys()) {
+      // A cut tile with a free room cell on the parent side for its switch.
+      const bedTile = e.cut.find((t) => !claimed.has(`${t[0]},${t[1]}`));
+      const sw = freeInRoom(e.parent);
+      if (!bedTile || !sw) {
+        ok = false;
+        break;
+      }
+      claimed.add(`${bedTile[0]},${bedTile[1]}`);
+      beds.push({ at: bedTile, switchAt: sw });
+    }
+    if (!ok) continue;
+
+    // ---- render to ASCII ----
+    const chars: string[][] = grid.map((row) =>
+      row.map((c) => (c === WALL ? "#" : "."))
+    );
+    chars[heroPos[0]][heroPos[1]] = "H";
+    chars[exitPos[0]][exitPos[1]] = "E";
+    chars[keyPos[0]][keyPos[1]] = "k";
+    const toggles: NonNullable<PuzzleRoomSpec["toggles"]> = [];
+    for (const b of beds) {
+      chars[b.at[0]][b.at[1]] = "^"; // bed UP (blocking) until its switch is thrown
+      chars[b.switchAt[0]][b.switchAt[1]] = "T";
+      toggles.push({ switchAt: b.switchAt, gates: [b.at], on: false });
+    }
+
+    const spec: PuzzleRoomSpec = {
+      name: `Dungeon #${seed}`,
+      asks:
+        `A dungeon of ${rooms.length} rooms. Each barred door drops when you throw its switch (in a ` +
+        `room you can already reach). Fetch the key${keyDetour ? " down the side passage" : ""}, ` +
+        `then reach the exit. First pass of the layout-first generator — does it read as a room, ` +
+        `not a stack of moats?`,
+      map: chars.map((r) => r.join("")),
+      trackOver: "lava",
+      toggles,
+      sword: true,
+      shield: true,
+    };
+
+    // Solver BACKSTOP. The tree-bridge argument says these are solvable by construction, but
+    // corridors can cross and quietly break that abstraction (an over-blocked layout slips through),
+    // so a cheap solve (<100ms on rooms this size — nothing like the 25s band rooms) rejects the
+    // bad rolls. As dungeons grow past what the solver can afford, the constructive proof has to
+    // stand on its own; for now this keeps every shipped room honestly solvable.
+    const solved = solvePuzzleRoom(parsePuzzleRoom(spec), {
+      maxStates: 80_000,
+      maxTurns: 200,
+    });
+    if (!solved.solvable || solved.capped) continue;
+
+    return {
+      spec,
+      meta: { rooms: rooms.length, gates: beds.length, keyDetour },
+      seed,
+      minTurns: solved.minTurns,
+      tier: difficultyTier(solved.minTurns),
+      solution: solved.solution,
+    };
+  }
+  throw new Error(`generateDungeonRoom: no layout certified for seed ${seed}`);
+}

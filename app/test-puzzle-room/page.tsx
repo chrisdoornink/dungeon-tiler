@@ -10,23 +10,18 @@ import {
 } from "../../lib/puzzles/rooms";
 import { solutionStates } from "../../lib/puzzles/solver";
 import {
-  generateCertifiedRoom,
-  type GeneratedPuzzleRoom,
-} from "../../lib/puzzles/generate_room";
+  generateDungeonRoom,
+  type GeneratedDungeon,
+} from "../../lib/puzzles/generate_dungeon";
 import { TileSubtype } from "../../lib/map/constants";
 
 /**
- * RANDOMLY GENERATED puzzle rooms — a fresh one on every refresh.
+ * RANDOMLY GENERATED dungeon puzzles — a fresh one on every refresh.
  *
- * Each room is built by lib/puzzles/generate_room.ts from the ruleset the hand-authored
- * calibration rooms taught us, then CERTIFIED before it is shown: the goblin-stripped room is
- * proven solvable by the real-engine solver, and proven UNsolvable with its platforms stripped —
- * so the machinery is always genuinely required. The seed is displayed so a good room can be
- * shared and reproduced exactly.
- *
- * PRESS `.` (or numpad 5) TO WAIT — a deck moves once per turn and carries whoever stands on it.
- * On mobile, tap either hourglass in the top corners of the d-pad. Goblins can ride the ferries
- * too; you are armed (sword + shield).
+ * The LAYOUT-FIRST generator (lib/puzzles/generate_dungeon.ts): a normal dungeon of rooms joined by
+ * corridors, with puzzle blockades FITTED onto its natural chokepoints (v1: barred doors on
+ * corridors, opened by switches, plus a key the exit needs). Every room is solver-checked before it
+ * is shown, so it is always solvable; the seed is displayed so a good room can be reproduced.
  */
 
 /** Full-room minimap. The camera only shows a window, which is useless for reading a puzzle. */
@@ -103,10 +98,10 @@ function TestPuzzleRoomInner() {
   // Generation + certification runs the real solver a couple of times, so a room can take a few
   // seconds — the placeholder below covers it. Deterministic: the same seed always rebuilds the
   // identical room, which is what makes the seed shareable.
-  const generated: GeneratedPuzzleRoom | { error: string } | null = useMemo(() => {
+  const generated: GeneratedDungeon | { error: string } | null = useMemo(() => {
     if (seed === null) return null;
     try {
-      return generateCertifiedRoom(seed);
+      return generateDungeonRoom(seed);
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
     }
@@ -123,7 +118,7 @@ function TestPuzzleRoomInner() {
   // playback looks identical to the real room.
   const playback = useMemo(
     () =>
-      room ? solutionStates(parsePuzzleRoom(room.strippedSpec), room.solution) : null,
+      room ? solutionStates(parsePuzzleRoom(room.spec), room.solution) : null,
     [room]
   );
   const [playStep, setPlayStep] = useState<number | null>(null);
@@ -155,17 +150,12 @@ function TestPuzzleRoomInner() {
   return (
     <div className="min-h-screen flex flex-col items-center p-4 text-white bg-black/90 gap-4">
       <div className="text-center bg-black/70 rounded-lg p-3 w-full max-w-3xl">
-        <h1 className="text-xl font-bold">Generated Puzzle Rooms</h1>
+        <h1 className="text-xl font-bold">Generated Dungeon Puzzles</h1>
         <p className="text-xs text-gray-300 mt-1">
-          A <b>new room on every refresh</b>, built from the puzzle ruleset and certified by the
-          solver before you see it: always solvable, and never beatable without its machinery. The
-          seed reproduces a room exactly — note it down if one is worth talking about.
-        </p>
-        <p className="text-sm mt-2 rounded bg-sky-900/50 px-3 py-2">
-          Press <b className="font-mono">.</b> (or numpad <b className="font-mono">5</b>) to{" "}
-          <b>wait a turn</b>, or tap either <b>hourglass</b> on the d-pad. Water is swimmable —
-          goblins can&apos;t swim, but they <i>can</i> ride the ferries. You carry a sword and
-          shield.
+          A <b>new dungeon on every refresh</b> — a normal layout of rooms and corridors, with puzzle
+          blockades fitted onto it and checked solvable before you see it. Walk onto a{" "}
+          <b>switch</b> to drop the barred door it controls; fetch the <b>key</b>, then reach the{" "}
+          <b>exit</b>. The seed reproduces a dungeon exactly — note it if one is worth talking about.
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center items-center mt-3">
@@ -218,16 +208,16 @@ function TestPuzzleRoomInner() {
           <div className="font-bold text-amber-300">
             {room.spec.name}{" "}
             <span className="text-xs font-normal text-gray-400">
-              seed {room.seed} · {room.meta.orientation} · {room.meta.plan} ·{" "}
-              {room.meta.lockRule} lock
+              seed {room.seed} · {room.meta.rooms} rooms · {room.meta.gates} gates
+              {room.meta.keyDetour ? " · key off the path" : ""}
             </span>
           </div>
           <div className="text-gray-300 mt-1">{room.spec.asks}</div>
           <div className="text-xs text-gray-500 mt-2">{describeRoom(parsed)}</div>
           <div className="text-xs mt-1">
             <span className="text-emerald-300">certified:</span> solvable in{" "}
-            <b>{room.minTurns}</b> turns (goblins aside) ·{" "}
-            <span className="uppercase tracking-wide">{room.tier}</span> · machinery required
+            <b>{room.minTurns}</b> turns ·{" "}
+            <span className="uppercase tracking-wide">{room.tier}</span>
           </div>
         </div>
       )}
@@ -257,9 +247,7 @@ function TestPuzzleRoomInner() {
               {playStep === null ? "▶" : "↻"} Watch the intended line ({room.minTurns} turns)
             </button>
             <div className="text-xs text-gray-400 h-4">
-              {playStep !== null
-                ? `turn ${playStep} / ${room.minTurns} (goblins hidden)`
-                : ""}
+              {playStep !== null ? `turn ${playStep} / ${room.minTurns}` : ""}
             </div>
           </div>
           <TilemapGrid
