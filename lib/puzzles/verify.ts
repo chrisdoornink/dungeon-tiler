@@ -52,21 +52,26 @@ function reflexBlocked(s: GameState, y: number, x: number): boolean {
   return false;
 }
 
-/** First step of a shortest walk from the hero to the nearest tile in `targets`, or null if none. */
-function firstStepToward(s: GameState, targets: Set<string>): Direction | null {
+/**
+ * First step of a walk from the hero toward a tile in `targets` — the NEAREST one, or (for a switch-
+ * choice variant of the mindless player) the FARTHEST reachable one. Returns null if none reachable.
+ * BFS runs to completion so both the first (nearest) and last (farthest) reachable target are known.
+ */
+function firstStepToward(
+  s: GameState,
+  targets: Set<string>,
+  pick: "nearest" | "farthest" = "nearest"
+): Direction | null {
   const p = findPlayerPosition(s.mapData);
   if (!p) return null;
   const [hy, hx] = p;
   const queue: Array<[number, number]> = [[hy, hx]];
   const prev = new Map<string, [number, number]>();
   const seen = new Set<string>([`${hy},${hx}`]);
-  let found: [number, number] | null = null;
+  const reached: Array<[number, number]> = []; // targets in BFS (increasing-distance) order
   while (queue.length) {
     const [y, x] = queue.shift() as [number, number];
-    if (targets.has(`${y},${x}`) && !(y === hy && x === hx)) {
-      found = [y, x];
-      break;
-    }
+    if (targets.has(`${y},${x}`) && !(y === hy && x === hx)) reached.push([y, x]);
     for (const [dy, dx] of [
       [-1, 0],
       [1, 0],
@@ -82,8 +87,8 @@ function firstStepToward(s: GameState, targets: Set<string>): Direction | null {
       queue.push([ny, nx]);
     }
   }
-  if (!found) return null;
-  let cur = found;
+  if (reached.length === 0) return null;
+  let cur = pick === "nearest" ? reached[0] : reached[reached.length - 1];
   for (;;) {
     const pr = prev.get(`${cur[0]},${cur[1]}`);
     if (!pr) break;
@@ -109,11 +114,18 @@ function tilesWith(s: GameState, sub: TileSubtype): Set<string> {
 
 /**
  * Does the faithfully-mindless reflex agent win this room? Its whole policy: head for the goal (the
- * key first, then the exit); if no open walk to the goal exists, head for the nearest switch and
- * step on it (which throws it). Repeat until it wins, dies, gives up on a repeated state, or gets
- * stuck. `C` colour switches count as switches (they carry TOGGLE_SWITCH in the map).
+ * key first, then the exit); if no open walk to the goal exists, head for a switch and step on it
+ * (which throws it). `switchPick` chooses WHICH switch — "nearest" (the base policy) or "farthest"
+ * (a second faithful variant: still no memory or lookahead, it just prefers the far switch). Repeat
+ * until it wins, dies, gives up on a repeated state, or gets stuck. `C` colour switches count as
+ * switches (they carry TOGGLE_SWITCH in the map).
+ *
+ * Prefer `reflexSolvesAny` for certification — a room is only a puzzle if NEITHER variant beats it.
  */
-export function reflexSolves(spec: PuzzleRoomSpec): boolean {
+export function reflexSolves(
+  spec: PuzzleRoomSpec,
+  switchPick: "nearest" | "farthest" = "nearest"
+): boolean {
   let s = puzzleRoomToGameState(parsePuzzleRoom(spec));
   const seen = new Set<string>();
   for (let t = 0; t < REFLEX_TURN_CAP; t++) {
@@ -125,34 +137,49 @@ export function reflexSolves(spec: PuzzleRoomSpec): boolean {
     const goal = s.hasExitKey
       ? tilesWith(s, TileSubtype.EXIT)
       : tilesWith(s, TileSubtype.EXITKEY);
-    let dir = firstStepToward(s, goal);
-    if (dir === null) dir = firstStepToward(s, tilesWith(s, TileSubtype.TOGGLE_SWITCH));
+    let dir = firstStepToward(s, goal); // the goal is always approached by the shortest walk
+    if (dir === null)
+      dir = firstStepToward(s, tilesWith(s, TileSubtype.TOGGLE_SWITCH), switchPick);
     if (dir === null) return false; // nowhere useful to go
     s = movePlayer(s, dir);
   }
   return false;
 }
 
+/**
+ * The MINDLESS SUITE: a room fails the "requires logic" bar if ANY faithful memoryless policy beats
+ * it — currently nearest-switch and farthest-switch. Both are genuine reflex players (no memory, no
+ * lookahead); they differ only in which switch they walk to when blocked. Requiring both to fail
+ * closes the "a slightly different mindless policy cracks it" hole for free — e.g. it correctly
+ * rejects an AND puzzle whose intended order is simply "far switch first", which farthest stumbles
+ * into. (Deliberately NOT included: a wiring-aware / 1-ply-lookahead agent — that is a greedy
+ * SOLVER, not a mindless player; it beats even genuine puzzles like the Airlock, so using it would
+ * wrongly reject real logic.)
+ */
+export function reflexSolvesAny(spec: PuzzleRoomSpec): boolean {
+  return reflexSolves(spec, "nearest") || reflexSolves(spec, "farthest");
+}
+
 export interface RequiresLogic {
-  /** True iff the room is solvable AND the mindless reflex agent cannot win it. */
+  /** True iff the room is solvable AND no mindless-suite policy can win it. */
   ok: boolean;
   /** The full solve — reuse its `solution` / `minTurns` rather than solving again. */
   full: SolveResult;
-  /** Whether the reflex agent won (if it did, the room needs no thought). */
+  /** Whether any mindless policy won (if so, the room needs no thought). */
   reflexWon: boolean;
 }
 
 /**
- * Decide whether `spec` requires genuine logic: the real solver wins, but the mindless reflex agent
- * does not. Returns the full solve so a caller that needs the solution/difficulty does not re-solve.
- * A capped (inconclusive) solve is treated as "not proven" — callers re-seed.
+ * Decide whether `spec` requires genuine logic: the real solver wins, but no mindless-suite policy
+ * does. Returns the full solve so a caller that needs the solution/difficulty does not re-solve. A
+ * capped (inconclusive) solve is treated as "not proven" — callers re-seed.
  */
 export function requiresLogic(spec: PuzzleRoomSpec): RequiresLogic {
   const full = solvePuzzleRoom(parsePuzzleRoom(spec), SOLVE_BUDGET);
   if (!full.solvable || full.capped) {
     return { ok: false, full, reflexWon: false };
   }
-  const reflexWon = reflexSolves(spec);
+  const reflexWon = reflexSolvesAny(spec);
   return { ok: !reflexWon, full, reflexWon };
 }
 

@@ -21,10 +21,18 @@ import {
   generateHandoffRoom,
   type GeneratedHandoff,
 } from "../../lib/puzzles/generate_handoff";
+import {
+  generateQuorumRoom,
+  type GeneratedQuorum,
+} from "../../lib/puzzles/generate_quorum";
 import { TileSubtype } from "../../lib/map/constants";
 
-type Mode = "shuttle" | "handoff" | "dungeon";
-type Generated = GeneratedShuttle | GeneratedHandoff | GeneratedDungeon;
+type Mode = "shuttle" | "handoff" | "quorum" | "dungeon";
+type Generated =
+  | GeneratedShuttle
+  | GeneratedHandoff
+  | GeneratedQuorum
+  | GeneratedDungeon;
 
 /**
  * RANDOMLY GENERATED dungeon puzzles — a fresh one on every refresh.
@@ -117,6 +125,8 @@ function TestPuzzleRoomInner() {
         ? generateShuttleRoom(seed)
         : mode === "handoff"
         ? generateHandoffRoom(seed)
+        : mode === "quorum"
+        ? generateQuorumRoom(seed)
         : generateDungeonRoom(seed);
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
@@ -187,6 +197,17 @@ function TestPuzzleRoomInner() {
               from the right side to leave — a four-press, non-monotone plan the solver certifies no
               mindless line can shortcut.
             </>
+          ) : mode === "quorum" ? (
+            <>
+              <b>Quorum (a 2-of-3 majority gate):</b> three <b>colour switches</b> on one lock; the
+              doors open while at least <b>two</b> of the three match — and the middle door is the
+              opposite (open only when they <i>don&apos;t</i>). It starts at quorum with the exit open
+              but the key sealed behind the middle door. The trick is an <b>anchor shuttle</b>: pin
+              one switch on as a spare, then walk the majority down the corridor and back — the only
+              way, because dropping below two slams the door you&apos;re standing behind. Certified
+              against <i>two</i> mindless players (nearest- and farthest-switch), and the 3-of-3
+              (pure AND) version of the same room is provably unsolvable.
+            </>
           ) : (
             <>
               <b>Layout-first (the old dungeon):</b> a normal layout of rooms and corridors with
@@ -223,6 +244,19 @@ function TestPuzzleRoomInner() {
               }`}
             >
               Colour Airlock
+            </button>
+            <button
+              onClick={() => {
+                if (mode !== "quorum") {
+                  setOutcome("none");
+                  setMode("quorum");
+                }
+              }}
+              className={`px-3 py-1 font-bold ${
+                mode === "quorum" ? "bg-sky-600" : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              Quorum
             </button>
             <button
               onClick={() => {
@@ -289,7 +323,9 @@ function TestPuzzleRoomInner() {
             {room.spec.name}{" "}
             <span className="text-xs font-normal text-gray-400">
               seed {room.seed} · {room.meta.rooms} rooms ·{" "}
-              {"caPresses" in room.meta
+              {"presses" in room.meta
+                ? `${room.meta.k}-of-${room.meta.n} majority · anchor + shuttle ${room.meta.presses.join("/")}`
+                : "caPresses" in room.meta
                 ? `Ca ×${room.meta.caPresses} / Cb ×${room.meta.cbPresses} · break-and-restore`
                 : "switchThrows" in room.meta
                 ? `switch thrown ${room.meta.switchThrows}× on the intended line`
