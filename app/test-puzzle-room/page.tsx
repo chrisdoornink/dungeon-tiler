@@ -13,7 +13,18 @@ import {
   generateDungeonRoom,
   type GeneratedDungeon,
 } from "../../lib/puzzles/generate_dungeon";
+import {
+  generateShuttleRoom,
+  type GeneratedShuttle,
+} from "../../lib/puzzles/generate_constraint";
+import {
+  generateHandoffRoom,
+  type GeneratedHandoff,
+} from "../../lib/puzzles/generate_handoff";
 import { TileSubtype } from "../../lib/map/constants";
+
+type Mode = "shuttle" | "handoff" | "dungeon";
+type Generated = GeneratedShuttle | GeneratedHandoff | GeneratedDungeon;
 
 /**
  * RANDOMLY GENERATED dungeon puzzles — a fresh one on every refresh.
@@ -90,6 +101,7 @@ function TestPuzzleRoomInner() {
   const [seedField, setSeedField] = useState("");
   const [resetCount, setResetCount] = useState(0);
   const [outcome, setOutcome] = useState<"none" | "won" | "lost">("none");
+  const [mode, setMode] = useState<Mode>("shuttle");
 
   useEffect(() => {
     if (seed === null) setSeed(1 + Math.floor(Math.random() * 999_999));
@@ -98,14 +110,18 @@ function TestPuzzleRoomInner() {
   // Generation + certification runs the real solver a couple of times, so a room can take a few
   // seconds — the placeholder below covers it. Deterministic: the same seed always rebuilds the
   // identical room, which is what makes the seed shareable.
-  const generated: GeneratedDungeon | { error: string } | null = useMemo(() => {
+  const generated: Generated | { error: string } | null = useMemo(() => {
     if (seed === null) return null;
     try {
-      return generateDungeonRoom(seed);
+      return mode === "shuttle"
+        ? generateShuttleRoom(seed)
+        : mode === "handoff"
+        ? generateHandoffRoom(seed)
+        : generateDungeonRoom(seed);
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) };
     }
-  }, [seed]);
+  }, [seed, mode]);
   const room = generated && !("error" in generated) ? generated : null;
 
   const parsed = useMemo(() => (room ? parsePuzzleRoom(room.spec) : null), [room]);
@@ -131,7 +147,7 @@ function TestPuzzleRoomInner() {
 
   useEffect(() => {
     setPlayStep(null);
-  }, [seed, resetCount]);
+  }, [seed, resetCount, mode]);
 
   const shownState = playStep !== null && playback ? playback[playStep] : state;
 
@@ -150,15 +166,79 @@ function TestPuzzleRoomInner() {
   return (
     <div className="min-h-screen flex flex-col items-center p-4 text-white bg-black/90 gap-4">
       <div className="text-center bg-black/70 rounded-lg p-3 w-full max-w-3xl">
-        <h1 className="text-xl font-bold">Generated Dungeon Puzzles</h1>
+        <h1 className="text-xl font-bold">Generated Puzzles</h1>
         <p className="text-xs text-gray-300 mt-1">
-          A <b>new dungeon on every refresh</b> — a normal layout of rooms and corridors, with puzzle
-          blockades fitted onto it and checked solvable before you see it. Walk onto a{" "}
-          <b>switch</b> to drop the barred door it controls; fetch the <b>key</b>, then reach the{" "}
-          <b>exit</b>. The seed reproduces a dungeon exactly — note it if one is worth talking about.
+          {mode === "shuttle" ? (
+            <>
+              <b>Shuttle (reflex-solvable baseline):</b> ONE switch drives the door to the{" "}
+              <b>key</b> and the door to the <b>exit</b> in opposite polarity; the exit needs the
+              key. It <i>looks</i> like a puzzle — but with a single switch, &quot;press it whenever a
+              door blocks you&quot; is a complete mindless strategy, so a reflex player clears it
+              without thinking. Kept as the <b>baseline</b> the certified templates improve on — flip
+              to the Colour Airlock to feel the difference.
+            </>
+          ) : mode === "handoff" ? (
+            <>
+              <b>Colour Airlock:</b> two <b>colour switches</b> on one lock drive three doors —{" "}
+              <i>matched</i> (same colour) opens the <b>exit</b> and the inner <b>key</b> room but
+              seals the middle; <i>mismatched</i> opens the middle with the far switch. It starts
+              matched, so the exit is already open and you arrive <i>empty-handed</i>. You must{" "}
+              <b>break the match</b> to reach the key, hand off across the middle room, then re-match
+              from the right side to leave — a four-press, non-monotone plan the solver certifies no
+              mindless line can shortcut.
+            </>
+          ) : (
+            <>
+              <b>Layout-first (the old dungeon):</b> a normal layout of rooms and corridors with
+              puzzle blockades fitted onto its chokepoints. Solvable by construction — but a greedy
+              walk (flip the nearest switch, step through) tends to clear it without thought.
+            </>
+          )}
         </p>
 
         <div className="flex flex-wrap gap-2 justify-center items-center mt-3">
+          <div className="flex rounded overflow-hidden border border-gray-600 text-sm">
+            <button
+              onClick={() => {
+                if (mode !== "shuttle") {
+                  setOutcome("none");
+                  setMode("shuttle");
+                }
+              }}
+              className={`px-3 py-1 ${
+                mode === "shuttle" ? "bg-sky-600" : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              Shuttle (baseline)
+            </button>
+            <button
+              onClick={() => {
+                if (mode !== "handoff") {
+                  setOutcome("none");
+                  setMode("handoff");
+                }
+              }}
+              className={`px-3 py-1 font-bold ${
+                mode === "handoff" ? "bg-sky-600" : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              Colour Airlock
+            </button>
+            <button
+              onClick={() => {
+                if (mode !== "dungeon") {
+                  setOutcome("none");
+                  setMode("dungeon");
+                }
+              }}
+              className={`px-3 py-1 ${
+                mode === "dungeon" ? "bg-sky-600" : "bg-gray-800 hover:bg-gray-700"
+              }`}
+            >
+              Old dungeon
+            </button>
+          </div>
+          <span className="w-px bg-gray-600 mx-1 self-stretch" />
           <button
             onClick={reroll}
             className="px-3 py-1 rounded text-sm bg-emerald-700 hover:bg-emerald-600 font-bold"
@@ -208,8 +288,12 @@ function TestPuzzleRoomInner() {
           <div className="font-bold text-amber-300">
             {room.spec.name}{" "}
             <span className="text-xs font-normal text-gray-400">
-              seed {room.seed} · {room.meta.rooms} rooms · {room.meta.gates} gates
-              {room.meta.keyDetour ? " · key off the path" : ""}
+              seed {room.seed} · {room.meta.rooms} rooms ·{" "}
+              {"caPresses" in room.meta
+                ? `Ca ×${room.meta.caPresses} / Cb ×${room.meta.cbPresses} · break-and-restore`
+                : "switchThrows" in room.meta
+                ? `switch thrown ${room.meta.switchThrows}× on the intended line`
+                : `${room.meta.gates} gates${room.meta.keyDetour ? " · key off the path" : ""}`}
             </span>
           </div>
           <div className="text-gray-300 mt-1">{room.spec.asks}</div>

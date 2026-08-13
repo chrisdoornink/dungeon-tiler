@@ -65,6 +65,18 @@ export interface SolveOptions {
   maxStates?: number;
   /** Abort a branch once it reaches this many turns. Default 200. */
   maxTurns?: number;
+  /**
+   * Restrict the search so each switch may be ACTUATED at most this many times along any path — a
+   * toggle flipped, or a colour switch turned. Undefined (the default) leaves the search byte-for-
+   * byte as it was: unrestricted, every switch re-usable freely.
+   *
+   * A bounded-actuation solve: it answers "can the room be won touching each switch at most N times",
+   * which quantifies how much re-switching a solution needs. It is NOT on its own a proof that a room
+   * "requires logic" — adversarial review showed a one-switch room where the two forced crossings of
+   * a single switch are pure reflex, so "must actuate twice" does not mean "must think". The mindless
+   * bar lives in verify.ts (the reflex agent); this option is a difficulty/telemetry tool.
+   */
+  maxActuationsPerSwitch?: number;
 }
 
 const MOVES: Direction[] = [
@@ -73,6 +85,10 @@ const MOVES: Direction[] = [
   Direction.LEFT,
   Direction.RIGHT,
 ];
+
+// Shared, never-mutated placeholder for a node's actuation counts when the search is unrestricted —
+// keeps the default path from allocating a per-node array it never reads.
+const EMPTY_COUNTS: number[] = [];
 
 // A stateless constant stands in for combatRng so the search is reproducible. Enemy-free rooms
 // never call it; enemy rooms get deterministic (if degenerate) behaviour, which is enough for the
@@ -253,6 +269,10 @@ interface Node {
   action: Action | null; // the action that produced this state (null at the root)
   parent: Node | null;
   depth: number; // turns taken to reach this state
+  // Per-switch actuation counts, only populated when maxActuationsPerSwitch is set (a shared empty
+  // array otherwise, so the default search allocates nothing extra). Slot order: toggle groups
+  // first, then each colour lock's switches — see actuatedSlot below.
+  counts: number[];
 }
 
 function reconstruct(node: Node): Action[] {
@@ -278,14 +298,42 @@ export function solvePuzzleRoom(
 ): SolveResult {
   const maxStates = opts.maxStates ?? 120_000;
   const maxTurns = opts.maxTurns ?? 200;
+  const cap = opts.maxActuationsPerSwitch;
+  const restricted = cap !== undefined;
 
   const start = cloneState(puzzleRoomToGameState(room));
   if (start.win) {
     return { solvable: true, capped: false, minTurns: 0, solution: [], statesExplored: 1 };
   }
 
-  const visited = new Set<string>([stateKey(start)]);
-  const queue: Node[] = [{ state: start, action: null, parent: null, depth: 0 }];
+  // Switch slots for the restricted search: toggle groups take the low slots, each colour lock's
+  // switches take the next contiguous block. actuatedSlot diffs a transition to find which one (if
+  // any) fired — at most one can, since a turn steps on / throws at a single tile.
+  const nToggles = start.toggleGroups?.length ?? 0;
+  const lockBase: number[] = [];
+  let nSwitches = nToggles;
+  for (const l of start.colorLocks ?? []) {
+    lockBase.push(nSwitches);
+    nSwitches += l.switches.length;
+  }
+  const actuatedSlot = (prev: GameState, next: GameState): number => {
+    const pt = prev.toggleGroups ?? [];
+    const nt = next.toggleGroups ?? [];
+    for (let i = 0; i < nt.length; i++) if (pt[i]?.on !== nt[i].on) return i;
+    const pl = prev.colorLocks ?? [];
+    const nl = next.colorLocks ?? [];
+    for (let l = 0; l < nl.length; l++) {
+      const ps = pl[l]?.states ?? [];
+      const ns = nl[l].states;
+      for (let j = 0; j < ns.length; j++) if (ps[j] !== ns[j]) return lockBase[l] + j;
+    }
+    return -1;
+  };
+  const rootCounts = restricted ? new Array<number>(nSwitches).fill(0) : EMPTY_COUNTS;
+
+  const rootKey = restricted ? stateKey(start) + "|a" + rootCounts.join(",") : stateKey(start);
+  const visited = new Set<string>([rootKey]);
+  const queue: Node[] = [{ state: start, action: null, parent: null, depth: 0, counts: rootCounts }];
   let head = 0;
   let explored = 0;
   let hitTurnCap = false;
@@ -312,6 +360,21 @@ export function solvePuzzleRoom(
     for (const action of candidateActions(node.state)) {
       const next = applyAction(mustClone ? cloneState(node.state) : node.state, action);
       if ((next.heroHealth ?? 0) <= 0) continue; // died — a dead branch, never a solution
+
+      // Restricted search: charge the switch this transition actuated, and refuse any that would
+      // push a switch past its cap — BEFORE the win check, so a win bought with an illegal
+      // re-actuation does not count. The counts ride in the visited key: the same board reached with
+      // fewer actuations spent has strictly more future freedom, so merging them would be unsound.
+      let childCounts = node.counts;
+      if (restricted) {
+        const slot = actuatedSlot(node.state, next);
+        if (slot >= 0) {
+          if (node.counts[slot] >= (cap as number)) continue; // would exceed the per-switch cap
+          childCounts = node.counts.slice();
+          childCounts[slot] += 1;
+        }
+      }
+
       if (next.win) {
         return {
           solvable: true,
@@ -321,10 +384,10 @@ export function solvePuzzleRoom(
           statesExplored: explored,
         };
       }
-      const key = stateKey(next);
+      const key = restricted ? stateKey(next) + "|a" + childCounts.join(",") : stateKey(next);
       if (visited.has(key)) continue;
       visited.add(key);
-      queue.push({ state: next, action, parent: node, depth: node.depth + 1 });
+      queue.push({ state: next, action, parent: node, depth: node.depth + 1, counts: childCounts });
     }
   }
 
