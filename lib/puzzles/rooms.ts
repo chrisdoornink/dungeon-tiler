@@ -101,8 +101,10 @@ export interface PuzzleRoomSpec {
   colorLocks?: Array<{
     switches: Array<[number, number]>;
     colors?: number;
-    rule: "allEqual" | "match";
+    rule: "allEqual" | "match" | "threshold";
     target?: number[];
+    /** For `rule === "threshold"`: satisfied at >= k switches on target (OR = 1 .. AND = n). Default 1. */
+    k?: number;
     initial?: number[];
     platforms?: string[];
     gates?: Array<[number, number]>;
@@ -479,16 +481,24 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
         throw new Error(`${spec.name}: colour lock ${i} initial colour ${s} out of range 0..${colors - 1}`);
       }
     }
-    if (cl.rule === "match") {
+    if (cl.rule === "match" || cl.rule === "threshold") {
       if (!cl.target || cl.target.length !== cl.switches.length) {
         throw new Error(
-          `${spec.name}: colour lock ${i} rule "match" needs a target of ${cl.switches.length} colours`
+          `${spec.name}: colour lock ${i} rule "${cl.rule}" needs a target of ${cl.switches.length} colours`
         );
       }
       for (const t of cl.target) {
         if (t < 0 || t >= colors) {
           throw new Error(`${spec.name}: colour lock ${i} target colour ${t} out of range 0..${colors - 1}`);
         }
+      }
+    }
+    if (cl.rule === "threshold") {
+      const k = cl.k ?? 1;
+      if (k < 1 || k > cl.switches.length) {
+        throw new Error(
+          `${spec.name}: colour lock ${i} threshold k ${k} out of range 1..${cl.switches.length}`
+        );
       }
     }
     for (const id of cl.platforms ?? []) {
@@ -512,6 +522,7 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
       states,
       rule: cl.rule,
       target: cl.target,
+      k: cl.k,
       platforms: cl.platforms ?? [],
       gates: cl.gates ?? [],
       invertedGates: cl.invertedGates ?? [],

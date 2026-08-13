@@ -112,9 +112,15 @@ export interface ColorLock {
   colors: number;
   /** Current colour per switch, parallel to `switches`. */
   states: number[];
-  rule: "allEqual" | "match";
-  /** Required colour per switch when `rule === "match"`. */
+  rule: "allEqual" | "match" | "threshold";
+  /** Required colour per switch for `rule === "match"` (all must hit it) or `"threshold"` (count that do). */
   target?: number[];
+  /**
+   * For `rule === "threshold"`: satisfied when at least `k` switches equal their target colour. This
+   * is the OR / k-of-n gate — k=1 is OR, k=switches.length is AND (same as `match`), values between
+   * are a genuine "any k of n". Defaults to 1.
+   */
+  k?: number;
   /** Platforms that run while the lock is satisfied. */
   platforms: string[];
   /** Spike beds that retract while satisfied and rise while not. */

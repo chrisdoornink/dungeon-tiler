@@ -370,7 +370,14 @@ export function colorLockSatisfied(lock: ColorLock): boolean {
   if (lock.states.length === 0) return false;
   if (lock.rule === "allEqual") return lock.states.every((s) => s === lock.states[0]);
   const target = lock.target ?? [];
-  return lock.states.every((s, i) => s === target[i]);
+  if (lock.rule === "threshold") {
+    // OR / k-of-n: satisfied once at least k switches sit on their target colour.
+    const k = lock.k ?? 1;
+    let hit = 0;
+    for (let i = 0; i < lock.states.length; i++) if (lock.states[i] === target[i]) hit++;
+    return hit >= k;
+  }
+  return lock.states.every((s, i) => s === target[i]); // match — every switch on target (AND)
 }
 
 /** True if a colour switch sits at (y,x) — the dispatch signal between turnColorSwitch and throwToggle. */
