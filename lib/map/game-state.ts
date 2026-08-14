@@ -619,7 +619,12 @@ export function performThrowRock(gameState: GameState): GameState {
   const bossesBefore = snapshotBosses(gameState);
   const result = performThrowRockCore(gameState);
   resolveBossDefeat(result, bossesBefore);
-  return result;
+  // A thrown rock can smash a [POT, WISP] pot (or kill an enemy that drops a wisp) —
+  // both are wisp release sources. advanceWispTurn is otherwise wired only into
+  // movePlayer, so without this a rock-smashed wisp pot silently releases nothing.
+  // No hero step this turn, so its drift/pity legs are inert; only the smashed-pot
+  // and enemy-death release detection fires. Dormant (no wispConfig) => no-op.
+  return advanceWispTurn(gameState, result);
 }
 
 /**

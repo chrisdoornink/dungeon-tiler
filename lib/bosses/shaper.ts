@@ -50,8 +50,8 @@ const SHAPER_IDLE_MAX_TILES = 3;
 // into torch-snuffing DEEP water that slows your approach), then LAUNCH FIRE
 // (telegraphed — it rockets up, glowing target tiles appear), then next turn the
 // FIRE RAINS DOWN as lethal lava on those tiles. Fire actively avoids water.
-const SHAPER_FIRE_MIN_TILES = 4;
-const SHAPER_FIRE_MAX_TILES = 6;
+const SHAPER_FIRE_MIN_TILES = 3;
+const SHAPER_FIRE_MAX_TILES = 4;
 const SHAPER_FIRE_WATER_HIT_CHANCE = 0.15; // fire mostly avoids water tiles
 
 // Per-encounter STRATEGY, rolled once when it first spots you (a tendency, not a
@@ -63,6 +63,16 @@ export type ShaperStrategy = "drowning" | "wall";
 const SHAPER_WALL_STRATEGY_CHANCE = 0.45; // else drowning
 const SHAPER_WALL_LAVA_MIX = 0.3; // wall strategy: chance to lob fire instead of a wall
 const SHAPER_DROWNING_PILLAR_CHANCE = 0.15; // drowning strategy: chance of a lone pillar
+// Wall strategy: minimum turns between fire lobs. Without this, a losing wall race
+// (every blocked build fell straight through to a fire) blanketed the whole room in
+// lava — during the cooldown a blocked build paces/holds instead of adding a patch.
+const SHAPER_WALL_FIRE_COOLDOWN = 2;
+// Out of line-of-sight the boss can't rain fire on your live tile every turn. It
+// lobs the occasional splatter toward where it LAST saw you, this many turns apart.
+const SHAPER_SEARCH_FIRE_COOLDOWN = 3;
+// How many of its OWN walls a fire rain-down melts to charred floor, opening the maze
+// it built. Only its own tracked walls, never the arena structure or the map border.
+const SHAPER_FIRE_WALL_MELT = 1;
 
 export type ShaperElement = "lava" | "water";
 export type ShaperShape = "path" | "splatter";
@@ -100,6 +110,14 @@ interface ShaperMemory {
   // A wall it raised this turn (for the stone-rise flash + shake).
   lastWall?: { nonce: number; tiles: Array<[number, number]> } | null;
   lastAttack?: { nonce: number; element: ShaperElement; tiles: Array<[number, number]> } | null;
+  // Last tile it actually SAW the hero on (LOS). An out-of-sight boss aims its
+  // occasional searching fire here instead of tracking the live hero through walls.
+  lastSeen?: { y: number; x: number };
+  // Turns remaining before it may lob fire again (wall strategy + searching).
+  fireCooldown?: number;
+  // Every wall it has raised and not yet melted — so its own lava can bring them down
+  // (meltOwnWallsNearFire) without ever touching the arena's structural walls.
+  builtWalls?: Array<[number, number]>;
 }
 
 const FLOOR = 0;
@@ -511,6 +529,7 @@ function tryBuildWall(
     grid[y][x] = WALL;
     subs[y][x] = [];
     mem.lastWall = { nonce: mem.turn ?? 0, tiles: [[y, x]] };
+    (mem.builtWalls = mem.builtWalls ?? []).push([y, x]);
     return true;
   }
   return false;
@@ -530,6 +549,63 @@ function launchFire(
   const tiles = fireTargets(boss, aim, ctx.grid, subs, rng);
   mem.pendingFire = tiles.length > 0 ? { tiles } : null;
   if (tiles.length > 0) mem.fireLaunchNonce = mem.turn;
+}
+
+// Alerted but currently blind: lob an occasional fire toward the LAST tile it saw the
+// hero on (never the live hero — it can't see them), spaced by a cooldown, and pace
+// the chamber the rest of the time. This is the "don't rain lava on me through a wall"
+// behaviour that makes breaking line-of-sight actually mean something.
+function searchOutOfSight(
+  ctx: BehaviorContext,
+  mem: ShaperMemory,
+  boss: { y: number; x: number },
+  hero: { y: number; x: number },
+  heroNext: { y: number; x: number },
+  rng: () => number
+): void {
+  if ((mem.fireCooldown ?? 0) <= 0 && mem.lastSeen) {
+    launchFire(ctx, mem, boss, mem.lastSeen, rng);
+    mem.fireCooldown = SHAPER_SEARCH_FIRE_COOLDOWN;
+    return;
+  }
+  const dirs: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const start = Math.floor(rng() * 4);
+  tryStep(ctx, mem, hero, heroNext, [0, 1, 2, 3].map((i) => dirs[(start + i) % 4]));
+}
+
+// A fire rain-down melts up to SHAPER_FIRE_WALL_MELT of the Shaper's OWN walls that
+// border the blast into charred floor — its lava opens the maze it built. Only its
+// tracked walls (never the arena's structural walls) and never the map border, so it
+// can neither breach the room nor seal itself in.
+function meltOwnWallsNearFire(
+  ctx: BehaviorContext,
+  mem: ShaperMemory,
+  fireTiles: Array<[number, number]>
+): void {
+  const subs = ctx.subtypes;
+  if (!subs || !mem.builtWalls || mem.builtWalls.length === 0) return;
+  const near = new Set<string>();
+  for (const [fy, fx] of fireTiles) {
+    for (const [dy, dx] of [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+      near.add(`${fy + dy},${fx + dx}`);
+    }
+  }
+  const melts: ShaperMutation[] = [];
+  const kept: Array<[number, number]> = [];
+  for (const [wy, wx] of mem.builtWalls) {
+    if (ctx.grid[wy]?.[wx] !== WALL) continue; // already gone
+    if (
+      melts.length < SHAPER_FIRE_WALL_MELT &&
+      near.has(`${wy},${wx}`) &&
+      !isBorder(ctx.grid, wy, wx)
+    ) {
+      melts.push({ y: wy, x: wx, sub: TileSubtype.SINGED });
+    } else {
+      kept.push([wy, wx]);
+    }
+  }
+  mem.builtWalls = kept;
+  if (melts.length > 0) executeShaperAttack(melts, ctx.grid, subs);
 }
 
 // A tile the boss may stand on while pacing/retreating: floor/flowers, safe
@@ -630,37 +706,67 @@ export function shaperUpdate(ctx: BehaviorContext): number {
   ctx.enemy.facing =
     Math.abs(dy) >= Math.abs(dx) ? (dy < 0 ? "UP" : "DOWN") : dx < 0 ? "LEFT" : "RIGHT";
 
-  // Latch the alert state once it gets line-of-sight within vision range, and
-  // roll a per-encounter strategy (unless one was pre-set).
-  if (!mem.alerted) {
-    const inRange = Math.abs(dy) + Math.abs(dx) <= SHAPER_VISION;
-    if (inRange && canSee(ctx.grid, [boss.y, boss.x], [hero.y, hero.x])) {
-      mem.alerted = true;
-      if (mem.strategy == null) {
-        mem.strategy = rng() < SHAPER_WALL_STRATEGY_CHANCE ? "wall" : "drowning";
-      }
+  // Current line-of-sight to the hero. It LATCHES `alerted` on the first sighting (so
+  // the boss never forgets you), but whether it actively presses the attack is
+  // re-decided every turn from `seesNow` — a hero who breaks sight is no longer rained
+  // on directly, which is what stops lava tracking you through walls.
+  const inVision = Math.abs(dy) + Math.abs(dx) <= SHAPER_VISION;
+  const seesNow = inVision && canSee(ctx.grid, [boss.y, boss.x], [hero.y, hero.x]);
+  if (!mem.alerted && seesNow) {
+    mem.alerted = true;
+    if (mem.strategy == null) {
+      mem.strategy = rng() < SHAPER_WALL_STRATEGY_CHANCE ? "wall" : "drowning";
     }
   }
+  if (seesNow) mem.lastSeen = { y: hero.y, x: hero.x };
 
   if (mem.alerted) {
-    // A fire launched last turn RAINS DOWN now (before the hero's move), turning
-    // the telegraphed tiles to lethal lava. The player had this turn's warning.
+    // A fire launched last turn RAINS DOWN now (before the hero's move), turning the
+    // telegraphed tiles to lethal lava. The player had this turn's warning. The same
+    // rain-down eats into the walls the Shaper itself built (meltOwnWallsNearFire), so
+    // a wall-mode fight can't be fenced into a permanent lava box.
     if (mem.pendingFire) {
-      const muts = floodTiles("lava", mem.pendingFire.tiles, ctx.grid, subs);
+      const fireTiles = mem.pendingFire.tiles;
+      const muts = floodTiles("lava", fireTiles, ctx.grid, subs);
       if (muts.length > 0) {
         executeShaperAttack(muts, ctx.grid, subs);
         mem.lastAttack = { nonce: (mem.turn ?? 0) * 100 + 9, element: "lava", tiles: muts.map((m) => [m.y, m.x]) };
       }
+      meltOwnWallsNearFire(ctx, mem, fireTiles);
       mem.pendingFire = null;
       return 0;
     }
 
+    // Fire is rate-limited now; tick its cooldown down each alerted turn.
+    if ((mem.fireCooldown ?? 0) > 0) mem.fireCooldown = (mem.fireCooldown ?? 0) - 1;
+
+    // OUT OF SIGHT: it can't see you, so it does NOT get to rain fire on your live
+    // tile. It lobs the occasional splatter toward where it LAST saw you (stale +
+    // jittered = spread out, never tracking) and paces the rest of the time.
+    if (!seesNow) {
+      searchOutOfSight(ctx, mem, boss, hero, heroNext, rng);
+      return 0;
+    }
+
     if (mem.strategy === "wall") {
-      // WALL: raise a wall to fence you off; if it can't extend one (would seal
-      // you out, or no dry ground) — or on its lava-mix tendency — it lobs fire.
-      const wantsFire = rng() < SHAPER_WALL_LAVA_MIX;
+      // WALL: raise a wall to fence you off; if it can't extend one (would seal you
+      // out, or no dry ground) — or on its lava-mix tendency — it lobs fire, but no
+      // more often than SHAPER_WALL_FIRE_COOLDOWN so it can't blanket the room.
+      const canFire = (mem.fireCooldown ?? 0) <= 0;
+      const wantsFire = canFire && rng() < SHAPER_WALL_LAVA_MIX;
       const built = wantsFire ? false : tryBuildWall(ctx, mem, hero, heroNext, boss);
-      if (!built) launchFire(ctx, mem, boss, heroNext, rng);
+      if (!built) {
+        if (canFire) {
+          launchFire(ctx, mem, boss, heroNext, rng);
+          mem.fireCooldown = SHAPER_WALL_FIRE_COOLDOWN;
+        } else {
+          // Can't build here and still cooling from the last fire — pace rather than
+          // lay down yet another lava patch.
+          const dirs: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+          const start = Math.floor(rng() * 4);
+          tryStep(ctx, mem, hero, heroNext, [0, 1, 2, 3].map((i) => dirs[(start + i) % 4]));
+        }
+      }
       return 0;
     }
 

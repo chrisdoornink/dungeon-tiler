@@ -880,6 +880,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.SNAKE &&
+        // WISP rides on a pot as [POT, WISP] exactly like [POT, SNAKE] (see
+        // stampWispPots). It is a hidden payload the smash consumes, never drawn —
+        // without this it falls through to the generic renderer and paints a gray
+        // "?" glyph on the pot tile.
+        subtype !== TileSubtype.WISP &&
         subtype !== TileSubtype.WALL_TORCH &&
         subtype !== TileSubtype.TOWN_SIGN &&
         subtype !== TileSubtype.PORTAL &&
