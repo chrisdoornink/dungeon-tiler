@@ -386,6 +386,47 @@ describe("Shaper WALL strategy", () => {
   });
 });
 
+describe("Shaper LOS gate + self-melting walls", () => {
+  test("once it loses sight of you it stops raining fire on your live tile", () => {
+    const { state, shaper } = openArena(13, [6, 6], [2, 6]);
+    // A full wall across row 4 permanently breaks line-of-sight between the boss
+    // (rows 1-3) and the hero (rows 6-7) — it can't pace around it to re-acquire you.
+    for (let x = 1; x <= 11; x++) state.mapData.tiles[4][x] = 1;
+    const mem = shaper.behaviorMemory as Record<string, unknown>;
+    mem.alerted = true; // it already spotted you earlier this fight...
+    mem.strategy = "wall";
+    state.combatRng = () => 0.5;
+    // Oscillate below the wall for several turns. It can't see the hero and has no
+    // last-seen tile, so it must never telegraph fire or lay down any lava.
+    let s = state;
+    for (let t = 0; t < 6; t++) {
+      s = movePlayer(s, t % 2 === 0 ? Direction.DOWN : Direction.UP);
+      expect(
+        shaperPendingFire(s.enemies![0].behaviorMemory as Record<string, unknown>)
+      ).toBeNull();
+    }
+    expect(countSubtype(s, TileSubtype.LAVA)).toBe(0);
+  });
+
+  test("a fire rain-down melts one of its OWN adjacent walls into charred floor", () => {
+    const { state, shaper } = openArena(13, [6, 6], [2, 6]);
+    const mem = shaper.behaviorMemory as Record<string, unknown>;
+    mem.alerted = true;
+    mem.strategy = "wall";
+    // It built a wall at (2,7); a fire is telegraphed on the floor tile beside it.
+    state.mapData.tiles[2][7] = 1;
+    mem.builtWalls = [[2, 7]];
+    mem.pendingFire = { tiles: [[3, 7]] };
+    state.combatRng = () => 0.5;
+    const s = movePlayer(state, Direction.DOWN); // the fire rains down this turn
+    // Its own wall came down to charred floor...
+    expect(s.mapData.tiles[2][7]).toBe(0);
+    expect(s.mapData.subtypes[2][7]).toContain(TileSubtype.SINGED);
+    // ...and the lava landed where it was telegraphed.
+    expect(s.mapData.subtypes[3][7]).toContain(TileSubtype.LAVA);
+  });
+});
+
 function forceStrat(s: GameState, strat: "drowning" | "wall"): void {
   (s.enemies![0].behaviorMemory as Record<string, unknown>).strategy = strat;
 }

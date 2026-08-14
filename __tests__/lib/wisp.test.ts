@@ -1,6 +1,7 @@
 import { TileSubtype, Direction } from "../../lib/map";
 import {
   movePlayer,
+  performThrowRock,
   initializeGameStateForMultiTier,
 } from "../../lib/map/game-state";
 import type { GameState } from "../../lib/map/game-state";
@@ -211,6 +212,22 @@ describe("spawning", () => {
     const after = movePlayer(state, Direction.RIGHT); // smash by walking in
     expect(after.wisps).toHaveLength(1);
     expect(after.mapData.subtypes[5][2]).not.toContain(TileSubtype.WISP);
+  });
+
+  it("a stamped wisp pot smashed by a THROWN ROCK also releases its wisp", () => {
+    // Regression: advanceWispTurn was wired only into movePlayer, so a rock-smashed
+    // wisp pot silently released nothing. The hero (5,1) faces RIGHT; the rock flies
+    // east and shatters the pot at (5,3).
+    const state = baseState({
+      wispConfig: {},
+      rockCount: 1,
+      combatRng: () => 0.5,
+    });
+    state.mapData.subtypes[5][3] = [TileSubtype.POT, TileSubtype.WISP];
+    const after = performThrowRock(state);
+    expect(after.wisps).toHaveLength(1);
+    expect(after.mapData.subtypes[5][3]).not.toContain(TileSubtype.WISP);
+    expect(after.mapData.subtypes[5][3]).not.toContain(TileSubtype.POT);
   });
 
   it("falling to exactly 1 heart draws a pity wisp out at the edge of view", () => {
