@@ -358,6 +358,7 @@ export function throwToggle(
     (g) => g.switchAt[0] === y && g.switchAt[1] === x
   );
   if (!group) return { crushed: [] };
+  if (group.latching && group.on) return { crushed: [] }; // a one-shot lever, already committed
   const on = !group.on;
   state.toggleGroups = (state.toggleGroups ?? []).map((g) =>
     g === group ? { ...g, on } : g

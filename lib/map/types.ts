@@ -89,6 +89,13 @@ export interface ToggleGroup {
   /** Ids of platforms this switch starts and stops. Running while `on`. */
   platforms: string[];
   on: boolean;
+  /**
+   * A ONE-SHOT lever: once thrown ON it can never be thrown back (throwToggle no-ops it). Its whole
+   * point is IRREVERSIBILITY — a re-armable toggle can always be undone, so nothing you do with it
+   * requires foresight; a latching lever is a permanent commitment, so a wrong throw can strand you
+   * and the room demands you plan before you pull it. Authored OFF (a lever authored ON is frozen).
+   */
+  latching?: boolean;
 }
 
 /**

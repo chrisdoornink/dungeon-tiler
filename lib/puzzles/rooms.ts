@@ -61,6 +61,8 @@ export interface PuzzleRoomSpec {
     platforms?: string[];
     /** Starting state. Default false (off). */
     on?: boolean;
+    /** A ONE-SHOT lever: once thrown on, it cannot be thrown back. Irreversible — see ToggleGroup. */
+    latching?: boolean;
   }>;
   /** Platform ids that start PARKED. Everything else runs from turn one. */
   parked?: string[];
@@ -430,6 +432,7 @@ export function parsePuzzleRoom(spec: PuzzleRoomSpec): ParsedPuzzleRoom {
       invertedGates: t.invertedGates ?? [],
       platforms: t.platforms ?? [],
       on: t.on ?? false,
+      latching: t.latching ?? false,
     };
   });
 
