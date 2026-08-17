@@ -60,6 +60,7 @@ import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./p
 import { recordRewindStep, type RewindSnapshot } from "./rewind";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
+import { stampColorSwitchLock } from "./color_switch_puzzle";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import {
   advanceMachinery,
@@ -86,6 +87,14 @@ import {
  * only to decorrelate this roll from the floor's own sequence (see the roll site).
  */
 const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
+/**
+ * Salt + roll rate for the floor-2 colour-switch puzzle's independent RNG stream. Same discipline as
+ * BOSS_KIND_SEED_SALT: a separate salted stream so placing the puzzle consumes NOTHING from the
+ * floor's own sequence, leaving enemy/rune/snake placement byte-identical and /stats reconstruction
+ * of past days untouched.
+ */
+const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
+const COLOR_PUZZLE_CHANCE = 0.4; // ~40% of floor-2 days carry the puzzle
 import {
   rollBossEntranceKind,
   rollDecoySealCount,
@@ -2803,6 +2812,24 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
   );
 
+  // Level-scale colour-switch puzzle: floor 2 only, ~40% of days. Rolled and placed from a SEPARATE
+  // salted stream (like dailyBossKind above) and stamped LAST — after every rng-consuming, map-reading
+  // step — so it consumes nothing from `rng` and leaves the shared sequence byte-identical. /stats
+  // re-runs this generator to reconstruct past days; because the shared stream is untouched, its
+  // answers (boss kind, L2 chests) are unchanged, so NO date-gate is needed. The stamper only ever
+  // carves dead-end wall pockets + drops switches on empty floor, so it can never sever the floor's
+  // path to the key/exit; it returns null (stamps nothing) when there is no safe spot.
+  let colorLocks: ColorLock[] | undefined;
+  if (nextFloor === 2 && playerPos) {
+    const puzRng = mulberry32Fn(dailySeed ^ COLOR_PUZZLE_SEED_SALT);
+    if (puzRng.next() < COLOR_PUZZLE_CHANCE) {
+      const avoid: Array<[number, number]> = (snakesAdded ?? []).map((e) => [e.y, e.x]);
+      avoid.push([playerPos[0], playerPos[1]]);
+      colorLocks =
+        stampColorSwitchLock(withRunes, puzRng, { switches: 4, colors: 4, avoid }) ?? undefined;
+    }
+  }
+
   // Create new game state preserving hero stats and inventory
   return {
     ...currentState,
@@ -2810,6 +2837,10 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     maxFloors,
     mapData: withRunes,
     enemies: snakesAdded,
+    // Fresh per floor: only floor 2 may carry it, and it must RESET on every other floor (the spread
+    // above would otherwise inherit the previous floor's lock, which points at tiles that don't exist
+    // on this map).
+    colorLocks,
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
