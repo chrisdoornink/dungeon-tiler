@@ -307,6 +307,96 @@ function growLavaPool(
 }
 
 /**
+ * After the pool is grown, guarantee a MINIMUM lava buffer around the entrance:
+ * every reachable dry tile must be at least `minBuffer` lava tiles away from the
+ * entrance (measured 4-directionally, the way rocks cool a path). The organic pool
+ * growth alone can leave 1-2 tile-thick sides that turn the intended 4-6 rock
+ * crossing into a 1-2 rock shortcut. Thin spots are fixed by converting the
+ * offending dry tiles to lava (connectivity-checked); returns false if any thin
+ * spot can't be thickened, so the caller rejects this placement.
+ */
+function enforceLavaBuffer(
+  trial: MapData,
+  ey: number,
+  ex: number,
+  before: Set<string>,
+  carved: Set<string>,
+  keepDry: Set<string>,
+  hy: number,
+  hx: number,
+  minBuffer: number
+): boolean {
+  const H = trial.tiles.length;
+  const W = trial.tiles[0].length;
+  const dirs4: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  const isLava = (y: number, x: number): boolean =>
+    (trial.subtypes[y]?.[x] ?? []).includes(TileSubtype.LAVA);
+  // Each pass may push the lava boundary one ring outward, so a few passes settle it.
+  for (let pass = 0; pass < minBuffer + 2; pass++) {
+    // BFS through lava from the entrance: dist = rocks needed to reach that tile.
+    const dist = new Map<string, number>();
+    let frontier: Array<[number, number]> = [];
+    for (const [dy, dx] of dirs4) {
+      const ny = ey + dy;
+      const nx = ex + dx;
+      if (isLava(ny, nx)) {
+        dist.set(`${ny},${nx}`, 1);
+        frontier.push([ny, nx]);
+      }
+    }
+    while (frontier.length) {
+      const next: Array<[number, number]> = [];
+      for (const [fy, fx] of frontier) {
+        const d = dist.get(`${fy},${fx}`)!;
+        for (const [dy, dx] of dirs4) {
+          const ny = fy + dy;
+          const nx = fx + dx;
+          const key = `${ny},${nx}`;
+          if (!isLava(ny, nx) || dist.has(key)) continue;
+          dist.set(key, d + 1);
+          next.push([ny, nx]);
+        }
+      }
+      frontier = next;
+    }
+    // Dry reachable tiles touching lava closer than the buffer = shortcut spots.
+    const reach = floodReachable(trial, hy, hx);
+    const thin = new Set<string>();
+    for (const [key, d] of dist) {
+      if (d >= minBuffer) continue;
+      const [ly, lx] = key.split(",").map(Number);
+      for (const [dy, dx] of dirs4) {
+        const ny = ly + dy;
+        const nx = lx + dx;
+        const nkey = `${ny},${nx}`;
+        if (reach.has(nkey) && !isLava(ny, nx)) thin.add(nkey);
+      }
+    }
+    if (thin.size === 0) return true;
+    for (const key of thin) {
+      const [y, x] = key.split(",").map(Number);
+      if (y < 1 || x < 1 || y >= H - 1 || x >= W - 1) return false;
+      if (keepDry.has(key)) return false;
+      const t = trial.tiles[y][x];
+      if (t !== WALL && t !== FLOOR) return false;
+      const s = trial.subtypes[y][x] ?? [];
+      if (s.some((sv) => PROTECTED_SUBS.includes(sv) || ELEMENTAL_SUBS.includes(sv))) {
+        return false;
+      }
+      trial.tiles[y][x] = FLOOR;
+      trial.subtypes[y][x] = [TileSubtype.LAVA];
+      carved.add(key);
+      const after = floodReachable(trial, hy, hx);
+      for (const k of before) {
+        if (carved.has(k)) continue;
+        if (!after.has(k)) return false; // walled something off — reject placement
+      }
+    }
+  }
+  return false;
+}
+
+/**
  * Carve a STRAIGHT, 1-wide lava channel as a dead-end spur ending in the boss
  * entrance, so the hero crosses it in a single straight line (cool the tile ahead,
  * step onto it, repeat — never turning, which over lava = instant death). Only
@@ -387,6 +477,13 @@ function stampStraightLavaSpur(map: MapData, channelLen: number): boolean {
         `${ty - 2 * dy},${tx - 2 * dx}`,
       ]);
       growLavaPool(trial, channel, before, carved, keepDry, hy, hx);
+      // The grown pool can still leave 1-2 tile-thick sides near the entrance — a
+      // cheap shortcut past the intended 4-6 rock crossing. Guarantee a 3-4 tile
+      // lava buffer on every accessible side, or reject this placement.
+      const minBuffer = 3 + Math.floor(Math.random() * 2);
+      if (!enforceLavaBuffer(trial, ey, ex, before, carved, keepDry, hy, hx, minBuffer)) {
+        continue;
+      }
       map.tiles = trial.tiles;
       map.subtypes = trial.subtypes;
       return true;
