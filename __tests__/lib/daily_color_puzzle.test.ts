@@ -96,10 +96,11 @@ describe("daily floor-2 colour puzzle", () => {
       // floor without solving the puzzle (mandatory).
       expect(openNow.has(`${exit[0]},${exit[1]}`)).toBe(true);
       expect(openNow.has(`${key[0]},${key[1]}`)).toBe(false);
-      // Opening the gate (satisfy the lock) makes the key reachable, not before.
-      const gate = lock.gates[0];
+      // Opening the whole gate run (satisfy the lock) makes the key reachable, not before.
+      expect(lock.gates.length).toBeGreaterThanOrEqual(1);
+      expect(lock.gates.length).toBeLessThanOrEqual(3);
       const open = JSON.parse(JSON.stringify(map)) as MapData;
-      open.subtypes[gate[0]][gate[1]] = [TileSubtype.SPIKE_HOLES];
+      for (const [gy, gx] of lock.gates) open.subtypes[gy][gx] = [TileSubtype.SPIKE_HOLES];
       expect(reachable(open, hero).has(`${key[0]},${key[1]}`)).toBe(true);
     }
     expect(checked).toBeGreaterThan(0);

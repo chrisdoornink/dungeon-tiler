@@ -77,7 +77,9 @@ describe("stampColorSwitchLock", () => {
       expect(colorLockSatisfied(lock)).toBe(false);
       expect(find(map, TileSubtype.TOGGLE_SWITCH).length).toBe(4);
 
-      const gate = lock.gates[0];
+      // The gate is a run of 1-3 spike tiles.
+      expect(lock.gates.length).toBeGreaterThanOrEqual(1);
+      expect(lock.gates.length).toBeLessThanOrEqual(3);
       // Exactly one exit key, RELOCATED behind the gate (the puzzle is mandatory now).
       const keys = find(map, TileSubtype.EXITKEY);
       expect(keys.length).toBe(1);
@@ -93,9 +95,9 @@ describe("stampColorSwitchLock", () => {
       // ...but the exit tile itself is still reachable (you just need the key first).
       expect(openNow.has(`${exit[0]},${exit[1]}`)).toBe(true);
 
-      // Solvable: making the lock satisfied (all same colour) opens the gate -> key reachable.
+      // Solvable: opening the WHOLE gate run (all-same) makes the key reachable.
       const openGate = JSON.parse(JSON.stringify(map)) as MapData;
-      openGate.subtypes[gate[0]][gate[1]] = [TileSubtype.SPIKE_HOLES];
+      for (const [gy, gx] of lock.gates) openGate.subtypes[gy][gx] = [TileSubtype.SPIKE_HOLES];
       expect(reachable(openGate, hero).has(`${key[0]},${key[1]}`)).toBe(true);
     }
     // It should find a spot on the large majority of floor-2 maps.

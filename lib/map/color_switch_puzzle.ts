@@ -103,50 +103,61 @@ export function stampColorSwitchLock(
       }
   if (!exitKeyAt) return null;
 
-  // 1) THE VAULT. Find a wall `gate` with a reachable-floor approach on one side and a carveable
-  //    dead-end wall `reward` on the opposite side, with the gate's PERPENDICULAR neighbours both
-  //    walls (so the gate is a stub, never a load-bearing corridor tile). Carving F—gate—reward can
-  //    then only ADD a dead-end pocket off already-reachable floor — it can sever nothing.
-  const vaults: Array<{ gate: [number, number]; reward: [number, number] }> = [];
+  // 1) THE VAULT. First a single-tile crossing: approach (reachable floor) -> gate (a carveable wall)
+  //    -> a sealed dead-end pocket (carved from wall) that will hold the exit key. Then the gate is
+  //    WIDENED 1-3 tiles along its run into adjacent wall tiles, each a spike with floor in front and
+  //    wall behind (a shallow niche), so the barrier reads as a 1-3 wide band without needing a rare
+  //    wide pocket. Everything carved is a solid interior wall becoming a dead-end off already-
+  //    reachable floor, so nothing is ever severed and the key stays reachable only across the gate.
+  const inB = (y: number, x: number) => y >= 1 && y < H - 1 && x >= 1 && x < W - 1;
+  const carve = (y: number, x: number) => inB(y, x) && map.tiles[y][x] === WALL; // interior wall we can open
+  const solid = (y: number, x: number) => map.tiles[y]?.[x] !== FLOOR; // wall or off-map
+  type Base = {
+    gate: [number, number];
+    pocket: [number, number];
+    through: [number, number];
+    perp: [number, number];
+  };
+  const bases: Base[] = [];
   for (let y = 1; y < H - 1; y++) {
     for (let x = 1; x < W - 1; x++) {
-      if (map.tiles[y][x] !== WALL) continue;
+      if (!carve(y, x)) continue;
       for (const [dy, dx] of [
+        [-1, 0],
         [1, 0],
+        [0, -1],
         [0, 1],
       ] as Array<[number, number]>) {
-        const side1: [number, number] = [y - dy, x - dx];
-        const side2: [number, number] = [y + dy, x + dx];
-        const [pdy, pdx] = [dx, dy]; // perpendicular axis
-        const perpWall =
-          map.tiles[y - pdy]?.[x - pdx] === WALL && map.tiles[y + pdy]?.[x + pdx] === WALL;
-        if (!perpWall) continue;
-        for (const [F, B] of [
-          [side1, side2],
-          [side2, side1],
-        ] as Array<[[number, number], [number, number]]>) {
-          if (!reach.has(`${F[0]},${F[1]}`)) continue; // approach reachable
-          if (B[0] < 1 || B[0] >= H - 1 || B[1] < 1 || B[1] >= W - 1) continue;
-          if (map.tiles[B[0]][B[1]] !== WALL) continue; // reward tile carveable
-          // reward must be a dead-end: its non-gate neighbours are all walls
-          const deadEnd = (
-            [
-              [B[0] - 1, B[1]],
-              [B[0] + 1, B[1]],
-              [B[0], B[1] - 1],
-              [B[0], B[1] + 1],
-            ] as Array<[number, number]>
-          )
-            .filter(([ny, nx]) => !(ny === y && nx === x))
-            .every(([ny, nx]) => map.tiles[ny]?.[nx] === WALL);
-          if (!deadEnd) continue;
-          vaults.push({ gate: [y, x], reward: B });
-        }
+        const [pdy, pdx] = [dx, dy]; // gate-run direction (perpendicular to through)
+        const ay = y - dy, ax = x - dx; // approach (front)
+        const py = y + dy, px = x + dx; // pocket (back)
+        if (!reach.has(`${ay},${ax}`) || !carve(py, px)) continue; // reachable front + carveable pocket
+        if (!solid(py + dy, px + dx)) continue; // pocket has a back wall
+        if (!solid(py - pdy, px - pdx) || !solid(py + pdy, px + pdx)) continue; // pocket ends walled
+        if (!solid(y - pdy, x - pdx) || !solid(y + pdy, x + pdx)) continue; // gate starts as a clean stub
+        bases.push({ gate: [y, x], pocket: [py, px], through: [dy, dx], perp: [pdy, pdx] });
       }
     }
   }
-  if (vaults.length === 0) return null;
-  const vault = vaults[ri(rng, 0, vaults.length - 1)];
+  if (bases.length === 0) return null;
+  const base = bases[ri(rng, 0, bases.length - 1)];
+  const [tdy, tdx] = base.through;
+  const [ppdy, ppdx] = base.perp;
+  const targetW = ri(rng, 1, 3);
+  const gateTiles: Array<[number, number]> = [base.gate];
+  for (const dir of [1, -1]) {
+    let step = 1;
+    while (gateTiles.length < targetW) {
+      const gy = base.gate[0] + dir * step * ppdy;
+      const gx = base.gate[1] + dir * step * ppdx;
+      // a decorative extension tile: carveable wall, reachable floor in front, wall behind (a niche).
+      if (!carve(gy, gx) || !reach.has(`${gy - tdy},${gx - tdx}`) || !solid(gy + tdy, gx + tdx)) break;
+      gateTiles.push([gy, gx]);
+      step++;
+    }
+    if (gateTiles.length >= targetW) break;
+  }
+  const vault = { gates: gateTiles, pocket: [base.pocket] as Array<[number, number]> };
 
   // 2) THE SWITCHES. Reachable empty floor, off the hero's tile, spread out, avoiding `avoid`.
   const cands: Array<[number, number]> = [];
@@ -168,19 +179,26 @@ export function stampColorSwitchLock(
   }
   if (chosen.length < nSwitches) return null; // couldn't place enough — skip the puzzle this floor
 
-  // 3) STAMP. Carve the vault (gate shut), MOVE the exit key behind it (so the floor now requires
-  //    solving the puzzle to escape), drop the switches.
-  map.tiles[vault.gate[0]][vault.gate[1]] = FLOOR;
-  map.subtypes[vault.gate[0]][vault.gate[1]] = [TileSubtype.SPIKES]; // gate: up while unsatisfied
+  // 3) STAMP. Carve the gate run (all shut) + the dead-end pocket, MOVE the exit key into the pocket
+  //    (so the floor now requires solving the puzzle to escape), drop the switches.
+  for (const [gy, gx] of vault.gates) {
+    map.tiles[gy][gx] = FLOOR;
+    map.subtypes[gy][gx] = [TileSubtype.SPIKES]; // gate up while unsatisfied
+  }
+  for (const [py, px] of vault.pocket) {
+    map.tiles[py][px] = FLOOR;
+    map.subtypes[py][px] = [];
+  }
   map.subtypes[exitKeyAt[0]][exitKeyAt[1]] = (map.subtypes[exitKeyAt[0]][exitKeyAt[1]] ?? []).filter(
     (s) => s !== TileSubtype.EXITKEY
   );
-  map.tiles[vault.reward[0]][vault.reward[1]] = FLOOR;
-  map.subtypes[vault.reward[0]][vault.reward[1]] = [TileSubtype.EXITKEY];
+  const keyTile = vault.pocket[Math.floor(vault.pocket.length / 2)];
+  map.subtypes[keyTile[0]][keyTile[1]] = [TileSubtype.EXITKEY];
   for (const [y, x] of chosen) map.subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH];
 
   // 4) THE LOCK. allEqual over the switches, started at DISTINCT colours (so it begins UNsatisfied —
-  //    gate shut — and the player must make them all match). Drives the gate open while satisfied.
+  //    the whole gate run shut — and the player must make them all match). Opens every gate tile at
+  //    once while satisfied.
   const states = chosen.map((_, i) => i % colors);
   const lock: ColorLock = {
     id: "cl_daily_color",
@@ -189,7 +207,7 @@ export function stampColorSwitchLock(
     states,
     rule: "allEqual",
     platforms: [],
-    gates: [vault.gate],
+    gates: vault.gates,
     invertedGates: [],
   };
   return [lock];
