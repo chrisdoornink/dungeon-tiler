@@ -1082,7 +1082,15 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.wallSealIcon} ${
               pickVariant([styles.wallSealVariantA, styles.wallSealVariantB])
             }`}
-            style={{ transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg)` }}
+            style={{
+              // Mirror/flip picked from a different hash than the A/B image pick so
+              // the two don't correlate — 2 images x 4 orientations = 8 looks.
+              transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg) ${
+                ["", "scaleX(-1)", "scaleY(-1)", "scaleX(-1) scaleY(-1)"][
+                  Math.abs(((row ?? 0) * 53 + (col ?? 0) * 71) % 4)
+                ]
+              }`,
+            }}
           />
         )}
 
