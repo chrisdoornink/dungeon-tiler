@@ -65,8 +65,6 @@ describe("stampColorSwitchLock", () => {
     for (let seed = 1; seed <= 25; seed++) {
       const map = genFloor2(seed);
       const hero = findPlayerPosition(map)!;
-      const exit = find(map, TileSubtype.EXIT)[0];
-      const exitKey = find(map, TileSubtype.EXITKEY)[0];
       const locks = stampColorSwitchLock(map, mulberry32(seed * 7 + 1), { switches: 4, colors: 4 });
       if (!locks) continue; // no safe spot this floor — graceful skip
       placed++;
@@ -80,24 +78,25 @@ describe("stampColorSwitchLock", () => {
       expect(find(map, TileSubtype.TOGGLE_SWITCH).length).toBe(4);
 
       const gate = lock.gates[0];
-      const reward = find(map, TileSubtype.CHEST).find(
-        ([y, x]) => (map.subtypes[y][x] ?? []).includes(TileSubtype.FOOD)
-      )!;
-      expect(reward).toBeTruthy();
+      // Exactly one exit key, RELOCATED behind the gate (the puzzle is mandatory now).
+      const keys = find(map, TileSubtype.EXITKEY);
+      expect(keys.length).toBe(1);
+      const key = keys[0];
+      const exit = find(map, TileSubtype.EXIT)[0];
 
       const openNow = reachable(map, hero);
       // Every switch is reachable...
       for (const [sy, sx] of lock.switches) expect(openNow.has(`${sy},${sx}`)).toBe(true);
-      // ...the reward is NOT (the gate is a real cut, shut at the start)...
-      expect(openNow.has(`${reward[0]},${reward[1]}`)).toBe(false);
-      // ...and the floor is still completable: key + exit still reachable past the sealed gate.
-      expect(openNow.has(`${exitKey[0]},${exitKey[1]}`)).toBe(true);
+      // ...the exit key is SEALED behind the gate (a real cut, shut at the start) so you cannot leave
+      // without solving it...
+      expect(openNow.has(`${key[0]},${key[1]}`)).toBe(false);
+      // ...but the exit tile itself is still reachable (you just need the key first).
       expect(openNow.has(`${exit[0]},${exit[1]}`)).toBe(true);
 
-      // Solvable: making the lock satisfied (all same colour) opens the gate -> reward reachable.
+      // Solvable: making the lock satisfied (all same colour) opens the gate -> key reachable.
       const openGate = JSON.parse(JSON.stringify(map)) as MapData;
       openGate.subtypes[gate[0]][gate[1]] = [TileSubtype.SPIKE_HOLES];
-      expect(reachable(openGate, hero).has(`${reward[0]},${reward[1]}`)).toBe(true);
+      expect(reachable(openGate, hero).has(`${key[0]},${key[1]}`)).toBe(true);
     }
     // It should find a spot on the large majority of floor-2 maps.
     expect(placed).toBeGreaterThanOrEqual(20);

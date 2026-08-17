@@ -1,8 +1,14 @@
 // A level-scale COLOUR-SWITCH puzzle, stamped into a normal dungeon floor: N colour switches
-// scattered across the floor that must all be turned to the SAME colour to open a gate guarding a
-// reward. The *logic* is trivial (make them match); the *difficulty* is executing it — reaching and
-// operating every switch while the floor's enemies and hazards fight you. This is the "level-scale
-// motif" from the puzzle-generation plan (§0.5): a recognizable pattern, not a certified pocket.
+// scattered across the floor that must all be turned to the SAME colour to open a gate that seals
+// the floor's EXIT KEY. The *logic* is trivial (make them match); the *difficulty* is executing it —
+// reaching and operating every switch while the floor's enemies and hazards fight you. Gating the
+// key (rather than an optional chest) makes the puzzle mandatory: you cannot leave the floor until
+// it is solved. This is the "level-scale motif" from the plan (§0.5): a pattern, not a certified
+// pocket.
+//
+// It stays winnable by construction: the switches only drive the one gate (never each other or any
+// other door), and each is independently reachable (verified) and freely cyclable, so all-same is
+// always achievable — the key is therefore always obtainable once the puzzle is placed.
 //
 // SAFETY / DETERMINISM CONTRACT (this is why it can go into the live daily without breaking /stats):
 //  - It takes its OWN seeded `rng` and NEVER touches Math.random, so it consumes nothing from the
@@ -86,6 +92,17 @@ export function stampColorSwitchLock(
   const reach = floodReachable(map, hero);
   const avoid = new Set((opts.avoid ?? []).map(([y, x]) => `${y},${x}`));
 
+  // The puzzle gates the EXIT KEY — find it so it can be moved behind the gate. No key => nothing to
+  // gate, so decline (floor 2 always has one, so this is just a guard).
+  let exitKeyAt: [number, number] | null = null;
+  for (let y = 0; y < H && !exitKeyAt; y++)
+    for (let x = 0; x < W; x++)
+      if ((map.subtypes[y]?.[x] ?? []).includes(TileSubtype.EXITKEY)) {
+        exitKeyAt = [y, x];
+        break;
+      }
+  if (!exitKeyAt) return null;
+
   // 1) THE VAULT. Find a wall `gate` with a reachable-floor approach on one side and a carveable
   //    dead-end wall `reward` on the opposite side, with the gate's PERPENDICULAR neighbours both
   //    walls (so the gate is a stub, never a load-bearing corridor tile). Carving F—gate—reward can
@@ -151,11 +168,15 @@ export function stampColorSwitchLock(
   }
   if (chosen.length < nSwitches) return null; // couldn't place enough — skip the puzzle this floor
 
-  // 3) STAMP. Carve the vault (gate shut; reward chest), drop the switches.
+  // 3) STAMP. Carve the vault (gate shut), MOVE the exit key behind it (so the floor now requires
+  //    solving the puzzle to escape), drop the switches.
   map.tiles[vault.gate[0]][vault.gate[1]] = FLOOR;
   map.subtypes[vault.gate[0]][vault.gate[1]] = [TileSubtype.SPIKES]; // gate: up while unsatisfied
+  map.subtypes[exitKeyAt[0]][exitKeyAt[1]] = (map.subtypes[exitKeyAt[0]][exitKeyAt[1]] ?? []).filter(
+    (s) => s !== TileSubtype.EXITKEY
+  );
   map.tiles[vault.reward[0]][vault.reward[1]] = FLOOR;
-  map.subtypes[vault.reward[0]][vault.reward[1]] = [TileSubtype.CHEST, TileSubtype.FOOD];
+  map.subtypes[vault.reward[0]][vault.reward[1]] = [TileSubtype.EXITKEY];
   for (const [y, x] of chosen) map.subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH];
 
   // 4) THE LOCK. allEqual over the switches, started at DISTINCT colours (so it begins UNsatisfied —

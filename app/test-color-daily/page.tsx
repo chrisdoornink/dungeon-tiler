@@ -59,12 +59,13 @@ function MiniMap({ state }: { state: GameState }) {
       return { bg: SWITCH_COLORS[swColor.get(`${y},${x}`) ?? 0] ?? "#fff", title: "colour switch", ring: true };
     if (subs.includes(TileSubtype.SPIKES)) return { bg: "#7f1d1d", title: "gate (shut)" };
     if (subs.includes(TileSubtype.SPIKE_HOLES)) return { bg: "#3b2020", title: "gate (open)" };
-    if (subs.includes(TileSubtype.CHEST)) return { bg: "#c0872a", title: "reward chest", ring: true };
+    if (subs.includes(TileSubtype.EXITKEY))
+      return { bg: "#fde047", title: "exit key (sealed behind the gate)", ring: true };
     if (subs.includes(TileSubtype.LAVA)) return { bg: "#ff5a1e", title: "lava" };
     if (subs.includes(TileSubtype.DEEP_WATER)) return { bg: "#1e4e7a", title: "water" };
     if (subs.includes(TileSubtype.PLAYER)) return { bg: "#ffffff", title: "hero" };
     if (subs.includes(TileSubtype.EXIT)) return { bg: "#34d399", title: "exit" };
-    if (subs.includes(TileSubtype.EXITKEY)) return { bg: "#fde047", title: "exit key" };
+    if (subs.includes(TileSubtype.CHEST)) return { bg: "#a16207", title: "chest" };
     if (subs.includes(TileSubtype.KEY)) return { bg: "#eab308", title: "chest key" };
     if (subs.includes(TileSubtype.POT)) return { bg: "#8d7350", title: "pot" };
     if (subs.includes(TileSubtype.ROCK)) return { bg: "#9ca3af", title: "rock" };
@@ -132,8 +133,9 @@ function Inner() {
         <p className="text-xs text-gray-300 mt-1">
           A real daily floor 2 (enemies stripped, hero armed). Turn all <b>four colour switches</b> to
           the <b>same colour</b> — the corner-dot palette shows each one&apos;s colour — to drop the{" "}
-          <b>gate</b> and reach the <b>chest</b>. In the live daily the floor&apos;s enemies are the
-          difficulty; it rolls on ~35% of days.
+          <b>gate</b> and reach the <b>exit key</b> (you can&apos;t leave the floor without it, so the
+          puzzle is mandatory). In the live daily the floor&apos;s enemies are the difficulty; it rolls
+          on only ~15-20% of days.
         </p>
         <p className="text-xs mt-2">
           seed <b>{seed}</b>

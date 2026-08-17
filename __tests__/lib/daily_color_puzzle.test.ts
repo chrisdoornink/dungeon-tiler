@@ -86,22 +86,21 @@ describe("daily floor-2 colour puzzle", () => {
       const map = f2.mapData;
       const hero = findPlayerPosition(map)!;
       const openNow = reachable(map, hero);
-      // Switches reachable; floor still completable past the sealed gate.
+      // Switches reachable.
       for (const [sy, sx] of lock.switches) expect(openNow.has(`${sy},${sx}`)).toBe(true);
       const exit = find(map, TileSubtype.EXIT)[0];
-      const exitKey = find(map, TileSubtype.EXITKEY)[0];
+      const keys = find(map, TileSubtype.EXITKEY);
+      expect(keys.length).toBe(1); // exactly one, relocated behind the gate (not duplicated)
+      const key = keys[0];
+      // The exit tile is reachable, but the exit KEY is sealed behind the gate — you cannot leave the
+      // floor without solving the puzzle (mandatory).
       expect(openNow.has(`${exit[0]},${exit[1]}`)).toBe(true);
-      expect(openNow.has(`${exitKey[0]},${exitKey[1]}`)).toBe(true);
-      // The gate is a real cut: opening it (satisfy the lock) makes the reward reachable, not before.
+      expect(openNow.has(`${key[0]},${key[1]}`)).toBe(false);
+      // Opening the gate (satisfy the lock) makes the key reachable, not before.
       const gate = lock.gates[0];
       const open = JSON.parse(JSON.stringify(map)) as MapData;
       open.subtypes[gate[0]][gate[1]] = [TileSubtype.SPIKE_HOLES];
-      const reward = find(open, TileSubtype.CHEST).find(
-        ([y, x]) => (open.subtypes[y][x] ?? []).includes(TileSubtype.FOOD)
-      );
-      expect(reward).toBeTruthy();
-      expect(reachable(open, hero).has(`${reward![0]},${reward![1]}`)).toBe(true);
-      expect(openNow.has(`${reward![0]},${reward![1]}`)).toBe(false);
+      expect(reachable(open, hero).has(`${key[0]},${key[1]}`)).toBe(true);
     }
     expect(checked).toBeGreaterThan(0);
   });

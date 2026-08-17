@@ -94,7 +94,7 @@ const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
  * of past days untouched.
  */
 const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
-const COLOR_PUZZLE_CHANCE = 0.7; // rolls ~70% of floor-2 days; nets ~55-60% after the stamper declines dense floors
+const COLOR_PUZZLE_CHANCE = 0.2; // rolls ~20% of floor-2 days; nets ~15-20% (rare while the feature is vetted)
 import {
   rollBossEntranceKind,
   rollDecoySealCount,
