@@ -197,6 +197,52 @@ describe("moat approach in a real Level-3 room", () => {
       }
     }
   });
+
+  test("entrance keeps a 3+ tile lava buffer on every accessible side", () => {
+    const dirs: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    for (let i = 0; i < 8; i++) {
+      const s = buildMoatApproach("lava");
+      const entrance = findSubtype(s, TileSubtype.BOSS_ENTRANCE);
+      if (!entrance) continue; // corner-moat fallback day — no spur to measure
+      const [ey, ex] = entrance;
+      const subs = s.mapData.subtypes;
+      const isLava = (y: number, x: number) => subs[y]?.[x]?.includes(TileSubtype.LAVA) ?? false;
+      if (!dirs.some(([dy, dx]) => isLava(ey + dy, ex + dx))) continue; // fallback moat
+      // BFS through lava from the entrance: dist = rocks needed to stand there.
+      const dist = new Map<string, number>();
+      let frontier: Array<[number, number]> = [];
+      for (const [dy, dx] of dirs) {
+        if (isLava(ey + dy, ex + dx)) {
+          dist.set(`${ey + dy},${ex + dx}`, 1);
+          frontier.push([ey + dy, ex + dx]);
+        }
+      }
+      while (frontier.length) {
+        const next: Array<[number, number]> = [];
+        for (const [fy, fx] of frontier) {
+          const d = dist.get(`${fy},${fx}`)!;
+          for (const [dy, dx] of dirs) {
+            const key = `${fy + dy},${fx + dx}`;
+            if (!isLava(fy + dy, fx + dx) || dist.has(key)) continue;
+            dist.set(key, d + 1);
+            next.push([fy + dy, fx + dx]);
+          }
+        }
+        frontier = next;
+      }
+      // Any lava tile bordering dry-reachable ground must be >= 3 rocks from the entrance.
+      const dry = dryReachableFrom(s, findHero(s));
+      for (const [key, d] of dist) {
+        const [ly, lx] = key.split(",").map(Number);
+        const bordersDry = dirs.some(
+          ([dy, dx]) => dry.has(`${ly + dy},${lx + dx}`) && !isLava(ly + dy, lx + dx)
+        );
+        if (bordersDry) {
+          expect(d).toBeGreaterThanOrEqual(3);
+        }
+      }
+    }
+  });
 });
 
 describe("outside world is no longer a boss route", () => {
