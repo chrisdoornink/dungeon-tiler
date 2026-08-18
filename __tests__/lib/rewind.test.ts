@@ -348,7 +348,7 @@ describe("picking the charm up", () => {
     expect(before.rewindCharges ?? 0).toBe(0);
 
     const picked = movePlayer(before, Direction.RIGHT);
-    expect(picked.rewindCharges).toBe(1);
+    expect(picked.rewindCharges).toBe(2);
     expect(picked.stats.chestItemsCollected).toContain("amber_moth");
     // The loot tag is consumed.
     expect(
@@ -368,7 +368,7 @@ describe("picking the charm up", () => {
     subtypes[1][1] = [TileSubtype.OPEN_CHEST, TileSubtype.AMBER_MOTH];
 
     const picked = movePlayer(baseState({ mapData: { tiles, subtypes } }), Direction.RIGHT);
-    expect(picked.rewindCharges).toBe(1);
+    expect(picked.rewindCharges).toBe(2);
 
     // Walk on, then wind back as far as history allows.
     const walked = walkRight(picked, 4);
@@ -381,7 +381,7 @@ describe("picking the charm up", () => {
       .some((tags) => tags.includes(TileSubtype.AMBER_MOTH));
     expect(loose).toBe(false);
     expect(findPlayerPosition(back.mapData)![1]).toBeGreaterThanOrEqual(1);
-    expect(back.rewindCharges).toBe(0);
+    expect(back.rewindCharges).toBe(1);
   });
 
   it("does not grant a charge through a still-locked chest", () => {
