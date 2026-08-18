@@ -10,27 +10,28 @@ import {
 import { mulberry32, withPatchedMathRandom, hashStringToSeed } from "../../lib/rng";
 
 /**
- * Preview harness for the daily FLOOR-2 colour-switch puzzle. Builds a real daily floor 2 through the
- * exact seeded path the game uses (initializeGameStateForMultiTier(1) -> advanceToNextFloor), so the
- * puzzle that appears is the one players get. It rolls on only ~35% of days, so this auto-scans
- * forward for a seed that carries one. Enemies are stripped and the hero armed so the puzzle can be
- * studied calmly — in the real daily the floor's enemies are the difficulty.
+ * Preview harness for the daily colour-switch puzzle. Builds a real daily floor through the exact
+ * seeded path the game uses (initializeGameStateForMultiTier(1) -> advanceToNextFloor), so the puzzle
+ * that appears is the one players get. It rolls on only a minority of days, so this auto-scans forward
+ * for a seed that carries one. Enemies are stripped and the hero armed so the puzzle can be studied
+ * calmly — in the real daily the floor's enemies are the difficulty.
  *
- * URL: ?seed=123 (defaults to the first puzzle seed at/after today's daily seed).
+ * URL: ?floor=1|2 (default 2; floor 1 uses 3 switches at ~5%, floor 2 uses 4 at ~15-20%) and ?seed=123
+ * (defaults to the first puzzle seed at/after today's daily seed).
  */
 const SWITCH_COLORS = ["#ef4444", "#3b82f6", "#22c55e", "#eab308"]; // one per colour index 0..3
 
-function buildF2(seed: number): GameState {
+function buildFloor(seed: number, floor: number): GameState {
   const f1 = withPatchedMathRandom(mulberry32(seed), () =>
     initializeGameStateForMultiTier(1)
   );
-  return advanceToNextFloor(f1, seed);
+  return floor <= 1 ? f1 : advanceToNextFloor(f1, seed);
 }
 const hasPuzzle = (s: GameState): boolean => (s.colorLocks ?? []).length > 0;
 
-/** First seed at/after `from` whose floor 2 carries the puzzle (bounded scan). */
-function findPuzzleSeed(from: number): number {
-  for (let s = from; s < from + 400; s++) if (hasPuzzle(buildF2(s))) return s;
+/** First seed at/after `from` whose chosen floor carries the puzzle (bounded scan). */
+function findPuzzleSeed(from: number, floor: number): number {
+  for (let s = from; s < from + 1200; s++) if (hasPuzzle(buildFloor(s, floor))) return s;
   return from;
 }
 
@@ -110,32 +111,40 @@ function Inner() {
   const todaySeed = hashStringToSeed(
     typeof window !== "undefined" ? new Date().toLocaleDateString("en-CA") : "2026-08-20"
   );
+  const floor = params?.get("floor") === "1" ? 1 : 2;
   const urlSeed = params?.get("seed") ? Number(params.get("seed")) : null;
-  const seed = urlSeed ?? findPuzzleSeed(todaySeed);
+  const seed = urlSeed ?? findPuzzleSeed(todaySeed, floor);
   const [resetKey, setResetKey] = useState(0);
 
-  const f2 = useMemo(() => buildF2(seed), [seed]);
-  const has = hasPuzzle(f2);
-  const state = useMemo(() => forPreview(f2), [f2]);
-  const lock = f2.colorLocks?.[0];
+  const built = useMemo(() => buildFloor(seed, floor), [seed, floor]);
+  const has = hasPuzzle(built);
+  const state = useMemo(() => forPreview(built), [built]);
+  const lock = built.colorLocks?.[0];
 
-  const link = (s: number) => `/test-color-daily?seed=${s}`;
-  const nextPuzzle = findPuzzleSeed(seed + 1);
+  const link = (s: number) => `/test-color-daily?floor=${floor}&seed=${s}`;
+  const otherFloor = floor === 1 ? 2 : 1;
+  const nextPuzzle = findPuzzleSeed(seed + 1, floor);
   const prevPuzzle = (() => {
-    for (let s = seed - 1; s > seed - 400 && s > 0; s--) if (hasPuzzle(buildF2(s))) return s;
+    for (let s = seed - 1; s > seed - 1200 && s > 0; s--) if (hasPuzzle(buildFloor(s, floor))) return s;
     return seed;
   })();
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 text-white bg-black/90 gap-3">
       <div className="text-center bg-black/70 rounded-lg p-3 max-w-3xl">
-        <h1 className="text-xl font-bold">Daily Floor-2 Colour Puzzle — preview</h1>
+        <h1 className="text-xl font-bold">Daily Floor-{floor} Colour Puzzle — preview</h1>
         <p className="text-xs text-gray-300 mt-1">
-          A real daily floor 2 (enemies stripped, hero armed). Turn all <b>four colour switches</b> to
-          the <b>same colour</b> — the corner-dot palette shows each one&apos;s colour — to drop the{" "}
-          <b>gate</b> and reach the <b>exit key</b> (you can&apos;t leave the floor without it, so the
-          puzzle is mandatory). In the live daily the floor&apos;s enemies are the difficulty; it rolls
-          on only ~15-20% of days.
+          A real daily floor {floor} (enemies stripped, hero armed). Turn all{" "}
+          <b>{floor === 1 ? "three" : "four"} colour switches</b> to the <b>same colour</b> — the
+          corner-dot palette shows each one&apos;s colour — to drop the <b>gate</b> and reach the{" "}
+          <b>exit key</b> (you can&apos;t leave the floor without it, so the puzzle is mandatory). In the
+          live daily the floor&apos;s enemies are the difficulty; it rolls on only{" "}
+          {floor === 1 ? "~5% of floor-1 days" : "~15-20% of floor-2 days"}.
+        </p>
+        <p className="text-xs mt-1">
+          <a className="underline text-sky-300" href={`/test-color-daily?floor=${otherFloor}`}>
+            → switch to the floor-{otherFloor} puzzle ({otherFloor === 1 ? "3 switches, ~5%" : "4 switches, ~15-20%"})
+          </a>
         </p>
         <p className="text-xs mt-2">
           seed <b>{seed}</b>
@@ -155,7 +164,7 @@ function Inner() {
           <a className="underline" href={link(nextPuzzle)}>
             next puzzle seed →
           </a>
-          <a className="underline" href={link(findPuzzleSeed(todaySeed))}>
+          <a className="underline" href={link(findPuzzleSeed(todaySeed, floor))}>
             today
           </a>
           <button className="underline" onClick={() => setResetKey((k) => k + 1)}>

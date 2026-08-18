@@ -108,6 +108,11 @@ const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
  */
 const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
 const COLOR_PUZZLE_CHANCE = 0.2; // rolls ~20% of floor-2 days; nets ~15-20% (rare while the feature is vetted)
+// Floor 1 gets a rarer, smaller variant (3 switches). Its builder never receives the daily seed, so
+// the puzzle stream is seeded from the day's generated map instead — see the stamp in
+// initializeGameStateForMultiTier. A distinct salt keeps it uncorrelated with the floor-2 stream.
+const COLOR_PUZZLE_FLOOR1_SEED_SALT = 0x85eb_ca6b;
+const COLOR_PUZZLE_FLOOR1_CHANCE = 0.07; // rolls ~7%, nets ~5% of floor-1 days (an occasional early twist)
 import {
   rollBossEntranceKind,
   rollDecoySealCount,
@@ -118,7 +123,7 @@ import {
   type BossEntranceKind,
 } from "../bosses/boss_entrances";
 import { seedMist, advanceMist, mistContains } from "./pink-mist";
-import { mulberry32 as mulberry32Fn, withPatchedMathRandom } from "../rng";
+import { mulberry32 as mulberry32Fn, withPatchedMathRandom, hashStringToSeed } from "../rng";
 import type { HeroDiaryEntry } from "../story/hero_diary";
 
 import { pickPotRevealDeterministic } from "./pots";
@@ -2641,9 +2646,33 @@ export function initializeGameStateForMultiTier(
   // earlier or on separate streams, so they stay true.
   stampWispPots(withRunes);
 
+  // Level-scale colour puzzle on floor 1 (~5% of days; 3 switches rather than floor 2's 4, to suit
+  // the smaller opening floor). Same /stats discipline as the floor-2 puzzle, adapted to a builder
+  // that never receives the daily seed: it draws from its OWN stream, seeded from the day's already-
+  // generated map (deterministic per date, yet consuming nothing from the shared Math.random
+  // sequence). Stamped BEFORE the switch gate so its placement can never depend on whether switch
+  // gates are enabled — the gates suite pins that toggling that feature changes nothing else on the
+  // floor — and the map is hashed here, before the puzzle carves it, so both runs seed identically.
+  // The switch gate is then handed the puzzle's tiles to avoid, so the two never collide.
+  let colorLocks: ColorLock[] | undefined;
+  const f1Player = findPlayerPosition(withRunes);
+  if (floor === 1 && f1Player) {
+    const mapKey = withRunes.tiles.map((r) => r.join("")).join("");
+    const puzRng = mulberry32Fn(hashStringToSeed(mapKey) ^ COLOR_PUZZLE_FLOOR1_SEED_SALT);
+    if (puzRng.next() < COLOR_PUZZLE_FLOOR1_CHANCE) {
+      const avoid: Array<[number, number]> = (snakesAdded ?? []).map((e) => [e.y, e.x]);
+      avoid.push([f1Player[0], f1Player[1]]);
+      colorLocks =
+        stampColorSwitchLock(withRunes, puzRng, { switches: 3, colors: 4, avoid }) ?? undefined;
+    }
+  }
+
   if (opts.switchGates) {
+    const gateAvoid = occupiedTiles(snakesAdded);
+    for (const l of colorLocks ?? [])
+      for (const [ty, tx] of [...l.switches, ...l.gates]) gateAvoid.add(`${ty},${tx}`);
     maybePlaceSwitchGate(gateWiring, floor, findPlayerPosition(withRunes), {
-      avoid: occupiedTiles(snakesAdded),
+      avoid: gateAvoid,
     });
   }
 
@@ -2659,6 +2688,7 @@ export function initializeGameStateForMultiTier(
     currentFloor: floor,
     maxFloors: 3,
     mapData: withRunes,
+    colorLocks,
     sealPayloads,
     // Wisps are live in the daily: seeded pot stamps above, plus the runtime
     // enemy-drop and once-per-floor pity sources this config switches on.
