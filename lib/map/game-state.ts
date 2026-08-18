@@ -101,6 +101,14 @@ import {
  */
 const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
 /**
+ * Salt for the boss-entrance FALLBACK stream. When the day's rolled entrance kind has no
+ * legal spot on this particular floor 3, a different kind is placed instead (so a boss day
+ * never silently loses its door) — and that retry's randomness is drawn from this separate
+ * salted stream so it consumes NOTHING from the floor's own sequence, keeping enemy/snake/
+ * decoy placement and /stats replay of every successfully-placed day byte-identical.
+ */
+const BOSS_ENTRANCE_FALLBACK_SEED_SALT = 0xb529_7a4d;
+/**
  * Salt + roll rate for the floor-2 colour-switch puzzle's independent RNG stream. Same discipline as
  * BOSS_KIND_SEED_SALT: a separate salted stream so placing the puzzle consumes NOTHING from the
  * floor's own sequence, leaving enemy/rune/snake placement byte-identical and /stats reconstruction
@@ -117,7 +125,7 @@ import {
   rollBossEntranceKind,
   rollDecoySealCount,
   sealCoords,
-  stampBossEntranceOnFloor,
+  stampBossEntranceWithFallback,
   stampDecoySeals,
   arenaSeedForEntrance,
   type BossEntranceKind,
@@ -2840,10 +2848,19 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
       );
       const kind = rollBossEntranceKind({ bombAvailable });
       if (kind) {
-        const stamped = stampBossEntranceOnFloor(mapData, kind);
-        if (stamped.placed) {
-          bossEntrance = kind;
-          sealPayloads = stamped.sealPayloads;
+        // If the rolled kind has no legal spot on THIS floor 3, place a different
+        // (reachable, non-bomb) kind instead, so a boss day never silently loses its
+        // door. The retry draws from a SEPARATE salted stream so it consumes nothing from
+        // `rng`: every successfully-placed day stays byte-identical and /stats replay of
+        // past days is undisturbed. See stampBossEntranceWithFallback for the discipline.
+        const placed = stampBossEntranceWithFallback(
+          mapData,
+          kind,
+          mulberry32Fn(dailySeed ^ BOSS_ENTRANCE_FALLBACK_SEED_SALT)
+        );
+        if (placed) {
+          bossEntrance = placed.kind;
+          sealPayloads = placed.sealPayloads;
         }
       }
     }

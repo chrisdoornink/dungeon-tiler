@@ -22,6 +22,7 @@ import type { GameState } from "../map/game-state";
 import { generateCompleteMapForFloor } from "../map/map-features";
 import { computeTorchGlow } from "../torch_glow";
 import { Enemy } from "../enemy";
+import { withPatchedMathRandom, type Rng } from "../rng";
 
 export type MoatElement = "lava" | "water";
 
@@ -1085,6 +1086,67 @@ export function stampBossEntranceOnFloor(
   const before = countSubtype(map, TileSubtype.DARK_PORTAL);
   placeDarkPortal(map, hy, hx);
   return { placed: countSubtype(map, TileSubtype.DARK_PORTAL) > before };
+}
+
+/**
+ * Stamp the day's boss entrance, and if the rolled `kind` has no legal spot on THIS
+ * particular floor 3, place a different (reachable, non-bomb) kind instead — so a boss day
+ * never silently loses its door. The bug this closes: a rolled kind whose placement failed
+ * left `stampBossEntranceOnFloor` returning `{ placed: false }` with no fallback, so ~1.7%
+ * of days ended up with no boss entrance at all.
+ *
+ * Stream discipline — load-bearing for /stats, which replays this generator to answer
+ * "what did that date roll" (lib/stats/boss_day.ts re-runs advanceToNextFloor):
+ *   - The PRIMARY attempt (the rolled kind) runs under the AMBIENT Math.random (the daily
+ *     floor stream) on a COPY of the map, committed only if it places. So a day whose
+ *     rolled kind succeeds draws exactly what it always did and ends with the exact same
+ *     tiles — byte-identical to before this fallback existed — and a failed primary leaves
+ *     NO half-flooded terrain behind on the real map.
+ *   - The FALLBACK attempts draw from a SEPARATE salted stream (`fallbackRng`, the same
+ *     discipline as dailyBossKind), each on its own COPY, so they consume NOTHING from the
+ *     floor's own sequence. Decoy-seal and enemy/snake placement downstream — and the
+ *     historical replay of every successfully-placed day — are left completely undisturbed.
+ *
+ * Never falls back to "bomb": that door needs a bomb the run may not carry, and an
+ * unreachable bomb door on a bombless day is the exact failure this guards against. The
+ * corner water moat leads the order because it draws no randomness and all but always finds
+ * a wadeable landing; douse and the lava spur sit behind it purely for completeness.
+ *
+ * Returns the kind that actually placed (which may differ from `kind`) and its seal
+ * payloads, or null if not even a fallback found a spot (astronomically rare). Must be
+ * called inside the daily seeded RNG block.
+ */
+export function stampBossEntranceWithFallback(
+  map: MapData,
+  kind: BossEntranceKind,
+  fallbackRng: Rng
+): { kind: BossEntranceKind; sealPayloads?: SealPayloads } | null {
+  // Primary: ambient (daily) stream, on a copy, committed only on success — so this path is
+  // byte-identical to the old inline stamp when the rolled kind places, and leaves the real
+  // map untouched when it does not.
+  const primary = cloneMap(map);
+  const stampedPrimary = stampBossEntranceOnFloor(primary, kind);
+  if (stampedPrimary.placed) {
+    map.tiles = primary.tiles;
+    map.subtypes = primary.subtypes;
+    return { kind, sealPayloads: stampedPrimary.sealPayloads };
+  }
+  // Fallback: a reachable non-bomb kind, drawn from the salted stream so the daily sequence
+  // never shifts. moat-water first (deterministic and near-certain to place).
+  const FALLBACK_ORDER: BossEntranceKind[] = ["moat-water", "douse", "moat-lava"];
+  for (const alt of FALLBACK_ORDER) {
+    if (alt === kind) continue;
+    const trial = cloneMap(map);
+    const stamped = withPatchedMathRandom(fallbackRng, () =>
+      stampBossEntranceOnFloor(trial, alt)
+    );
+    if (stamped.placed) {
+      map.tiles = trial.tiles;
+      map.subtypes = trial.subtypes;
+      return { kind: alt, sealPayloads: stamped.sealPayloads };
+    }
+  }
+  return null;
 }
 
 function countSubtype(map: MapData, sub: number): number {
