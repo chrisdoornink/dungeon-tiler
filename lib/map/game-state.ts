@@ -58,6 +58,13 @@ import {
 } from "./utils";
 import { addPlayerToMap, findPlayerPosition, removePlayerFromMapData } from "./player";
 import { recordRewindStep, type RewindSnapshot } from "./rewind";
+import {
+  advanceWispTurn,
+  stampWispPots,
+  WISP_STANDARD_CONFIG,
+  type WildWisp,
+  type WispConfig,
+} from "./wisp";
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { stampColorSwitchLock } from "./color_switch_puzzle";
@@ -69,6 +76,11 @@ import {
   isColorSwitch,
   tileIsPlatformed,
 } from "./machinery";
+import {
+  maybePlaceSwitchGate,
+  occupiedTiles,
+  type DailySwitchGate,
+} from "./switch-gates";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
 import { buildPinkRealm } from "./pink-realm";
 import { buildShaperArena, type ShaperEntry } from "../bosses/shaper_arena";
@@ -79,6 +91,7 @@ import {
   QUARRYMASTER_LAYOUTS,
 } from "../bosses/quarrymaster_arena";
 import {
+  BOSS_KINDS,
   rollDailyBossKind,
   type BossKind,
 } from "../bosses/boss_roster";
@@ -422,7 +435,21 @@ export function performWait(gameState: GameState): GameState {
   return withRewindStep(before, newGameState);
 }
 
+/**
+ * Using an item spends a turn, and a turn inside a boss arena can kill the boss without the
+ * player swinging at anything: a bomb's fuse runs out (detonateLiveBombs, below), or a coil
+ * length cut off last turn is reaped by applyEnemyHazardDeaths. Both used to land here with no
+ * payout attached, so the kill paid nothing — see ensureBossArenaSolvable for what that cost.
+ * Wrapped like performThrowRock rather than hooked, for the same reason: many exits.
+ */
 export function performUseFood(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUseFoodCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUseFoodCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.foodCount || 0;
@@ -489,6 +516,13 @@ export function performUseFood(gameState: GameState): GameState {
  * Use potion from inventory to heal 2 HP (costs a move like throwing rocks/runes)
  */
 export function performUsePotion(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUsePotionCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUsePotionCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.potionCount || 0;
@@ -565,6 +599,13 @@ export const PINK_HEART_BONUS_HEARTS = 3;
  * potion). Does nothing if none are held.
  */
 export function performUsePinkHeart(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUsePinkHeartCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUsePinkHeartCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.pinkHeartCount ?? 0;
@@ -630,6 +671,13 @@ export function performUsePinkHeart(gameState: GameState): GameState {
  * none are held.
  */
 export function performUseBerry(gameState: GameState): GameState {
+  const bossesBefore = snapshotBosses(gameState);
+  const result = performUseBerryCore(gameState);
+  resolveBossDefeat(result, bossesBefore);
+  return result;
+}
+
+function performUseBerryCore(gameState: GameState): GameState {
   gameState = detonateLiveBombs(gameState);
   if (gameState.heroHealth <= 0) return gameState;
   const count = gameState.berryCount ?? 0;
@@ -702,8 +750,13 @@ export function performThrowRock(gameState: GameState): GameState {
   const bossesBefore = snapshotBosses(gameState);
   const result = performThrowRockCore(gameState);
   resolveBossDefeat(result, bossesBefore);
+  // Advance the puzzle machinery (platforms/toggles) for the throw-turn...
   advanceThrowMachinery(gameState, result, gameState.rockCount ?? 0);
-  return result;
+  // ...and route it through the wisp hook too: a thrown rock can smash a [POT, WISP] pot (or kill an
+  // enemy that drops a wisp). advanceWispTurn is otherwise wired only into movePlayer, so without
+  // this a rock-smashed wisp pot silently releases nothing. No hero step this turn, so its drift/pity
+  // legs are inert; only smashed-pot + enemy-death release fire. Dormant (no wispConfig) => no-op.
+  return advanceWispTurn(gameState, result);
 }
 
 /**
@@ -1043,14 +1096,16 @@ export function performThrowRockCore(gameState: GameState): GameState {
     {
       const plateSubs = newMapData.subtypes[ty][tx] || [];
       if (plateSubs.includes(TileSubtype.PRESSURE_PLATE)) {
-        const wiring: { gateGroups?: GateGroup[] } = {
+        const wiring: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate } = {
           gateGroups: preTickState.gateGroups,
+          switchGate: preTickState.switchGate,
         };
-        pressPlate(wiring, newMapData, ty, tx);
+        pressPlate(wiring, newMapData, ty, tx, "rock");
         return {
           ...preTickState,
           mapData: newMapData,
           gateGroups: wiring.gateGroups,
+          switchGate: wiring.switchGate,
           rockCount: count - 1,
           stats: {
             ...preTickState.stats,
@@ -1941,6 +1996,15 @@ export interface GameState {
   // only recorded while a charge is held. See lib/map/rewind.ts.
   rewindCharges?: number;
   rewindHistory?: RewindSnapshot[];
+  // Wisp life-regen companion (see lib/map/wisp.ts). Live in daily + endless
+  // (WISP_STANDARD_CONFIG) and the /test-wisp room; absent wispConfig keeps the whole
+  // system dormant in story/tutorial/legacy modes.
+  wispConfig?: WispConfig;
+  wisps?: WildWisp[]; // Wild, uncaught wisps drifting on the map
+  wispCompanions?: number; // Caught wisps carried as extra lives
+  wispPos?: [number, number]; // Carried wisp's current perch (render + rescue tug target)
+  heroTrail?: Array<[number, number]>; // Last few tiles the hero vacated, newest last
+  wispPityFloors?: number[]; // Floors whose once-per-floor pity wisp already appeared
   stats: {
     damageDealt: number;
     damageTaken: number;
@@ -2090,10 +2154,23 @@ export interface GameState {
   toggleGroups?: ToggleGroup[];
   /**
    * Colour locks (lib/map/machinery.ts): groups of turning colour switches whose combined colours
-   * drive a platform/gates through a predicate. Puzzle-bench only, like toggleGroups.
+   * drive gates through a predicate. Used by the daily floor-2 colour puzzle (color_switch_puzzle.ts)
+   * and the puzzle bench; absent on every other map.
    */
   colorLocks?: ColorLock[];
   platforms?: Platform[];
+  /**
+   * Daily switch gates: is the feature on for this run, and what did the day end up with?
+   *
+   * Both are set when floor 1 is built and carried forward by advanceToNextFloor's spread, which
+   * is what makes the cascade work across floors generated minutes apart in separate RNG
+   * streams. `switchGate` doubles as the "already spent" flag and as the analytics record — its
+   * presence is what stops a second floor claiming one. `switchGatesEnabled` is left undefined
+   * rather than false when off, so it stays absent from the serialized save for every run that
+   * predates the feature.
+   */
+  switchGatesEnabled?: boolean;
+  switchGate?: DailySwitchGate;
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -2469,7 +2546,17 @@ function enemyCountForFloor(floor: number): number {
  * Initialize a new game state for floor 1 of multi-tier daily mode.
  * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
  */
-export function initializeGameStateForMultiTier(floor: number = 1): GameState {
+/**
+ * @param opts.switchGates Opt in to the daily's switch-gate feature (see
+ *   lib/map/switch-gates.ts). Defaults to OFF so that every other caller — tests, story mode,
+ *   endless, and the historical replays in lib/stats — is unaffected by construction. The two
+ *   daily entry points turn it on, gated on SWITCH_GATE_START_DATE, because they are the only
+ *   callers that know what date's map they are building.
+ */
+export function initializeGameStateForMultiTier(
+  floor: number = 1,
+  opts: { switchGates?: boolean } = {}
+): GameState {
   // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
 
@@ -2482,7 +2569,7 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const floorAlloc = floorChestAllocation[floor] ?? { chests: 0, keys: 0, chestContents: [] };
   const mapData = generateCompleteMapForFloor(floorAlloc, floor);
 
-  // Decoy cracks, 0-2, on every floor including this one. On floor 1 the hero has no
+  // Decoy cracks, 3-5, on every floor including this one. On floor 1 the hero has no
   // bombs at all, so a crack here is pure intrigue — it teaches the motif before it can
   // ever be used. (The real sealed doorway is floor 3 only; see advanceToNextFloor.)
   const sealPayloads = orUndefined(
@@ -2537,6 +2624,29 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
   const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
 
+  // The day's switch gate gets its first shot here. LAST in the floor's RNG stream on purpose —
+  // after the map, the seals, the enemies, the runes and the snakes — so switching the feature
+  // on moves none of those draws on any date. See maybePlaceSwitchGate.
+  const gateWiring: {
+    mapData: MapData;
+    gateGroups?: GateGroup[];
+    switchGate?: DailySwitchGate;
+  } = { mapData: withRunes };
+  // The day's wisp pots, baked into the map so the SAME pots hold wisps for every
+  // player on this seed. Placed after every other generation draw but immediately
+  // BEFORE the switch gate: the gate must stay the floor's final — and only
+  // conditional — draw, so its on/off toggle can never shift these stamps (the
+  // gates suite pins "enabling gates changes NOTHING else on the floor"). The
+  // draws /stats replays historically (chest allocation, boss kind) all happen
+  // earlier or on separate streams, so they stay true.
+  stampWispPots(withRunes);
+
+  if (opts.switchGates) {
+    maybePlaceSwitchGate(gateWiring, floor, findPlayerPosition(withRunes), {
+      avoid: occupiedTiles(snakesAdded),
+    });
+  }
+
   return {
     hasKey: false,
     hasExitKey: false,
@@ -2550,6 +2660,14 @@ export function initializeGameStateForMultiTier(floor: number = 1): GameState {
     maxFloors: 3,
     mapData: withRunes,
     sealPayloads,
+    // Wisps are live in the daily: seeded pot stamps above, plus the runtime
+    // enemy-drop and once-per-floor pity sources this config switches on.
+    wispConfig: WISP_STANDARD_CONFIG,
+    // Carried across floors: whether the feature is on for this run, and whether the day's one
+    // gate has already been spent. advanceToNextFloor reads both.
+    switchGatesEnabled: opts.switchGates ? true : undefined,
+    switchGate: gateWiring.switchGate,
+    gateGroups: gateWiring.gateGroups,
     showFullMap: false,
     win: false,
     playerDirection: Direction.DOWN,
@@ -2699,9 +2817,9 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         }
       }
     }
-    // Decoy cracks, 0-2, on EVERY floor — independent of the boss roll, so a floor can
-    // carry cracks with no doorway behind any of them and a bomb day can roll none at
-    // all. Placed after the doorway so they keep their distance from it.
+    // Decoy cracks, 3-5, on EVERY floor — independent of the boss roll, so a floor
+    // always carries cracks with no doorway behind most of them. Placed after the
+    // doorway so they keep their distance from it.
     const decoys = stampDecoySeals(
       mapData,
       rollDecoySealCount(),
@@ -2812,13 +2930,41 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
   );
 
-  // Level-scale colour-switch puzzle: floor 2 only, ~40% of days. Rolled and placed from a SEPARATE
-  // salted stream (like dailyBossKind above) and stamped LAST — after every rng-consuming, map-reading
-  // step — so it consumes nothing from `rng` and leaves the shared sequence byte-identical. /stats
-  // re-runs this generator to reconstruct past days; because the shared stream is untouched, its
-  // answers (boss kind, L2 chests) are unchanged, so NO date-gate is needed. The stamper only ever
-  // carves dead-end wall pockets + drops switches on empty floor, so it can never sever the floor's
-  // path to the key/exit; it returns null (stamps nothing) when there is no safe spot.
+  // Wisp pots for this floor. Immediately BEFORE the switch gate: the gate must stay the floor's
+  // final rng-consuming draw so its toggle never shifts these stamps. Gated on the run carrying a
+  // wisp config so legacy multi-floor modes don't grow markers.
+  if (currentState.wispConfig) {
+    withPatchedMathRandom(rng, () => stampWispPots(withRunes));
+  }
+
+  // This floor's shot at the day's switch gate, if an earlier floor did not already claim it. LAST
+  // in `rng`'s stream on purpose — see maybePlaceSwitchGate; every draw it makes lands after the
+  // map, boss, enemy, rune, snake and wisp draws above, so turning the feature on cannot change what
+  // any past date replays to. gateGroups deliberately starts EMPTY rather than carrying
+  // currentState's: it is per-map wiring, and the previous floor's beds died with the previous floor.
+  const gateWiring: {
+    mapData: MapData;
+    gateGroups?: GateGroup[];
+    switchGate?: DailySwitchGate;
+  } = {
+    mapData: withRunes,
+    switchGate: currentState.switchGate,
+  };
+  if (currentState.switchGatesEnabled) {
+    withPatchedMathRandom(rng, () =>
+      maybePlaceSwitchGate(gateWiring, nextFloor, findPlayerPosition(withRunes), {
+        avoid: occupiedTiles(snakesAdded),
+      })
+    );
+  }
+
+  // Level-scale colour-switch puzzle (floor 2 only, ~15-20% of days). Rolled + placed from a SEPARATE
+  // salted stream (like dailyBossKind) and stamped TRULY LAST — after the switch gate above has read
+  // the clean map and made its `rng` draws — so it consumes NOTHING from `rng` and its tiles are seen
+  // by nothing downstream. The shared sequence stays byte-identical, so /stats reconstruction of past
+  // days (boss kind, L2 chests, switch gates, wisps) is unchanged and no date-gate is needed. It only
+  // carves dead-end wall pockets + drops switches on empty floor and relocates the exit key behind the
+  // gate, so it can never sever the floor or softlock; returns null (stamps nothing) when no safe spot.
   let colorLocks: ColorLock[] | undefined;
   if (nextFloor === 2 && playerPos) {
     const puzRng = mulberry32Fn(dailySeed ^ COLOR_PUZZLE_SEED_SALT);
@@ -2841,6 +2987,11 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     // above would otherwise inherit the previous floor's lock, which points at tiles that don't exist
     // on this map).
     colorLocks,
+    switchGate: gateWiring.switchGate,
+    // Replaced, not merged: gateGroups is per-map wiring and the previous floor's beds are gone
+    // with the previous floor. Carrying them forward would leave pressPlate matching a plate
+    // coordinate on a map that no longer has it.
+    gateGroups: gateWiring.gateGroups,
     hasExitKey: false, // Reset exit key for new floor
     portalLocation: undefined, // Reset placed portal — no backtracking between floors
     win: false, // Reset win state
@@ -2852,6 +3003,12 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     bossArenaSeed: bossEntrance ? arenaSeedForEntrance(bossEntrance) : undefined,
     sealPayloads,
     dailyBossKind,
+    // Wild wisps, the hero's trail and the companion's perch are positions on the
+    // floor being left behind — reset. Carried companions and the per-floor pity
+    // latch (wispPityFloors, keyed by floor number) ride along via the spread.
+    wisps: undefined,
+    heroTrail: undefined,
+    wispPos: undefined,
     recentDeaths: [],
     recentBombBlasts: [], // don't carry a blast's VFX/shake into the next floor
     defeatedEnemies: [],
@@ -3486,11 +3643,22 @@ export function snapshotBosses(state: GameState): BossSnapshot {
     const e = (state.enemies ?? []).find((en) => en.kind === kind);
     return e ? [e.y, e.x] : null;
   };
+  // The Coilwyrm counts as "still here" while ANY of its parts stands, not just a head:
+  // a decapitated body can spend a turn (or more) headless before it promotes a replacement
+  // or is reaped, and if the snapshot only saw heads those turns would have coilwyrm: null —
+  // so the turn the last segment finally died would skip the payout branch entirely and the
+  // exit key would never drop. Registry-driven (bodyPart) so the next segmented boss inherits it.
+  const findCoilwyrm = (): [number, number] | null => {
+    const head = find("coilwyrm");
+    if (head) return head;
+    const part = (state.enemies ?? []).find((en) => EnemyRegistry[en.kind]?.bodyPart);
+    return part ? [part.y, part.x] : null;
+  };
   return {
     shaper: find("shaper"),
     fisher: find("fisher"),
     quarrymaster: find("quarrymaster"),
-    coilwyrm: find("coilwyrm"),
+    coilwyrm: findCoilwyrm(),
   };
 }
 
@@ -3530,8 +3698,75 @@ function settleBossKill(after: GameState): void {
  *             chamber switch thrown, which is a separate gate (see gateGroups).
  *
  * All four also hand over a heart — see settleBossKill.
+ *
+ * Whatever this decides, `ensureBossArenaSolvable` gets the last word — a boss arena with
+ * nothing left to kill and no way to the exit is a dead run, so the key is guaranteed there
+ * rather than here. Add new bosses to the branches below for the right drop in the right
+ * place; the net is what makes a mistake in one survivable.
  */
 function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
+  awardBossDefeat(after, before);
+  ensureBossArenaSolvable(after);
+}
+
+/**
+ * Is this enemy the fight itself — the thing whose death ends the arena?
+ *
+ * Keyed off BOSS_KINDS, the roster that already defines what a boss IS, rather than the
+ * registry's `boss` flag: that flag was added for the Coilwyrm's regrow check and only ever
+ * reached the two kinds that needed it, so the Fisher and Quarrymaster read as ordinary
+ * enemies through it. Anything that asks "is the boss dead" and gets that wrong pays out
+ * mid-fight or not at all, so the question is asked in exactly one place.
+ *
+ * `bodyPart` comes along for segmented bosses: a headless length of Coilwyrm is still the boss,
+ * and it is registry-driven so the next segmented boss inherits this for free.
+ */
+function isBossPart(enemy: Enemy): boolean {
+  if (BOSS_KINDS.includes(enemy.kind as BossKind)) return true;
+  return Boolean(EnemyRegistry[enemy.kind]?.bodyPart);
+}
+
+/**
+ * Last-resort guarantee: you killed everything in a boss arena, so the exit must be openable.
+ *
+ * The per-boss payouts above are precise — right drop, right tile, right turn — and precision
+ * is exactly what leaks. It has already happened once: a Coilwyrm decapitated a turn earlier
+ * left only body segments, so the turn they finally died had no head in the pre-turn snapshot
+ * and the payout branch was skipped. The player had killed the boss and was sealed in the room
+ * with no key and nothing left to hit — an unwinnable run with no way to tell it was a bug.
+ *
+ * So the invariant is enforced from the other end, where it does not depend on knowing which
+ * kill path fired: in an arena, with no boss and no boss body still standing, if there is no
+ * key on the floor and none in the pack, hand it over. Granted straight to the pack rather than
+ * dropped as a tile because a drop still has to be walked onto, and the whole point here is that
+ * nothing further is required of the player.
+ *
+ * Fires at most once per arena by construction — afterwards `hasExitKey` is set, and on the turn
+ * it is spent the run is already leaving (win or floor transition, both excluded).
+ *
+ * `bossKind` is required alongside `inBossRoom` so this only ever speaks for a room the run
+ * actually entered to fight something. Both are set together (enterBossRoom, endlessBossStateFor),
+ * cleared together, and saved together, so requiring it costs nothing in real play — but a bare
+ * arena built straight from a builder for a test harness has no boss to be owed a key for.
+ */
+function ensureBossArenaSolvable(after: GameState): void {
+  if (!after.inBossRoom || !after.bossKind || after.hasExitKey) return;
+  if (after.win || after.needsFloorTransition) return;
+  if ((after.enemies ?? []).some(isBossPart)) return;
+  let hasExit = false;
+  for (const row of after.mapData.subtypes) {
+    for (const cell of row) {
+      if (cell.includes(TileSubtype.EXITKEY)) return; // reachable on the floor: nothing to do
+      if (cell.includes(TileSubtype.EXIT)) hasExit = true;
+    }
+  }
+  if (!hasExit) return; // no keyed door in here to be stuck behind
+  after.hasExitKey = true;
+  // The heart rides along: a payout this missed the key on missed the rest of the kill too.
+  if (!after.bossDefeated) settleBossKill(after);
+}
+
+function awardBossDefeat(after: GameState, before: BossSnapshot): void {
   if (!after.inBossRoom || after.bossDefeated) return;
   const alive = after.enemies ?? [];
   // Prefer the recorded death tile; fall back to where it stood before the killing blow.
@@ -3562,12 +3797,8 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
     // at all — paying out there hands over the exit key mid-fight. Its body parts therefore
     // count as the boss still standing, which is correct for both endings: a body long enough
     // to promote produces a new head, and one too short marks itself severed and is reaped
-    // within a tick. `bodyPart` is registry-driven so the next segmented boss inherits this.
-    const standing = alive.some((e) => {
-      const cfg = EnemyRegistry[e.kind];
-      return Boolean(cfg?.boss || cfg?.bodyPart);
-    });
-    if (standing) return;
+    // within a tick. See isBossPart for what counts as still standing.
+    if (alive.some(isBossPart)) return;
     const [ky, kx] = deathTile(before.coilwyrm);
     const cell = after.mapData.subtypes[ky]?.[kx];
     if (cell && !cell.includes(TileSubtype.EXITKEY)) cell.push(TileSubtype.EXITKEY);
@@ -3610,15 +3841,23 @@ function resolveBossDefeat(after: GameState, before: BossSnapshot): void {
  * Mutates in place; safe to call on a tile with no group wired to it (no-op).
  */
 function pressPlate(
-  state: { gateGroups?: GateGroup[] },
+  state: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate },
   mapData: MapData,
   y: number,
-  x: number
+  x: number,
+  by: "rock" | "boot"
 ): void {
   const cell = mapData.subtypes[y]?.[x];
   if (cell) {
     const i = cell.indexOf(TileSubtype.PRESSURE_PLATE);
     if (i >= 0) cell[i] = TileSubtype.PRESSURE_PLATE_PRESSED;
+  }
+  // Record engagement with THE DAILY'S gate only, matched by plate coordinate. A daily run that
+  // finds the floor-3 boss door presses up to four Quarrymaster plates, and those are the
+  // arena's puzzle, not this feature — counting them would inflate every number in the report.
+  const daily = state.switchGate;
+  if (daily && !daily.thrownBy && daily.plate[0] === y && daily.plate[1] === x) {
+    state.switchGate = { ...daily, thrownBy: by };
   }
   const group = state.gateGroups?.find(
     (g) => g.plate[0] === y && g.plate[1] === x && !g.open
@@ -3787,12 +4026,15 @@ export function movePlayer(
   // Standing actions (throwing, using items) blind mist-covered enemies but deliberately
   // don't shift the cloud; the hero stirs it by walking through it.
   if (gameState.inPinkRealm && detonated.inPinkRealm) {
-    return withRewindStep(gameState, {
-      ...detonated,
-      mist: advanceMist(detonated.mist ?? [], detonated.mapData),
-    });
+    return withRewindStep(
+      gameState,
+      advanceWispTurn(gameState, {
+        ...detonated,
+        mist: advanceMist(detonated.mist ?? [], detonated.mapData),
+      })
+    );
   }
-  return withRewindStep(gameState, detonated);
+  return withRewindStep(gameState, advanceWispTurn(gameState, detonated));
 }
 
 /**
@@ -4775,7 +5017,7 @@ function movePlayerCore(
     // cage gate in its group drops to bare floor. Like the lightswitch, the plate stays
     // on the tile and coexists with the player (it just changes to the pressed art).
     if (subtype.includes(TileSubtype.PRESSURE_PLATE)) {
-      pressPlate(newGameState, newMapData, newY, newX);
+      pressPlate(newGameState, newMapData, newY, newX, "boot");
     }
 
     // A toggle switch is thrown the same way but never latches — see throwToggle. A colour switch

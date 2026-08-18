@@ -1,6 +1,7 @@
 import {
   advanceToNextFloor,
   initializeGameStateForMultiTier,
+  SWITCH_GATE_START_DATE,
   type GameState,
 } from "../map";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
@@ -38,7 +39,12 @@ export function buildDailyFloor2FromTutorial(
   // advanceToNextFloor reads when generating floor 2.
   const rng = mulberry32(seed);
   const floor1 = withPatchedMathRandom(rng, () => {
-    return initializeGameStateForMultiTier(1);
+    // Same date gate as the daily route in GameView — this path also builds a real daily map
+    // from the date seed, so it has to agree about whether the day has switch gates or the
+    // tutorial hand-off would generate a different floor 2 than the normal route.
+    return initializeGameStateForMultiTier(1, {
+      switchGates: localToday >= SWITCH_GATE_START_DATE,
+    });
   });
   if (!floor1) {
     throw new Error(

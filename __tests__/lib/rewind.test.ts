@@ -201,6 +201,39 @@ describe("rewinding", () => {
     expect(back!.stats.damageTaken).toBe(4);
   });
 
+  it("does not relight the torch — a condition carries forward", () => {
+    // The DOUSE boss entrance depends on this: douse in the pool, wind back to the
+    // portal, arrive still dark. A wholesale restore would hand back the lit torch the
+    // snapshot was taken with and make that entrance unreachable.
+    const after = walkRight(baseState({ rewindCharges: 1, heroTorchLit: true }), 8);
+    expect(after.rewindHistory?.[0]?.state.heroTorchLit).toBe(true);
+
+    const doused: GameState = { ...after, heroTorchLit: false };
+    const back = rewindStateBy(doused, 6);
+    expect(back!.heroTorchLit).toBe(false);
+    // Position still came from the past — that's the whole trick.
+    expect(findPlayerPosition(back!.mapData)).toEqual([1, 2]);
+  });
+
+  it("carries a RELIT torch forward too — the trick works both ways", () => {
+    const after = walkRight(baseState({ rewindCharges: 1, heroTorchLit: false }), 6);
+    const relit: GameState = { ...after, heroTorchLit: true };
+    expect(rewindStateBy(relit, 4)!.heroTorchLit).toBe(true);
+  });
+
+  it("DOES rewind held quantities — carrying them forward would duplicate loot", () => {
+    // The map rolls back with the snapshot, so a looted chest is closed and full again.
+    // Keep the items too and every pickup inside the window can be collected twice.
+    const start = baseState({ rewindCharges: 1, rockCount: 2, potionCount: 0 });
+    const after = walkRight(start, 6);
+    const looted: GameState = { ...after, rockCount: 5, potionCount: 1, hasSword: true };
+
+    const back = rewindStateBy(looted, 4)!;
+    expect(back.rockCount).toBe(2);
+    expect(back.potionCount).toBe(0);
+    expect(back.hasSword).toBeFalsy();
+  });
+
   it("keeps run-level achievement latches and the last checkpoint", () => {
     const after = walkRight(baseState({ rewindCharges: 1 }), 5);
     const decorated: GameState = {

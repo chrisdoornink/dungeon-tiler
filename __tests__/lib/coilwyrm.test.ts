@@ -459,9 +459,8 @@ describe("two hits kill a head, and the body grows another", () => {
     // A 5-segment coil filled all five slots of the "Enemies in sight" panel with identical
     // segment rows and pushed the head — the only part with meaningful hearts — off the list.
     expect(EnemyRegistry["coilwyrm-coil"].bodyPart).toBe(true);
-    expect(EnemyRegistry["coilwyrm"].bodyPart).toBeFalsy();
     // The core of a multi-part boss must stay listable, or the fight has no HUD presence.
-    expect(EnemyRegistry["coilwyrm"].boss).toBe(true);
+    expect(EnemyRegistry["coilwyrm"].bodyPart).toBeFalsy();
   });
 
   it("a headshot is BOUGHT with a bite — that is what stops head-grinding", () => {
@@ -640,6 +639,28 @@ describe("two hits kill a head, and the body grows another", () => {
       });
     const after = movePlayer(state, Direction.RIGHT);
     expect((after.enemies ?? []).some((e) => e.kind === "coilwyrm")).toBe(false);
+    expect(after.bossDefeated).toBe(true);
+    const keyed = after.mapData.subtypes.some((row) =>
+      row.some((cell) => cell.includes(TileSubtype.EXITKEY))
+    );
+    expect(keyed).toBe(true);
+  });
+
+  it("a headless body too short to regrow still pays out the exit key when it dies", () => {
+    // Regression: the head died on an earlier turn, so no turn from here on has a
+    // `coilwyrm` head in its pre-turn snapshot. If the snapshot only counted heads, the
+    // turn the leftover segments were reaped would skip the payout branch and the run
+    // would soft-lock — killed boss, no key, sealed exit.
+    const enemies = makeCoil([[5, 5], [5, 4], [5, 3], [5, 2]]);
+    enemies.splice(enemies.indexOf(headOf(enemies)), 1); // head already dead
+    expect(segmentsOf(enemies).length).toBeLessThan(COILWYRM_SPLIT_MIN);
+    const state = coilState(13, [9, 9], enemies, { inBossRoom: true });
+    // One in-game turn: segments notice the missing head, fail to promote, and are reaped.
+    let after = movePlayer(state, Direction.LEFT);
+    for (let t = 0; t < 3 && (after.enemies ?? []).length > 0; t++) {
+      after = movePlayer(after, Direction.RIGHT);
+    }
+    expect(after.enemies ?? []).toHaveLength(0);
     expect(after.bossDefeated).toBe(true);
     const keyed = after.mapData.subtypes.some((row) =>
       row.some((cell) => cell.includes(TileSubtype.EXITKEY))

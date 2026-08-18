@@ -177,17 +177,12 @@ export enum TileSubtype {
   // organic-mystical, and amber is literally preserved time. See lib/map/rewind.ts for the
   // snapshot ring buffer and .claude/features/amber-moth-rewind/index.md for the design.
   AMBER_MOTH = 71,
+  // A wisp curled up inside a pot, stamped at map generation (lib/map/wisp.ts
+  // stampWispPots) so the SAME pots hold wisps for every player on a daily seed.
+  // Never rendered — the marker only means "this pot releases a wisp when smashed";
+  // the wisp turn hook consumes it. Rides on [POT, WISP] like [POT, SNAKE] does.
+  WISP = 72,
   // ---- Puzzle machinery (see lib/map/machinery.ts) -----------------------------------------
-  // A TOGGLE_SWITCH is the re-armable cousin of PRESSURE_PLATE. The plate latches: it turns
-  // into PRESSURE_PLATE_PRESSED once and its spikes never come back, because in the
-  // Quarrymaster's arena the point is banked, irreversible progress. A toggle instead flips its
-  // group every time it is thrown, so the same switch can be used to solve a room one way, then
-  // thrown again to solve it another. That difference is what turns a barrier into a puzzle.
-  //
-  // Kept as its own subtype rather than a flag on PRESSURE_PLATE so the two read differently at
-  // a glance — the player must be able to tell "this is spent" from "this can be thrown again"
-  // without trying it. Latching plates are warm/brass, toggles are cold/blue.
-  TOGGLE_SWITCH = 72,
   // A MOVING_PLATFORM is a stone slab that rides a fixed track across LAVA or DEEP_WATER,
   // one tile per turn. It is a FLOOR overlay that coexists with the hazard beneath it and
   // suppresses it, exactly the way OBSIDIAN makes a lava tile safe — the difference is that
@@ -200,6 +195,19 @@ export enum TileSubtype {
   // and non-blocking, and NOT optional: a platform whose path cannot be read is a platform the
   // player has to learn by dying in lava. The track is what makes the timing fair.
   PLATFORM_TRACK = 74,
+  // A TOGGLE_SWITCH is the re-armable cousin of PRESSURE_PLATE. The plate latches: it turns
+  // into PRESSURE_PLATE_PRESSED once and its spikes never come back, because in the
+  // Quarrymaster's arena the point is banked, irreversible progress. A toggle instead flips its
+  // group every time it is thrown, so the same switch can be used to solve a room one way, then
+  // thrown again to solve it another. That difference is what turns a barrier into a puzzle.
+  //
+  // Kept as its own subtype rather than a flag on PRESSURE_PLATE so the two read differently at
+  // a glance — the player must be able to tell "this is spent" from "this can be thrown again"
+  // without trying it. Latching plates are warm/brass, toggles are cold/blue.
+  //
+  // Value 75, not 72: WISP shipped to main at 72 first, so on merge this (unshipped) branch's
+  // switch was renumbered to the next free slot to avoid the collision. All references are symbolic.
+  TOGGLE_SWITCH = 75,
 }
 
 /**

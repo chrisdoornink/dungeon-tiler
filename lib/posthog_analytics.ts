@@ -154,6 +154,15 @@ export function trackGameComplete(params: {
   bossEntranceKind?: "bomb" | "douse" | "moat-lava" | "moat-water";
   bossKind?: string;
   dailyBossKind?: string;
+  // Switch gates (lib/map/switch-gates.ts). switchGateFloor/Access describe what the day
+  // OFFERED — present on any run that reached the floor carrying it, whether or not the player
+  // noticed — while switchGateThrownBy says what they DID: "rock" means they threw one across
+  // the spike bed, "boot" means they walked around and stood on it. That split is the whole
+  // point of the instrumentation: it is the only way to tell whether the behind-the-spikes
+  // variant is earning its place or just being walked around.
+  switchGateFloor?: number;
+  switchGateAccess?: "open" | "behind-bed";
+  switchGateThrownBy?: "rock" | "boot";
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -189,6 +198,15 @@ export function trackGameComplete(params: {
     boss_entrance_kind: params.bossEntranceKind,
     boss_kind: params.bossKind,
     daily_boss_kind: params.dailyBossKind,
+    switch_gate_floor: params.switchGateFloor,
+    switch_gate_access: params.switchGateAccess,
+    switch_gate_thrown_by: params.switchGateThrownBy,
+    // Derived so the funnel is one filter each rather than a formula. Both are undefined (not
+    // false) when the day had no gate, which keeps "days without a gate" out of the denominator
+    // when measuring the throw rate.
+    switch_gate_present: params.switchGateFloor != null ? true : undefined,
+    switch_gate_thrown:
+      params.switchGateFloor != null ? params.switchGateThrownBy != null : undefined,
   });
 }
 
@@ -276,6 +294,23 @@ export function trackRewindUsed(params: {
   dateSeed?: string;
 }) {
   captureEvent('rewind_used', { ...params });
+}
+
+/**
+ * The wisp life-regen companion (lib/map/wisp.ts). Two events, one funnel:
+ * `wisp_caught` is a wild wisp joining the hero; `wisp_save` is a carried one
+ * spending itself on the death that would have ended the run. caught vs saved
+ * says how often the insurance is actually cashed in — the first number to watch
+ * when tuning rarity (target was ~1-1.5 sightings/run, carry in ~1/3 of runs).
+ * Sightings themselves aren't tracked: no reliable client signal for "the player
+ * noticed it" exists, so the funnel starts at the catch.
+ */
+export function trackWispCaught(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  captureEvent('wisp_caught', { ...params });
+}
+
+export function trackWispSave(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {
+  captureEvent('wisp_save', { ...params });
 }
 
 export function trackPinkRealmReached(params?: { mode?: "daily" | "normal" | "endless"; floor?: number; dateSeed?: string }) {

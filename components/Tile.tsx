@@ -927,6 +927,11 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.MED &&
         subtype !== TileSubtype.RUNE &&
         subtype !== TileSubtype.SNAKE &&
+        // WISP rides on a pot as [POT, WISP] exactly like [POT, SNAKE] (see
+        // stampWispPots). It is a hidden payload the smash consumes, never drawn —
+        // without this it falls through to the generic renderer and paints a gray
+        // "?" glyph on the pot tile.
+        subtype !== TileSubtype.WISP &&
         subtype !== TileSubtype.WALL_TORCH &&
         subtype !== TileSubtype.TOWN_SIGN &&
         subtype !== TileSubtype.PORTAL &&
@@ -1204,7 +1209,15 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.wallSealIcon} ${
               pickVariant([styles.wallSealVariantA, styles.wallSealVariantB])
             }`}
-            style={{ transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg)` }}
+            style={{
+              // Mirror/flip picked from a different hash than the A/B image pick so
+              // the two don't correlate — 2 images x 4 orientations = 8 looks.
+              transform: `rotate(${getFaultyFloorRotation() % 24 - 12}deg) ${
+                ["", "scaleX(-1)", "scaleY(-1)", "scaleX(-1) scaleY(-1)"][
+                  Math.abs(((row ?? 0) * 53 + (col ?? 0) * 71) % 4)
+                ]
+              }`,
+            }}
           />
         )}
 

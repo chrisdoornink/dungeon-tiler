@@ -64,6 +64,19 @@ export {
 } from "./map/machinery";
 
 export {
+  SWITCH_GATE_START_DATE,
+  SWITCH_GATE_FLOOR_CHANCE,
+  maybePlaceSwitchGate,
+  planSwitchGate,
+  planSwitchGateBestEffort,
+  applySwitchGate,
+  injectSwitchGate,
+  occupiedTiles,
+  type PlateAccess,
+  type SwitchGatePlan,
+} from "./map/switch-gates";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,
