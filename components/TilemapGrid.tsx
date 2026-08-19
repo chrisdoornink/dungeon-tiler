@@ -5331,7 +5331,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           rewindAvailableDepth > 0
                             ? `Amber Moth — rewind up to ${rewindAvailableDepth} step${
                                 rewindAvailableDepth === 1 ? "" : "s"
-                              } (one use) — tap or press Z`
+                              } (${gameState.rewindCharges} use${
+                                gameState.rewindCharges === 1 ? "" : "s"
+                              } left) — tap or press Z`
                             : "Amber Moth — take a few steps first"
                         }
                       >
@@ -5348,12 +5350,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           }}
                         />
                         {isCompact ? (
-                          <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
-                            Z
-                          </span>
+                          <>
+                            <span className="absolute top-0 left-0 rounded-br bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              Z
+                            </span>
+                            <span className="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[9px] font-bold leading-tight text-white">
+                              {gameState.rewindCharges}
+                            </span>
+                          </>
                         ) : (
                           <>
-                            <span>Amber Moth</span>
+                            <span>Amber Moth x{gameState.rewindCharges}</span>
                             <span className="ml-1 text-[10px] text-gray-300/80 whitespace-nowrap hidden sm:inline">
                               (tap or Z)
                             </span>
@@ -6611,7 +6618,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                 key: "amber-moth",
                 label: "Amber Moth",
                 icon: assetUrl("/images/items/amber-moth.png"),
-                // No count: it is one-use, so a permanent "1" is noise.
+                // Two uses now, so show the remaining charge (2 -> 1) like the bomb does.
+                count: gameState.rewindCharges,
                 onUse: handleOpenRewind,
               }]
             : []),

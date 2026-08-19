@@ -101,6 +101,14 @@ import {
  */
 const BOSS_KIND_SEED_SALT = 0x5f1e_a17b;
 /**
+ * Salt for the boss-entrance FALLBACK stream. When the day's rolled entrance kind has no
+ * legal spot on this particular floor 3, a different kind is placed instead (so a boss day
+ * never silently loses its door) — and that retry's randomness is drawn from this separate
+ * salted stream so it consumes NOTHING from the floor's own sequence, keeping enemy/snake/
+ * decoy placement and /stats replay of every successfully-placed day byte-identical.
+ */
+const BOSS_ENTRANCE_FALLBACK_SEED_SALT = 0xb529_7a4d;
+/**
  * Salt + roll rate for the floor-2 colour-switch puzzle's independent RNG stream. Same discipline as
  * BOSS_KIND_SEED_SALT: a separate salted stream so placing the puzzle consumes NOTHING from the
  * floor's own sequence, leaving enemy/rune/snake placement byte-identical and /stats reconstruction
@@ -117,7 +125,7 @@ import {
   rollBossEntranceKind,
   rollDecoySealCount,
   sealCoords,
-  stampBossEntranceOnFloor,
+  stampBossEntranceWithFallback,
   stampDecoySeals,
   arenaSeedForEntrance,
   type BossEntranceKind,
@@ -671,7 +679,7 @@ function performUsePinkHeartCore(gameState: GameState): GameState {
 }
 
 /**
- * Use a belted berry (keyboard 'g'): heal a variable 2-3 hearts (clamped to max health).
+ * Use a belted berry (keyboard 'g'): heal a variable 3-4 hearts (clamped to max health).
  * Consumes one berry and costs a turn (enemies act first, like a potion). Does nothing if
  * none are held.
  */
@@ -727,9 +735,12 @@ function performUseBerryCore(gameState: GameState): GameState {
   // the abyss now, exactly as on a movement turn (see performThrowRock).
   onTurnElapsed(preTickState);
 
-  // Consume the berry: heal a variable 2-3 hearts (capped at heroMaxHealth).
-  const healRng = preTickState.combatRng ?? Math.random;
-  const heal = healRng() < 0.5 ? 2 : 3;
+  // Consume the berry: heal a variable 3-4 hearts (capped at heroMaxHealth). The split is
+  // deterministic on the hero's facing direction rather than a coin flip — vertical facing
+  // (UP/DOWN) heals 3, horizontal facing (LEFT/RIGHT) heals 4. Four directions split evenly.
+  const facingHorizontal =
+    preTickState.playerDirection === Direction.LEFT || preTickState.playerDirection === Direction.RIGHT;
+  const heal = facingHorizontal ? 4 : 3;
   const newGameState = { ...preTickState };
   newGameState.heroHealth = Math.min(
     newGameState.heroMaxHealth ?? 5,
@@ -1517,7 +1528,7 @@ const BOMB_PLAYER_DAMAGE_SHIELD = 4;
 /** Damage dealt to each enemy in the blast. Kills everything, incl. a stone goblin (8 HP). */
 const BOMB_ENEMY_DAMAGE = 8;
 /** Each chest bomb pickup grants this many bombs. */
-export const BOMB_PACK_SIZE = 3;
+export const BOMB_PACK_SIZE = 5;
 
 /**
  * Subtypes a bomb blast must NOT destroy. The exit door (EXIT) and exit key
@@ -1989,7 +2000,7 @@ export interface GameState {
   // Inventory
   rockCount?: number; // Count of collected rocks
   runeCount?: number; // Count of collected runes
-  bombCount?: number; // Count of carried bombs (chest pickups grant a 3-pack)
+  bombCount?: number; // Count of carried bombs (chest pickups grant a 5-pack)
   foodCount?: number; // Count of collected food items
   potionCount?: number; // Count of collected +2 potions
   pinkHeartCount?: number; // Pink flaming heart prizes held (pink realm); use with 'h' or keep as a trophy
@@ -2840,10 +2851,19 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
       );
       const kind = rollBossEntranceKind({ bombAvailable });
       if (kind) {
-        const stamped = stampBossEntranceOnFloor(mapData, kind);
-        if (stamped.placed) {
-          bossEntrance = kind;
-          sealPayloads = stamped.sealPayloads;
+        // If the rolled kind has no legal spot on THIS floor 3, place a different
+        // (reachable, non-bomb) kind instead, so a boss day never silently loses its
+        // door. The retry draws from a SEPARATE salted stream so it consumes nothing from
+        // `rng`: every successfully-placed day stays byte-identical and /stats replay of
+        // past days is undisturbed. See stampBossEntranceWithFallback for the discipline.
+        const placed = stampBossEntranceWithFallback(
+          mapData,
+          kind,
+          mulberry32Fn(dailySeed ^ BOSS_ENTRANCE_FALLBACK_SEED_SALT)
+        );
+        if (placed) {
+          bossEntrance = placed.kind;
+          sealPayloads = placed.sealPayloads;
         }
       }
     }
@@ -4988,10 +5008,10 @@ function movePlayerCore(
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       if (subtype.includes(TileSubtype.AMBER_MOTH)) {
-        // One rewind, spendable manually or automatically on death. The ring buffer only
+        // Two rewinds, spendable manually or automatically on death. The ring buffer only
         // starts recording once a charge is held (see recordRewindStep), so the charm can
         // never wind back past the moment it was picked up.
-        newGameState.rewindCharges = (newGameState.rewindCharges ?? 0) + 1;
+        newGameState.rewindCharges = (newGameState.rewindCharges ?? 0) + 2;
         newGameState.stats.itemsCollected = (newGameState.stats.itemsCollected ?? 0) + 1;
       }
       // Clearing of item happens below when we set dest tile subtypes

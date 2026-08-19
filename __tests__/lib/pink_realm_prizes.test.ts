@@ -92,32 +92,32 @@ describe("Pink realm prizes", () => {
   });
 
   describe("performUseBerry", () => {
-    it("heals 3 hearts when the roll is high, consuming one berry", () => {
+    it("heals 4 hearts when facing horizontally, consuming one berry", () => {
       const map = arena(10, 5, 5);
       const state = baseState(map, {
         heroHealth: 1,
         berryCount: 2,
-        combatRng: () => 0.9, // >= 0.5 -> heals 3
+        playerDirection: Direction.RIGHT, // horizontal -> heals 4
+      });
+
+      const after = performUseBerry(state);
+
+      expect(after.heroHealth).toBe(5); // 1 + 4
+      expect(after.berryCount).toBe(1);
+      expect(after.stats.berriesUsed).toBe(1);
+    });
+
+    it("heals 3 hearts when facing vertically", () => {
+      const map = arena(10, 5, 5);
+      const state = baseState(map, {
+        heroHealth: 1,
+        berryCount: 1,
+        playerDirection: Direction.DOWN, // vertical -> heals 3
       });
 
       const after = performUseBerry(state);
 
       expect(after.heroHealth).toBe(4); // 1 + 3
-      expect(after.berryCount).toBe(1);
-      expect(after.stats.berriesUsed).toBe(1);
-    });
-
-    it("heals 2 hearts when the roll is low", () => {
-      const map = arena(10, 5, 5);
-      const state = baseState(map, {
-        heroHealth: 1,
-        berryCount: 1,
-        combatRng: () => 0.1, // < 0.5 -> heals 2
-      });
-
-      const after = performUseBerry(state);
-
-      expect(after.heroHealth).toBe(3); // 1 + 2
       expect(after.berryCount).toBe(0);
     });
 
