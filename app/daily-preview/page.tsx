@@ -30,9 +30,11 @@ function isValidDate(s: string): boolean {
 }
 
 // Upcoming days that carry a colour puzzle (computed from the daily seeds). Quick-pick only —
-// the date field takes any day.
+// the date field takes any day. Floor 1 (~5%) and floor 2 (~19%) roll INDEPENDENTLY, so a day
+// occasionally has both; those are separated out so a floor-1-only test isn't muddied by a floor-2.
 const FLOOR2_PUZZLE_DAYS = ["2026-09-01", "2026-09-08", "2026-09-12", "2026-09-14", "2026-09-17", "2026-09-20", "2026-09-25"];
-const FLOOR1_PUZZLE_DAYS = ["2026-09-28", "2026-10-02", "2026-10-15", "2026-11-26", "2026-12-05"];
+const FLOOR1_ONLY_DAYS = ["2026-10-15", "2026-11-26", "2026-12-05", "2026-12-12", "2027-01-04", "2027-01-08"];
+const BOTH_PUZZLE_DAYS = ["2026-09-28", "2026-10-02", "2027-01-06", "2027-07-06"];
 
 function DayButton({ date }: { date: string }) {
   return (
@@ -77,12 +79,16 @@ function Picker({ current }: { current: string }) {
         </div>
         <div className="text-left text-sm space-y-2 pt-2">
           <div>
-            <div className="text-emerald-300 font-semibold">Floor-2 colour-puzzle days (4 switches):</div>
+            <div className="text-sky-300 font-semibold">Floor-1 puzzle only (3 switches):</div>
+            <div>{FLOOR1_ONLY_DAYS.map((d) => <DayButton key={d} date={d} />)}</div>
+          </div>
+          <div>
+            <div className="text-emerald-300 font-semibold">Floor-2 puzzle (4 switches):</div>
             <div>{FLOOR2_PUZZLE_DAYS.map((d) => <DayButton key={d} date={d} />)}</div>
           </div>
           <div>
-            <div className="text-sky-300 font-semibold">Floor-1 colour-puzzle days (3 switches):</div>
-            <div>{FLOOR1_PUZZLE_DAYS.map((d) => <DayButton key={d} date={d} />)}</div>
+            <div className="text-amber-300 font-semibold">Both floors (rare — {BOTH_PUZZLE_DAYS.length}/yr):</div>
+            <div>{BOTH_PUZZLE_DAYS.map((d) => <DayButton key={d} date={d} />)}</div>
           </div>
         </div>
       </div>
