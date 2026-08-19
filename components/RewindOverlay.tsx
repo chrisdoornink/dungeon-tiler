@@ -1,7 +1,15 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { assetUrl } from "../lib/asset_url";
 
 const PIXEL_FONT = 'var(--font-press-start-2p), "Courier New", monospace';
+
+/** The on-death beat auto-dismisses after this long even if the player never acts. */
+const REWIND_DEATH_MAX_MS = 1500;
+/**
+ * ...but the player's next action dismisses it early. This brief hold runs first so a key
+ * still held (or buffered) from the lethal moment can't blink the beat away before it is seen.
+ */
+const REWIND_DEATH_MIN_MS = 400;
 
 /**
  * The Amber Moth's rewind HUD.
@@ -155,10 +163,44 @@ function RewindDeathBeat({
   onDone,
   shown,
 }: RewindDeathProps & { shown: boolean }) {
+  // The beat is a cosmetic one-shot: the world was already restored before it mounted, so
+  // the hero is playable underneath it. It gets out of the way the moment the player acts
+  // again, and caps itself at REWIND_DEATH_MAX_MS if they just sit there.
+  //
+  // onDone is read through a ref so the timer effect can run exactly ONCE. The parent hands
+  // a fresh arrow every render; keying the effect on it (as this once did) let every parent
+  // re-render — one per step taken underneath the overlay — tear down and restart the timer,
+  // so it never fired while the player kept moving and the beat lingered indefinitely.
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
   useEffect(() => {
-    const timer = setTimeout(onDone, 2100);
-    return () => clearTimeout(timer);
-  }, [onDone]);
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      onDoneRef.current();
+    };
+    const cap = setTimeout(finish, REWIND_DEATH_MAX_MS);
+    // Dismiss on the next action, once the brief hold has armed it.
+    let armed = false;
+    const arm = setTimeout(() => {
+      armed = true;
+    }, REWIND_DEATH_MIN_MS);
+    const onAction = () => {
+      if (armed) finish();
+    };
+    window.addEventListener("keydown", onAction);
+    window.addEventListener("pointerdown", onAction);
+    window.addEventListener("touchstart", onAction);
+    return () => {
+      clearTimeout(cap);
+      clearTimeout(arm);
+      window.removeEventListener("keydown", onAction);
+      window.removeEventListener("pointerdown", onAction);
+      window.removeEventListener("touchstart", onAction);
+    };
+  }, []);
 
   return (
     <div
@@ -169,7 +211,9 @@ function RewindDeathBeat({
       style={{
         background:
           "radial-gradient(circle at 50% 45%, rgba(120, 66, 14, 0.72) 0%, rgba(10, 6, 2, 0.93) 70%)",
-        pointerEvents: "all",
+        // Click-through: the hero is live under here, so a tap/keypress both moves and
+        // dismisses the beat rather than being swallowed by it.
+        pointerEvents: "none",
       }}
       role="status"
     >

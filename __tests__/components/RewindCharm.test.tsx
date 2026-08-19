@@ -2,6 +2,7 @@ import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/dom";
 import { TilemapGrid } from "../../components/TilemapGrid";
+import { RewindOverlay } from "../../components/RewindOverlay";
 import { Direction, TileSubtype, movePlayer, type GameState } from "../../lib/map";
 import { findPlayerPosition } from "../../lib/map/player";
 import { CurrentGameStorage } from "../../lib/current_game_storage";
@@ -101,6 +102,97 @@ describe("Amber Moth — inventory button", () => {
 
     walkRight(2);
     expect(screen.getByTestId("amber-moth-button")).toBeEnabled();
+  });
+});
+
+describe("Amber Moth — charge count on the button", () => {
+  it("shows the remaining uses, dropping from 2 to 1 after one is spent", () => {
+    const saves = watchSaves();
+    render(
+      <TilemapGrid tileTypes={{}} initialGameState={makeState({ rewindCharges: 2 })} />
+    );
+    walkRight(3);
+    expect(screen.getByTestId("amber-moth-button")).toHaveTextContent("2");
+
+    // Spend one charge via a manual rewind.
+    act(() => {
+      fireEvent.click(screen.getByTestId("amber-moth-button"));
+    });
+    act(() => {
+      fireEvent.click(screen.getByTestId("rewind-commit"));
+    });
+
+    expect(saves.latest()!.rewindCharges).toBe(1);
+    const button = screen.getByTestId("amber-moth-button");
+    expect(button).toHaveTextContent("1");
+    expect(button).not.toHaveTextContent("2");
+  });
+});
+
+/**
+ * The on-death beat is cosmetic — the world is already restored under it — so it must
+ * step aside quickly. Regression guard for the timer that used to restart on every parent
+ * re-render (one per step taken underneath), leaving the overlay stuck on screen.
+ */
+describe("Amber Moth — death beat dismissal", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("is click-through so a tap/keypress reaches the hero underneath", () => {
+    render(<RewindOverlay mode="death" depth={5} onDone={() => {}} />);
+    expect(screen.getByTestId("rewind-death-beat")).toHaveStyle({
+      pointerEvents: "none",
+    });
+  });
+
+  it("dismisses on the next action once the brief hold has passed", () => {
+    jest.useFakeTimers();
+    const onDone = jest.fn();
+    render(<RewindOverlay mode="death" depth={5} onDone={onDone} />);
+
+    // A key still held from the lethal moment (before the hold arms) is ignored.
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+    });
+    expect(onDone).not.toHaveBeenCalled();
+
+    // Once armed, the very next action dismisses it.
+    act(() => {
+      jest.advanceTimersByTime(400);
+    });
+    act(() => {
+      fireEvent.keyDown(window, { key: "ArrowRight" });
+    });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps itself even if the player never acts", () => {
+    jest.useFakeTimers();
+    const onDone = jest.fn();
+    render(<RewindOverlay mode="death" depth={5} onDone={onDone} />);
+    act(() => {
+      jest.advanceTimersByTime(1500);
+    });
+    expect(onDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not restart its timer when the parent re-renders with a fresh onDone", () => {
+    jest.useFakeTimers();
+    const onDone = jest.fn();
+    // A fresh arrow each render is exactly what TilemapGrid passes every turn.
+    const { rerender } = render(
+      <RewindOverlay mode="death" depth={5} onDone={() => onDone()} />
+    );
+    act(() => {
+      jest.advanceTimersByTime(1000);
+    });
+    rerender(<RewindOverlay mode="death" depth={5} onDone={() => onDone()} />);
+    // The cap fires 1500ms after MOUNT, not 1500ms after the re-render.
+    act(() => {
+      jest.advanceTimersByTime(500);
+    });
+    expect(onDone).toHaveBeenCalledTimes(1);
   });
 });
 
