@@ -306,6 +306,12 @@ interface TilemapGridProps {
    */
   onDeath?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
+  /**
+   * /daily-preview date override (YYYY-MM-DD). When set, floor advancement is seeded from THIS
+   * date instead of today, and every analytics event /stats reads is suppressed so a test replay
+   * never lands in production numbers. Only ever passed by the /daily-preview route.
+   */
+  dailyDateOverride?: string;
   // Notify parent where the hero is (floor number + pink realm / boss arena
   // status) so it can render a location title. Fires on mount and on any change.
   onLocationChange?: (loc: {
@@ -326,6 +332,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onWin,
   onDeath,
   storageSlot,
+  dailyDateOverride,
   onLocationChange,
 }) => {
   const router = useRouter();
@@ -2962,10 +2969,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   // Handle floor transition for multi-tier daily and endless modes — start iris wipe animation
   useEffect(() => {
-    const isMultiTierDaily = isDailyChallenge && resolvedStorageSlot === 'daily-new';
+    const isMultiTierDaily =
+      isDailyChallenge &&
+      (resolvedStorageSlot === 'daily-new' || resolvedStorageSlot === 'daily-preview');
     if (gameState.needsFloorTransition && (isMultiTierDaily || isEndless) && !floorTransition) {
-      // Pre-compute the next floor state so it's ready when the screen goes black
-      const localToday = DateUtils.getTodayString();
+      // Pre-compute the next floor state so it's ready when the screen goes black. /daily-preview
+      // advances the SAME chosen date across every floor; the live daily always uses today.
+      const localToday = dailyDateOverride ?? DateUtils.getTodayString();
       const nextFloorState = isEndless
         ? advanceToNextEndlessFloor(gameState)
         : advanceToNextFloor(gameState, hashStringToSeed(localToday));
@@ -2978,19 +2988,22 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       }
 
       // Telemetry: record the loadout carried UP a floor, so we can see e.g. how
-      // many people rush to level 2 without grabbing the sword/shield.
-      try {
-        const fromFloor = gameState.currentFloor ?? 1;
-        trackFloorAdvance({
-          mode: isEndless ? "endless" : "daily",
-          fromFloor,
-          toFloor: fromFloor + 1,
-          hasSword: !!gameState.hasSword,
-          hasShield: !!gameState.hasShield,
-          hasKey: !!gameState.hasKey,
-          dateSeed: isEndless ? undefined : localToday,
-        });
-      } catch {}
+      // many people rush to level 2 without grabbing the sword/shield. Suppressed for
+      // /daily-preview so a test replay never lands in the funnels.
+      if (!dailyDateOverride) {
+        try {
+          const fromFloor = gameState.currentFloor ?? 1;
+          trackFloorAdvance({
+            mode: isEndless ? "endless" : "daily",
+            fromFloor,
+            toFloor: fromFloor + 1,
+            hasSword: !!gameState.hasSword,
+            hasShield: !!gameState.hasShield,
+            hasKey: !!gameState.hasKey,
+            dateSeed: isEndless ? undefined : localToday,
+          });
+        } catch {}
+      }
 
       // Close on the hero's actual viewport position (off-center when the
       // camera is clamped at a map edge), and open on his next-floor spawn.
@@ -3013,7 +3026,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         pendingGameState: nextFloorState,
       });
     }
-  }, [gameState.needsFloorTransition, isDailyChallenge, isEndless, resolvedStorageSlot, floorTransition]);
+  }, [gameState.needsFloorTransition, isDailyChallenge, isEndless, resolvedStorageSlot, floorTransition, dailyDateOverride]);
 
   // One-off exploration milestones (hidden, bomb-gated actions). The ref is
   // seeded from the state at mount so a mid-run reload — where the flag is
@@ -3025,6 +3038,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   });
   useEffect(() => {
     if (gameState.mode === "tutorial") return;
+    if (dailyDateOverride) return; // /daily-preview: no /stats analytics
     const mode = isDailyChallenge ? "daily" : "normal";
     const dateSeed = isDailyChallenge ? DateUtils.getTodayString() : undefined;
     if (gameState.reachedOutsideWorld && !explorationFiredRef.current.outsideWorld) {
@@ -3046,6 +3060,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     gameState.mode,
     gameState.currentFloor,
     isDailyChallenge,
+    dailyDateOverride,
   ]);
 
   // Redirect to end page OR signal completion (daily) and persist game snapshot on win
@@ -3056,7 +3071,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       // isn't a completed game, has no floor, and would log as "None::win".
       // Keep tutorial runs out of game_complete; the tutorial funnel
       // (tutorial_completed) covers them.
-      if (gameState.mode !== "tutorial") {
+      if (gameState.mode !== "tutorial" && !dailyDateOverride) {
         try {
           const mode = isDailyChallenge ? "daily" : "normal";
           const mapId = computeMapId(gameState.mapData);
@@ -3117,7 +3132,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             foodCount: gameState.foodCount ?? 0,
             potionCount: gameState.potionCount ?? 0,
           };
-        if (typeof window !== "undefined") {
+        // /daily-preview must not touch the real "lastGame" snapshot (streak + completed screen).
+        if (typeof window !== "undefined" && !dailyDateOverride) {
           window.localStorage.setItem("lastGame", JSON.stringify(payload));
         }
       } catch {
@@ -3209,6 +3225,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     onWin,
     router,
     resolvedStorageSlot,
+    dailyDateOverride,
   ]);
 
   useEffect(() => {
@@ -3682,7 +3699,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           potionCount: gameState.potionCount ?? 0,
         } as const;
         if (typeof window !== "undefined") {
-          window.localStorage.setItem("lastGame", JSON.stringify(payload));
+          // /daily-preview must not overwrite the real "lastGame" snapshot (streak + completed
+          // screen), but it SHOULD still clear its own (isolated) slot so a refresh can't resume.
+          if (!dailyDateOverride) {
+            window.localStorage.setItem("lastGame", JSON.stringify(payload));
+          }
           // Clear current game since it's completed
           CurrentGameStorage.clearCurrentGame(resolvedStorageSlot);
         }
@@ -3754,6 +3775,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     spawnWispBurst,
     heroDeathPhase,
     shouldAnimateHeroDeath,
+    dailyDateOverride,
   ]);
 
   // Handle player movement

@@ -19,7 +19,14 @@ export interface GameViewProps {
   isDailyChallenge?: boolean;
   forceDaylightDefault?: boolean;
   onDailyComplete?: (result: "won" | "lost") => void;
-  storageSlot?: "default" | "daily-new" | "story" | "endless";
+  storageSlot?: "default" | "daily-new" | "daily-preview" | "story" | "endless";
+  /**
+   * Date-override for the /daily-preview test route: when set (YYYY-MM-DD), the daily is
+   * generated and advanced for THIS date instead of today, so any past/future day's full run
+   * (enemies, darkness, floor cascade) can be replayed. Only ever passed by /daily-preview,
+   * which also isolates storage (daily-preview slot) and suppresses /stats analytics.
+   */
+  dailyDateOverride?: string;
 }
 
 /**
@@ -62,6 +69,7 @@ function GameViewInner({
   forceDaylightDefault,
   onDailyComplete,
   storageSlot,
+  dailyDateOverride,
 }: GameViewProps) {
   const [daylight] = useState(
     typeof forceDaylightDefault === "boolean"
@@ -123,7 +131,8 @@ function GameViewInner({
     if (!state) {
       // Deterministic daily seed: Local date string YYYY-MM-DD
       if (isDailyChallenge) {
-        const localToday = DateUtils.getTodayString();
+        // /daily-preview replays a chosen date; the live daily always uses today.
+        const localToday = dailyDateOverride ?? DateUtils.getTodayString();
         const seed = hashStringToSeed(localToday);
         const rng = mulberry32(seed);
         state = withPatchedMathRandom(rng, () => {
@@ -133,7 +142,7 @@ function GameViewInner({
           } else if (algorithm === "complete") {
             generateCompleteMap();
           }
-          if (slot === 'daily-new') {
+          if (slot === 'daily-new' || slot === 'daily-preview') {
             // Multi-tier daily mode uses its own initializer with floor-based generation.
             // Switch gates are date-gated: this is one of only two callers that knows which
             // day's map it is building, so the version check has to live here rather than
@@ -188,7 +197,7 @@ function GameViewInner({
     }
 
     return state;
-  }, [algorithm, replayExact, mapId, isDailyChallenge, storageSlot]);
+  }, [algorithm, replayExact, mapId, isDailyChallenge, storageSlot, dailyDateOverride]);
 
   // Legacy replay that only preserves map: derive a fresh state from lastGame.mapData
   const [replayState, setReplayState] = useState<GameState | undefined>();
@@ -238,12 +247,14 @@ function GameViewInner({
   useEffect(() => {
     try {
       if (!finalInitialState || !finalInitialState.mapData) return;
+      // /daily-preview is a local test run — never let it emit analytics that /stats reads.
+      if (dailyDateOverride) return;
       const mode = storageSlot === "endless" ? "endless" : isDailyChallenge ? "daily" : "normal";
       const mapId = computeMapId(finalInitialState.mapData);
       const dateSeed = isDailyChallenge ? DateUtils.getTodayString() : undefined;
       trackGameStart({ mode, mapId, dateSeed, algorithm });
     } catch {}
-  }, [finalInitialState, isDailyChallenge, algorithm, storageSlot]);
+  }, [finalInitialState, isDailyChallenge, algorithm, storageSlot, dailyDateOverride]);
 
   return (
     <div
@@ -268,6 +279,7 @@ function GameViewInner({
           isDailyChallenge={!!isDailyChallenge}
           onDailyComplete={onDailyComplete}
           storageSlot={storageSlot}
+          dailyDateOverride={dailyDateOverride}
           onLocationChange={setHeroLocation}
         />
       </div>

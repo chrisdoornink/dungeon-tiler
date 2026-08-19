@@ -13,13 +13,27 @@ const STORY_GAME_KEY = "currentStoryGame";
 const TUTORIAL_GAME_KEY = "currentTutorialGame";
 const TEST_GAME_KEY = "currentTestGame";
 const ENDLESS_GAME_KEY = "currentEndlessGame";
+// The date-override preview (/daily-preview): a real daily run for a chosen date, kept in its OWN
+// key so replaying a date never touches — or is loaded in place of — the player's actual daily save.
+const DAILY_PREVIEW_GAME_KEY = "currentDailyPreviewGame";
 
-export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial" | "test" | "endless";
+/**
+ * Slots that ARE the multi-tier daily: they generate floors, cascade, and get the same resume/dead-
+ * save guards. "daily-preview" is the date-override test run and behaves identically to "daily-new"
+ * for storage — the only differences (isolated key, no /stats analytics) live at the call sites.
+ */
+export function isDailySlot(slot: GameStorageSlot): boolean {
+  return slot === "daily-new" || slot === "daily-preview";
+}
+
+export type GameStorageSlot = "default" | "daily-new" | "daily-preview" | "story" | "tutorial" | "test" | "endless";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
     case "daily-new":
       return DAILY_NEW_GAME_KEY;
+    case "daily-preview":
+      return DAILY_PREVIEW_GAME_KEY;
     case "endless":
       return ENDLESS_GAME_KEY;
     case "story":
@@ -174,7 +188,7 @@ export class CurrentGameStorage {
         recentBombBlasts: [],
         recentDeaths: [],
         lastSaved: Date.now(),
-        isDailyChallenge: slot === "daily-new",
+        isDailyChallenge: isDailySlot(slot),
       };
       const key = keyForSlot(slot);
       window.localStorage.setItem(key, JSON.stringify(storedState));
@@ -211,7 +225,7 @@ export class CurrentGameStorage {
       // completion that has already been recorded (a duplicate daily result, a duplicate
       // endless leaderboard submission). Story/tutorial deliberately keep theirs — their
       // death screen offers a checkpoint restart, and dropping the save would lose the run.
-      if (slot === "daily-new" || slot === "endless") {
+      if (isDailySlot(slot) || slot === "endless") {
         if (parsed.heroHealth <= 0) {
           this.clearCurrentGame(slot);
           return null;
@@ -220,7 +234,7 @@ export class CurrentGameStorage {
 
       // For daily slots, also reject saves that are stale (already won, or from a previous
       // calendar day). These would immediately re-trigger completion.
-      if (slot === "daily-new") {
+      if (isDailySlot(slot)) {
         if (parsed.win) {
           this.clearCurrentGame(slot);
           return null;

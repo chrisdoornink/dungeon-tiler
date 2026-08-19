@@ -72,8 +72,18 @@ export function markNewPlayer(opts?: { enteredViaTutorial?: boolean }) {
 }
 
 // Safe PostHog event capture
+// When true, every captured event is dropped. The /daily-preview test route flips this on for
+// the duration of a replay so a practice run of a past/future daily never lands in production
+// analytics (game_complete, floor_advanced, pickups, ...). It is a single choke point because
+// EVERY track* helper funnels through captureEvent.
+let analyticsSuppressed = false;
+export function setAnalyticsSuppressed(suppressed: boolean): void {
+  analyticsSuppressed = suppressed;
+}
+
 function captureEvent(eventName: string, properties?: EventParams) {
   if (typeof window === 'undefined') return;
+  if (analyticsSuppressed) return;
 
   try {
     posthog.capture(
