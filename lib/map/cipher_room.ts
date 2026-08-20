@@ -16,6 +16,8 @@
 // corner is a later step.
 import { FLOOR, WALL, GRID_SIZE, TileSubtype } from "./constants";
 import type { ColorLock, MapData } from "./types";
+import type { Rng } from "../rng";
+import { findPlayerPosition } from "./player";
 
 export type CipherReward =
   | { kind: "items"; items: TileSubtype[] } // loose pickups on the floor behind the gate (no key)
@@ -150,7 +152,10 @@ function buildMuralVariant(opts: CipherRoomOptions): Built {
   for (let y = 11; y <= 14; y++) tiles[y][7] = FLOOR;
 
   const cols = [3, 4, 5, 6].slice(0, sequence.length);
-  const switches: Array<[number, number]> = cols.map((c) => [6, c]);
+  // Staggered rows within a four-row band (all below the gate), so the switches read as a scattered
+  // group rather than a rigid row — one per column, left to right.
+  const stagger = [6, 8, 7, 9];
+  const switches: Array<[number, number]> = cols.map((c, i) => [stagger[i] ?? 6, c]);
   // The engraving spans TWO adjacent wall tiles on the mural chamber's top WALL (each with floor below
   // at row 15, so the forced-perspective face is visible) — the code split across them, two glyphs a
   // tile, so each mark is big enough to read. A real level needs a two-wide wall for it.
@@ -173,4 +178,194 @@ function buildMuralVariant(opts: CipherRoomOptions): Built {
 /** Build the standalone cipher room as a complete floor (for the bench). */
 export function buildCipherRoomFloor(opts: CipherRoomOptions = {}): Built {
   return (opts.legendStyle ?? "mural") === "torches" ? buildTorchVariant(opts) : buildMuralVariant(opts);
+}
+
+// ==================================================================================================
+// stampCipherRoom — distribute a mural cipher puzzle into an ALREADY-GENERATED floor (a real L2/L3),
+// rather than carving a self-contained room. Three pieces get placed into the existing geography:
+//   - the SWITCHES: four colour switches, one per column, left-to-right, staggered within a ~4-row
+//     band (a loose scattered group, not a rigid row);
+//   - a GATED REWARD: a spike gate carved into a wall beside a fresh dead-end pocket holding a loose
+//     item (the gate the lock drives; sealing only the new pocket, so it can never sever the floor);
+//   - the MURAL: a two-wide wall engraving placed 8-14 tiles from the switches (default) so it is
+//     offscreen from them — you read it, remember it, and walk back.
+// Returns the ColorLock to attach to the GameState, or null if the floor has no room for all three
+// (the caller then just skips it). Uses ONLY the passed rng.
+// ==================================================================================================
+
+export interface StampCipherOptions {
+  sequence?: number[];
+  colors?: number;
+  reward?: CipherReward;
+  /** Tiles to keep clear (e.g. enemy positions). The hero tile is always avoided. */
+  avoid?: Array<[number, number]>;
+  /** How far the mural sits from the switch centroid (Euclidean tiles). Default 8..14, aiming ~11. */
+  muralMinDist?: number;
+  muralMaxDist?: number;
+}
+
+const ri = (rng: Rng, lo: number, hi: number): number => lo + Math.floor(rng.next() * (hi - lo + 1));
+const euclid = (a: [number, number], b: [number, number]): number => Math.hypot(a[0] - b[0], a[1] - b[1]);
+
+function passable(map: MapData, y: number, x: number): boolean {
+  if (map.tiles[y]?.[x] !== FLOOR) return false;
+  const s = map.subtypes[y]?.[x] ?? [];
+  return (
+    !s.includes(TileSubtype.SPIKES) && !s.includes(TileSubtype.LAVA) && !s.includes(TileSubtype.DEEP_WATER)
+  );
+}
+
+function reachFrom(map: MapData, start: [number, number]): Set<string> {
+  const seen = new Set<string>();
+  if (!passable(map, start[0], start[1])) return seen;
+  seen.add(`${start[0]},${start[1]}`);
+  const st: Array<[number, number]> = [start];
+  while (st.length) {
+    const [y, x] = st.pop() as [number, number];
+    for (const [ny, nx] of [[y - 1, x], [y + 1, x], [y, x - 1], [y, x + 1]] as Array<[number, number]>) {
+      const k = `${ny},${nx}`;
+      if (seen.has(k) || !passable(map, ny, nx)) continue;
+      seen.add(k);
+      st.push([ny, nx]);
+    }
+  }
+  return seen;
+}
+
+function isEmpty(map: MapData, y: number, x: number): boolean {
+  if (map.tiles[y]?.[x] !== FLOOR) return false;
+  const s = map.subtypes[y]?.[x] ?? [];
+  return s.length === 0 || (s.length === 1 && s[0] === TileSubtype.NONE);
+}
+
+export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions = {}): ColorLock | null {
+  const colors = Math.max(3, opts.colors ?? 4);
+  const N = 4;
+  const sequence = (opts.sequence ?? Array.from({ length: N }, () => ri(rng, 0, colors - 1))).slice(0, N);
+  const reward: CipherReward =
+    opts.reward ?? { kind: "items", items: [TileSubtype.EXTRA_HEART] };
+  const minDist = opts.muralMinDist ?? 8;
+  const maxDist = opts.muralMaxDist ?? 14;
+
+  const hero = findPlayerPosition(map);
+  if (!hero) return null;
+  const H = map.tiles.length;
+  const Wd = map.tiles[0].length;
+  const reach = reachFrom(map, hero);
+  const avoid = new Set((opts.avoid ?? []).map(([y, x]) => `${y},${x}`));
+  avoid.add(`${hero[0]},${hero[1]}`);
+
+  const free = (y: number, x: number): boolean =>
+    reach.has(`${y},${x}`) &&
+    isEmpty(map, y, x) &&
+    !avoid.has(`${y},${x}`) &&
+    Math.abs(y - hero[0]) + Math.abs(x - hero[1]) >= 3;
+
+  // ---- 1) SWITCHES: distinct columns, staggered rows within a ~4-row band, in a compact group ----
+  const freeTiles: Array<[number, number]> = [];
+  for (const k of reach) {
+    const [y, x] = k.split(",").map(Number) as [number, number];
+    if (free(y, x)) freeTiles.push([y, x]);
+  }
+  for (let i = freeTiles.length - 1; i > 0; i--) {
+    const j = ri(rng, 0, i);
+    [freeTiles[i], freeTiles[j]] = [freeTiles[j], freeTiles[i]];
+  }
+  let switches: Array<[number, number]> | null = null;
+  for (const [ay, ax] of freeTiles) {
+    const byCol = new Map<number, Array<[number, number]>>();
+    for (const [y, x] of freeTiles) {
+      if (x >= ax && x <= ax + 6 && y >= ay - 2 && y <= ay + 2) {
+        const list = byCol.get(x) ?? [];
+        list.push([y, x]);
+        byCol.set(x, list);
+      }
+    }
+    const cols = [...byCol.keys()].sort((a, b) => a - b);
+    if (cols.length < N) continue;
+    // 4 columns spread across what is available.
+    const picked = Array.from({ length: N }, (_, i) => cols[Math.floor((i * (cols.length - 1)) / (N - 1))]);
+    if (new Set(picked).size < N) continue;
+    const chosen = picked.map((c) => {
+      const list = byCol.get(c) as Array<[number, number]>;
+      return list[ri(rng, 0, list.length - 1)];
+    });
+    const rows = chosen.map(([y]) => y);
+    if (Math.max(...rows) - Math.min(...rows) > 4) continue; // stagger stays within ~4 rows
+    chosen.sort((a, b) => a[1] - b[1]); // left-to-right
+    switches = chosen;
+    break;
+  }
+  if (!switches) return null;
+  const usedFloor = new Set(switches.map(([y, x]) => `${y},${x}`));
+  const centroid: [number, number] = [
+    switches.reduce((s, [y]) => s + y, 0) / N,
+    switches.reduce((s, [, x]) => s + x, 0) / N,
+  ];
+
+  // ---- 2) GATE + REWARD POCKET, carved beside a wall nearest the switches ----
+  const inB = (y: number, x: number) => y >= 1 && y < H - 1 && x >= 1 && x < Wd - 1;
+  const carveable = (y: number, x: number) => inB(y, x) && map.tiles[y][x] === WALL;
+  const solid = (y: number, x: number) => map.tiles[y]?.[x] !== FLOOR;
+  type Base = { gate: [number, number]; pocket: [number, number] };
+  const bases: Base[] = [];
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < Wd - 1; x++) {
+      if (!carveable(y, x)) continue;
+      for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>) {
+        const ay = y - dy, ax = x - dx; // approach
+        const py = y + dy, px = x + dx; // pocket
+        if (!reach.has(`${ay},${ax}`) || avoid.has(`${ay},${ax}`) || usedFloor.has(`${ay},${ax}`)) continue;
+        if (!carveable(py, px)) continue;
+        if (!solid(py + dy, px + dx)) continue; // dead-end back wall
+        if (!solid(py - dx, px - dy) || !solid(py + dx, px + dy)) continue; // walled sides
+        bases.push({ gate: [y, x], pocket: [py, px] });
+      }
+    }
+  if (bases.length === 0) return null;
+  bases.sort((a, b) => euclid(a.gate, centroid) - euclid(b.gate, centroid));
+  const base = bases[0];
+  map.tiles[base.gate[0]][base.gate[1]] = FLOOR;
+  map.subtypes[base.gate[0]][base.gate[1]] = [TileSubtype.SPIKES];
+  map.tiles[base.pocket[0]][base.pocket[1]] = FLOOR;
+  if (reward.kind === "items" && reward.items.length) {
+    map.subtypes[base.pocket[0]][base.pocket[1]] = [reward.items[0]];
+  } else if (reward.kind === "chest") {
+    map.subtypes[base.pocket[0]][base.pocket[1]] = [TileSubtype.CHEST];
+  } else {
+    map.subtypes[base.pocket[0]][base.pocket[1]] = [TileSubtype.EXITKEY];
+  }
+  const gates: Array<[number, number]> = [base.gate];
+
+  // ---- 3) MURAL: two adjacent wall tiles with floor below, 8-14 tiles from the switches ----
+  const muralCands: Array<{ tiles: [[number, number], [number, number]]; d: number }> = [];
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < Wd - 2; x++) {
+      if (map.tiles[y][x] !== WALL || map.tiles[y][x + 1] !== WALL) continue;
+      if (map.tiles[y + 1][x] !== FLOOR || map.tiles[y + 1][x + 1] !== FLOOR) continue;
+      const f1 = `${y + 1},${x}`, f2 = `${y + 1},${x + 1}`;
+      if (!reach.has(f1) || !reach.has(f2) || usedFloor.has(f1) || usedFloor.has(f2)) continue;
+      const d = euclid([y + 1, x], centroid);
+      if (d < minDist || d > maxDist) continue;
+      muralCands.push({ tiles: [[y, x], [y, x + 1]], d });
+    }
+  if (muralCands.length === 0) return null;
+  muralCands.sort((a, b) => Math.abs(a.d - 11) - Math.abs(b.d - 11)); // aim ~11 tiles away
+  const pick = muralCands[ri(rng, 0, Math.min(muralCands.length - 1, 4))];
+  map.subtypes[pick.tiles[0][0]][pick.tiles[0][1]] = [TileSubtype.MURAL_PANEL];
+  map.subtypes[pick.tiles[1][0]][pick.tiles[1][1]] = [TileSubtype.MURAL_PANEL];
+
+  // ---- 4) LOCK (match rule; every switch OFF target so it opens unsolved) ----
+  return {
+    id: "cipher_room",
+    switches,
+    colors,
+    states: sequence.map((t) => (t + 1) % colors),
+    rule: "match",
+    target: sequence.slice(),
+    platforms: [],
+    gates,
+    invertedGates: [],
+    mural: { tiles: [pick.tiles[0], pick.tiles[1]] },
+  };
 }

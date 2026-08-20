@@ -1,8 +1,15 @@
-import { buildCipherRoomFloor } from "../../lib/map/cipher_room";
+import { buildCipherRoomFloor, stampCipherRoom } from "../../lib/map/cipher_room";
 import { TileSubtype, Direction, FLOOR, WALL } from "../../lib/map/constants";
 import { colorLockSatisfied, applyColorLock } from "../../lib/map/machinery";
-import { initializeGameStateFromMap, movePlayer, type GameState } from "../../lib/map/game-state";
+import {
+  initializeGameStateFromMap,
+  initializeGameStateForMultiTier,
+  advanceToNextFloor,
+  movePlayer,
+  type GameState,
+} from "../../lib/map/game-state";
 import { findPlayerPosition } from "../../lib/map/player";
+import { mulberry32, withPatchedMathRandom } from "../../lib/rng";
 import type { MapData } from "../../lib/map/types";
 
 function find(map: MapData, sub: TileSubtype): Array<[number, number]> {
@@ -128,5 +135,50 @@ describe("cipher room — torch variant", () => {
     expect(lit[0]).toBe(true);
     expect(lit[1]).toBe(false);
     expect(state.colorLocks?.[0].legend?.lit[0]).toBe(false); // original not mutated
+  });
+});
+
+describe("cipher room — stamped into a real generated floor", () => {
+  function realFloor(seed: number, f: number): MapData {
+    const f1 = withPatchedMathRandom(mulberry32(seed), () => initializeGameStateForMultiTier(1));
+    let s = f1;
+    for (let i = 2; i <= f; i++) s = advanceToNextFloor(s, seed);
+    return s.mapData;
+  }
+
+  it("distributes staggered switches, a gated reward, and an offscreen mural", () => {
+    let placed: ReturnType<typeof stampCipherRoom> = null;
+    let map: MapData | null = null;
+    for (let seed = 1; seed <= 60 && !placed; seed++) {
+      const m = realFloor(seed, 2);
+      const lock = stampCipherRoom(m, mulberry32(seed ^ 0xc15e));
+      if (lock) {
+        placed = lock;
+        map = m;
+      }
+    }
+    expect(placed).toBeTruthy();
+    const lock = placed!;
+    // Four switches, distinct columns, ordered left-to-right, staggered within a four-row band.
+    expect(lock.switches.length).toBe(4);
+    const cols = lock.switches.map(([, x]) => x);
+    expect(new Set(cols).size).toBe(4);
+    expect(cols).toEqual([...cols].sort((a, b) => a - b));
+    const rows = lock.switches.map(([y]) => y);
+    expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(4);
+    // The mural is two adjacent wall tiles, placed well away from the switches (offscreen).
+    expect(lock.mural?.tiles.length).toBe(2);
+    expect(lock.mural!.tiles[0][0]).toBe(lock.mural!.tiles[1][0]);
+    expect(Math.abs(lock.mural!.tiles[0][1] - lock.mural!.tiles[1][1])).toBe(1);
+    const cy = rows.reduce((a, b) => a + b, 0) / 4;
+    const cx = cols.reduce((a, b) => a + b, 0) / 4;
+    const d = Math.hypot(lock.mural!.tiles[0][0] - cy, lock.mural!.tiles[0][1] - cx);
+    expect(d).toBeGreaterThanOrEqual(7);
+    // Solvable: match rule, starts unsolved, and satisfying it retracts the gate.
+    expect(lock.rule).toBe("match");
+    expect(colorLockSatisfied(lock)).toBe(false);
+    const solved = { ...lock, states: (lock.target ?? []).slice() };
+    applyColorLock({ mapData: map!, platforms: [] }, solved, new Set());
+    for (const [gy, gx] of lock.gates) expect(map!.subtypes[gy][gx]).not.toContain(TileSubtype.SPIKES);
   });
 });
