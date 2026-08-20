@@ -2086,6 +2086,18 @@ export interface GameState {
   }>;
   // Torch state: when false, player's personal light is out (e.g., stolen by ghost)
   heroTorchLit?: boolean;
+  // Hearth & Home (/home) only — which family member the player is controlling.
+  // Unset in daily/story/endless; dialogue rules may branch on it via customCondition.
+  activeHeroId?: string;
+  // Hearth & Home (/home) only — sprite paths that replace the hero art.
+  // heroSprite is the front view and the fallback for all facings; back/side
+  // are optional (side art faces right, mirrored for left). Unset = default
+  // hero sprites.
+  heroSprite?: string;
+  heroSpriteBack?: string;
+  heroSpriteSide?: string;
+  // Render height of heroSprite as % of the tile (85 = NPC standard, 51 = dog).
+  heroSpriteScale?: number;
   // Death cause tracking for specific death messages
   deathCause?: {
     type: "enemy" | "faulty_floor" | "poison" | "bomb" | "darkness" | "lava" | "spikes";

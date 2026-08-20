@@ -24,6 +24,7 @@ export type Surface =
   | "end"
   | "endless"
   | "story"
+  | "home"
   | "stats"
   | "tutorial"
   | "privacy"
@@ -43,6 +44,7 @@ const EXACT: Record<string, Surface> = {
   "/end": "end",
   "/endless": "endless",
   "/story": "story",
+  "/home": "home",
   "/stats": "stats",
   "/tutorial": "tutorial",
   "/privacy": "privacy",
