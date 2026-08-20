@@ -18,7 +18,8 @@
  *    `lifespan` steps — flashing for the last WISP_FLASH_MOVES so you know the
  *    window is closing.
  *  - Wisps are SHY OF FIRE. While the hero's torch is lit they wander aimlessly and
- *    bolt when you get adjacent — catching one means cornering it. Douse your torch
+ *    usually bolt when you get adjacent, though they sometimes hesitate or flutter
+ *    another way. Douse your torch
  *    and they invert: drawn to the dark hero, drifting closer each step until one
  *    settles on you and is caught. (Snakes also hunt you in the dark. That's the
  *    trade.)
@@ -49,6 +50,8 @@ export const WISP_MAX_COMPANIONS = 3;
 export const WISP_TRAIL_LENGTH = 3;
 /** A lit torch spooks wild wisps within this Chebyshev distance. */
 export const WISP_FLEE_RADIUS = 1;
+/** Chance a nearby wild wisp actively flees a lit torch on each drift step. */
+export const WISP_FLEE_CHANCE = 0.75;
 /** Chance a plain pot is stamped to hold a wisp at map generation (see stampWispPots). */
 export const WISP_POT_CHANCE = 0.03;
 /**
@@ -264,13 +267,36 @@ export function advanceWispTurn(
           } else if (
             chebyshev(w.y, w.x, heroPos[0], heroPos[1]) <= WISP_FLEE_RADIUS
           ) {
-            // Spooked by the flame: the step that opens the most distance.
-            target = options.reduce((best, cur) =>
-              chebyshev(cur[0], cur[1], heroPos[0], heroPos[1]) >
-              chebyshev(best[0], best[1], heroPos[0], heroPos[1])
-                ? cur
-                : best
+            const currentDistance = chebyshev(
+              w.y,
+              w.x,
+              heroPos[0],
+              heroPos[1]
             );
+            if (rng() < WISP_FLEE_CHANCE) {
+              // Usually spooked by the flame: take the step that opens the most
+              // distance, preserving the original flee behavior.
+              target = options.reduce((best, cur) =>
+                chebyshev(cur[0], cur[1], heroPos[0], heroPos[1]) >
+                chebyshev(best[0], best[1], heroPos[0], heroPos[1])
+                  ? cur
+                  : best
+              );
+            } else {
+              // Sometimes the wisp falters instead. Include its current tile and
+              // only moves that do not open distance, so this branch can hold,
+              // drift sideways, or even venture toward the hero without secretly
+              // increasing the effective flee chance above 75%.
+              const nonFleeOptions: ReadonlyArray<readonly [number, number]> = [
+                [w.y, w.x],
+                ...options.filter(
+                  ([y, x]) =>
+                    chebyshev(y, x, heroPos[0], heroPos[1]) <= currentDistance
+                ),
+              ];
+              target =
+                nonFleeOptions[Math.floor(rng() * nonFleeOptions.length)];
+            }
           } else {
             target = options[Math.floor(rng() * options.length)];
           }

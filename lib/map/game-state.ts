@@ -3027,8 +3027,16 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // days (boss kind, L2 chests, switch gates, wisps) is unchanged and no date-gate is needed. It only
   // carves dead-end wall pockets + drops switches on empty floor and relocates the exit key behind the
   // gate, so it can never sever the floor or softlock; returns null (stamps nothing) when no safe spot.
+  // ONE colour puzzle per run: floor 1 generates first, so if it already placed one, floor 2 skips
+  // its roll — a day never stacks two (they play repetitive back-to-back). currentState IS the
+  // floor-1 state here (nextFloor === 2), and floor-1 puzzle presence is deterministic per daily
+  // seed, so this stays fully deterministic. It reads a flag, draws nothing, and the floor-2 roll it
+  // gates uses only its OWN salted stream — so `rng` (and therefore /stats replay) is untouched
+  // whichever way it goes; still no date-gate needed. Floor 1 only fires ~5% of days, so floor 2's
+  // effective rate barely moves (loses the ~1% of days that would have had both).
+  const floor1HasColorPuzzle = (currentState.colorLocks?.length ?? 0) > 0;
   let colorLocks: ColorLock[] | undefined;
-  if (nextFloor === 2 && playerPos) {
+  if (nextFloor === 2 && playerPos && !floor1HasColorPuzzle) {
     const puzRng = mulberry32Fn(dailySeed ^ COLOR_PUZZLE_SEED_SALT);
     if (puzRng.next() < COLOR_PUZZLE_CHANCE) {
       const avoid: Array<[number, number]> = (snakesAdded ?? []).map((e) => [e.y, e.x]);

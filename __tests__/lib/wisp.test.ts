@@ -7,6 +7,7 @@ import {
 import type { GameState } from "../../lib/map/game-state";
 import {
   WISP_DEFAULT_LIFESPAN,
+  WISP_FLEE_CHANCE,
   WISP_MAX_COMPANIONS,
   WISP_PITY_MAX_DIST,
   WISP_PITY_MIN_DIST,
@@ -128,11 +129,34 @@ describe("drift", () => {
       wispConfig: {},
       wisps: [wisp(5, 3)], // will be adjacent to the hero's landing tile (5,2)
     });
+    const random = jest
+      .spyOn(Math, "random")
+      .mockReturnValue(WISP_FLEE_CHANCE - 0.01);
     const after = movePlayer(state, Direction.RIGHT);
+    random.mockRestore();
     const w = after.wisps?.[0];
     expect(w).toBeDefined();
     const d = Math.max(Math.abs(w!.y - 5), Math.abs(w!.x - 2));
     expect(d).toBeGreaterThan(1);
+  });
+
+  it("an adjacent wisp sometimes hesitates instead of fleeing a lit torch", () => {
+    const before = baseState({
+      wispConfig: {},
+      wisps: [wisp(5, 3)],
+    });
+    const afterMove = movePlayer(
+      baseState({ wispConfig: {}, wisps: [] }),
+      Direction.RIGHT
+    );
+    afterMove.wisps = before.wisps;
+
+    // First draw declines the 75% flee; second draw selects the added hold option.
+    const draws = [WISP_FLEE_CHANCE, 0];
+    const after = advanceWispTurn(before, afterMove, () => draws.shift() ?? 0);
+
+    expect(after.wisps?.[0]).toMatchObject({ y: 5, x: 3 });
+    expect(after.wisps?.[0]?.movesLeft).toBe(WISP_DEFAULT_LIFESPAN - 1);
   });
 
   it("in the dark, a far wisp closes distance every step", () => {

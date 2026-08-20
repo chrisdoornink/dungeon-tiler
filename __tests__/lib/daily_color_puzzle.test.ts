@@ -106,6 +106,21 @@ describe("daily floor-2 colour puzzle", () => {
     expect(checked).toBeGreaterThan(0);
   });
 
+  it("never stacks a floor-2 puzzle on a day that already has a floor-1 puzzle (one per run)", () => {
+    // Floor 1 generates first, so when it places a colour puzzle floor 2 must skip its roll —
+    // two back-to-back colour puzzles play repetitively. Scan enough seeds to hit some floor-1
+    // puzzle days (~5%), and assert none of them also carry a floor-2 puzzle.
+    let floor1PuzzleDays = 0;
+    for (let seed = 1; seed <= 300; seed++) {
+      const f1 = withPatchedMathRandom(mulberry32(seed), () => initializeGameStateForMultiTier(1));
+      if ((f1.colorLocks ?? []).length === 0) continue;
+      floor1PuzzleDays++;
+      const f2 = advanceToNextFloor(f1, seed);
+      expect(f2.colorLocks ?? []).toEqual([]);
+    }
+    expect(floor1PuzzleDays).toBeGreaterThan(0); // the sample actually exercised the rule
+  });
+
   it("is deterministic per daily seed and resets on the next floor", () => {
     // Find a seed that rolls the puzzle.
     let seed = 1;
