@@ -2364,6 +2364,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return m;
   })();
 
+  // CODE_TORCH legend state, keyed "y,x": which colour a cipher-room torch reveals, and whether it has
+  // been lit yet. The colour is the switch's target; an unlit torch renders dark (code hidden).
+  const codeTorches: Map<string, { color: number; lit: boolean }> | undefined = (() => {
+    const locks = gameState.colorLocks ?? [];
+    const m = new Map<string, { color: number; lit: boolean }>();
+    for (const l of locks) {
+      const leg = l.legend;
+      if (!leg) continue;
+      leg.torches.forEach(([ty, tx], i) =>
+        m.set(`${ty},${tx}`, { color: (l.target ?? [])[i] ?? 0, lit: leg.lit[i] ?? false })
+      );
+    }
+    return m.size ? m : undefined;
+  })();
+
   // One deck descriptor per platform, keyed by its ANCHOR tile: the topmost tile of a vertical rail
   // or the leftmost of a horizontal one, since the element grows down/right from there.
   const platformDecks:
@@ -6172,6 +6187,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothPlatformSteps,
                     toggleStates,
                     toggleColors,
+                    codeTorches,
                     platformDecks
                   )}
                 </div>
@@ -6794,6 +6810,7 @@ function renderTileGrid(
   // Colour count per COLOUR switch, keyed "y,x". Present only for colour switches; drives the
   // four-corner palette display (absent => keep the binary toggle's single lamp).
   toggleColors?: Map<string, number>,
+  codeTorches?: Map<string, { color: number; lit: boolean }>,
   // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
   decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>
 ) {
@@ -7215,6 +7232,7 @@ function renderTileGrid(
             deck={decks?.get(`${rowIndex},${colIndex}`)}
             toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
             toggleColors={toggleColors?.get(`${rowIndex},${colIndex}`)}
+            codeTorch={codeTorches?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

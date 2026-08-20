@@ -312,6 +312,11 @@ interface TileProps {
    * binary toggle, which keeps its single indicator lamp.
    */
   toggleColors?: number;
+  /**
+   * CODE_TORCH legend state (cipher rooms): the target colour this torch reveals and whether it has
+   * been lit. Unlit renders a dark sconce (colour hidden); lit renders a flame in the target colour.
+   */
+  codeTorch?: { color: number; lit: boolean };
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -413,6 +418,7 @@ export const Tile: React.FC<TileProps> = ({
   deck,
   toggleState,
   toggleColors,
+  codeTorch,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1111,6 +1117,61 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
             className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
           />
+        )}
+
+        {/* Code torch — the cipher-room legend. Lit, it burns in its switch's target colour, so the
+            row of flames spells the combination; unlit, it is a dark ember and the code stays hidden
+            until the hero walks the row and lights them. Inline-styled (no sprite yet). */}
+        {codeTorch && subtypes?.includes(TileSubtype.CODE_TORCH) && (
+          <div
+            key="code-torch"
+            data-testid={`subtype-icon-${TileSubtype.CODE_TORCH}`}
+            data-lit={codeTorch.lit ? "true" : "false"}
+            style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+          >
+            {/* sconce bracket */}
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: "20%",
+                width: "14%",
+                height: "30%",
+                transform: "translateX(-50%)",
+                background: "#3a332a",
+                borderRadius: "2px",
+              }}
+            />
+            {codeTorch.lit ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: "42%",
+                  width: "34%",
+                  height: "42%",
+                  transform: "translateX(-50%)",
+                  background: toggleStateColor(codeTorch.color),
+                  borderRadius: "50% 50% 50% 50% / 72% 72% 38% 38%",
+                  boxShadow: `0 0 9px 3px ${toggleStateColor(codeTorch.color)}`,
+                  filter: "brightness(1.2)",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: "48%",
+                  width: "14%",
+                  height: "14%",
+                  transform: "translateX(-50%)",
+                  background: "#2b2620",
+                  borderRadius: "50%",
+                }}
+              />
+            )}
+          </div>
         )}
 
         {/* Toggle switch. Cold blue where a latching plate is warm brass, and it keeps its glow

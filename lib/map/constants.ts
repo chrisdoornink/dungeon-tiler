@@ -208,6 +208,13 @@ export enum TileSubtype {
   // Value 75, not 72: WISP shipped to main at 72 first, so on merge this (unshipped) branch's
   // switch was renumbered to the next free slot to avoid the collision. All references are symbolic.
   TOGGLE_SWITCH = 75,
+  // A CODE_TORCH is the legend for a prescribed colour-cipher puzzle room (lib/map/cipher_room.ts):
+  // a wall sconce mounted by each colour switch that, once LIT, shows that switch's target colour —
+  // so the row of flames spells the combination. It is a walkable FLOOR overlay (the hero passes over
+  // it, and stepping on it with a lit torch is what ignites it). Unlit it shows no colour, so the code
+  // stays hidden until the hero lights the torches. The colour it displays and its lit state live on
+  // the owning ColorLock's `legend`, not on the tile — the tile only marks "a code torch is here".
+  CODE_TORCH = 76,
 }
 
 /**

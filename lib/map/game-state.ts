@@ -5090,6 +5090,20 @@ function movePlayerCore(
       killEnemiesAt(newGameState, crushed);
     }
 
+    // A CODE_TORCH is a cipher-room legend sconce (lib/map/cipher_room.ts). Stepping onto it with a lit
+    // torch ignites it, revealing that switch's target colour; unlit it shows nothing, so lighting the
+    // row is what makes the code readable. Lit state lives on the owning ColorLock's legend. Rebuilt
+    // immutably (newGameState is only a shallow copy of gameState, so its colorLocks are still shared).
+    if (subtype.includes(TileSubtype.CODE_TORCH) && newGameState.heroTorchLit) {
+      newGameState.colorLocks = (newGameState.colorLocks ?? []).map((lock) => {
+        const i = lock.legend?.torches.findIndex(([ty, tx]) => ty === newY && tx === newX) ?? -1;
+        if (i < 0 || !lock.legend || lock.legend.lit[i]) return lock;
+        const lit = lock.legend.lit.slice();
+        lit[i] = true;
+        return { ...lock, legend: { ...lock.legend, lit } };
+      });
+    }
+
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
@@ -5155,6 +5169,8 @@ function movePlayerCore(
       // A toggle stays on its tile so it can be thrown again — that is the whole difference
       // from a latching plate. The slab and its track decal are floor the hero stands on.
       destSubtypes.includes(TileSubtype.TOGGLE_SWITCH) ||
+      // A code torch is a walkable floor sconce — the hero passes over it (and lights it doing so).
+      destSubtypes.includes(TileSubtype.CODE_TORCH) ||
       destSubtypes.includes(TileSubtype.MOVING_PLATFORM) ||
       destSubtypes.includes(TileSubtype.PLATFORM_TRACK) ||
       // Retracted spike beds are walkable floor decals. Without this the hero standing on
