@@ -144,6 +144,15 @@ export interface ColorLock {
     torches: Array<[number, number]>;
     lit: boolean[];
   };
+  /**
+   * Optional MURAL legend (the mural cipher-room variant): painted stone panels, parallel to `target`,
+   * that spell the combination. Unlike `legend` torches these carry no lit state (always readable) and
+   * live in a DIFFERENT chamber from the switches, so the code must be memorised and carried back. Panel
+   * i shows `target[i]`'s colour.
+   */
+  mural?: {
+    tiles: Array<[number, number]>;
+  };
 }
 
 /**

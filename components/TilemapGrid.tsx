@@ -2380,6 +2380,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return m.size ? m : undefined;
   })();
 
+  // MURAL_PANEL colours, keyed "y,x": a cipher-room mural panel always shows its switch's target colour
+  // (no lit state — it is a painting, always readable). The colour is the switch's target.
+  const muralPanels: Map<string, number> | undefined = (() => {
+    const locks = gameState.colorLocks ?? [];
+    const m = new Map<string, number>();
+    for (const l of locks) {
+      const mu = l.mural;
+      if (!mu) continue;
+      mu.tiles.forEach(([ty, tx], i) => m.set(`${ty},${tx}`, (l.target ?? [])[i] ?? 0));
+    }
+    return m.size ? m : undefined;
+  })();
+
   // One deck descriptor per platform, keyed by its ANCHOR tile: the topmost tile of a vertical rail
   // or the leftmost of a horizontal one, since the element grows down/right from there.
   const platformDecks:
@@ -6202,7 +6215,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     codeTorches,
                     platformDecks,
                     heroOverrideSprite,
-                    gameState.heroSpriteScale
+                    gameState.heroSpriteScale,
+                    muralPanels
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6852,7 +6866,9 @@ function renderTileGrid(
   // Hearth & Home: static sprite replacing the hero art for all facings,
   // plus its render height as % of the tile (85 = NPC standard, 51 = dog).
   heroSpriteOverride?: string,
-  heroSpriteScale?: number
+  heroSpriteScale?: number,
+  // Cipher-room mural: which target colour each MURAL_PANEL tile paints, keyed "y,x".
+  muralPanels?: Map<string, number>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7275,6 +7291,7 @@ function renderTileGrid(
             toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
             toggleColors={toggleColors?.get(`${rowIndex},${colIndex}`)}
             codeTorch={codeTorches?.get(`${rowIndex},${colIndex}`)}
+            muralPanel={muralPanels?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

@@ -319,6 +319,11 @@ interface TileProps {
    * been lit. Unlit renders a dark sconce (colour hidden); lit renders a flame in the target colour.
    */
   codeTorch?: { color: number; lit: boolean };
+  /**
+   * MURAL_PANEL colour (cipher rooms, mural variant): the target colour this painted panel shows.
+   * Rendered as a matte inlay set in stone — deliberately not a glowing light.
+   */
+  muralPanel?: number;
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -423,6 +428,7 @@ export const Tile: React.FC<TileProps> = ({
   toggleState,
   toggleColors,
   codeTorch,
+  muralPanel,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1175,6 +1181,39 @@ export const Tile: React.FC<TileProps> = ({
                 }}
               />
             )}
+          </div>
+        )}
+
+        {/* Mural panel — the cipher-room mural legend. A matte painted inlay set in stone (framed,
+            faintly bevelled, colour muted), deliberately NOT a glowing light: it is a painting you
+            read and remember, not a lamp. Colour is its switch's target. */}
+        {typeof muralPanel === "number" && subtypes?.includes(TileSubtype.MURAL_PANEL) && (
+          <div
+            key="mural-panel"
+            data-testid={`subtype-icon-${TileSubtype.MURAL_PANEL}`}
+            style={{
+              position: "absolute",
+              inset: "8%",
+              pointerEvents: "none",
+              background: "#2a2620",
+              borderRadius: "3px",
+              boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.6)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <div
+              style={{
+                width: "60%",
+                height: "60%",
+                background: toggleStateColor(muralPanel),
+                borderRadius: "2px",
+                filter: "saturate(0.8) brightness(0.9)",
+                boxShadow:
+                  "inset 0 0 0 2px rgba(0,0,0,0.35), inset 2px 2px 3px rgba(255,255,255,0.12), inset -2px -2px 3px rgba(0,0,0,0.45)",
+              }}
+            />
           </div>
         )}
 

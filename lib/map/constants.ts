@@ -215,6 +215,11 @@ export enum TileSubtype {
   // stays hidden until the hero lights the torches. The colour it displays and its lit state live on
   // the owning ColorLock's `legend`, not on the tile — the tile only marks "a code torch is here".
   CODE_TORCH = 76,
+  // A MURAL_PANEL is the OTHER cipher-room legend: one painted stone panel in a wall mural that spells
+  // the combination, placed in a SEPARATE chamber from the switches so the code must be read, memorised,
+  // and carried back (a matte inlay, not a light — deliberately unlike the torch). Its colour lives on
+  // the owning ColorLock's `mural`, parallel to `target`; the tile only marks "a mural panel is here".
+  MURAL_PANEL = 77,
 }
 
 /**

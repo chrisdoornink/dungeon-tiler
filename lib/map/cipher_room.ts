@@ -1,17 +1,19 @@
-// A PRESCRIBED colour-cipher puzzle room — hand-authored, not generated. Four colour switches in a
-// row must each be turned to a specific target colour (the "code"); matching all of them retracts a
-// spike gate and frees a loose-item reward sealed behind it. The code is spelled out by a row of
-// CODE_TORCHes: one sconce per switch that shows that switch's target colour ONCE LIT, so the puzzle
-// asks you to first light the torches (walk the row) and then read the flames.
+// PRESCRIBED colour-cipher puzzle rooms — hand-authored, not generated. Four colour switches must
+// each be turned to a target colour (the "code"); matching all of them (the `match`-rule ColorLock)
+// retracts a spike gate and frees a loose-item reward sealed behind it. Two legend styles say WHAT the
+// code is:
 //
-// This is the assembled form of shipped parts — colour switches (TOGGLE_SWITCH), the `match`-rule
-// ColorLock, and spike gates all already exist and are wired into movement/render — plus the one new
-// piece, the CODE_TORCH legend. Because it is authored (not generated) it needs no solver/verifier:
-// the layout is fixed and solvable by construction (every switch is reachable and freely cyclable, so
-// the target is always achievable; the reward sits behind the gate the lock drives).
+//  - "torches": a row of CODE_TORCHes above the switches, lit by the hero to reveal each colour. The
+//    code sits right on top of the answer, so it is a gentle teaching room.
+//  - "mural":   a painted wall mural in a SEPARATE chamber spells the code. You read it, remember it,
+//    and walk back to the switches with nothing in view to check against — the difficulty is memory,
+//    not the flames. This is the harder, preferred direction.
 //
-// v1 ships a STANDALONE room (buildCipherRoomFloor) for the /test-cipher-room bench. Stamping it into
-// a real daily floor's corner is a later step and gets its own function.
+// Assembled from shipped parts (colour switches, the match ColorLock, spike gates) plus the two legend
+// tiles (CODE_TORCH / MURAL_PANEL). Authored, so no solver is needed: every layout is solvable by
+// construction (all switches reachable and freely cyclable; the reward sits behind the gate the lock
+// drives). v1 ships STANDALONE floors for the /test-cipher-room bench; stamping into a real daily-floor
+// corner is a later step.
 import { FLOOR, WALL, GRID_SIZE, TileSubtype } from "./constants";
 import type { ColorLock, MapData } from "./types";
 
@@ -20,105 +22,152 @@ export type CipherReward =
   | { kind: "chest" }
   | { kind: "exit" };
 
+export type CipherLegendStyle = "torches" | "mural";
+
 export interface CipherRoomOptions {
+  /** Which legend tells the code: an in-room torch row, or a mural in a separate chamber (default). */
+  legendStyle?: CipherLegendStyle;
   /** The code: target colour index per switch (0..colors-1). Length sets the switch count (default 4). */
   sequence?: number[];
   /** Colours each switch cycles through (default 4 — the palette maxes at four). */
   colors?: number;
   /** What waits behind the gate. Default: two loose hearts (no chest, no key — the puzzle is the lock). */
   reward?: CipherReward;
-  /** Torches start lit (code visible immediately). Default false = light-to-reveal. */
+  /** Torch style only: torches start lit (code visible). Default false = light-to-reveal. */
   litLegend?: boolean;
 }
 
-// Room geometry, expressed relative to the room's top-left wall corner. A 5-wide x 8-tall floor
-// interior inside a 7x10 wall ring. Vertical so the flow reads bottom-to-top: enter -> light the
-// torch row -> set the switch row above it -> cross the opened gate -> take the reward. Column c pairs
-// torch (TORCH_ROW,c) with the switch (SWITCH_ROW,c) right above it. The room is embedded in a full
-// GRID_SIZE map (rest solid wall) so the renderer, which assumes standard map dimensions, is happy —
-// and so this same relative layout can later be stamped into a real floor at any origin.
-const ROOM_W = 7;
-const ROOM_H = 10;
-const REWARD_ROW = 1;
-const GATE_ROW = 2;
-const SWITCH_ROW = 4;
-const TORCH_ROW = 5;
-const SWITCH_COLS = [1, 2, 3, 4];
-const HERO = [8, 3] as const;
-
-/** Build the standalone cipher room as a complete floor (for the bench). */
-export function buildCipherRoomFloor(opts: CipherRoomOptions = {}): {
+interface Built {
   mapData: MapData;
   colorLocks: ColorLock[];
+}
+
+function blankWalls(n: number): { tiles: number[][]; subtypes: number[][][] } {
+  return {
+    tiles: Array.from({ length: n }, () => Array.from({ length: n }, () => WALL)),
+    subtypes: Array.from({ length: n }, () => Array.from({ length: n }, () => [] as number[])),
+  };
+}
+
+/** Carve a rectangular floor interior, leaving a one-tile wall ring around it. */
+function carveRoom(tiles: number[][], top: number, left: number, h: number, w: number): void {
+  for (let y = top + 1; y < top + h - 1; y++)
+    for (let x = left + 1; x < left + w - 1; x++) tiles[y][x] = FLOOR;
+}
+
+function placeReward(subtypes: number[][][], slots: Array<[number, number]>, reward: CipherReward): void {
+  if (reward.kind === "items") {
+    reward.items.slice(0, slots.length).forEach((it, i) => (subtypes[slots[i][0]][slots[i][1]] = [it]));
+  } else if (reward.kind === "chest") {
+    const [y, x] = slots[0];
+    subtypes[y][x] = [TileSubtype.CHEST];
+  } else {
+    const [y, x] = slots[0];
+    subtypes[y][x] = [TileSubtype.EXITKEY];
+  }
+}
+
+function normalize(opts: CipherRoomOptions): {
+  colors: number;
+  sequence: number[];
+  reward: CipherReward;
 } {
   const colors = Math.max(2, opts.colors ?? 4);
   const sequence = (opts.sequence ?? [0, 2, 3, 1]).map((c) => ((c % colors) + colors) % colors);
   const reward: CipherReward =
     opts.reward ?? { kind: "items", items: [TileSubtype.EXTRA_HEART, TileSubtype.EXTRA_HEART] };
-  const litLegend = opts.litLegend ?? false;
+  return { colors, sequence, reward };
+}
 
-  // Full-size map, solid wall, with the room carved near the top-left.
-  const N = GRID_SIZE;
-  const oy = 2; // room origin row (top wall)
-  const ox = 2; // room origin col (left wall)
-  const tiles: number[][] = Array.from({ length: N }, () => Array.from({ length: N }, () => WALL));
-  const subtypes: number[][][] = Array.from({ length: N }, () =>
-    Array.from({ length: N }, () => [] as number[])
-  );
-  // Carve the room's floor interior (leave the room's own wall ring solid).
-  for (let ry = 1; ry <= ROOM_H - 2; ry++)
-    for (let rx = 1; rx <= ROOM_W - 2; rx++) tiles[oy + ry][ox + rx] = FLOOR;
-
-  const at = (ry: number, rx: number): [number, number] => [oy + ry, ox + rx];
-
-  // Switches and their target only span as many columns as the sequence provides.
-  const cols = SWITCH_COLS.slice(0, sequence.length);
-  const switches: Array<[number, number]> = cols.map((c) => at(SWITCH_ROW, c));
-  const torches: Array<[number, number]> = cols.map((c) => at(TORCH_ROW, c));
-
-  // Gate: spikes across the full interior width so there is no way around — the puzzle is the only key.
-  const gates: Array<[number, number]> = [];
-  for (let rx = 1; rx <= ROOM_W - 2; rx++) {
-    const [gy, gx] = at(GATE_ROW, rx);
-    subtypes[gy][gx] = [TileSubtype.SPIKES];
-    gates.push([gy, gx]);
-  }
-
-  switches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH]));
-  torches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.CODE_TORCH]));
-
-  // Reward behind the gate.
-  if (reward.kind === "items") {
-    const slots: Array<[number, number]> = [at(REWARD_ROW, 2), at(REWARD_ROW, 3), at(REWARD_ROW, 4), at(REWARD_ROW, 1)];
-    reward.items.slice(0, slots.length).forEach((it, i) => (subtypes[slots[i][0]][slots[i][1]] = [it]));
-  } else if (reward.kind === "chest") {
-    const [cy, cx] = at(REWARD_ROW, 3);
-    subtypes[cy][cx] = [TileSubtype.CHEST];
-  } else {
-    // exit: the key sits behind the gate (mandatory).
-    const [ky, kx] = at(REWARD_ROW, 3);
-    subtypes[ky][kx] = [TileSubtype.EXITKEY];
-  }
-
-  const [hy, hx] = at(HERO[0], HERO[1]);
-  subtypes[hy][hx] = [TileSubtype.PLAYER];
-
-  // The lock: match rule (each switch must equal its target). Start every switch OFF its target so the
-  // room opens fully unsolved and the player must set all of them.
-  const target = sequence.slice();
-  const states = target.map((t) => (t + 1) % colors);
-  const lock: ColorLock = {
+/** Match lock shared by both styles: every switch OFF its target, so the room opens fully unsolved. */
+function buildLock(
+  switches: Array<[number, number]>,
+  gates: Array<[number, number]>,
+  target: number[],
+  colors: number,
+  extra: Pick<ColorLock, "legend" | "mural">
+): ColorLock {
+  return {
     id: "cipher_room",
     switches,
     colors,
-    states,
+    states: target.map((t) => (t + 1) % colors),
     rule: "match",
-    target,
+    target: target.slice(),
     platforms: [],
     gates,
     invertedGates: [],
-    legend: { torches, lit: torches.map(() => litLegend) },
+    ...extra,
   };
+}
 
+// ---- Torch variant: one vertical room, torches above the switches ---------------------------------
+// enter (bottom) -> light the torch row -> set the switch row above it -> cross the opened gate -> reward.
+function buildTorchVariant(opts: CipherRoomOptions): Built {
+  const { colors, sequence, reward } = normalize(opts);
+  const litLegend = opts.litLegend ?? false;
+  const { tiles, subtypes } = blankWalls(GRID_SIZE);
+
+  const oy = 2;
+  const ox = 2;
+  carveRoom(tiles, oy, ox, 10, 7); // interior rows oy+1..oy+8, cols ox+1..ox+5
+  const at = (ry: number, rx: number): [number, number] => [oy + ry, ox + rx];
+
+  const cols = [1, 2, 3, 4].slice(0, sequence.length);
+  const switches = cols.map((c) => at(4, c));
+  const torches = cols.map((c) => at(5, c));
+
+  const gates: Array<[number, number]> = [];
+  for (let rx = 1; rx <= 5; rx++) {
+    const [gy, gx] = at(2, rx);
+    subtypes[gy][gx] = [TileSubtype.SPIKES];
+    gates.push([gy, gx]);
+  }
+  switches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH]));
+  torches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.CODE_TORCH]));
+  placeReward(subtypes, [at(1, 2), at(1, 3), at(1, 4), at(1, 1)], reward);
+  const [hy, hx] = at(8, 3);
+  subtypes[hy][hx] = [TileSubtype.PLAYER];
+
+  const lock = buildLock(switches, gates, sequence, colors, {
+    legend: { torches, lit: torches.map(() => litLegend) },
+  });
   return { mapData: { tiles, subtypes }, colorLocks: [lock] };
+}
+
+// ---- Mural variant: two chambers, the code on a mural you must remember ---------------------------
+// Hero starts in the lower MURAL chamber, reads the painted row, then climbs a corridor to the upper
+// SWITCH chamber (out of sight of the mural) and sets the switches from memory.
+function buildMuralVariant(opts: CipherRoomOptions): Built {
+  const { colors, sequence, reward } = normalize(opts);
+  const { tiles, subtypes } = blankWalls(GRID_SIZE);
+
+  // Switch chamber (top): rows 2..11, cols 2..8. Interior rows 3..10, cols 3..7.
+  carveRoom(tiles, 2, 2, 10, 7);
+  // Mural chamber (bottom): rows 14..21, cols 2..8. Interior rows 15..20, cols 3..7.
+  carveRoom(tiles, 14, 2, 8, 7);
+  // Corridor on col 7 joining the two (switch-room bottom wall -> mural-room top wall).
+  for (let y = 11; y <= 14; y++) tiles[y][7] = FLOOR;
+
+  const cols = [3, 4, 5, 6].slice(0, sequence.length);
+  const switches: Array<[number, number]> = cols.map((c) => [6, c]);
+  const muralTiles: Array<[number, number]> = cols.map((c) => [15, c]);
+
+  const gates: Array<[number, number]> = [];
+  for (let x = 3; x <= 7; x++) {
+    subtypes[4][x] = [TileSubtype.SPIKES];
+    gates.push([4, x]);
+  }
+  switches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH]));
+  muralTiles.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.MURAL_PANEL]));
+  placeReward(subtypes, [[3, 4], [3, 5], [3, 6], [3, 3]], reward);
+  subtypes[20][5] = [TileSubtype.PLAYER]; // hero starts in the mural chamber
+
+  const lock = buildLock(switches, gates, sequence, colors, { mural: { tiles: muralTiles } });
+  return { mapData: { tiles, subtypes }, colorLocks: [lock] };
+}
+
+/** Build the standalone cipher room as a complete floor (for the bench). */
+export function buildCipherRoomFloor(opts: CipherRoomOptions = {}): Built {
+  return (opts.legendStyle ?? "mural") === "torches" ? buildTorchVariant(opts) : buildMuralVariant(opts);
 }

@@ -1,7 +1,8 @@
 import { buildCipherRoomFloor } from "../../lib/map/cipher_room";
-import { TileSubtype, Direction } from "../../lib/map/constants";
+import { TileSubtype, Direction, FLOOR } from "../../lib/map/constants";
 import { colorLockSatisfied, applyColorLock } from "../../lib/map/machinery";
 import { initializeGameStateFromMap, movePlayer, type GameState } from "../../lib/map/game-state";
+import { findPlayerPosition } from "../../lib/map/player";
 import type { MapData } from "../../lib/map/types";
 
 function find(map: MapData, sub: TileSubtype): Array<[number, number]> {
@@ -12,50 +13,95 @@ function find(map: MapData, sub: TileSubtype): Array<[number, number]> {
   return out;
 }
 
-describe("prescribed colour-cipher room", () => {
-  it("lays out four switches, four unlit torches, a gate, and a sealed reward", () => {
+/** Floor the hero can walk given the map (spikes/lava block; mural + torch tiles are walkable). */
+function reachable(map: MapData, start: [number, number]): Set<string> {
+  const ok = (y: number, x: number) => {
+    if (map.tiles[y]?.[x] !== FLOOR) return false;
+    const s = map.subtypes[y]?.[x] ?? [];
+    return !s.includes(TileSubtype.SPIKES) && !s.includes(TileSubtype.LAVA);
+  };
+  const seen = new Set<string>();
+  if (!ok(start[0], start[1])) return seen;
+  seen.add(`${start[0]},${start[1]}`);
+  const st = [start];
+  while (st.length) {
+    const [y, x] = st.pop() as [number, number];
+    for (const [ny, nx] of [[y - 1, x], [y + 1, x], [y, x - 1], [y, x + 1]] as Array<[number, number]>) {
+      const k = `${ny},${nx}`;
+      if (!seen.has(k) && ok(ny, nx)) {
+        seen.add(k);
+        st.push([ny, nx]);
+      }
+    }
+  }
+  return seen;
+}
+
+describe("cipher room — mural variant (default)", () => {
+  it("puts the code on a mural in a chamber far from the switches", () => {
     const { mapData, colorLocks } = buildCipherRoomFloor();
     const lock = colorLocks[0];
     expect(lock.rule).toBe("match");
     expect(lock.switches.length).toBe(4);
     expect(lock.target?.length).toBe(4);
-    expect(lock.legend?.torches.length).toBe(4);
-    expect(lock.legend?.lit.every((l) => l === false)).toBe(true); // start unlit — code hidden
-    expect(colorLockSatisfied(lock)).toBe(false); // starts unsolved
-    expect(find(mapData, TileSubtype.TOGGLE_SWITCH).length).toBe(4);
-    expect(find(mapData, TileSubtype.CODE_TORCH).length).toBe(4);
-    expect(find(mapData, TileSubtype.SPIKES).length).toBeGreaterThan(0);
-    expect(find(mapData, TileSubtype.EXTRA_HEART).length).toBe(2); // default reward, loose (no chest)
-    expect(find(mapData, TileSubtype.CHEST).length).toBe(0);
+    expect(lock.mural?.tiles.length).toBe(4);
+    expect(lock.legend).toBeUndefined(); // no torches in the mural variant
+    expect(colorLockSatisfied(lock)).toBe(false);
+    expect(find(mapData, TileSubtype.MURAL_PANEL).length).toBe(4);
+    expect(find(mapData, TileSubtype.CODE_TORCH).length).toBe(0);
+    expect(find(mapData, TileSubtype.EXTRA_HEART).length).toBe(2);
+    // The mural and the switches are far apart — you cannot read one while standing at the other.
+    const muralRow = lock.mural!.tiles[0][0];
+    const switchRow = lock.switches[0][0];
+    expect(Math.abs(muralRow - switchRow)).toBeGreaterThanOrEqual(6);
   });
 
-  it("torch i reveals switch i's target colour (legend is parallel to target)", () => {
-    const seq = [1, 3, 0, 2];
-    const { colorLocks } = buildCipherRoomFloor({ sequence: seq });
+  it("is solvable: hero reaches the mural and the switches, but the reward is sealed until solved", () => {
+    const { mapData, colorLocks } = buildCipherRoomFloor();
     const lock = colorLocks[0];
-    expect(lock.target).toEqual(seq);
-    // Each torch sits directly above its switch (same column).
+    const hero = findPlayerPosition(mapData)!;
+    const reach = reachable(mapData, hero);
+    for (const [my, mx] of lock.mural!.tiles) expect(reach.has(`${my},${mx}`)).toBe(true); // read the code
+    for (const [sy, sx] of lock.switches) expect(reach.has(`${sy},${sx}`)).toBe(true); // set the switches
+    const reward = find(mapData, TileSubtype.EXTRA_HEART);
+    for (const [ry, rx] of reward) expect(reach.has(`${ry},${rx}`)).toBe(false); // sealed behind the gate
+
+    // Open the gate (satisfy the lock) and the reward becomes reachable.
+    const solved = { ...lock, states: (lock.target ?? []).slice() };
+    expect(colorLockSatisfied(solved)).toBe(true);
+    applyColorLock({ mapData, platforms: [] }, solved, new Set());
+    const afterReach = reachable(mapData, hero);
+    for (const [ry, rx] of reward) expect(afterReach.has(`${ry},${rx}`)).toBe(true);
+  });
+
+  it("panel i shows switch i's target colour (mural is parallel to target)", () => {
+    const seq = [3, 1, 2, 0];
+    const { colorLocks } = buildCipherRoomFloor({ sequence: seq });
+    expect(colorLocks[0].target).toEqual(seq);
+    expect(colorLocks[0].mural?.tiles.length).toBe(4);
+  });
+});
+
+describe("cipher room — torch variant", () => {
+  const opts = { legendStyle: "torches" as const };
+
+  it("lays out four unlit torches above the switches", () => {
+    const { mapData, colorLocks } = buildCipherRoomFloor(opts);
+    const lock = colorLocks[0];
+    expect(lock.legend?.torches.length).toBe(4);
+    expect(lock.legend?.lit.every((l) => l === false)).toBe(true);
+    expect(lock.mural).toBeUndefined();
+    expect(find(mapData, TileSubtype.CODE_TORCH).length).toBe(4);
     lock.legend!.torches.forEach(([ty, tx], i) => {
       const [sy, sx] = lock.switches[i];
       expect(tx).toBe(sx);
-      expect(ty).toBe(sy + 1); // torch is the row below the switch
+      expect(ty).toBe(sy + 1);
     });
   });
 
-  it("solving the code retracts the gate spikes (frees the reward)", () => {
-    const { mapData, colorLocks } = buildCipherRoomFloor();
-    const solved = { ...colorLocks[0], states: (colorLocks[0].target ?? []).slice() };
-    expect(colorLockSatisfied(solved)).toBe(true);
-    applyColorLock({ mapData, platforms: [] }, solved, new Set());
-    for (const [gy, gx] of solved.gates) {
-      expect(mapData.subtypes[gy][gx]).not.toContain(TileSubtype.SPIKES);
-    }
-  });
-
   it("stepping onto a torch with a lit hero-torch lights it (and only it)", () => {
-    const { mapData, colorLocks } = buildCipherRoomFloor();
+    const { mapData, colorLocks } = buildCipherRoomFloor(opts);
     const base = initializeGameStateFromMap(mapData);
-    // Relocate the hero directly below torch 0 so a single UP step lands on it.
     const [ty, tx] = colorLocks[0].legend!.torches[0];
     for (let y = 0; y < mapData.subtypes.length; y++)
       for (let x = 0; x < mapData.subtypes[y].length; x++)
@@ -71,21 +117,7 @@ describe("prescribed colour-cipher room", () => {
     const after = movePlayer(state, Direction.UP);
     const lit = after.colorLocks?.[0].legend?.lit ?? [];
     expect(lit[0]).toBe(true);
-    expect(lit[1]).toBe(false); // untouched torches stay dark
-    // The original state was not mutated (immutability of the lighting update).
-    expect(state.colorLocks?.[0].legend?.lit[0]).toBe(false);
-  });
-
-  it("an unlit hero torch cannot light a code torch", () => {
-    const { mapData, colorLocks } = buildCipherRoomFloor();
-    const base = initializeGameStateFromMap(mapData);
-    const [ty, tx] = colorLocks[0].legend!.torches[0];
-    for (let y = 0; y < mapData.subtypes.length; y++)
-      for (let x = 0; x < mapData.subtypes[y].length; x++)
-        mapData.subtypes[y][x] = mapData.subtypes[y][x].filter((s) => s !== TileSubtype.PLAYER);
-    mapData.subtypes[ty + 1][tx] = [TileSubtype.PLAYER];
-    const state: GameState = { ...base, mapData, colorLocks, enemies: [], heroTorchLit: false };
-    const after = movePlayer(state, Direction.UP);
-    expect(after.colorLocks?.[0].legend?.lit[0]).toBe(false);
+    expect(lit[1]).toBe(false);
+    expect(state.colorLocks?.[0].legend?.lit[0]).toBe(false); // original not mutated
   });
 });

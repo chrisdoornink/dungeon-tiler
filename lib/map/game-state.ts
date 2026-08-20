@@ -5183,6 +5183,8 @@ function movePlayerCore(
       destSubtypes.includes(TileSubtype.TOGGLE_SWITCH) ||
       // A code torch is a walkable floor sconce — the hero passes over it (and lights it doing so).
       destSubtypes.includes(TileSubtype.CODE_TORCH) ||
+      // A mural panel is a walkable painted inlay — the hero can stand on/by it to read the code.
+      destSubtypes.includes(TileSubtype.MURAL_PANEL) ||
       destSubtypes.includes(TileSubtype.MOVING_PLATFORM) ||
       destSubtypes.includes(TileSubtype.PLATFORM_TRACK) ||
       // Retracted spike beds are walkable floor decals. Without this the hero standing on
