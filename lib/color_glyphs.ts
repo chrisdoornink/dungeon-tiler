@@ -2,7 +2,7 @@
 // must be shown as a MARK rather than a swatch (cipher-room murals today; reusable on switches, HUD,
 // etc. later). One entry per palette index (parallel to TOGGLE_STATE_COLORS in lib/map/machinery):
 //
-//   0 blue -> water (two wavy lines)   1 green -> leaf (outline + midrib)
+//   0 blue -> water (two wavy lines)   1 green -> sprig (upright stem + paired branches)
 //   2 violet -> spiral                 3 rose  -> sun (ring + rays)
 //
 // The shapes are deliberately mnemonic where a colour has an obvious natural sign, so a glyph both
@@ -13,10 +13,10 @@
 export const COLOR_GLYPHS: ReadonlyArray<ReadonlyArray<string>> = [
   // 0 — water
   ["M3 9 q2.75 -3 5.5 0 t5.5 0 t5.5 0", "M3 15 q2.75 -3 5.5 0 t5.5 0 t5.5 0"],
-  // 1 — leaf
-  ["M12 3 C6 8 6 15 12 21 C18 15 18 8 12 3 Z", "M12 6 L12 18"],
-  // 2 — spiral
-  ["M12 12 c0 -1.6 2.4 -1.6 2.4 0 c0 2.6 -4 2.6 -4 0 c0 -3.8 5.6 -3.8 5.6 0 c0 5 -7.2 5 -7.2 0"],
+  // 1 — sprig (upright stem, forked tip, two paired branches)
+  ["M12 21 L12 6 M12 6 L9.5 3 M12 6 L14.5 3 M12 10.5 L7 6.5 M12 10.5 L17 6.5 M12 15.5 L7.5 11.5 M12 15.5 L16.5 11.5"],
+  // 2 — spiral (winds out to nearly fill the glyph)
+  ["M12 12 c0 -3 4.6 -3 4.6 0 c0 5 -7.6 5 -7.6 0 c0 -7.2 10.8 -7.2 10.8 0 c0 9.6 -14 9.6 -14 0"],
   // 3 — sun
   [
     "M12 8.4 a3.6 3.6 0 1 0 0.01 0 Z",
