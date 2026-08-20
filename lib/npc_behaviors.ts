@@ -1,5 +1,5 @@
 import { NPC } from "./npc";
-import { FLOOR, TileSubtype } from "./map/constants";
+import { Direction, FLOOR, TileSubtype } from "./map/constants";
 
 /**
  * Restricted tiles where dogs cannot move (entrance/exit areas)
@@ -390,9 +390,23 @@ export function updateWanderBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult
     // Move is valid
     npc.y = targetY;
     npc.x = targetX;
-    
+
+    // NPCs with real directional art turn to face where they walk. Everyone
+    // else keeps their authored facing — the legacy single-sprite renderer
+    // shows a rotated front sprite for UP, which looks wrong mid-stroll.
+    if (npc.metadata?.directionalSprites) {
+      npc.facing =
+        moveY < 0
+          ? Direction.UP
+          : moveY > 0
+          ? Direction.DOWN
+          : moveX < 0
+          ? Direction.LEFT
+          : Direction.RIGHT;
+    }
+
     return { moved: true };
   }
-  
+
   return { moved: false };
 }

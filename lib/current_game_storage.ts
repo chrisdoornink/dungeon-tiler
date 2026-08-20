@@ -13,8 +13,9 @@ const STORY_GAME_KEY = "currentStoryGame";
 const TUTORIAL_GAME_KEY = "currentTutorialGame";
 const TEST_GAME_KEY = "currentTestGame";
 const ENDLESS_GAME_KEY = "currentEndlessGame";
+const HOME_GAME_KEY = "currentHomeGame";
 
-export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial" | "test" | "endless";
+export type GameStorageSlot = "default" | "daily-new" | "story" | "tutorial" | "test" | "endless" | "home";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
@@ -28,6 +29,8 @@ function keyForSlot(slot: GameStorageSlot): string {
       return TUTORIAL_GAME_KEY;
     case "test":
       return TEST_GAME_KEY;
+    case "home":
+      return HOME_GAME_KEY;
     default:
       return CURRENT_GAME_KEY;
   }
