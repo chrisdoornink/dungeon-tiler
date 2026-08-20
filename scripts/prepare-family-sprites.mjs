@@ -52,7 +52,7 @@ const f = (member, pose, stretch) => ({ member, pose, stretch });
 const SHEET_LAYOUTS = {
   "chris-front.png": { figures: [f("chris", "front")] },
   "chris-back-and-sides.png": {
-    figures: [f("chris", "back", 1.18), f("chris", "side", 1.1), null],
+    figures: [f("chris", "back", 1.22), f("chris", "side", 1.16), null],
   },
   "annie.png": {
     figures: [
@@ -228,11 +228,37 @@ function removeBackground(buf, w, h) {
 
   let removed;
   if (avgCornerLuma > 128) {
-    // Light background: flood anything near the corner color.
+    // Light background: flood anything near the corner color, then defringe —
+    // anti-aliased blend pixels between outline and background survive the
+    // flood and render as a white halo on the dark game floor.
     const corner = [buf[corners[0]], buf[corners[0] + 1], buf[corners[0] + 2]];
     removed = floodFromBorders(buf, w, h, (i) =>
       colorDist(buf, i, corner) < LIGHT_BG_TOLERANCE
     );
+    for (let pass = 0; pass < 2; pass++) {
+      const extra = [];
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const p = y * w + x;
+          if (removed[p]) continue;
+          if (colorDist(buf, p * 4, corner) >= 130) continue; // real art, keep
+          let touchesRemoved = false;
+          for (let dy = -1; dy <= 1 && !touchesRemoved; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              const ny = y + dy;
+              const nx = x + dx;
+              if (ny < 0 || nx < 0 || ny >= h || nx >= w) continue;
+              if (removed[ny * w + nx]) {
+                touchesRemoved = true;
+                break;
+              }
+            }
+          }
+          if (touchesRemoved) extra.push(p);
+        }
+      }
+      for (const p of extra) removed[p] = 1;
+    }
   } else {
     // Dark background with glow: keep the closing of the strong-edge mask,
     // plus everything it encloses; remove whatever the border flood reaches.
@@ -330,8 +356,10 @@ function stretchX(buf, w, h, factor) {
 
 function cropWithMargin(buf, w, box) {
   const margin = Math.round((box.y1 - box.y0) * MARGIN_RATIO);
+  // No margin below the feet: the game anchors sprites bottom-center, so any
+  // bottom padding floats the figure above the tile it's standing on.
   const cw = box.x1 - box.x0 + 1 + margin * 2;
-  const ch = box.y1 - box.y0 + 1 + margin * 2;
+  const ch = box.y1 - box.y0 + 1 + margin;
   const out = Buffer.alloc(cw * ch * 4);
   for (let y = box.y0; y <= box.y1; y++) {
     const srcStart = (y * w + box.x0) * 4;

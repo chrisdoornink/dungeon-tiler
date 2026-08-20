@@ -1,6 +1,15 @@
 import { Direction, TileSubtype, type GameState, movePlayer } from "../../lib/map";
 import { Enemy } from "../../lib/enemy";
 
+// A combatRng that returns each value in order, repeating the last one forever.
+// Stepping AWAY from an adjacent enemy now rolls a "parting shot" first (connects when
+// the draw is < 0.4), then the usual attack-variance draw — so a retreating hit needs a
+// low first value followed by the variance value.
+function seqRng(values: number[]): () => number {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}
+
 function makeState(y: number, x: number, opts?: Partial<GameState>): GameState {
   const size = 25;
   const tiles = Array.from({ length: size }, () => Array(size).fill(0)); // FLOOR
@@ -27,15 +36,16 @@ function makeState(y: number, x: number, opts?: Partial<GameState>): GameState {
 describe("Combat variance and equipment", () => {
   test("enemy attack uses ±1 variance around strength (no shield)", () => {
     const gs = makeState(2, 2, {
-      combatRng: () => 0.8, // +1 variance for goblin-weighted (>= 0.75)
+      // parting shot connects (0.1 < 0.4), then +1 variance for goblin-weighted (>= 0.8)
+      combatRng: seqRng([0.1, 0.8]),
     });
-    const e = new Enemy({ y: 2, x: 1 }); // left of player, will attempt to move into player when we tick
+    const e = new Enemy({ y: 2, x: 1 }); // left of player; hero steps away (UP) so it gets a parting shot
     e.attack = 1;
     gs.enemies!.push(e);
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // damage = 1 base + 1 variance = 2 (goblin-weighted: >= 0.75 gives +1)
+    // damage = 1 base + 1 variance = 2 (goblin-weighted: >= 0.8 gives +1)
     expect(after.heroHealth).toBe(before - 2);
     expect(after.stats.damageTaken).toBe(2);
   });
@@ -79,7 +89,8 @@ describe("Combat variance and equipment", () => {
   test("shield gives +1 damage reduction (protection)", () => {
     const gs = makeState(2, 2, {
       hasShield: true,
-      combatRng: () => 0.8, // +1 variance for goblin-weighted (>= 0.75)
+      // parting shot connects (0.1 < 0.4), then +1 variance for goblin-weighted (>= 0.8)
+      combatRng: seqRng([0.1, 0.8]),
     });
     const e = new Enemy({ y: 2, x: 1 });
     e.attack = 1;
@@ -87,7 +98,7 @@ describe("Combat variance and equipment", () => {
 
     const before = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP);
-    // incoming = 1 + 1 = 2; defense = 1; net = 1 (goblin-weighted: >= 0.75 gives +1)
+    // incoming = 1 + 1 = 2; defense = 1; net = 1 (goblin-weighted: >= 0.8 gives +1)
     expect(after.heroHealth).toBe(before - 1);
     expect(after.stats.damageTaken).toBe(1);
   });
