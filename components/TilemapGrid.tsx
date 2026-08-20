@@ -2380,15 +2380,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return m.size ? m : undefined;
   })();
 
-  // MURAL_PANEL colours, keyed "y,x": a cipher-room mural panel always shows its switch's target colour
-  // (no lit state — it is a painting, always readable). The colour is the switch's target.
-  const muralPanels: Map<string, number> | undefined = (() => {
+  // MURAL_PANEL glyph-colours, keyed "y,x": which colours a cipher-room mural tile engraves (as the
+  // canonical cave-art glyphs). A SINGLE mural tile carries the WHOLE code — a compact wall engraving;
+  // a spread mural would put one colour per tile. No lit state — a mural is always readable.
+  const muralPanels: Map<string, number[]> | undefined = (() => {
     const locks = gameState.colorLocks ?? [];
-    const m = new Map<string, number>();
+    const m = new Map<string, number[]>();
     for (const l of locks) {
       const mu = l.mural;
       if (!mu) continue;
-      mu.tiles.forEach(([ty, tx], i) => m.set(`${ty},${tx}`, (l.target ?? [])[i] ?? 0));
+      const target = l.target ?? [];
+      mu.tiles.forEach(([ty, tx], i) =>
+        m.set(`${ty},${tx}`, mu.tiles.length === 1 ? target.slice() : [target[i] ?? 0])
+      );
     }
     return m.size ? m : undefined;
   })();
@@ -6867,8 +6871,9 @@ function renderTileGrid(
   // plus its render height as % of the tile (85 = NPC standard, 51 = dog).
   heroSpriteOverride?: string,
   heroSpriteScale?: number,
-  // Cipher-room mural: which target colour each MURAL_PANEL tile paints, keyed "y,x".
-  muralPanels?: Map<string, number>
+  // Cipher-room mural: which target colours each MURAL_PANEL tile engraves (whole code on a single
+  // tile, or one per tile), keyed "y,x".
+  muralPanels?: Map<string, number[]>
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid

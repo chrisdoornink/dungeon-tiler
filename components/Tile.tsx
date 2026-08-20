@@ -5,6 +5,7 @@ import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { CoilPiece, CoilHeadPose } from "../lib/bosses/coilwyrm";
 import { CoilwyrmStench } from "./CoilwyrmStench";
+import { ColorGlyph } from "./ColorGlyph";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
 import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
@@ -320,10 +321,10 @@ interface TileProps {
    */
   codeTorch?: { color: number; lit: boolean };
   /**
-   * MURAL_PANEL colour (cipher rooms, mural variant): the target colour this painted panel shows.
-   * Rendered as a matte inlay set in stone — deliberately not a glowing light.
+   * MURAL_PANEL colours (cipher rooms, mural variant): the code this wall engraving spells, drawn as
+   * the canonical cave-art glyphs (one per colour). Usually the whole sequence on one tile.
    */
-  muralPanel?: number;
+  muralPanel?: number[];
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -1184,36 +1185,37 @@ export const Tile: React.FC<TileProps> = ({
           </div>
         )}
 
-        {/* Mural panel — the cipher-room mural legend. A matte painted inlay set in stone (framed,
-            faintly bevelled, colour muted), deliberately NOT a glowing light: it is a painting you
-            read and remember, not a lamp. Colour is its switch's target. */}
-        {typeof muralPanel === "number" && subtypes?.includes(TileSubtype.MURAL_PANEL) && (
+        {/* Cipher-room mural: the code carved into the wall as the canonical cave-art glyphs — faint
+            and coloured, in a shallow recess low on the wall's face (where the forced perspective
+            shows stone, same place WALL_SEAL sits). One glyph per colour, the row spelling the code. */}
+        {muralPanel && muralPanel.length > 0 && subtypes?.includes(TileSubtype.MURAL_PANEL) && (
           <div
-            key="mural-panel"
+            key="mural-engraving"
             data-testid={`subtype-icon-${TileSubtype.MURAL_PANEL}`}
             style={{
               position: "absolute",
-              inset: "8%",
-              pointerEvents: "none",
-              background: "#2a2620",
-              borderRadius: "3px",
-              boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.6)",
+              left: "6%",
+              right: "6%",
+              bottom: "8%",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
+              gap: "6%",
+              pointerEvents: "none",
+              padding: "6% 6%",
+              background: "rgba(0,0,0,0.26)",
+              borderRadius: "2px",
+              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.05)",
             }}
           >
-            <div
-              style={{
-                width: "60%",
-                height: "60%",
-                background: toggleStateColor(muralPanel),
-                borderRadius: "2px",
-                filter: "saturate(0.8) brightness(0.9)",
-                boxShadow:
-                  "inset 0 0 0 2px rgba(0,0,0,0.35), inset 2px 2px 3px rgba(255,255,255,0.12), inset -2px -2px 3px rgba(0,0,0,0.45)",
-              }}
-            />
+            {muralPanel.map((c, i) => (
+              <div
+                key={i}
+                style={{ flex: "1 1 0", minWidth: 0, aspectRatio: "1 / 1", display: "flex", alignItems: "center" }}
+              >
+                <ColorGlyph colorIndex={c} color={toggleStateColor(c)} size="100%" strokeWidth={1.7} opacity={0.72} />
+              </div>
+            ))}
           </div>
         )}
 

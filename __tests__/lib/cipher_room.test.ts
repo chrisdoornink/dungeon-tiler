@@ -1,5 +1,5 @@
 import { buildCipherRoomFloor } from "../../lib/map/cipher_room";
-import { TileSubtype, Direction, FLOOR } from "../../lib/map/constants";
+import { TileSubtype, Direction, FLOOR, WALL } from "../../lib/map/constants";
 import { colorLockSatisfied, applyColorLock } from "../../lib/map/machinery";
 import { initializeGameStateFromMap, movePlayer, type GameState } from "../../lib/map/game-state";
 import { findPlayerPosition } from "../../lib/map/player";
@@ -44,16 +44,19 @@ describe("cipher room — mural variant (default)", () => {
     expect(lock.rule).toBe("match");
     expect(lock.switches.length).toBe(4);
     expect(lock.target?.length).toBe(4);
-    expect(lock.mural?.tiles.length).toBe(4);
+    expect(lock.mural?.tiles.length).toBe(1); // one compact engraving carrying the whole code
     expect(lock.legend).toBeUndefined(); // no torches in the mural variant
     expect(colorLockSatisfied(lock)).toBe(false);
-    expect(find(mapData, TileSubtype.MURAL_PANEL).length).toBe(4);
+    expect(find(mapData, TileSubtype.MURAL_PANEL).length).toBe(1);
     expect(find(mapData, TileSubtype.CODE_TORCH).length).toBe(0);
     expect(find(mapData, TileSubtype.EXTRA_HEART).length).toBe(2);
     // The mural and the switches are far apart — you cannot read one while standing at the other.
-    const muralRow = lock.mural!.tiles[0][0];
+    const [muralRow, muralCol] = lock.mural!.tiles[0];
     const switchRow = lock.switches[0][0];
     expect(Math.abs(muralRow - switchRow)).toBeGreaterThanOrEqual(6);
+    // It is a WALL engraving with floor directly below it (a camera-facing face to read).
+    expect(mapData.tiles[muralRow][muralCol]).toBe(WALL);
+    expect(mapData.tiles[muralRow + 1][muralCol]).toBe(FLOOR);
   });
 
   it("is solvable: hero reaches the mural and the switches, but the reward is sealed until solved", () => {
@@ -61,7 +64,8 @@ describe("cipher room — mural variant (default)", () => {
     const lock = colorLocks[0];
     const hero = findPlayerPosition(mapData)!;
     const reach = reachable(mapData, hero);
-    for (const [my, mx] of lock.mural!.tiles) expect(reach.has(`${my},${mx}`)).toBe(true); // read the code
+    const [my, mx] = lock.mural!.tiles[0];
+    expect(reach.has(`${my + 1},${mx}`)).toBe(true); // hero can stand below the wall engraving to read it
     for (const [sy, sx] of lock.switches) expect(reach.has(`${sy},${sx}`)).toBe(true); // set the switches
     const reward = find(mapData, TileSubtype.EXTRA_HEART);
     for (const [ry, rx] of reward) expect(reach.has(`${ry},${rx}`)).toBe(false); // sealed behind the gate
@@ -74,11 +78,11 @@ describe("cipher room — mural variant (default)", () => {
     for (const [ry, rx] of reward) expect(afterReach.has(`${ry},${rx}`)).toBe(true);
   });
 
-  it("panel i shows switch i's target colour (mural is parallel to target)", () => {
+  it("keeps the whole code on a single compact engraving", () => {
     const seq = [3, 1, 2, 0];
     const { colorLocks } = buildCipherRoomFloor({ sequence: seq });
     expect(colorLocks[0].target).toEqual(seq);
-    expect(colorLocks[0].mural?.tiles.length).toBe(4);
+    expect(colorLocks[0].mural?.tiles.length).toBe(1);
   });
 });
 

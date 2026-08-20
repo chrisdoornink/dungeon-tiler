@@ -6,6 +6,7 @@ import { tileTypes, type GameState } from "../../lib/map";
 import { initializeGameStateFromMap } from "../../lib/map/game-state";
 import { buildCipherRoomFloor, type CipherLegendStyle } from "../../lib/map/cipher_room";
 import { toggleStateColor } from "../../lib/map/machinery";
+import { ColorGlyph } from "../../components/ColorGlyph";
 
 /**
  * Bench for the prescribed colour-cipher puzzle room (lib/map/cipher_room.ts). Two legend styles:
@@ -78,10 +79,11 @@ function Inner() {
         </h1>
         {style === "mural" ? (
           <p className="text-xs text-gray-300 mt-1">
-            You start in the lower chamber with a painted <b>mural</b> — four colours in order, the
-            combination. Memorise it, climb the corridor to the <b>switch room</b> (the mural is out of
-            sight up there), and set each switch to match. All four correct → the <b>spikes</b> retract
-            and the reward is yours. Forget the code? Walk back down and look again.
+            You start in the lower chamber facing a carved <b>mural</b> on the wall — four cave-art
+            symbols, one per colour, spelling the combination. Memorise it, climb the corridor to the{" "}
+            <b>switch room</b> (the mural is out of sight up there), and set each switch to the matching
+            colour. All four correct → the <b>spikes</b> retract and the reward is yours. Forget the
+            code? Walk back down and look again.
           </p>
         ) : (
           <p className="text-xs text-gray-300 mt-1">
@@ -92,11 +94,10 @@ function Inner() {
         <p className="text-xs mt-2">
           answer (debug):{" "}
           {target.map((c, i) => (
-            <span key={i} className="inline-flex items-center gap-1 mr-2">
-              <span
-                style={{ background: toggleStateColor(c) }}
-                className="inline-block w-3 h-3 rounded-sm border border-black/40"
-              />
+            <span key={i} className="inline-flex items-center gap-1 mr-3 align-middle">
+              <span style={{ display: "inline-flex", width: 20, height: 20 }}>
+                <ColorGlyph colorIndex={c} color={toggleStateColor(c)} size={20} strokeWidth={2} />
+              </span>
               {COLOR_NAMES[c] ?? c}
             </span>
           ))}
