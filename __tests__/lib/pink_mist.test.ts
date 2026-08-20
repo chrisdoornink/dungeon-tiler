@@ -164,11 +164,15 @@ describe("pink mist — enemy blinding", () => {
   it("the same adjacent enemy attacks when NOT in mist", () => {
     const map = arena(12, 5, 5);
     const enemy = goblinAt(5, 4);
+    // Hero steps UP (a retreat), so the enemy's swing now rolls a parting shot first.
+    // Feed [0.1, 0.5]: 0.1 < 0.4 connects, 0.5 -> 0-variance, so its base hit lands.
+    let i = 0;
+    const seq = [0.1, 0.5];
     const state = baseState(map, {
       inPinkRealm: true,
       mist: [], // no mist
       enemies: [enemy],
-      combatRng: () => 0.5,
+      combatRng: () => seq[Math.min(i++, seq.length - 1)],
     });
     const after = movePlayer(state, Direction.UP);
     expect(after.heroHealth).toBeLessThan(5); // took a hit

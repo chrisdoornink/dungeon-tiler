@@ -1,6 +1,14 @@
 import { initializeGameState, movePlayer, Direction, TileSubtype, type GameState } from "../../lib/map";
 import { Enemy, placeEnemies } from "../../lib/enemy";
 
+// combatRng that returns each value in order, repeating the last forever. Retreating from
+// an adjacent enemy now rolls a "parting shot" first (connects when the draw is < 0.4),
+// then the attack-variance draw, so a connecting retreat hit needs [low, variance].
+function seqRng(values: number[]): () => number {
+  let i = 0;
+  return () => values[Math.min(i++, values.length - 1)];
+}
+
 describe("Health system - initial hero health", () => {
   test("hero starts with 5 health", () => {
     const gs = initializeGameState();
@@ -9,17 +17,38 @@ describe("Health system - initial hero health", () => {
   });
 
 describe("Combat - running away behavior", () => {
-  test("when adjacent and the player increases distance in same tick, hero takes no damage", () => {
+  test("running away is no longer free: a connecting parting shot still wounds the hero", () => {
     const gs = makeEmptyStateWithPlayer(2, 2);
     // Enemy to the right (adjacent)
     const e = new Enemy({ y: 2, x: 3 });
     e.health = 3;
     e.attack = 1;
+    // Parting shot connects (0.1 < 0.4), then 0-variance (0.5) -> 1 damage.
+    gs.combatRng = seqRng([0.1, 0.5]);
     gs.enemies!.push(e);
 
     const before = { health: gs.heroHealth, taken: gs.stats.damageTaken };
 
     // Run away: move LEFT to increase distance from 1 to 2
+    const after = movePlayer(gs, Direction.LEFT);
+
+    expect(after.heroHealth).toBe(before.health - 1);
+    expect(after.stats.damageTaken).toBe(before.taken + 1);
+    // Enemy stayed put (it swung rather than chased).
+    expect(after.enemies![0].y).toBe(2);
+    expect(after.enemies![0].x).toBe(3);
+  });
+
+  test("the parting shot can miss, so retreat is safer than standing (not a guaranteed hit)", () => {
+    const gs = makeEmptyStateWithPlayer(2, 2);
+    const e = new Enemy({ y: 2, x: 3 });
+    e.health = 3;
+    e.attack = 1;
+    // Parting shot rolls a miss (0.9 >= 0.4) -> the enemy's attack is suppressed.
+    gs.combatRng = seqRng([0.9]);
+    gs.enemies!.push(e);
+
+    const before = { health: gs.heroHealth, taken: gs.stats.damageTaken };
     const after = movePlayer(gs, Direction.LEFT);
 
     expect(after.heroHealth).toBe(before.health);
@@ -36,6 +65,9 @@ describe("Combat - enemy attacks when attempting to step onto player", () => {
     e.attack = 1;
     gs.enemies!.push(e);
 
+    // Stepping to the side is still a retreat, so force the parting shot to connect
+    // (0.1 < 0.4) with 0-variance (0.5) -> 1 damage.
+    gs.combatRng = seqRng([0.1, 0.5]);
     const beforeHealth = gs.heroHealth;
     const after = movePlayer(gs, Direction.UP); // any move to tick enemies
 
