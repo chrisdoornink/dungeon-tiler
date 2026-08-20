@@ -3,6 +3,7 @@ import {
   placeEnemies,
   updateEnemies,
   rehydrateEnemies,
+  enemyAttackVariance,
   type PlainEnemy,
   type EnemyAttackInfo,
 } from "../enemy";
@@ -369,6 +370,33 @@ export const SPIKES_BUMP_DAMAGE = 1;
 const PINK_REALM_DAMAGE_CAP = 6;
 function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
   return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
+}
+
+// --- Melee-exchange risk (anti-kite balance) --------------------------------
+// Two moves used to be entirely risk-free, which let a patient player melee down
+// even a stone goblin with zero danger (step away, step back, repeat):
+//
+//   1. Retreating from an adjacent enemy. The enemy's attack was fully cancelled
+//      whenever the hero stepped off (see the `suppress` hook in movePlayerCore).
+//   2. Closing a one-tile gap and striking. The enemy spent its turn walking into
+//      the gap (no attack), then the hero's move resolved as a free melee hit.
+//
+// Both now carry a chance the enemy still lands its blow, restoring a risk gradient:
+// standing toe-to-toe (attack an already-adjacent enemy) is the riskiest — the enemy
+// always gets its swing; closing in to strike is a bit safer; retreating is the safest
+// but no longer free. Rolled against the run's combat RNG (Math.random in real play, so
+// daily-seed reconstruction is unaffected — combat variance is already non-deterministic).
+const RETREAT_PARTING_HIT_CHANCE = 0.4;
+const CLOSE_IN_COUNTER_CHANCE = 0.6;
+
+// Damage a single enemy's contact hit lands right now, using the same variance model as
+// the enemy turn (see enemyAttackVariance) and subtracting the hero's shield defense.
+function enemyContactDamage(
+  enemy: Enemy,
+  rng: () => number,
+  defense: number
+): number {
+  return Math.max(0, enemy.attack + enemyAttackVariance(enemy.kind, rng()) - defense);
 }
 
 /**
@@ -4243,6 +4271,14 @@ function movePlayerCore(
   let moved = false;
   let checkpointTouched = false;
 
+  // Carried from the enemy tick to the melee block below (which lives outside the
+  // enemy-turn `if`): who attacked, how much cap the tick already spent, and where every
+  // enemy stood BEFORE it moved — the last one lets the melee resolver tell a "closing"
+  // enemy (walked into the hero's path this turn) from one that was already adjacent.
+  let enemyTurnDamageApplied = 0;
+  let enemyAttacksThisTurn: EnemyAttackInfo[] = [];
+  const prevEnemyPositions = new Map<Enemy, { y: number; x: number }>();
+
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
   // Predict where the hero will stand once this move resolves, so ranged attackers
@@ -4282,6 +4318,8 @@ function movePlayerCore(
         ) ?? null
       : null;
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+    // Snapshot pre-move positions so the melee resolver can detect a "closing" enemy.
+    for (const e of newGameState.enemies) prevEnemyPositions.set(e, { y: e.y, x: e.x });
     // console.log(`[ENEMY TURN] Starting enemy turn. Player at (${currentY},${currentX}), moving ${direction}. Enemies:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x})`).join(', '));
     const result = updateEnemies(
       newMapData.tiles,
@@ -4303,24 +4341,42 @@ function movePlayerCore(
         // behavior can see where the mist is.
         skipEnemy: mistBlindSkip(gameState, true),
         mist: gameState.mist,
-        // Suppress only when the player moves directly away from an adjacent enemy along the same axis
+        // Retreat parting shot: an adjacent enemy the hero steps away from (any direction,
+        // not just directly-away) used to have its attack fully cancelled — the free retreat
+        // that let a player kite anything to death. Now it lands a reduced-chance parting hit
+        // instead. Stepping INTO the enemy to strike it is unchanged: that enemy still gets its
+        // full swing (toe-to-toe is the riskiest option). Snakes always bite when adjacent, and
+        // non-adjacent (e.g. ranged) attacks are never suppressed here.
         suppress: (e: Enemy) => {
-          const dy = newY - currentY;
-          const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
-          const movingAway =
-            (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
-            (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
-          // Do not suppress snakes; they should bite if adjacent
-          if (e.kind === 'snake') return false;
-          return adj && movingAway;
+          if (!adj) return false;
+          const attackingThisEnemy = newY === e.y && newX === e.x;
+          if (attackingThisEnemy) return false;
+          if (e.kind === "snake") return false;
+          // Bosses keep their own bespoke anti-kite tuning (the Coilwyrm's split-on-cut, the
+          // Fisher's spike moat, ...) and their deterministic policy sims, so leave them on the
+          // original rule: a retreat is only free when moving directly away, never a parting
+          // shot. The general risk is for ordinary enemies — the ones the kite exploit trivialized.
+          if (isBossPart(e)) {
+            const dy = newY - currentY;
+            const dx = newX - currentX;
+            const movingAway =
+              (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
+              (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
+            return movingAway;
+          }
+          const rng = newGameState.combatRng ?? Math.random;
+          // Suppress (the enemy misses) unless the parting-shot roll connects.
+          return rng() >= RETREAT_PARTING_HIT_CHANCE;
         },
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
     newGameState.recentEnemyAttacks = result.attackingEnemies;
+    enemyAttacksThisTurn = result.attackingEnemies ?? [];
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(newGameState), result.damage);
+      enemyTurnDamageApplied = applied;
       applyHeroDamage(newGameState, applied);
       newGameState.stats.damageTaken += applied;
 
@@ -4926,6 +4982,76 @@ function movePlayerCore(
           )
         ) {
           newGameState.heroTorchLit = true;
+        }
+
+        // Closing-enemy counter (anti-kite): a struck enemy that walked into the hero's
+        // path THIS turn — it wasn't already adjacent, and it spent its move closing rather
+        // than attacking — used to eat the hero's blow for free (the one-tile-gap exploit).
+        // Now that clash carries a chance it lands a hit too. A killing blow avoids the
+        // counter (the enemy is cut down mid-lunge), so one-shotting weak enemies stays safe
+        // while a tanky one like a stone goblin, which survives the hero's chip damage, bites
+        // back. Already-adjacent enemies are handled by the enemy turn (they got their swing),
+        // and a blinded/suppressed one never counts as "closing" since it couldn't move here.
+        if (enemy.health > 0) {
+          const prev = prevEnemyPositions.get(enemy);
+          const wasAdjacentBefore =
+            !!prev &&
+            Math.abs(prev.y - currentY) + Math.abs(prev.x - currentX) === 1;
+          const attackedThisTurn = enemyAttacksThisTurn.some(
+            (a) => a.y === enemy.y && a.x === enemy.x
+          );
+          // Bosses are exempt (see the suppress hook): their fights are tuned and sim-tested
+          // on their own terms, so the general closing-counter does not apply to them.
+          const isClosingEnemy =
+            !wasAdjacentBefore && !attackedThisTurn && !isBossPart(enemy);
+          if (isClosingEnemy && rng() < CLOSE_IN_COUNTER_CHANCE) {
+            const defense = newGameState.hasShield ? 1 : 0;
+            const remainingCap = Math.max(
+              0,
+              perTurnDamageCap(newGameState) - enemyTurnDamageApplied
+            );
+            const counter = Math.min(
+              remainingCap,
+              enemyContactDamage(enemy, rng, defense)
+            );
+            if (counter > 0) {
+              applyHeroDamage(newGameState, counter);
+              newGameState.stats.damageTaken += counter;
+              enemyTurnDamageApplied += counter;
+              // Tutorial guardrail: mirror the enemy-turn floor (never die in the tutorial).
+              if (newGameState.mode === "tutorial" && newGameState.heroHealth < 1) {
+                newGameState.heroHealth = 1;
+              }
+              // Surface the counter to the render layer so the hit is visible.
+              newGameState.recentEnemyAttacks = [
+                ...(newGameState.recentEnemyAttacks ?? []),
+                {
+                  kind: enemy.kind,
+                  damage: counter,
+                  y: enemy.y,
+                  x: enemy.x,
+                  ranged: false,
+                },
+              ];
+              // A closing snake still delivers venom.
+              if (enemy.kind === "snake") {
+                if (!newGameState.conditions) newGameState.conditions = {};
+                if (!newGameState.conditions.poisoned) {
+                  newGameState.conditions.poisoned = {
+                    active: true,
+                    stepsSinceLastDamage: 0,
+                    damagePerInterval: 1,
+                    stepInterval: 8,
+                  };
+                } else {
+                  newGameState.conditions.poisoned.active = true;
+                }
+              }
+              if (newGameState.heroHealth <= 0 && !newGameState.deathCause) {
+                newGameState.deathCause = { type: "enemy", enemyKind: enemy.kind };
+              }
+            }
+          }
         }
 
         if (enemy.health <= 0) {
