@@ -44,19 +44,20 @@ describe("cipher room — mural variant (default)", () => {
     expect(lock.rule).toBe("match");
     expect(lock.switches.length).toBe(4);
     expect(lock.target?.length).toBe(4);
-    expect(lock.mural?.tiles.length).toBe(1); // one compact engraving carrying the whole code
+    expect(lock.mural?.tiles.length).toBe(2); // spans two wall tiles so each glyph is legible
     expect(lock.legend).toBeUndefined(); // no torches in the mural variant
     expect(colorLockSatisfied(lock)).toBe(false);
-    expect(find(mapData, TileSubtype.MURAL_PANEL).length).toBe(1);
+    expect(find(mapData, TileSubtype.MURAL_PANEL).length).toBe(2);
     expect(find(mapData, TileSubtype.CODE_TORCH).length).toBe(0);
     expect(find(mapData, TileSubtype.EXTRA_HEART).length).toBe(2);
-    // The mural and the switches are far apart — you cannot read one while standing at the other.
-    const [muralRow, muralCol] = lock.mural!.tiles[0];
     const switchRow = lock.switches[0][0];
-    expect(Math.abs(muralRow - switchRow)).toBeGreaterThanOrEqual(6);
-    // It is a WALL engraving with floor directly below it (a camera-facing face to read).
-    expect(mapData.tiles[muralRow][muralCol]).toBe(WALL);
-    expect(mapData.tiles[muralRow + 1][muralCol]).toBe(FLOOR);
+    for (const [muralRow, muralCol] of lock.mural!.tiles) {
+      // The mural and the switches are far apart — you cannot read one while standing at the other.
+      expect(Math.abs(muralRow - switchRow)).toBeGreaterThanOrEqual(6);
+      // Each is a WALL engraving with floor directly below it (a camera-facing face to read).
+      expect(mapData.tiles[muralRow][muralCol]).toBe(WALL);
+      expect(mapData.tiles[muralRow + 1][muralCol]).toBe(FLOOR);
+    }
   });
 
   it("is solvable: hero reaches the mural and the switches, but the reward is sealed until solved", () => {
@@ -78,11 +79,15 @@ describe("cipher room — mural variant (default)", () => {
     for (const [ry, rx] of reward) expect(afterReach.has(`${ry},${rx}`)).toBe(true);
   });
 
-  it("keeps the whole code on a single compact engraving", () => {
+  it("spreads the code across two adjacent wall tiles", () => {
     const seq = [3, 1, 2, 0];
     const { colorLocks } = buildCipherRoomFloor({ sequence: seq });
     expect(colorLocks[0].target).toEqual(seq);
-    expect(colorLocks[0].mural?.tiles.length).toBe(1);
+    const tiles = colorLocks[0].mural!.tiles;
+    expect(tiles.length).toBe(2);
+    // adjacent: same row, neighbouring columns (so the engraving reads as one continuous row)
+    expect(tiles[0][0]).toBe(tiles[1][0]);
+    expect(Math.abs(tiles[0][1] - tiles[1][1])).toBe(1);
   });
 });
 

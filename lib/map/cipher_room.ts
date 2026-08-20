@@ -151,9 +151,10 @@ function buildMuralVariant(opts: CipherRoomOptions): Built {
 
   const cols = [3, 4, 5, 6].slice(0, sequence.length);
   const switches: Array<[number, number]> = cols.map((c) => [6, c]);
-  // The whole code is one compact engraving on the mural chamber's top WALL (floor below at row 15,
-  // so the forced-perspective face is visible) — a single tile, so a real level only needs one wall.
-  const muralTile: [number, number] = [14, 5];
+  // The engraving spans TWO adjacent wall tiles on the mural chamber's top WALL (each with floor below
+  // at row 15, so the forced-perspective face is visible) — the code split across them, two glyphs a
+  // tile, so each mark is big enough to read. A real level needs a two-wide wall for it.
+  const muralTiles: Array<[number, number]> = [[14, 5], [14, 6]];
 
   const gates: Array<[number, number]> = [];
   for (let x = 3; x <= 7; x++) {
@@ -161,11 +162,11 @@ function buildMuralVariant(opts: CipherRoomOptions): Built {
     gates.push([4, x]);
   }
   switches.forEach(([y, x]) => (subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH]));
-  subtypes[muralTile[0]][muralTile[1]] = [TileSubtype.MURAL_PANEL];
+  muralTiles.forEach(([my, mx]) => (subtypes[my][mx] = [TileSubtype.MURAL_PANEL]));
   placeReward(subtypes, [[3, 4], [3, 5], [3, 6], [3, 3]], reward);
   subtypes[20][5] = [TileSubtype.PLAYER]; // hero starts in the mural chamber, facing the engraving
 
-  const lock = buildLock(switches, gates, sequence, colors, { mural: { tiles: [muralTile] } });
+  const lock = buildLock(switches, gates, sequence, colors, { mural: { tiles: muralTiles } });
   return { mapData: { tiles, subtypes }, colorLocks: [lock] };
 }
 

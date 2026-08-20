@@ -2381,18 +2381,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   })();
 
   // MURAL_PANEL glyph-colours, keyed "y,x": which colours a cipher-room mural tile engraves (as the
-  // canonical cave-art glyphs). A SINGLE mural tile carries the WHOLE code — a compact wall engraving;
-  // a spread mural would put one colour per tile. No lit state — a mural is always readable.
+  // canonical cave-art glyphs). The code is split as evenly as possible across the mural's tiles — e.g.
+  // a 4-colour code on two tiles is two glyphs per tile, so each mark stays big enough to read. No lit
+  // state — a mural is always readable.
   const muralPanels: Map<string, number[]> | undefined = (() => {
     const locks = gameState.colorLocks ?? [];
     const m = new Map<string, number[]>();
     for (const l of locks) {
       const mu = l.mural;
-      if (!mu) continue;
+      if (!mu || mu.tiles.length === 0) continue;
       const target = l.target ?? [];
-      mu.tiles.forEach(([ty, tx], i) =>
-        m.set(`${ty},${tx}`, mu.tiles.length === 1 ? target.slice() : [target[i] ?? 0])
-      );
+      const perTile = Math.ceil(target.length / mu.tiles.length);
+      mu.tiles.forEach(([ty, tx], i) => {
+        const chunk = target.slice(i * perTile, (i + 1) * perTile);
+        if (chunk.length) m.set(`${ty},${tx}`, chunk);
+      });
     }
     return m.size ? m : undefined;
   })();

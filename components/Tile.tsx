@@ -1198,26 +1198,22 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.MURAL_PANEL}`}
             style={{
               position: "absolute",
-              left: "6%",
-              right: "6%",
-              bottom: "8%",
+              left: "2%",
+              right: "2%",
+              bottom: "14%",
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-end",
               justifyContent: "center",
-              gap: "6%",
+              gap: "8%",
               pointerEvents: "none",
-              padding: "6% 6%",
-              background: "rgba(0,0,0,0.26)",
-              borderRadius: "2px",
-              boxShadow: "inset 0 1px 2px rgba(0,0,0,0.55), inset 0 -1px 1px rgba(255,255,255,0.05)",
             }}
           >
             {muralPanel.map((c, i) => (
               <div
                 key={i}
-                style={{ flex: "1 1 0", minWidth: 0, aspectRatio: "1 / 1", display: "flex", alignItems: "center" }}
+                style={{ flex: "1 1 0", minWidth: 0, aspectRatio: "1 / 1", display: "flex" }}
               >
-                <ColorGlyph colorIndex={c} color={toggleStateColor(c)} size="100%" strokeWidth={1.7} opacity={0.72} />
+                <ColorGlyph colorIndex={c} color={toggleStateColor(c)} size="100%" strokeWidth={2} opacity={0.82} />
               </div>
             ))}
           </div>
