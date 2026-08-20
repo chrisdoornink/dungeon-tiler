@@ -99,12 +99,12 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     sprite: "/images/family/chris-front.png",
     spriteBack: "/images/family/chris-back.png",
     spriteSide: "/images/family/chris-side.png",
-    heroSpriteScale: 114,
+    heroSpriteScale: 126,
     home: [13, 2],
     facing: Direction.DOWN,
     canMove: false,
     // metadata.scale is the NPC-layer size (heroSpriteScale / 85, the NPC standard)
-    metadata: { scale: 1.34 },
+    metadata: { scale: 1.48 },
   },
   // Annie — kitchen, mid-project as always. Real assets.
   {
@@ -114,14 +114,14 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     sprite: "/images/family/annie-front.png",
     spriteBack: "/images/family/annie-back.png",
     spriteSide: "/images/family/annie-side.png",
-    heroSpriteScale: 114,
+    heroSpriteScale: 126,
     home: [6, 3],
     facing: Direction.DOWN,
     canMove: true,
     metadata: {
       behavior: "wander",
       wanderBounds: { minY: 4, maxY: 7, minX: 3, maxX: 5 },
-      scale: 1.34,
+      scale: 1.48,
     },
   },
   // Emerson — his room, never standing still. Real assets; 12 and a little
@@ -133,14 +133,14 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     sprite: "/images/family/emerson-front.png",
     spriteBack: "/images/family/emerson-back.png",
     spriteSide: "/images/family/emerson-side.png",
-    heroSpriteScale: 95,
+    heroSpriteScale: 110,
     home: [13, 8],
     facing: Direction.LEFT,
     canMove: true,
     metadata: {
       behavior: "wander",
       wanderBounds: { minY: 13, maxY: 15, minX: 7, maxX: 8 },
-      scale: 1.12,
+      scale: 1.29,
     },
   },
   // Claire — her room, calm and still. Real assets; 14, ~75% of the adults.
@@ -151,11 +151,11 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     sprite: "/images/family/claire-front.png",
     spriteBack: "/images/family/claire-back.png",
     spriteSide: "/images/family/claire-side.png",
-    heroSpriteScale: 101,
+    heroSpriteScale: 116,
     home: [10, 8],
     facing: Direction.DOWN,
     canMove: false,
-    metadata: { scale: 1.19 },
+    metadata: { scale: 1.36 },
   },
   // Opal — starts in the living room, roams the house
   {

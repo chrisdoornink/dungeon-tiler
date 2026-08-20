@@ -87,8 +87,8 @@ describe("character toggle", () => {
   });
 
   it("renders the kids at kid size", () => {
-    expect(buildHearthHomeState("emerson").heroSpriteScale).toBe(95);
-    expect(buildHearthHomeState("claire").heroSpriteScale).toBe(101);
+    expect(buildHearthHomeState("emerson").heroSpriteScale).toBe(110);
+    expect(buildHearthHomeState("claire").heroSpriteScale).toBe(116);
   });
 
   it("supports dog mode at dog size", () => {
@@ -96,7 +96,7 @@ describe("character toggle", () => {
     expect(state.heroSprite).toBe("/images/dog-golden/dog-front-1.png");
     expect(state.heroSpriteScale).toBe(36);
     // Humans with real art render larger than the NPC standard.
-    expect(buildHearthHomeState("chris").heroSpriteScale).toBe(114);
+    expect(buildHearthHomeState("chris").heroSpriteScale).toBe(126);
     const ids = (state.npcs ?? []).map((npc) => npc.id).sort();
     expect(ids).toEqual(["npc-annie", "npc-chris", "npc-claire", "npc-emerson"]);
   });
