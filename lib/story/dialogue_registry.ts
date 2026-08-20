@@ -1158,6 +1158,58 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Jorin", text: "Keep it sharp, and it'll keep you safe." },
     ],
   },
+
+  // Hearth & Home (/home) — the family house. Placeholder v1 lines; real
+  // quest dialogue arrives with the Game of the House phase. The "-dad"
+  // variants play only when Chris is the active hero (activeHeroId rule).
+  "home-chris-default": {
+    id: "home-chris-default",
+    lines: [
+      { speaker: "Chris", text: "Hang on. I've almost got this riff." },
+      { speaker: "Chris", text: "Okay, listen to this. ...Nope. One more try. It'll be worth it, promise." },
+    ],
+  },
+  "home-annie-default": {
+    id: "home-annie-default",
+    lines: [
+      { speaker: "Annie", text: "Oh good, you're home! Quick question. Be honest." },
+      { speaker: "Annie", text: "Does the dining room feel more terracotta or more burnt sienna to you? Wait. Don't answer. I'm repainting it either way." },
+    ],
+  },
+  "home-emerson-default": {
+    id: "home-emerson-default",
+    lines: [
+      { speaker: "Emerson", text: "Hey! Hey! I made up a new song! It's about Opal!" },
+      { speaker: "Emerson", text: "It goes: OPAL, OPAL, OPAL! That's the whole song. Wanna race to the kitchen?" },
+    ],
+  },
+  "home-emerson-dad": {
+    id: "home-emerson-dad",
+    lines: [
+      { speaker: "Emerson", text: "Dad! Dad! I made up a new song! It's about Opal!" },
+      { speaker: "Emerson", text: "It goes: OPAL, OPAL, OPAL! That's the whole song. Wanna race to the kitchen?" },
+    ],
+  },
+  "home-claire-default": {
+    id: "home-claire-default",
+    lines: [
+      { speaker: "Claire", text: "...hi." },
+      { speaker: "Claire", text: "I learned the quiet part of that song on the piano. The part everyone skips. It's my favorite part." },
+    ],
+  },
+  "home-claire-dad": {
+    id: "home-claire-dad",
+    lines: [
+      { speaker: "Claire", text: "...hi, Dad." },
+      { speaker: "Claire", text: "I learned the quiet part of that song on the piano. The part everyone skips. It's my favorite part." },
+    ],
+  },
+  "home-opal-default": {
+    id: "home-opal-default",
+    lines: [
+      { speaker: "Opal", text: "Woof! Woof woof! (Her whole back half is wagging.)" },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {

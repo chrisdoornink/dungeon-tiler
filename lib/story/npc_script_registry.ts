@@ -544,6 +544,48 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     scriptId: "jorin-default",
     priority: PRIORITIES.DEFAULT,
   },
+
+  // Hearth & Home (/home) — family house NPCs. The kids call you "Dad" only
+  // when Chris is the active hero; everyone else gets the generic greeting.
+  {
+    npcId: "npc-chris",
+    scriptId: "home-chris-default",
+    priority: PRIORITIES.DEFAULT,
+  },
+  {
+    npcId: "npc-annie",
+    scriptId: "home-annie-default",
+    priority: PRIORITIES.DEFAULT,
+  },
+  {
+    npcId: "npc-emerson",
+    scriptId: "home-emerson-dad",
+    priority: 10,
+    customCondition: (gameState: GameState) =>
+      gameState.activeHeroId === "chris",
+  },
+  {
+    npcId: "npc-emerson",
+    scriptId: "home-emerson-default",
+    priority: PRIORITIES.DEFAULT,
+  },
+  {
+    npcId: "npc-claire",
+    scriptId: "home-claire-dad",
+    priority: 10,
+    customCondition: (gameState: GameState) =>
+      gameState.activeHeroId === "chris",
+  },
+  {
+    npcId: "npc-claire",
+    scriptId: "home-claire-default",
+    priority: PRIORITIES.DEFAULT,
+  },
+  {
+    npcId: "npc-opal",
+    scriptId: "home-opal-default",
+    priority: PRIORITIES.DEFAULT,
+  },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {

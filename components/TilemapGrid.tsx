@@ -157,6 +157,7 @@ import {
   type DialogueLine,
 } from "../lib/story/dialogue_registry";
 import { resolveNpcDialogueScript } from "../lib/story/npc_script_registry";
+import { resolveHeroSpriteOverride } from "../lib/hero_sprite";
 import { trackTutorialBeat } from "../lib/posthog_analytics";
 import { createInitialStoryFlags, type StoryEffect } from "../lib/story/event_registry";
 import { performExchange } from "../lib/story/exchange_registry";
@@ -2638,6 +2639,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environmentDaylight = environmentConfig.daylight;
   const autoPhaseVisibility = environmentDaylight;
   const heroTorchLitState = gameState.heroTorchLit ?? true;
+  // Hearth & Home: family members don't carry torches, so the hero flame VFX
+  // (and the flame-vs-snuff sprite variant) is suppressed whenever a scene
+  // declares an active family hero — even if a wall torch "relights" the torch
+  // state in passing. Darkness handling is unaffected (the house is daylight).
+  const heroFlameLit = heroTorchLitState && !gameState.activeHeroId;
+  // Hearth & Home: the override sprite for the hero's CURRENT facing (front /
+  // back / mirrored side). Undefined outside the family-house scene.
+  const heroOverrideSprite = resolveHeroSpriteOverride(
+    gameState.playerDirection,
+    gameState
+  );
 
   // One-shot "flame guttering out" VFX: when the torch goes lit -> snuffed (a
   // wisp reaching the hero), play a blue flame flutter-and-fade for ~560ms. The
@@ -6169,7 +6181,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.npcs,
                     gameState.hasSword,
                     gameState.hasShield,
-                    heroTorchLitState,
+                    heroFlameLit,
                     suppressDarknessOverlay,
                     gameState.hasExitKey,
                     Boolean(gameState.conditions?.poisoned?.active),
@@ -6188,7 +6200,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     toggleStates,
                     toggleColors,
                     codeTorches,
-                    platformDecks
+                    platformDecks,
+                    heroOverrideSprite,
+                    gameState.heroSpriteScale
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6225,10 +6239,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         style={{
                           position: "absolute",
                           inset: 0,
-                          transform:
-                            gameState.playerDirection === Direction.LEFT
-                              ? "scaleX(-1)"
-                              : undefined,
+                          // Override sprites size via a feet-anchored scale
+                          // (like NPC metadata.scale) so factors above 1x can
+                          // overflow the tile instead of clipping.
+                          transform: (() => {
+                            const parts: string[] = [];
+                            if (gameState.playerDirection === Direction.LEFT) {
+                              parts.push("scaleX(-1)");
+                            }
+                            if (heroOverrideSprite) {
+                              const f = (gameState.heroSpriteScale ?? 85) / 85;
+                              if (f !== 1) parts.push(`scale(${f})`);
+                            }
+                            return parts.length ? parts.join(" ") : undefined;
+                          })(),
+                          transformOrigin: "50% 100%",
                           // Combat lunge: standalone `translate` composes
                           // BEFORE `transform`, so the shake direction stays
                           // in world coords even when the sprite is flipped.
@@ -6240,14 +6265,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           style={{
                             position: "absolute",
                             inset: 0,
-                            backgroundImage: `url(${heroSpritePath(
-                              gameState.playerDirection,
-                              Boolean(gameState.hasSword),
-                              Boolean(gameState.hasShield),
-                              heroTorchLitState
-                            )})`,
-                            backgroundSize: "contain",
-                            backgroundPosition: "center",
+                            backgroundImage: `url(${
+                              heroOverrideSprite
+                                ? assetUrl(heroOverrideSprite)
+                                : heroSpritePath(
+                                    gameState.playerDirection,
+                                    Boolean(gameState.hasSword),
+                                    Boolean(gameState.hasShield),
+                                    heroFlameLit
+                                  )
+                            })`,
+                            // Override sprites are NPC art: draw at the NPC
+                            // base metric (85% tile height, feet down); the
+                            // parent's scale transform applies heroSpriteScale.
+                            backgroundSize: heroOverrideSprite
+                              ? "auto 85%"
+                              : "contain",
+                            backgroundPosition: heroOverrideSprite
+                              ? "center bottom"
+                              : "center",
                             backgroundRepeat: "no-repeat",
                             transformOrigin: "50% 100%",
                             // Submersion: wading hides the hero below the waist,
@@ -6276,7 +6312,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         >
                           {/* Torch flame rides inside the sprite div so the
                               procedural step animation carries it along */}
-                          {heroTorchLitState && (() => {
+                          {heroFlameLit && (() => {
                             const dirKey =
                               gameState.playerDirection === Direction.UP
                                 ? ("back" as const)
@@ -6812,7 +6848,11 @@ function renderTileGrid(
   toggleColors?: Map<string, number>,
   codeTorches?: Map<string, { color: number; lit: boolean }>,
   // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
-  decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>
+  decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>,
+  // Hearth & Home: static sprite replacing the hero art for all facings,
+  // plus its render height as % of the tile (85 = NPC standard, 51 = dog).
+  heroSpriteOverride?: string,
+  heroSpriteScale?: number
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7097,6 +7137,8 @@ function renderTileGrid(
             terrainNeighbors={terrainNeighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
+            heroSpriteOverride={isPlayerTile ? heroSpriteOverride : undefined}
+            heroSpriteScale={isPlayerTile ? heroSpriteScale : undefined}
             heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}

@@ -13,6 +13,7 @@ const STORY_GAME_KEY = "currentStoryGame";
 const TUTORIAL_GAME_KEY = "currentTutorialGame";
 const TEST_GAME_KEY = "currentTestGame";
 const ENDLESS_GAME_KEY = "currentEndlessGame";
+const HOME_GAME_KEY = "currentHomeGame";
 // The date-override preview (/daily-preview): a real daily run for a chosen date, kept in its OWN
 // key so replaying a date never touches — or is loaded in place of — the player's actual daily save.
 const DAILY_PREVIEW_GAME_KEY = "currentDailyPreviewGame";
@@ -26,7 +27,7 @@ export function isDailySlot(slot: GameStorageSlot): boolean {
   return slot === "daily-new" || slot === "daily-preview";
 }
 
-export type GameStorageSlot = "default" | "daily-new" | "daily-preview" | "story" | "tutorial" | "test" | "endless";
+export type GameStorageSlot = "default" | "daily-new" | "daily-preview" | "story" | "tutorial" | "test" | "endless" | "home";
 
 function keyForSlot(slot: GameStorageSlot): string {
   switch (slot) {
@@ -42,6 +43,8 @@ function keyForSlot(slot: GameStorageSlot): string {
       return TUTORIAL_GAME_KEY;
     case "test":
       return TEST_GAME_KEY;
+    case "home":
+      return HOME_GAME_KEY;
     default:
       return CURRENT_GAME_KEY;
   }

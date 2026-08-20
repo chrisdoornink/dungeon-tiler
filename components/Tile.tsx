@@ -214,6 +214,8 @@ interface TileProps {
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
+  heroSpriteOverride?: string; // Static sprite replacing the hero art for all facings (Hearth & Home)
+  heroSpriteScale?: number; // Override render height as % of tile (85 = NPC standard, 51 = dog)
   heroTorchSnuffing?: boolean; // brief window after a snuff: show the blue flame flutter-out
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
   hasEnemy?: boolean; // Whether this tile contains an enemy
@@ -384,6 +386,8 @@ export const Tile: React.FC<TileProps> = ({
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
+  heroSpriteOverride,
+  heroSpriteScale,
   heroTorchSnuffing = false,
   heroPoisoned = false,
   hasEnemy = false,
@@ -1704,7 +1708,9 @@ export const Tile: React.FC<TileProps> = ({
   })();
 
   const heroImage = isVisible && subtype && subtype.includes(TileSubtype.PLAYER)
-    ? (() => {
+    ? heroSpriteOverride
+    ? assetUrl(heroSpriteOverride)
+    : (() => {
         const equip = () => {
           const s = hasSword ? '-sword' : '';
           const h = hasShield ? '-shield' : '';
@@ -1778,6 +1784,25 @@ export const Tile: React.FC<TileProps> = ({
   const heroTransition = heroIsAbyss ? 'scale 450ms ease-in' : undefined;
 
   const shouldShowNpc = npc && ((npcVisible ?? isVisible) === true);
+  // NPCs with real directional art (Hearth & Home family) swap sprites by
+  // facing; everyone else keeps the legacy single-sprite behavior below
+  // (mirror for left, rotate for up).
+  const npcDirectionalSprites = npc?.metadata?.directionalSprites as
+    | { back?: string; side?: string }
+    | undefined;
+  const npcResolvedSprite = (() => {
+    if (!npc) return undefined;
+    if (npc.facing === Direction.UP && npcDirectionalSprites?.back) {
+      return npcDirectionalSprites.back;
+    }
+    if (
+      (npc.facing === Direction.LEFT || npc.facing === Direction.RIGHT) &&
+      npcDirectionalSprites?.side
+    ) {
+      return npcDirectionalSprites.side;
+    }
+    return npc.sprite;
+  })();
   const npcTransform = (() => {
     if (!npc) return 'none';
     const transforms: string[] = [];
@@ -1786,7 +1811,9 @@ export const Tile: React.FC<TileProps> = ({
         transforms.push('scaleX(-1)');
         break;
       case Direction.UP:
-        transforms.push('rotate(-90deg)');
+        // Directional art has a real back view; only sprites without one get
+        // the legacy sideways-rotation stand-in.
+        if (!npcDirectionalSprites?.back) transforms.push('rotate(-90deg)');
         break;
       case Direction.RIGHT:
       case Direction.DOWN:
@@ -1806,7 +1833,9 @@ export const Tile: React.FC<TileProps> = ({
     if (!npc) return '50% 100%';
     switch (npc.facing) {
       case Direction.UP:
-        return '50% 60%';
+        // The shifted origin only exists to make the legacy rotation pivot
+        // sensibly; real back sprites anchor at the feet like everyone else.
+        return npcDirectionalSprites?.back ? '50% 100%' : '50% 60%';
       default:
         return '50% 100%';
     }
@@ -2539,7 +2568,26 @@ export const Tile: React.FC<TileProps> = ({
               className={styles.heroImage}
               style={{
                 backgroundImage: `url(${heroImage})`,
-                transform: heroTransform,
+                // Override sprites are NPC art: draw at the NPC base metric
+                // (85% tile height, feet down) and apply heroSpriteScale as a
+                // feet-anchored transform so factors above 1x overflow the
+                // tile instead of clipping.
+                ...(heroSpriteOverride
+                  ? {
+                      backgroundSize: 'auto 85%',
+                      backgroundPosition: 'center bottom',
+                      transformOrigin: '50% 100%',
+                    }
+                  : null),
+                transform: (() => {
+                  if (!heroSpriteOverride) return heroTransform;
+                  const f = (heroSpriteScale ?? 85) / 85;
+                  if (f === 1) return heroTransform;
+                  const scalePart = `scale(${f})`;
+                  return heroTransform === 'none'
+                    ? scalePart
+                    : `${heroTransform} ${scalePart}`;
+                })(),
                 rotate: heroAbyssRotate,
                 scale: heroScale,
                 transition: heroTransition,
@@ -2636,7 +2684,7 @@ export const Tile: React.FC<TileProps> = ({
               key={npcStep ? `npc-step-${npcStep.seq}` : 'npc-static'}
               className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
-                backgroundImage: `url(${npc.sprite})`,
+                backgroundImage: `url(${npcResolvedSprite ?? npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
                 // Dogs get the bob+tilt step (the wiggle); other NPCs slide flat.
@@ -3100,7 +3148,26 @@ export const Tile: React.FC<TileProps> = ({
               className={styles.heroImage}
               style={{
                 backgroundImage: `url(${heroImage})`,
-                transform: heroTransform,
+                // Override sprites are NPC art: draw at the NPC base metric
+                // (85% tile height, feet down) and apply heroSpriteScale as a
+                // feet-anchored transform so factors above 1x overflow the
+                // tile instead of clipping.
+                ...(heroSpriteOverride
+                  ? {
+                      backgroundSize: 'auto 85%',
+                      backgroundPosition: 'center bottom',
+                      transformOrigin: '50% 100%',
+                    }
+                  : null),
+                transform: (() => {
+                  if (!heroSpriteOverride) return heroTransform;
+                  const f = (heroSpriteScale ?? 85) / 85;
+                  if (f === 1) return heroTransform;
+                  const scalePart = `scale(${f})`;
+                  return heroTransform === 'none'
+                    ? scalePart
+                    : `${heroTransform} ${scalePart}`;
+                })(),
                 rotate: heroAbyssRotate,
                 scale: heroScale,
                 transition: heroTransition,
@@ -3126,7 +3193,7 @@ export const Tile: React.FC<TileProps> = ({
               key={npcStep ? `npc-step-${npcStep.seq}` : 'npc-static'}
               className={isDogNpc ? styles.npcImageDog : styles.npcImage}
               style={{
-                backgroundImage: `url(${npc.sprite})`,
+                backgroundImage: `url(${npcResolvedSprite ?? npc.sprite})`,
                 transform: npcTransformWithScale,
                 transformOrigin: npcTransformOrigin,
                 // Dogs get the bob+tilt step (the wiggle); other NPCs slide flat.
