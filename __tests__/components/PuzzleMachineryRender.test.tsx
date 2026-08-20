@@ -502,3 +502,35 @@ describe("colour switch palette", () => {
     ).toBeInTheDocument();
   });
 })
+
+describe("cipher-room legend tiles draw their own art, not a '?' placeholder", () => {
+  // Regression: a custom-rendered subtype that is NOT excluded from the generic icon renderer gets a
+  // second element with the same test id and a stray "?" pip painted over it (the mural showed one).
+  it("a mural panel draws the engraving and no '?' pip", () => {
+    render(
+      <Tile
+        tileId={1}
+        tileType={{ id: 1, name: "wall", color: "#333", walkable: false }}
+        subtype={[TileSubtype.MURAL_PANEL]}
+        isVisible={true}
+        muralPanel={[0, 2, 3, 1]}
+      />
+    );
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.MURAL_PANEL}`)).toBeInTheDocument();
+    expect(screen.queryByText("?")).not.toBeInTheDocument();
+  });
+
+  it("a code torch draws its flame and no '?' pip", () => {
+    render(
+      <Tile
+        tileId={0}
+        tileType={FLOOR_TYPE}
+        subtype={[TileSubtype.CODE_TORCH]}
+        isVisible={true}
+        codeTorch={{ color: 1, lit: true }}
+      />
+    );
+    expect(screen.getByTestId(`subtype-icon-${TileSubtype.CODE_TORCH}`)).toBeInTheDocument();
+    expect(screen.queryByText("?")).not.toBeInTheDocument();
+  });
+})

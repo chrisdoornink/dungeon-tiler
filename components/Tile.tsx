@@ -1012,6 +1012,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.TOGGLE_SWITCH &&
         subtype !== TileSubtype.MOVING_PLATFORM &&
         subtype !== TileSubtype.PLATFORM_TRACK &&
+        // Cipher-room legends draw their own overlays (torch flame / carved mural engraving) — without
+        // this a stray "?" placeholder pip sat on top of each one.
+        subtype !== TileSubtype.CODE_TORCH &&
+        subtype !== TileSubtype.MURAL_PANEL &&
         // Sealed doorway: a crack decal on the wall face
         subtype !== TileSubtype.WALL_SEAL
     );
