@@ -99,6 +99,8 @@ function MiniMap({ state, lock }: { state: GameState; lock: ColorLock }) {
 function Inner() {
   const [mounted, setMounted] = useState(false);
   const [resetKey, setResetKey] = useState(0);
+  const [showMap, setShowMap] = useState(false); // full-floor overview hidden by default
+  const [daylight, setDaylight] = useState(false); // false = the daily's torch FOV
   useEffect(() => setMounted(true), []);
 
   const { floor, urlSeed } = useMemo(() => {
@@ -139,8 +141,8 @@ function Inner() {
         <p className="text-xs text-gray-300 mt-1">
           The puzzle is stamped into a live daily floor: <b>staggered switches</b> (one per column),
           a <b>gated reward</b>, and the <b>mural</b> ~{dist.toFixed(0)} tiles away — offscreen, so you
-          read it, remember it, and walk back. Fog is on; enemies stripped. The mini-map shows where
-          everything landed (switches ringed by colour, mural in gold, gate dark-red, reward pink).
+          read it, remember it, and walk back. The game view below uses the daily&apos;s <b>torch FOV</b>
+          (enemies stripped). Toggle the overview if you want to see where everything landed.
         </p>
         <p className="text-xs mt-2 flex items-center justify-center gap-3 flex-wrap">
           <span>
@@ -157,17 +159,23 @@ function Inner() {
           <a className="underline text-sky-300" href={`/test-cipher-daily?floor=${other}`}>→ floor {other}</a>
           <a className="underline" href={`/test-cipher-daily?floor=${floor}&seed=${findSeed(seed + 1, floor)}`}>next floor →</a>
           <button className="underline" onClick={() => setResetKey((k) => k + 1)}>restart</button>
+          <button className="underline" onClick={() => setShowMap((v) => !v)}>{showMap ? "hide" : "show"} overview</button>
+          <button className="underline" onClick={() => setDaylight((v) => !v)}>lighting: {daylight ? "full" : "torch FOV"}</button>
         </p>
       </div>
 
-      <div className="text-xs text-gray-400">whole-floor overview (debug)</div>
-      <MiniMap state={state} lock={lock} />
+      {showMap && (
+        <>
+          <div className="text-xs text-gray-400">whole-floor overview (debug)</div>
+          <MiniMap state={state} lock={lock} />
+        </>
+      )}
 
       <TilemapGrid
-        key={`${floor}-${seed}-${resetKey}`}
+        key={`${floor}-${seed}-${resetKey}-${daylight}`}
         tileTypes={tileTypes}
         initialGameState={state}
-        forceDaylight={false}
+        forceDaylight={daylight}
         storageSlot="test"
       />
     </div>
