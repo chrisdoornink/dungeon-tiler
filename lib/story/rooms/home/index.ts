@@ -1,5 +1,6 @@
 export {
   buildFamilyHouse,
+  createFamilyNpc,
   getFamilyMember,
   FAMILY_MEMBERS,
   FAMILY_HOUSE_SPAWN,

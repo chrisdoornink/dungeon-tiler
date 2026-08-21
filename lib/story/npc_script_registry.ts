@@ -586,6 +586,33 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     scriptId: "home-opal-default",
     priority: PRIORITIES.DEFAULT,
   },
+  // Hearth & Home intro scenario stages, highest priority first: battle
+  // (goblins inside), aftermath (house defended), chest hints (before the
+  // bookshelf gives up the keys). All gated on the party being present.
+  ...(["annie", "emerson", "claire"] as const).flatMap((member) => [
+    {
+      npcId: `npc-${member}`,
+      scriptId: `home-${member}-battle`,
+      priority: 30,
+      customCondition: (gameState: GameState) =>
+        !!gameState.scenarioFlags?.hearthBreached &&
+        !gameState.scenarioFlags?.hearthDefended,
+    },
+    {
+      npcId: `npc-${member}`,
+      scriptId: `home-${member}-defended`,
+      priority: 25,
+      customCondition: (gameState: GameState) =>
+        !!gameState.scenarioFlags?.hearthDefended,
+    },
+    {
+      npcId: `npc-${member}`,
+      scriptId: `home-${member}-chest-hint`,
+      priority: 20,
+      customCondition: (gameState: GameState) =>
+        !!gameState.party && !gameState.scenarioFlags?.hearthKeysFound,
+    },
+  ]),
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {

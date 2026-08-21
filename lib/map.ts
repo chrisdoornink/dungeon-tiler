@@ -110,7 +110,11 @@ export {
   initializeGameStateForMultiTier,
 } from "./map/game-state";
 
-export type { GameState, CheckpointSnapshot } from "./map/game-state";
+export type {
+  GameState,
+  CheckpointSnapshot,
+  PartyMemberState,
+} from "./map/game-state";
 
 export {
   initializeGameStateForEndless,

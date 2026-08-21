@@ -18,6 +18,7 @@ import {
   reviveFromLastCheckpoint,
   serializeEnemies,
   serializeNPCs,
+  type PartyMemberState,
   type RoomSnapshot,
 } from "../lib/map";
 import { coilPieceFor, coilHeadPoseFor } from "../lib/bosses/coilwyrm";
@@ -308,6 +309,15 @@ interface TilemapGridProps {
   onDeath?: (finalState: GameState) => void;
   storageSlot?: GameStorageSlot;
   /**
+   * One-shot state transform injected from OUTSIDE the grid (e.g. Hearth &
+   * Home's mid-play control switch). Applied whenever `seq` changes; `apply`
+   * must be pure and return the input unchanged for no-ops. This is the only
+   * sanctioned way for a parent to touch live game state after mount.
+   */
+  externalAction?: { seq: number; apply: (state: GameState) => GameState };
+  /** Fires when the party roster or controlled member changes (Hearth & Home picker). */
+  onPartyChange?: (party: PartyMemberState[], activeHeroId?: string) => void;
+  /**
    * /daily-preview date override (YYYY-MM-DD). When set, floor advancement is seeded from THIS
    * date instead of today, and every analytics event /stats reads is suppressed so a test replay
    * never lands in production numbers. Only ever passed by the /daily-preview route.
@@ -333,6 +343,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onWin,
   onDeath,
   storageSlot,
+  externalAction,
+  onPartyChange,
   dailyDateOverride,
   onLocationChange,
 }) => {
@@ -352,9 +364,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const shouldAnimateHeroDeath =
     resolvedStorageSlot === 'story' || isDailyChallenge || isEndless;
 
+
   // Router removed; daily flow handled via onDailyComplete callback
 
   // Initialize game state
+  const lastExternalActionSeq = useRef(0);
   const [gameState, setGameState] = useState<GameState>(() => {
     if (initialGameState) {
       return initialGameState;
@@ -398,6 +412,24 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       throw new Error("Either initialGameState or tilemap must be provided");
     }
   });
+
+  // Externally injected one-shot state transforms (see the prop docs).
+  useEffect(() => {
+    if (!externalAction) return;
+    if (externalAction.seq === lastExternalActionSeq.current) return;
+    lastExternalActionSeq.current = externalAction.seq;
+    setGameState((prev) => externalAction.apply(prev));
+    // An external transform may hand control to a living body after a death
+    // (Hearth & Home possession) — re-arm death/completion processing so the
+    // NEXT death fires the hooks again.
+    setGameCompletionProcessed(false);
+  }, [externalAction]);
+
+  // Report party roster changes upward (Hearth & Home picker state).
+  useEffect(() => {
+    if (!onPartyChange || !gameState.party) return;
+    onPartyChange(gameState.party, gameState.activeHeroId);
+  }, [onPartyChange, gameState.party, gameState.activeHeroId]);
 
   // Find player position in the grid
   const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(
@@ -3540,7 +3572,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
     // Sandbox/test hook: the parent owns the death (in-place reset). Skip the
     // death screen, analytics, and every redirect; just clear our save slot.
-    if (onDeath && !isDailyChallenge && gameState.mode !== "story") {
+    // Party scenes (activeHeroId set) run in story mode but own their deaths —
+    // control jumps to the next family member instead of ending the run.
+    if (
+      onDeath &&
+      !isDailyChallenge &&
+      (gameState.mode !== "story" || gameState.activeHeroId)
+    ) {
       setGameCompletionProcessed(true);
       triggerScreenShake(400);
       try {
