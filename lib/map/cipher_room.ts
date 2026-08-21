@@ -308,7 +308,10 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
 
   // ---- 2) GATE + REWARD POCKET, carved beside a wall nearest the switches ----
   const inB = (y: number, x: number) => y >= 1 && y < H - 1 && x >= 1 && x < Wd - 1;
-  const carveable = (y: number, x: number) => inB(y, x) && map.tiles[y][x] === WALL;
+  // A wall we may open. Skip walls wearing a WALL_SEAL crack: carving one would drop the crack tile
+  // but leave its sealPayloads entry orphaned (the seal-count invariant would break).
+  const carveable = (y: number, x: number) =>
+    inB(y, x) && map.tiles[y][x] === WALL && !(map.subtypes[y]?.[x] ?? []).includes(TileSubtype.WALL_SEAL);
   const solid = (y: number, x: number) => map.tiles[y]?.[x] !== FLOOR;
   type Base = { gate: [number, number]; pocket: [number, number] };
   const bases: Base[] = [];
@@ -336,6 +339,12 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
   } else if (reward.kind === "chest") {
     map.subtypes[base.pocket[0]][base.pocket[1]] = [TileSubtype.CHEST];
   } else {
+    // exit: RELOCATE the floor's existing exit key behind the gate (mandatory — never a second key).
+    // Solving the puzzle is now the only way to reach it, so the floor can't be left without it.
+    for (let y = 0; y < H; y++)
+      for (let x = 0; x < Wd; x++)
+        if (map.subtypes[y][x].includes(TileSubtype.EXITKEY))
+          map.subtypes[y][x] = map.subtypes[y][x].filter((s) => s !== TileSubtype.EXITKEY);
     map.subtypes[base.pocket[0]][base.pocket[1]] = [TileSubtype.EXITKEY];
   }
   const gates: Array<[number, number]> = [base.gate];
@@ -345,6 +354,10 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
   for (let y = 1; y < H - 1; y++)
     for (let x = 1; x < Wd - 2; x++) {
       if (map.tiles[y][x] !== WALL || map.tiles[y][x + 1] !== WALL) continue;
+      // Don't paint the mural over a decoy crack — it would overwrite the WALL_SEAL and orphan its
+      // sealPayloads entry.
+      if ((map.subtypes[y][x] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
+      if ((map.subtypes[y][x + 1] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
       if (map.tiles[y + 1][x] !== FLOOR || map.tiles[y + 1][x + 1] !== FLOOR) continue;
       const f1 = `${y + 1},${x}`, f2 = `${y + 1},${x + 1}`;
       if (!reach.has(f1) || !reach.has(f2) || usedFloor.has(f1) || usedFloor.has(f2)) continue;

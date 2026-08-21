@@ -186,4 +186,27 @@ describe("cipher room — stamped into a real generated floor", () => {
     applyColorLock({ mapData: map!, platforms: [] }, solved, new Set());
     for (const [gy, gx] of lock.gates) expect(map!.subtypes[gy][gx]).not.toContain(TileSubtype.SPIKES);
   });
+
+  it("in exit mode (mandatory), RELOCATES the single exit key behind the gate — never a second one", () => {
+    let placed: ReturnType<typeof stampCipherRoom> = null;
+    let map: MapData | null = null;
+    for (let seed = 1; seed <= 60 && !placed; seed++) {
+      const m = realFloor(seed, 2);
+      expect(find(m, TileSubtype.EXITKEY).length).toBe(1); // the floor starts with exactly one
+      const lock = stampCipherRoom(m, mulberry32(seed ^ 0xc15e), { reward: { kind: "exit" } });
+      if (lock) {
+        placed = lock;
+        map = m;
+      }
+    }
+    expect(placed).toBeTruthy();
+    // Still exactly one exit key (relocated, not duplicated), and it's sealed until the lock is solved.
+    const keys = find(map!, TileSubtype.EXITKEY);
+    expect(keys.length).toBe(1);
+    const hero = findPlayerPosition(map!)!;
+    expect(reachable(map!, hero).has(`${keys[0][0]},${keys[0][1]}`)).toBe(false); // behind the gate
+    const solved = { ...placed!, states: (placed!.target ?? []).slice() };
+    applyColorLock({ mapData: map!, platforms: [] }, solved, new Set());
+    expect(reachable(map!, hero).has(`${keys[0][0]},${keys[0][1]}`)).toBe(true); // freed on solve
+  });
 });

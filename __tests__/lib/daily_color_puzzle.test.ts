@@ -78,7 +78,14 @@ describe("daily floor-2 colour puzzle", () => {
       if (locks.length === 0) continue;
       checked++;
       const lock = locks[0];
-      expect(lock.rule).toBe("allEqual");
+      // Two variants share the floor-2 slot: the all-same-colour puzzle (allEqual) and the cipher
+      // room (match + a two-tile mural placed well away from the switches). Both are mandatory and
+      // seal the exit key the same way — only the rule and the mural differ.
+      expect(["allEqual", "match"]).toContain(lock.rule);
+      if (lock.rule === "match") {
+        expect(lock.target?.length).toBe(4);
+        expect(lock.mural?.tiles.length).toBe(2);
+      }
       expect(lock.switches.length).toBe(4);
       expect(lock.colors).toBe(4);
       expect(colorLockSatisfied(lock)).toBe(false); // starts unsolved

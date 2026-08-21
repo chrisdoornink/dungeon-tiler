@@ -69,6 +69,7 @@ import {
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { stampColorSwitchLock } from "./color_switch_puzzle";
+import { stampCipherRoom } from "./cipher_room";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import {
   advanceMachinery,
@@ -117,6 +118,10 @@ const BOSS_ENTRANCE_FALLBACK_SEED_SALT = 0xb529_7a4d;
  */
 const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
 const COLOR_PUZZLE_CHANCE = 0.2; // rolls ~20% of floor-2 days; nets ~15-20% (rare while the feature is vetted)
+// Of the floor-2 colour-puzzle days, this fraction becomes the mandatory CIPHER ROOM (match rule +
+// distant mural + exit-key gate) instead of the all-same-colour puzzle. The two are variants of one
+// slot, so a run still gets at most one colour-switch puzzle. 0.75 -> cipher ~15% of floor-2 days.
+const CIPHER_VARIANT_SHARE = 0.75;
 // Floor 1 gets a rarer, smaller variant (3 switches). Its builder never receives the daily seed, so
 // the puzzle stream is seeded from the day's generated map instead — see the stamp in
 // initializeGameStateForMultiTier. A distinct salt keeps it uncorrelated with the floor-2 stream.
@@ -3066,11 +3071,23 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   let colorLocks: ColorLock[] | undefined;
   if (nextFloor === 2 && playerPos && !floor1HasColorPuzzle) {
     const puzRng = mulberry32Fn(dailySeed ^ COLOR_PUZZLE_SEED_SALT);
-    if (puzRng.next() < COLOR_PUZZLE_CHANCE) {
+    const roll = puzRng.next();
+    if (roll < COLOR_PUZZLE_CHANCE) {
       const avoid: Array<[number, number]> = (snakesAdded ?? []).map((e) => [e.y, e.x]);
       avoid.push([playerPos[0], playerPos[1]]);
-      colorLocks =
-        stampColorSwitchLock(withRunes, puzRng, { switches: 4, colors: 4, avoid }) ?? undefined;
+      // The cipher room takes the first slice of the colour-puzzle budget; the rest stays the
+      // all-same-colour puzzle. Reusing `roll` (no extra draw) keeps all-same days byte-identical to
+      // before. Cipher gates the exit key (mandatory) and falls back to all-same if it can't place —
+      // so a colour-puzzle day always gets some puzzle. All from the SAME separate salted stream that
+      // is stamped LAST, so the shared rng (enemies/chests/boss) and /stats stay untouched.
+      let lock: ColorLock | null = null;
+      if (roll < COLOR_PUZZLE_CHANCE * CIPHER_VARIANT_SHARE) {
+        lock = stampCipherRoom(withRunes, puzRng, { reward: { kind: "exit" }, avoid });
+      }
+      if (!lock) {
+        lock = stampColorSwitchLock(withRunes, puzRng, { switches: 4, colors: 4, avoid })?.[0] ?? null;
+      }
+      colorLocks = lock ? [lock] : undefined;
     }
   }
 
