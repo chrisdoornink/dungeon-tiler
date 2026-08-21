@@ -461,6 +461,52 @@ function DayCard({ day }: { day: StatsDayPayload }) {
               {(day.bossDay.bossName ?? "").toUpperCase()}
             </span>
           ) : null}
+          {/* The day's puzzles, recomputed from the date like the boss beside it. Only from
+              PUZZLE_TRACKING_START_DATE on — older days show nothing rather than a misreport. */}
+          {day.puzzle?.tracked && day.puzzle.colorPuzzle ? (
+            <span
+              className="pixel-text"
+              style={{
+                fontSize: 10,
+                padding: "3px 6px",
+                borderRadius: 3,
+                color: C.text,
+                background: "transparent",
+                border: `1px solid ${C.border}`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+              title={`Colour-switch puzzle on floor ${day.puzzle.colorPuzzle.floor}: ${
+                day.puzzle.colorPuzzle.kind === "cipher"
+                  ? "the cipher room (read the mural code, set the switches)"
+                  : "set every switch to the same colour"
+              } — gates the exit key (recomputed from the date)`}
+            >
+              <span>{day.puzzle.colorPuzzle.kind === "cipher" ? "🗿" : "🎨"}</span>
+              {`${day.puzzle.colorPuzzle.kind === "cipher" ? "CIPHER" : "ALL-SAME"} F${day.puzzle.colorPuzzle.floor}`}
+            </span>
+          ) : null}
+          {day.puzzle?.tracked && day.puzzle.switchGate ? (
+            <span
+              className="pixel-text"
+              style={{
+                fontSize: 10,
+                padding: "3px 6px",
+                borderRadius: 3,
+                color: C.muted,
+                background: "transparent",
+                border: `1px solid ${C.borderDark}`,
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+              title={`Rock/boot switch gate (${day.puzzle.switchGate.access}) on floor ${day.puzzle.switchGate.floor} — a spike-bed shortcut (recomputed from the date)`}
+            >
+              <span>🪨</span>
+              {`GATE F${day.puzzle.switchGate.floor}`}
+            </span>
+          ) : null}
         </div>
       </header>
 

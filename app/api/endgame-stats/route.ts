@@ -7,6 +7,7 @@ import {
 } from "../../../lib/stats/endgame_stats";
 import { level2ChestStatusForDate } from "../../../lib/stats/daily_chest";
 import { bossDayInfoForDate, reconcileBossDay } from "../../../lib/stats/boss_day";
+import { puzzleDayInfoForDate } from "../../../lib/stats/puzzle_day";
 
 // Reads historical daily runs out of PostHog for the endgame stats dashboard.
 // This is a read path (PostHog Query / HogQL) and needs a *personal* API key +
@@ -226,6 +227,7 @@ export async function GET(req: NextRequest) {
           bombAvailable: chestStatus.bombAvailable,
         },
         bossDay,
+        puzzle: puzzleDayInfoForDate(date),
         summary: g?.summary ?? {
           total: 0,
           wins: 0,

@@ -17,6 +17,7 @@
 
 import type { ChestItemMeta } from "./daily_chest";
 import type { BossDayInfo } from "./boss_day";
+import type { PuzzleDayInfo } from "./puzzle_day";
 
 /** One completed daily game, normalized from a PostHog `game_complete` row. */
 export interface GameCompleteRow {
@@ -79,6 +80,9 @@ export interface StatsDayPayload {
   // in analytics. Mirrors `chests` in spirit: a fact about the DAY, not a per-run
   // aggregate.
   bossDay: BossDayInfo;
+  // The day's puzzles (colour-switch puzzle kind + floor, rock/boot switch gate), recomputed from the
+  // seed like `bossDay`. Forward-only — `tracked` is false for days before puzzle tracking began.
+  puzzle: PuzzleDayInfo;
   summary: DaySummary;
   games: GameCompleteRow[];
 }
