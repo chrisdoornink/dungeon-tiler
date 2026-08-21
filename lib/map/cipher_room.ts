@@ -244,8 +244,8 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
   const sequence = (opts.sequence ?? Array.from({ length: N }, () => ri(rng, 0, colors - 1))).slice(0, N);
   const reward: CipherReward =
     opts.reward ?? { kind: "items", items: [TileSubtype.EXTRA_HEART] };
-  const minDist = opts.muralMinDist ?? 8;
-  const maxDist = opts.muralMaxDist ?? 14;
+  const minDist = opts.muralMinDist ?? 13; // keep the mural well offscreen from the switches
+  const maxDist = opts.muralMaxDist ?? 40; // effectively "as far as the floor allows"
 
   const hero = findPlayerPosition(map);
   if (!hero) return null;
@@ -353,8 +353,8 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
       muralCands.push({ tiles: [[y, x], [y, x + 1]], d });
     }
   if (muralCands.length === 0) return null;
-  muralCands.sort((a, b) => Math.abs(a.d - 11) - Math.abs(b.d - 11)); // aim ~11 tiles away
-  const pick = muralCands[ri(rng, 0, Math.min(muralCands.length - 1, 4))];
+  muralCands.sort((a, b) => b.d - a.d); // farthest first — prefer the mural as far offscreen as possible
+  const pick = muralCands[ri(rng, 0, Math.min(muralCands.length - 1, 4))]; // one of the farthest few
   map.subtypes[pick.tiles[0][0]][pick.tiles[0][1]] = [TileSubtype.MURAL_PANEL];
   map.subtypes[pick.tiles[1][0]][pick.tiles[1][1]] = [TileSubtype.MURAL_PANEL];
 

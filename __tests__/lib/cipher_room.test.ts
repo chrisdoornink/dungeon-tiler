@@ -178,7 +178,7 @@ describe("cipher room — stamped into a real generated floor", () => {
     const cy = rows.reduce((a, b) => a + b, 0) / 4;
     const cx = cols.reduce((a, b) => a + b, 0) / 4;
     const d = Math.hypot(lock.mural!.tiles[0][0] - cy, lock.mural!.tiles[0][1] - cx);
-    expect(d).toBeGreaterThanOrEqual(7);
+    expect(d).toBeGreaterThanOrEqual(11); // kept well offscreen (stamp aims >= 13 from the floor front)
     // Solvable: match rule, starts unsolved, and satisfying it retracts the gate.
     expect(lock.rule).toBe("match");
     expect(colorLockSatisfied(lock)).toBe(false);
