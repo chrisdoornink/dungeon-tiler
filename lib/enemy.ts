@@ -639,6 +639,9 @@ export function updateEnemies(
     // Hero's predicted end-of-turn tile (after their pending move resolves). Used
     // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
     playerNext?: { y: number; x: number };
+    // Tiles no enemy may end its tick on (Hearth & Home party allies). Purely
+    // additive: absent everywhere except party scenes.
+    blockedTiles?: Array<[number, number]>;
   }
 ): number;
 export function updateEnemies(
@@ -657,6 +660,9 @@ export function updateEnemies(
     // Hero's predicted end-of-turn tile (after their pending move resolves). Used
     // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
     playerNext?: { y: number; x: number };
+    // Tiles no enemy may end its tick on (Hearth & Home party allies). Purely
+    // additive: absent everywhere except party scenes.
+    blockedTiles?: Array<[number, number]>;
   }
 ): { damage: number; attackingEnemies: EnemyAttackInfo[] };
 export function updateEnemies(
@@ -674,6 +680,9 @@ export function updateEnemies(
     // Hero's predicted end-of-turn tile (after their pending move resolves). Used
     // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
     playerNext?: { y: number; x: number };
+    // Tiles no enemy may end its tick on (Hearth & Home party allies). Purely
+    // additive: absent everywhere except party scenes.
+    blockedTiles?: Array<[number, number]>;
   },
   opts?: {
     rng?: () => number;
@@ -686,6 +695,9 @@ export function updateEnemies(
     // Hero's predicted end-of-turn tile (after their pending move resolves). Used
     // by ranged attackers to gate LOS so they can't fire at a hero rounding a corner.
     playerNext?: { y: number; x: number };
+    // Tiles no enemy may end its tick on (Hearth & Home party allies). Purely
+    // additive: absent everywhere except party scenes.
+    blockedTiles?: Array<[number, number]>;
   }
 ): number | { damage: number; attackingEnemies: EnemyAttackInfo[] } {
   // Handle backward compatibility: old signature was (grid, enemies, player, opts)
@@ -722,6 +734,10 @@ export function updateEnemies(
   // entity vs. tile state and can strand the run — the pink goblin's ring teleport
   // once did exactly that.
   occupied.add(`${player.y},${player.x}`);
+  // Party allies (Hearth & Home) are solid to enemies, exactly like the hero.
+  for (const [by, bx] of finalOpts?.blockedTiles ?? []) {
+    occupied.add(`${by},${bx}`);
+  }
   // Boss adds — the summon channel (Quarrymaster hatches, Coilwyrm growth, ...).
   // Buffered rather than pushed straight onto `enemies`: the loop below captures its bound,
   // so an immediate push would let a newborn act on the very turn it appeared. Appended

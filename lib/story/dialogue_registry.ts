@@ -1210,6 +1210,68 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Opal", text: "Woof! Woof woof! (Her whole back half is wagging.)" },
     ],
   },
+
+  // Hearth & Home intro scenario stages (see lib/story/hearth_scenario.ts):
+  // chest hints before the keys are found, battle lines during the break-in,
+  // aftermath lines once the house is defended.
+  "home-annie-chest-hint": {
+    id: "home-annie-chest-hint",
+    lines: [
+      { speaker: "Annie", text: "There is a LOCKED CHEST in our bedroom. Was that always there?" },
+      { speaker: "Annie", text: "And Opal keeps staring at the bookshelf like it owes her a treat. Follow the dog." },
+    ],
+  },
+  "home-emerson-chest-hint": {
+    id: "home-emerson-chest-hint",
+    lines: [
+      { speaker: "Emerson", text: "There's a treasure chest in my room!! It's locked. This is the best mystery ever." },
+      { speaker: "Emerson", text: "Opal keeps sniffing the bookshelf. She knows something. She always knows." },
+    ],
+  },
+  "home-claire-chest-hint": {
+    id: "home-claire-chest-hint",
+    lines: [
+      { speaker: "Claire", text: "...there's a chest in my room. I didn't put it there." },
+      { speaker: "Claire", text: "Opal's trying to tell us something. Follow her." },
+    ],
+  },
+  "home-annie-battle": {
+    id: "home-annie-battle",
+    lines: [
+      { speaker: "Annie", text: "GOBLINS. IN MY LIVING ROOM." },
+      { speaker: "Annie", text: "Everyone stay together! Swing at anything green!" },
+    ],
+  },
+  "home-emerson-battle": {
+    id: "home-emerson-battle",
+    lines: [
+      { speaker: "Emerson", text: "GOBLINS! This is the best day of my LIFE!" },
+    ],
+  },
+  "home-claire-battle": {
+    id: "home-claire-battle",
+    lines: [{ speaker: "Claire", text: "...behind me, Emerson." }],
+  },
+  "home-annie-defended": {
+    id: "home-annie-defended",
+    lines: [
+      { speaker: "Annie", text: "Is everyone okay? Okay. Good." },
+      { speaker: "Annie", text: "Now. WHY does our house come with swords? Who built this place?" },
+    ],
+  },
+  "home-emerson-defended": {
+    id: "home-emerson-defended",
+    lines: [
+      { speaker: "Emerson", text: "Did you SEE me?! I got one! Can goblins come back tomorrow?" },
+    ],
+  },
+  "home-claire-defended": {
+    id: "home-claire-defended",
+    lines: [
+      { speaker: "Claire", text: "...we did good. The house is safe." },
+      { speaker: "Claire", text: "I'm keeping the sword." },
+    ],
+  },
 };
 
 export function getDialogueScript(id: string): DialogueScript | undefined {

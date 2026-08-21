@@ -313,6 +313,179 @@ export function getRandomDogBackSprite(rng?: () => number): string {
 }
 
 /**
+ * Follow behavior: the party line. Each follower steps toward its leader —
+ * the previous follower in `metadata.followOrder`, or the player for the
+ * front of the line — and stops once adjacent, forming a trailing conga.
+ * Facing turns with each step for NPCs with directional art; dogs swap their
+ * walk frames instead.
+ */
+export function updateFollowBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
+  const { npc, grid, player, npcs, enemies } = ctx;
+
+  // Hold the line: a follower standing next to an enemy squares up and
+  // fights (the strike itself lands in the party-combat pass) instead of
+  // trailing off after its leader.
+  const engaged = enemies?.find(
+    (e) => Math.abs(e.y - npc.y) + Math.abs(e.x - npc.x) === 1
+  );
+  if (engaged) {
+    if (npc.metadata?.directionalSprites) {
+      npc.facing =
+        engaged.y < npc.y
+          ? Direction.UP
+          : engaged.y > npc.y
+          ? Direction.DOWN
+          : engaged.x < npc.x
+          ? Direction.LEFT
+          : Direction.RIGHT;
+    }
+    return { moved: false };
+  }
+
+  const myOrder = (npc.metadata?.followOrder as number) ?? 0;
+  const leader =
+    npcs
+      .filter(
+        (other) =>
+          other.id !== npc.id &&
+          other.metadata?.behavior === "follow" &&
+          ((other.metadata?.followOrder as number) ?? Infinity) < myOrder
+      )
+      .sort(
+        (a, b) =>
+          ((b.metadata?.followOrder as number) ?? 0) -
+          ((a.metadata?.followOrder as number) ?? 0)
+      )[0] ?? player;
+
+  const dy = leader.y - npc.y;
+  const dx = leader.x - npc.x;
+  if (Math.abs(dy) + Math.abs(dx) <= 1) {
+    return { moved: false }; // already in line
+  }
+
+  // Close the larger gap first; fall back to the other axis when blocked.
+  const stepY: Array<[number, number]> = dy !== 0 ? [[Math.sign(dy), 0]] : [];
+  const stepX: Array<[number, number]> = dx !== 0 ? [[0, Math.sign(dx)]] : [];
+  const candidates =
+    Math.abs(dy) >= Math.abs(dx) ? [...stepY, ...stepX] : [...stepX, ...stepY];
+
+  for (const [moveY, moveX] of candidates) {
+    const targetY = npc.y + moveY;
+    const targetX = npc.x + moveX;
+
+    if (!isValidPosition(grid, targetY, targetX)) continue;
+
+    const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
+    if (targetSubtypes) {
+      const hasBlockingSubtype = targetSubtypes.some(
+        (subtype) =>
+          subtype === TileSubtype.WALL_TORCH ||
+          subtype === TileSubtype.TOWN_SIGN ||
+          subtype === TileSubtype.CHECKPOINT ||
+          subtype === TileSubtype.BOOKSHELF
+      );
+      if (hasBlockingSubtype) continue;
+    }
+
+    if (targetY === player.y && targetX === player.x) continue;
+    if (
+      npcs.some(
+        (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
+      )
+    ) {
+      continue;
+    }
+    if (enemies?.some((e) => e.y === targetY && e.x === targetX)) continue;
+
+    npc.y = targetY;
+    npc.x = targetX;
+
+    if (npc.tags?.includes("dog")) {
+      updateDogSprite(npc, moveY, moveX);
+    } else if (npc.metadata?.directionalSprites) {
+      npc.facing =
+        moveY < 0
+          ? Direction.UP
+          : moveY > 0
+          ? Direction.DOWN
+          : moveX < 0
+          ? Direction.LEFT
+          : Direction.RIGHT;
+    }
+
+    return { moved: true };
+  }
+
+  return { moved: false };
+}
+
+/**
+ * Goto behavior: walk to `metadata.gotoTarget` and wait there (scenario
+ * direction — Opal leading the family to the bookshelf). Same stepping and
+ * blocking rules as follow; arrival means standing on or beside the target.
+ */
+export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
+  const { npc, grid, player, npcs, enemies } = ctx;
+  const target = npc.metadata?.gotoTarget as { y: number; x: number } | undefined;
+  if (!target) return { moved: false };
+
+  const dy = target.y - npc.y;
+  const dx = target.x - npc.x;
+  if (Math.abs(dy) + Math.abs(dx) <= 1) {
+    return { moved: false }; // arrived
+  }
+
+  const stepY: Array<[number, number]> = dy !== 0 ? [[Math.sign(dy), 0]] : [];
+  const stepX: Array<[number, number]> = dx !== 0 ? [[0, Math.sign(dx)]] : [];
+  const candidates =
+    Math.abs(dy) >= Math.abs(dx) ? [...stepY, ...stepX] : [...stepX, ...stepY];
+
+  for (const [moveY, moveX] of candidates) {
+    const targetY = npc.y + moveY;
+    const targetX = npc.x + moveX;
+    if (!isValidPosition(grid, targetY, targetX)) continue;
+    const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
+    if (
+      targetSubtypes?.some(
+        (subtype) =>
+          subtype === TileSubtype.WALL_TORCH ||
+          subtype === TileSubtype.TOWN_SIGN ||
+          subtype === TileSubtype.CHECKPOINT ||
+          subtype === TileSubtype.BOOKSHELF
+      )
+    ) {
+      continue;
+    }
+    if (targetY === player.y && targetX === player.x) continue;
+    if (
+      npcs.some(
+        (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
+      )
+    ) {
+      continue;
+    }
+    if (enemies?.some((e) => e.y === targetY && e.x === targetX)) continue;
+
+    npc.y = targetY;
+    npc.x = targetX;
+    if (npc.tags?.includes("dog")) {
+      updateDogSprite(npc, moveY, moveX);
+    } else if (npc.metadata?.directionalSprites) {
+      npc.facing =
+        moveY < 0
+          ? Direction.UP
+          : moveY > 0
+          ? Direction.DOWN
+          : moveX < 0
+          ? Direction.LEFT
+          : Direction.RIGHT;
+    }
+    return { moved: true };
+  }
+  return { moved: false };
+}
+
+/**
  * Wander behavior: NPC randomly moves within specified bounds
  * 50% chance to move each turn, picks a random adjacent direction
  */
