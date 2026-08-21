@@ -8,8 +8,34 @@ import { stampCipherRoom } from "../../lib/map/cipher_room";
 import { mulberry32, withPatchedMathRandom, hashStringToSeed } from "../../lib/rng";
 import { toggleStateColor } from "../../lib/map/machinery";
 import { ColorGlyph } from "../../components/ColorGlyph";
-import { TileSubtype } from "../../lib/map/constants";
-import type { ColorLock } from "../../lib/map/types";
+import { TileSubtype, FLOOR } from "../../lib/map/constants";
+import type { ColorLock, MapData } from "../../lib/map/types";
+
+/**
+ * Move the hero onto the nearest empty floor tile to the switch cluster, so the bench opens looking AT
+ * the switches (the mural is the far half you walk to). Only for the bench — the live daily keeps its
+ * own spawn.
+ */
+function relocateHeroToSwitches(map: MapData, switches: Array<[number, number]>): void {
+  for (let y = 0; y < map.subtypes.length; y++)
+    for (let x = 0; x < map.subtypes[y].length; x++)
+      if (map.subtypes[y][x].includes(TileSubtype.PLAYER))
+        map.subtypes[y][x] = map.subtypes[y][x].filter((s) => s !== TileSubtype.PLAYER);
+  const cy = Math.round(switches.reduce((a, [y]) => a + y, 0) / switches.length);
+  const cx = Math.round(switches.reduce((a, [, x]) => a + x, 0) / switches.length);
+  const emptyFloor = (y: number, x: number) =>
+    map.tiles[y]?.[x] === FLOOR && (map.subtypes[y]?.[x]?.length ?? 0) === 0;
+  for (let r = 0; r <= 8; r++)
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dy), Math.abs(dx)) !== r) continue; // ring at radius r
+        const y = cy + dy, x = cx + dx;
+        if (emptyFloor(y, x)) {
+          map.subtypes[y][x] = [TileSubtype.PLAYER];
+          return;
+        }
+      }
+}
 
 /**
  * Bench for stampCipherRoom: the mural cipher puzzle DISTRIBUTED into a real generated L2/L3 floor —
@@ -29,6 +55,7 @@ function build(seed: number, floor: number): Built | null {
   for (let i = 2; i <= floor; i++) s = advanceToNextFloor(s, seed);
   const lock = stampCipherRoom(s.mapData, mulberry32(seed ^ CIPHER_SALT));
   if (!lock) return null;
+  relocateHeroToSwitches(s.mapData, lock.switches); // bench opens on the switches; mural is the walk
   const state: GameState = {
     ...s,
     colorLocks: [lock],
@@ -140,9 +167,9 @@ function Inner() {
         <h1 className="text-xl font-bold">Cipher room in a real Floor {floor}</h1>
         <p className="text-xs text-gray-300 mt-1">
           The puzzle is stamped into a live daily floor: <b>staggered switches</b> (one per column),
-          a <b>gated reward</b>, and the <b>mural</b> ~{dist.toFixed(0)} tiles away — offscreen, so you
-          read it, remember it, and walk back. The game view below uses the daily&apos;s <b>torch FOV</b>
-          (enemies stripped). Toggle the overview if you want to see where everything landed.
+          a <b>gated reward</b>, and the <b>mural</b> ~{dist.toFixed(0)} tiles away. You start ON the
+          switches (torch FOV, enemies stripped); the mural is offscreen, so walk out to read it,
+          remember it, and come back. Toggle the overview to see where everything landed.
         </p>
         <p className="text-xs mt-2 flex items-center justify-center gap-3 flex-wrap">
           <span>
