@@ -103,12 +103,15 @@ export interface WispConfig {
 
 /**
  * The real-mode tuning (daily + endless), from the 2026-08-10 balance pass. With
- * ~13 pots and ~27 enemies per daily run this lands around 1-1.5 wisp sightings
- * per run, weighted toward the pity rescue; carrying one is roughly a coin flip
- * on top (they expire and flee the torch), safely below Amber Moth frequency.
+ * ~13 pots per daily run this lands around 1 wisp sighting per run, weighted
+ * toward the pity rescue; carrying one is roughly a coin flip on top (they expire
+ * and flee the torch), safely below Amber Moth frequency. Enemy-death drops were
+ * removed 2026-08-21 (they read as unexplained — see WISP_STANDARD_CONFIG).
  */
 export const WISP_STANDARD_CONFIG: WispConfig = {
-  enemyDropChance: 0.02,
+  // No enemy-death drops: a wisp appearing from a defeated enemy (a ghost, say)
+  // reads as unexplained since enemies show no wisp beforehand. Wisps now come
+  // only from baked pots, the pity rescue at 1 heart, and drifting wild wisps.
   pity: true,
   maxCompanions: 1,
 };
