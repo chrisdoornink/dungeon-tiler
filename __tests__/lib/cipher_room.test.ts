@@ -166,6 +166,11 @@ describe("cipher room — stamped into a real generated floor", () => {
     expect(cols).toEqual([...cols].sort((a, b) => a - b));
     const rows = lock.switches.map(([y]) => y);
     expect(Math.max(...rows) - Math.min(...rows)).toBeLessThanOrEqual(4);
+    // The switches and mural are actually STAMPED ON THE MAP (not just referenced by the lock) — else
+    // the puzzle renders as invisible floor and you see the mural with nothing to solve.
+    for (const [sy, sx] of lock.switches) expect(map!.subtypes[sy][sx]).toContain(TileSubtype.TOGGLE_SWITCH);
+    for (const [my, mx] of lock.mural!.tiles) expect(map!.subtypes[my][mx]).toContain(TileSubtype.MURAL_PANEL);
+    for (const [gy, gx] of lock.gates) expect(map!.subtypes[gy][gx]).toContain(TileSubtype.SPIKES);
     // The mural is two adjacent wall tiles, placed well away from the switches (offscreen).
     expect(lock.mural?.tiles.length).toBe(2);
     expect(lock.mural!.tiles[0][0]).toBe(lock.mural!.tiles[1][0]);

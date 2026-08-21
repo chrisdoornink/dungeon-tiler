@@ -297,6 +297,9 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
     break;
   }
   if (!switches) return null;
+  // Stamp the switches onto the MAP — the lock alone only wires the mechanic; without this the tiles
+  // render as plain floor and the puzzle is invisible (you see the mural but nothing to solve).
+  for (const [y, x] of switches) map.subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH];
   const usedFloor = new Set(switches.map(([y, x]) => `${y},${x}`));
   const centroid: [number, number] = [
     switches.reduce((s, [y]) => s + y, 0) / N,
