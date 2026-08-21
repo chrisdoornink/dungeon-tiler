@@ -123,11 +123,12 @@ const BOSS_ENTRANCE_FALLBACK_SEED_SALT = 0xb529_7a4d;
  * of past days untouched.
  */
 const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
-const COLOR_PUZZLE_CHANCE = 0.2; // rolls ~20% of floor-2 days; nets ~15-20% (rare while the feature is vetted)
-// Of the floor-2 colour-puzzle days, this fraction becomes the mandatory CIPHER ROOM (match rule +
-// distant mural + exit-key gate) instead of the all-same-colour puzzle. The two are variants of one
-// slot, so a run still gets at most one colour-switch puzzle. 0.75 -> cipher ~15% of floor-2 days.
-const CIPHER_VARIANT_SHARE = 0.75;
+const COLOR_PUZZLE_CHANCE = 0.34; // rolls ~34% -> nets ~30% of floor-2 days (floor-1 suppression + the
+// rare no-fit day eat the rest). Of those, this fraction is the mandatory CIPHER ROOM (match rule +
+// distant mural + exit-key gate); the rest is the all-same-colour puzzle. Variants of one slot, so a
+// run still gets at most one colour-switch puzzle. 0.56 of 0.34 (~0.19 threshold) -> ~17% cipher /
+// ~13% all-same net (cipher's ~12% no-fit days fall back to all-same).
+const CIPHER_VARIANT_SHARE = 0.56;
 // Floor 1 gets a rarer, smaller variant (3 switches). Its builder never receives the daily seed, so
 // the puzzle stream is seeded from the day's generated map instead — see the stamp in
 // initializeGameStateForMultiTier. A distinct salt keeps it uncorrelated with the floor-2 stream.

@@ -3,9 +3,11 @@
 // nobody that day reached the floor to record it in analytics.
 //
 // FORWARD-ONLY: recomputation reflects the CURRENT generator, so a day whose live generator differed
-// would be misreported. The cipher-room variant shipped 2026-08-21, so tracking starts there; older
-// days return { tracked: false } rather than a guess. Any later change to puzzle generation must bump
-// this date (or date-version the generator), exactly like the chest-pool discipline.
+// would be misreported. Older days return { tracked: false } rather than a guess. Any change to puzzle
+// generation must bump this date (or date-version the generator), exactly like the chest-pool
+// discipline. History: cipher room shipped 2026-08-21; the rates were retuned to ~30% (17% cipher /
+// 13% all-same) later the same day, so tracking starts 2026-08-22 (the first full day on settled rates)
+// to skip that launch-day deploy window.
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
 import {
   initializeGameStateForMultiTier,
@@ -14,7 +16,7 @@ import {
 } from "../map/game-state";
 import { SWITCH_GATE_START_DATE } from "../map";
 
-export const PUZZLE_TRACKING_START_DATE = "2026-08-21";
+export const PUZZLE_TRACKING_START_DATE = "2026-08-22";
 
 export type ColorPuzzleKind = "all-same" | "cipher";
 
