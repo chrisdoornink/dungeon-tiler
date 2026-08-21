@@ -7053,9 +7053,18 @@ function renderTileGrid(
       // orthogonal arms brightest (.fov-tier-torch-adj), diagonal corners dimmer
       // (.fov-tier-torch-diag), and the rounded second ring faintest
       // (.fov-tier-torch-far) — instead of a hard cross with black corners.
-      const isTorchAdjacentGlow = g === ADJACENT_GLOW;
-      const isTorchDiagonalGlow = g === DIAGONAL_GLOW;
-      const isTorchSecondRingGlow = g === SECOND_RING_GLOW;
+      // A tile that is ITSELF a light source (wall torch, lava, torch-carrier,
+      // dark-portal beacon) must never be classified by another nearby torch's
+      // borrowed glow. Two torches within Chebyshev distance 2 each land in the
+      // other's glow ring, so absent this guard a torch sitting in a neighbour's
+      // SECOND_RING would render as `fov-tier-torch-far` (brightness 0.25 + heavy
+      // black inset) while the hero's torch is out — the torch tile goes black
+      // even though it is lighting the tiles around it. Light sources stay at
+      // full brightness (they fall through to fov-tier-3).
+      const isLightSource = isSelfTorch || isTorchCarrier || isDarkPortalBeacon;
+      const isTorchAdjacentGlow = !isLightSource && g === ADJACENT_GLOW;
+      const isTorchDiagonalGlow = !isLightSource && g === DIAGONAL_GLOW;
+      const isTorchSecondRingGlow = !isLightSource && g === SECOND_RING_GLOW;
       const isVisible = tier > 0;
 
       // Get neighboring tiles
