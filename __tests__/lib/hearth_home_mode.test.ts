@@ -1,4 +1,7 @@
-import { buildHearthHomeState } from "../../lib/story/hearth_home_mode";
+import {
+  buildHearthHomeState,
+  switchPartyMember,
+} from "../../lib/story/hearth_home_mode";
 import {
   FAMILY_HOUSE_ROOM_ID,
   FAMILY_HOUSE_SPAWN,
@@ -127,6 +130,20 @@ describe("directional sprites", () => {
     expect(resolveHeroSpriteOverride(Direction.UP, {})).toBeUndefined();
   });
 
+  it("puts the whole family in the party line, in roster order", () => {
+    const state = buildHearthHomeState("chris");
+    const party = (state.npcs ?? []).map((npc) => [
+      npc.metadata?.behavior,
+      npc.metadata?.followOrder,
+    ]);
+    expect(party).toEqual([
+      ["follow", 0],
+      ["follow", 1],
+      ["follow", 2],
+      ["follow", 3],
+    ]);
+  });
+
   it("gives family NPCs their directional art via metadata", () => {
     const state = buildHearthHomeState("chris");
     const annie = (state.npcs ?? []).find((npc) => npc.id === "npc-annie");
@@ -137,10 +154,86 @@ describe("directional sprites", () => {
   });
 });
 
+describe("possession (switchPartyMember)", () => {
+  it("initializes the full party roster", () => {
+    const state = buildHearthHomeState("chris");
+    expect(state.party?.map((p) => p.id)).toEqual([
+      "chris",
+      "annie",
+      "emerson",
+      "claire",
+      "opal",
+    ]);
+    expect(state.party?.every((p) => p.alive && p.health === 5)).toBe(true);
+  });
+
+  it("swaps control to a living member where they stand", () => {
+    const state = buildHearthHomeState("chris");
+    const annie = (state.npcs ?? []).find((n) => n.id === "npc-annie")!;
+    const next = switchPartyMember(state, "annie");
+
+    expect(next.activeHeroId).toBe("annie");
+    expect(next.mapData.subtypes[annie.y][annie.x]).toContain(
+      TileSubtype.PLAYER
+    );
+    expect(
+      next.mapData.subtypes[FAMILY_HOUSE_SPAWN[0]][FAMILY_HOUSE_SPAWN[1]]
+    ).not.toContain(TileSubtype.PLAYER);
+
+    // The ex-hero re-enters the world standing where the hero was.
+    const chrisNpc = (next.npcs ?? []).find((n) => n.id === "npc-chris")!;
+    expect([chrisNpc.y, chrisNpc.x]).toEqual(FAMILY_HOUSE_SPAWN);
+    expect((next.npcs ?? []).some((n) => n.id === "npc-annie")).toBe(false);
+
+    expect(next.heroSprite).toBe("/images/family/annie-front.png");
+    expect(next.playerDirection).toBe(annie.facing);
+    expect((next.npcs ?? []).map((n) => n.metadata?.followOrder)).toEqual([
+      0, 1, 2, 3,
+    ]);
+  });
+
+  it("round-trips stats and inventory through the roster", () => {
+    let state = buildHearthHomeState("chris");
+    state = { ...state, heroHealth: 3, rockCount: 2, hasSword: true };
+
+    state = switchPartyMember(state, "opal");
+    const chris = state.party!.find((p) => p.id === "chris")!;
+    expect([chris.health, chris.rockCount, chris.hasSword]).toEqual([
+      3, 2, true,
+    ]);
+    expect(state.heroHealth).toBe(5); // Opal's own fresh stats
+    expect(state.hasSword).toBe(false);
+
+    state = switchPartyMember(state, "chris");
+    expect(state.heroHealth).toBe(3);
+    expect(state.rockCount).toBe(2);
+    expect(state.hasSword).toBe(true);
+  });
+
+  it("refuses no-op and dead-member switches", () => {
+    const state = buildHearthHomeState("claire");
+    expect(switchPartyMember(state, "claire")).toBe(state);
+    const withDeadOpal = {
+      ...state,
+      party: state.party!.map((p) =>
+        p.id === "opal" ? { ...p, alive: false } : p
+      ),
+    };
+    expect(switchPartyMember(withDeadOpal, "opal")).toBe(withDeadOpal);
+  });
+});
+
 describe("hero-aware dialogue", () => {
   it("kids call you Dad only when Chris is playing", () => {
-    const asChris = buildHearthHomeState("chris");
-    const asClaire = buildHearthHomeState("claire");
+    // Past the intro's chest-hint stage, so the everyday lines resolve.
+    const asChris = {
+      ...buildHearthHomeState("chris"),
+      scenarioFlags: { hearthKeysFound: true },
+    };
+    const asClaire = {
+      ...buildHearthHomeState("claire"),
+      scenarioFlags: { hearthKeysFound: true },
+    };
 
     expect(
       resolveNpcDialogueScript("npc-emerson", asChris.storyFlags, asChris)

@@ -15,7 +15,7 @@
  * placeholders until the real family set is generated.
  */
 
-import { Direction } from "../../../map"
+import { Direction, TileSubtype } from "../../../map"
 import type { StoryRoom } from "../types"
 import { buildRoom, type RoomConfig } from "../room-builder"
 import { NPC } from "../../../npc"
@@ -102,7 +102,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     heroSpriteScale: 126,
     home: [13, 2],
     facing: Direction.DOWN,
-    canMove: false,
+    canMove: true,
     // metadata.scale is the NPC-layer size (heroSpriteScale / 85, the NPC standard)
     metadata: { scale: 1.48 },
   },
@@ -118,11 +118,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     home: [6, 3],
     facing: Direction.DOWN,
     canMove: true,
-    metadata: {
-      behavior: "wander",
-      wanderBounds: { minY: 4, maxY: 7, minX: 3, maxX: 5 },
-      scale: 1.48,
-    },
+    metadata: { scale: 1.48 },
   },
   // Emerson — his room, never standing still. Real assets; 12 and a little
   // small, so he renders below the kid baseline.
@@ -137,11 +133,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     home: [13, 8],
     facing: Direction.LEFT,
     canMove: true,
-    metadata: {
-      behavior: "wander",
-      wanderBounds: { minY: 13, maxY: 15, minX: 7, maxX: 8 },
-      scale: 1.29,
-    },
+    metadata: { scale: 1.29 },
   },
   // Claire — her room, calm and still. Real assets; 14, ~75% of the adults.
   {
@@ -154,7 +146,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     heroSpriteScale: 116,
     home: [10, 8],
     facing: Direction.DOWN,
-    canMove: false,
+    canMove: true,
     metadata: { scale: 1.36 },
   },
   // Opal — starts in the living room, roams the house
@@ -170,7 +162,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     canMove: true,
     tags: ["dog", "pet"],
     // NPC dogs already render at 51% via their own CSS class; scale is relative to that.
-    metadata: { behavior: "dog", scale: 0.7 },
+    metadata: { scale: 0.7 },
   },
 ];
 
@@ -180,29 +172,63 @@ export function getFamilyMember(id: FamilyMemberId): FamilyMember {
   return member;
 }
 
+/**
+ * Build one family member's NPC at a given spot. Used for the initial roster
+ * and by the control switch (the ex-hero re-enters the world as an NPC).
+ */
+export function createFamilyNpc(
+  member: FamilyMember,
+  at: {
+    y: number;
+    x: number;
+    facing: Direction;
+    followOrder: number;
+    health?: number;
+    maxHealth?: number;
+  }
+): NPC {
+  return new NPC({
+    id: member.npcId,
+    name: member.name,
+    sprite: member.sprite,
+    y: at.y,
+    x: at.x,
+    facing: at.facing,
+    canMove: member.canMove,
+    maxHealth: at.maxHealth,
+    health: at.health,
+    tags: member.tags,
+    metadata: {
+      ...member.metadata,
+      // Marks this NPC as a combat-capable party member and links it back to
+      // its roster entry (game-state's party combat keys off this).
+      partyId: member.id,
+      // The family moves as a party: everyone trails the controlled hero
+      // in roster order (the good guys fight together).
+      behavior: "follow",
+      followOrder: at.followOrder,
+      // Members with real directional art render it by facing; the NPC
+      // layer falls back to legacy single-sprite behavior otherwise.
+      ...(member.spriteBack || member.spriteSide
+        ? {
+            directionalSprites: {
+              back: member.spriteBack,
+              side: member.spriteSide,
+            },
+          }
+        : {}),
+    },
+  });
+}
+
 function buildFamilyNpcs(excludeId?: FamilyMemberId): NPC[] {
-  return FAMILY_MEMBERS.filter((m) => m.id !== excludeId).map(
-    (m) =>
-      new NPC({
-        id: m.npcId,
-        name: m.name,
-        sprite: m.sprite,
-        y: m.home[0],
-        x: m.home[1],
-        facing: m.facing,
-        canMove: m.canMove,
-        tags: m.tags,
-        metadata: {
-          ...m.metadata,
-          // Members with real directional art render it by facing; the NPC
-          // layer falls back to legacy single-sprite behavior otherwise.
-          ...(m.spriteBack || m.spriteSide
-            ? {
-                directionalSprites: { back: m.spriteBack, side: m.spriteSide },
-              }
-            : {}),
-        },
-      })
+  return FAMILY_MEMBERS.filter((m) => m.id !== excludeId).map((m, index) =>
+    createFamilyNpc(m, {
+      y: m.home[0],
+      x: m.home[1],
+      facing: m.facing,
+      followOrder: index,
+    })
   );
 }
 
@@ -223,5 +249,21 @@ export function buildFamilyHouse(activeHeroId?: FamilyMemberId): StoryRoom {
     environment: "house",
     npcs: buildFamilyNpcs(activeHeroId),
   };
-  return buildRoom(config);
+  const room = buildRoom(config);
+
+  // Intro beat 1: a locked chest in every bedroom with a sword inside. The
+  // keys are hidden in the living-room bookshelf (see lib/story/hearth_scenario.ts).
+  const chestTiles: Array<[number, number]> = [
+    [7, 10], // Chris & Annie's room
+    [11, 9], // Claire's room
+    [15, 9], // Emerson's room
+  ];
+  for (const [y, x] of chestTiles) {
+    room.mapData.subtypes[y][x] = [
+      TileSubtype.CHEST,
+      TileSubtype.LOCK,
+      TileSubtype.SWORD,
+    ];
+  }
+  return room;
 }

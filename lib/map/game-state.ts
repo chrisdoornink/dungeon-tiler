@@ -16,6 +16,7 @@ import {
   type NPCInteractionEvent,
 } from "../npc";
 import { resolveNpcDialogueScript } from "../story/npc_script_registry";
+import { runHearthScenario } from "../story/hearth_scenario";
 import {
   createInitialStoryFlags,
   type StoryCondition,
@@ -24,7 +25,12 @@ import {
 import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-handler";
 import { updateConditionalNpcs } from "../story/story_mode";
 import { determineRoomNpcs } from "../story/npc_conditions";
-import { updateDogBehavior, updateWanderBehavior } from "../npc_behaviors";
+import {
+  updateDogBehavior,
+  updateFollowBehavior,
+  updateGotoBehavior,
+  updateWanderBehavior,
+} from "../npc_behaviors";
 import {
   DEFAULT_ROOM_ID,
   Direction,
@@ -326,6 +332,126 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
       };
       
       updateWanderBehavior(ctx);
+    } else if (behavior === "follow") {
+      // Party line (Hearth & Home): trail the controlled hero in order
+      const ctx = {
+        npc,
+        grid: state.mapData.tiles,
+        subtypes: state.mapData.subtypes,
+        player: { y: py, x: px },
+        npcs: state.npcs,
+        enemies: state.enemies,
+        rng: state.combatRng,
+      };
+
+      updateFollowBehavior(ctx);
+    } else if (behavior === "goto") {
+      // Scenario-directed walk to a fixed tile (e.g. Opal leading the family
+      // to the bookshelf in Hearth & Home).
+      const ctx = {
+        npc,
+        grid: state.mapData.tiles,
+        subtypes: state.mapData.subtypes,
+        player: { y: py, x: px },
+        npcs: state.npcs,
+        enemies: state.enemies,
+        rng: state.combatRng,
+      };
+
+      updateGotoBehavior(ctx);
+    }
+  }
+
+  runPartyCombat(state, playerPos);
+  runHearthScenario(state, playerPos);
+}
+
+/**
+ * Tiles occupied by living party allies (Hearth & Home). Handed to
+ * updateEnemies as blockedTiles so enemies can't end a tick standing inside a
+ * family member. Undefined everywhere a party doesn't exist.
+ */
+function partyAllyTiles(state: GameState): Array<[number, number]> | undefined {
+  if (!state.party || !state.npcs?.length) return undefined;
+  const tiles = state.npcs
+    .filter((npc) => npc.metadata?.partyId)
+    .map((npc) => [npc.y, npc.x] as [number, number]);
+  return tiles.length > 0 ? tiles : undefined;
+}
+
+/**
+ * Hearth & Home party combat, run once per world tick after NPC movement:
+ *   1. every ally standing next to an enemy strikes it (roster attack)
+ *   2. every enemy NOT engaged with the hero strikes one adjacent ally
+ * Allies who fall are removed and their roster entry marked dead (permadeath).
+ * No-op unless the state carries a party.
+ */
+export function runPartyCombat(
+  state: GameState,
+  playerPos: [number, number]
+): void {
+  const party = state.party;
+  let enemies: Enemy[] | undefined = state.enemies;
+  if (!party || !state.npcs?.length || !enemies?.length) return;
+  const allies = state.npcs.filter((npc) => npc.metadata?.partyId);
+  if (allies.length === 0) return;
+  const [py, px] = playerPos;
+  const adjacent = (
+    a: { y: number; x: number },
+    b: { y: number; x: number }
+  ) => Math.abs(a.y - b.y) + Math.abs(a.x - b.x) === 1;
+
+  // 1. Family strikes.
+  for (const ally of allies) {
+    const target: Enemy | undefined = enemies.find((e) => adjacent(e, ally));
+    if (!target) continue;
+    const entry = party.find((p) => p.id === ally.metadata?.partyId);
+    // A chest sword doubles a family member's swing, mirroring the hero rule.
+    const damage = entry?.hasSword ? 2 : entry?.attack ?? 1;
+    target.health -= damage;
+    state.stats.damageDealt += damage;
+    if (target.health <= 0) {
+      enemies = enemies.filter((e) => e !== target);
+      state.enemies = enemies;
+      state.stats.enemiesDefeated += 1;
+      trackEnemyKill(state.stats, target.kind, state.currentFloor ?? 1);
+      const defeated = state.defeatedEnemies ?? [];
+      defeated.push({
+        y: target.y,
+        x: target.x,
+        kind: target.kind,
+        id: target.id,
+        behaviorMemory: { ...target.behaviorMemory },
+      });
+      state.defeatedEnemies = defeated;
+    }
+  }
+
+  // 2. Enemy counter-strikes on the family. An enemy busy with the hero
+  // (adjacent to the player) keeps its existing hero attack from the enemy
+  // tick; everyone else swings at one neighboring family member.
+  for (const enemy of enemies) {
+    if (adjacent(enemy, { y: py, x: px })) continue;
+    const victim = allies.find(
+      (ally) => ally.health > 0 && adjacent(enemy, ally)
+    );
+    if (!victim) continue;
+    const damage = enemy.attack ?? 1;
+    victim.health = Math.max(0, victim.health - damage);
+    state.stats.damageTaken += damage;
+    enemy.facing =
+      victim.y < enemy.y
+        ? "UP"
+        : victim.y > enemy.y
+        ? "DOWN"
+        : victim.x < enemy.x
+        ? "LEFT"
+        : "RIGHT";
+    const entry = party.find((p) => p.id === victim.metadata?.partyId);
+    if (entry) entry.health = victim.health;
+    if (victim.health <= 0) {
+      if (entry) entry.alive = false;
+      state.npcs = state.npcs.filter((npc) => npc !== victim);
     }
   }
 }
@@ -1993,6 +2119,26 @@ export interface PortalLocation {
 /**
  * Game state interface for tracking player inventory and game progress
  */
+/**
+ * One member of the Hearth & Home family party. The controlled member's
+ * stats live in the singular hero fields while they're being played; this is
+ * the at-rest copy, written back whenever control switches away.
+ */
+export interface PartyMemberState {
+  id: string;
+  health: number;
+  maxHealth: number;
+  attack: number;
+  alive: boolean;
+  hasSword: boolean;
+  hasShield: boolean;
+  rockCount: number;
+  runeCount: number;
+  bombCount: number;
+  foodCount: number;
+  potionCount: number;
+}
+
 export interface GameState {
   hasKey: boolean; // Player has the universal generic key
   hasExitKey: boolean;
@@ -2117,6 +2263,14 @@ export interface GameState {
   // Hearth & Home (/home) only — which family member the player is controlling.
   // Unset in daily/story/endless; dialogue rules may branch on it via customCondition.
   activeHeroId?: string;
+  // Hearth & Home (/home) only — the family party roster. Each member keeps
+  // their own stats/inventory; the controlled member's entry is projected
+  // into the singular hero fields and written back on every control switch.
+  // Unset in daily/story/endless.
+  party?: PartyMemberState[];
+  // Hearth & Home (/home) only — scripted-scenario progress flags (see
+  // lib/story/hearth_scenario.ts). Unset in daily/story/endless.
+  scenarioFlags?: Record<string, boolean>;
   // Hearth & Home (/home) only — sprite paths that replace the hero art.
   // heroSprite is the front view and the fallback for all facings; back/side
   // are optional (side art faces right, mirrored for left). Unset = default
@@ -4335,6 +4489,8 @@ function movePlayerCore(
           newGameState.heroTorchLit = lit;
         },
         playerNext: playerNextPos,
+        // Family party members are solid to enemies (Hearth & Home only).
+        blockedTiles: partyAllyTiles(newGameState),
         // Pink mist blinds enemies standing in it (no move/attack) — EXCEPT pink goblins,
         // which instead shuffle one tile toward the nearest clear tile (handled in their
         // behavior via the `mist` context below). The realm haze tiles are passed so that

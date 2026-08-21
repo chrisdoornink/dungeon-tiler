@@ -14,15 +14,19 @@
 import {
   Direction,
   TileSubtype,
+  findPlayerPosition,
   type GameState,
   type MapData,
+  type PartyMemberState,
 } from "../map";
 import { rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
 import {
   buildFamilyHouse,
+  createFamilyNpc,
   getFamilyMember,
   FAMILY_HOUSE_SPAWN,
+  FAMILY_MEMBERS,
   type FamilyMemberId,
 } from "./rooms/home";
 
@@ -38,6 +42,23 @@ function addPlayer(mapData: MapData, position: [number, number]): MapData {
     clone.subtypes[py][px] = [...cell, TileSubtype.PLAYER];
   }
   return clone;
+}
+
+function freshPartyMember(id: FamilyMemberId): PartyMemberState {
+  return {
+    id,
+    health: 5,
+    maxHealth: 5,
+    attack: 1,
+    alive: true,
+    hasSword: false,
+    hasShield: false,
+    rockCount: 0,
+    runeCount: 0,
+    bombCount: 0,
+    foodCount: 0,
+    potionCount: 0,
+  };
 }
 
 export function buildHearthHomeState(
@@ -77,6 +98,7 @@ export function buildHearthHomeState(
     heroAttack: 1,
     heroTorchLit: false,
     activeHeroId: hero.id,
+    party: FAMILY_MEMBERS.map((m) => freshPartyMember(m.id)),
     heroSprite: hero.sprite,
     heroSpriteBack: hero.spriteBack,
     heroSpriteSide: hero.spriteSide,
@@ -102,4 +124,163 @@ export function buildHearthHomeState(
   };
 
   return gameState;
+}
+
+/**
+ * Core of possession: hand control of the world to `targetId`. Assumes the
+ * roster in `state.party` is already up to date (write-backs and death
+ * marking happen in the callers). The PLAYER tile moves to the target's body,
+ * the target's roster entry is projected into the singular hero fields, and
+ * the NPC roster is rebuilt in family order — living members keep their live
+ * positions and health; the ex-hero re-enters as an NPC only when
+ * `includeExHeroAsNpc` (false after a death: the body is gone).
+ */
+function projectControlTo(
+  state: GameState,
+  targetId: FamilyMemberId,
+  opts: { includeExHeroAsNpc: boolean }
+): GameState {
+  const party = state.party ?? [];
+  const targetEntry = party.find((p) => p.id === targetId);
+  if (!targetEntry || !targetEntry.alive) return state;
+
+  const currentId = state.activeHeroId as FamilyMemberId | undefined;
+  const targetMember = getFamilyMember(targetId);
+
+  const heroPos = findPlayerPosition(state.mapData);
+  const targetNpc = (state.npcs ?? []).find(
+    (npc) => npc.id === targetMember.npcId
+  );
+  if (!heroPos || !targetNpc) return state;
+
+  // Move the PLAYER tile from the old body to the new one.
+  const mapData = cloneMapData(state.mapData);
+  const [hy, hx] = heroPos;
+  mapData.subtypes[hy][hx] = (mapData.subtypes[hy][hx] ?? []).filter(
+    (t) => t !== TileSubtype.PLAYER
+  );
+  const targetCell = mapData.subtypes[targetNpc.y][targetNpc.x] ?? [];
+  if (!targetCell.includes(TileSubtype.PLAYER)) {
+    mapData.subtypes[targetNpc.y][targetNpc.x] = [
+      ...targetCell,
+      TileSubtype.PLAYER,
+    ];
+  }
+
+  // Rebuild the NPC roster in family order from the living members.
+  const liveById = new Map((state.npcs ?? []).map((npc) => [npc.id, npc]));
+  const npcs = FAMILY_MEMBERS.filter((m) => {
+    if (m.id === targetId) return false;
+    const entry = party.find((p) => p.id === m.id);
+    if (!entry?.alive) return false;
+    if (m.id === currentId && !opts.includeExHeroAsNpc) return false;
+    return true;
+  }).map((m, index) => {
+    const entry = party.find((p) => p.id === m.id);
+    if (m.id === currentId) {
+      return createFamilyNpc(m, {
+        y: hy,
+        x: hx,
+        facing: state.playerDirection,
+        followOrder: index,
+        health: entry?.health,
+        maxHealth: entry?.maxHealth,
+      });
+    }
+    const live = liveById.get(m.npcId);
+    return createFamilyNpc(m, {
+      y: live?.y ?? m.home[0],
+      x: live?.x ?? m.home[1],
+      facing: live?.facing ?? m.facing,
+      followOrder: index,
+      health: live?.health ?? entry?.health,
+      maxHealth: live?.maxHealth ?? entry?.maxHealth,
+    });
+  });
+
+  return {
+    ...state,
+    mapData,
+    npcs,
+    party,
+    activeHeroId: targetId,
+    heroSprite: targetMember.sprite,
+    heroSpriteBack: targetMember.spriteBack,
+    heroSpriteSide: targetMember.spriteSide,
+    heroSpriteScale: targetMember.heroSpriteScale,
+    playerDirection: targetNpc.facing,
+    heroHealth: targetEntry.health,
+    heroMaxHealth: targetEntry.maxHealth,
+    heroAttack: targetEntry.attack,
+    hasSword: targetEntry.hasSword,
+    hasShield: targetEntry.hasShield,
+    rockCount: targetEntry.rockCount,
+    runeCount: targetEntry.runeCount,
+    bombCount: targetEntry.bombCount,
+    foodCount: targetEntry.foodCount,
+    potionCount: targetEntry.potionCount,
+  };
+}
+
+/**
+ * Switch control to another living family member, mid-play, world intact.
+ * The current hero's live stats are written back into the roster first.
+ * Returns the input state unchanged for no-ops (same member, dead, unknown).
+ */
+export function switchPartyMember(
+  state: GameState,
+  targetId: FamilyMemberId
+): GameState {
+  if (state.activeHeroId === targetId) return state;
+  const targetEntry = state.party?.find((p) => p.id === targetId);
+  if (!targetEntry || !targetEntry.alive) return state;
+
+  const currentId = state.activeHeroId as FamilyMemberId | undefined;
+  if (!currentId) return state;
+
+  const party = (state.party ?? []).map((p) =>
+    p.id === currentId
+      ? {
+          ...p,
+          health: state.heroHealth ?? p.health,
+          maxHealth: state.heroMaxHealth ?? p.maxHealth,
+          attack: state.heroAttack ?? p.attack,
+          hasSword: !!state.hasSword,
+          hasShield: !!state.hasShield,
+          rockCount: state.rockCount ?? 0,
+          runeCount: state.runeCount ?? 0,
+          bombCount: state.bombCount ?? 0,
+          foodCount: state.foodCount ?? 0,
+          potionCount: state.potionCount ?? 0,
+        }
+      : p
+  );
+
+  return projectControlTo({ ...state, party }, targetId, {
+    includeExHeroAsNpc: true,
+  });
+}
+
+/**
+ * The controlled member just died (permadeath). Control jumps to the first
+ * living member in family order; their fallen body does not re-enter the
+ * world. When nobody is left, the visit starts over fresh.
+ */
+export function handleControlledMemberDeath(state: GameState): GameState {
+  const currentId = state.activeHeroId as FamilyMemberId | undefined;
+  if (!currentId) return state;
+
+  const party = (state.party ?? []).map((p) =>
+    p.id === currentId ? { ...p, alive: false, health: 0 } : p
+  );
+  const successor = FAMILY_MEMBERS.find((m) =>
+    party.some((p) => p.id === m.id && p.alive)
+  );
+  if (!successor) {
+    // The whole family has fallen — the house resets to a fresh visit.
+    return buildHearthHomeState();
+  }
+  return projectControlTo({ ...state, party }, successor.id, {
+    includeExHeroAsNpc: false,
+  });
 }
