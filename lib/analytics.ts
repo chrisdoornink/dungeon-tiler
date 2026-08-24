@@ -44,7 +44,7 @@ export function trackGameComplete(params: {
   dailyBossKind?: string;
   switchGateFloor?: number;
   switchGateAccess?: "open" | "behind-bed";
-  switchGateThrownBy?: "rock" | "boot";
+  switchGateThrownBy?: "rock" | "boot" | "enemy";
 }) {
   posthogAnalytics.trackGameComplete(params);
 }

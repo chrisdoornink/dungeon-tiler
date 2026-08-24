@@ -1,5 +1,6 @@
 import {
   Enemy,
+  EnemyState,
   placeEnemies,
   updateEnemies,
   rehydrateEnemies,
@@ -87,6 +88,8 @@ import {
 import {
   maybePlaceSwitchGate,
   occupiedTiles,
+  SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE,
+  SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE,
   type DailySwitchGate,
 } from "./switch-gates";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
@@ -591,7 +594,17 @@ export function performWait(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
         applyHeroDamage(preTickState, applied);
@@ -652,7 +665,17 @@ function performUseFoodCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -725,7 +748,17 @@ function performUsePotionCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -807,7 +840,17 @@ function performUsePinkHeartCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -879,7 +922,17 @@ function performUseBerryCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -1051,6 +1104,11 @@ export function performThrowRockCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -1454,6 +1512,11 @@ function performThrowRuneCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -2025,6 +2088,11 @@ function performThrowBombCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -4115,7 +4183,7 @@ function pressPlate(
   mapData: MapData,
   y: number,
   x: number,
-  by: "rock" | "boot"
+  by: "rock" | "boot" | "enemy"
 ): void {
   const cell = mapData.subtypes[y]?.[x];
   if (cell) {
@@ -4144,6 +4212,52 @@ function pressPlate(
     if (!bed) continue;
     const i = bed.indexOf(TileSubtype.SPIKES);
     if (i >= 0) bed[i] = TileSubtype.SPIKE_HOLES;
+  }
+}
+
+/**
+ * Let an enemy standing on THE DAILY'S switch trip it by accident.
+ *
+ * Enemies never path toward a plate — they aren't aware enough to solve the gate on purpose —
+ * but when the hero flees across it, a pursuer walking the same lane can stomp it. Call this
+ * once per enemy tick, AFTER updateEnemies has committed every enemy's move for the turn, so
+ * an enemy's final tile for the turn is what counts.
+ *
+ * Scoped hard to `state.switchGate.plate`: it only ever fires on the one daily gate, matched by
+ * coordinate exactly as pressPlate's analytics guard is. That is what keeps a wandering
+ * Quarrymaster add from opening its own cage — arena plates carry gateGroups but never a
+ * `switchGate`, so this is a no-op in every boss fight and on every floor with no gate.
+ *
+ * The chasing vs. idle split is the whole ask: a pursuer is far likelier to be following the
+ * hero's path over the plate than a goblin milling around the room. Rolls on Math.random rather
+ * than any seeded stream — this is runtime play, not map generation, so it never touches daily
+ * reconstruction (lib/stats replays the MAP, not the turn-by-turn).
+ *
+ * Mutates `state` (gateGroups/switchGate) and `mapData` in place via pressPlate.
+ */
+export function maybeEnemiesPressSwitchGate(
+  state: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate },
+  mapData: MapData,
+  enemies: Enemy[] | undefined,
+  rng: () => number = Math.random
+): void {
+  const daily = state.switchGate;
+  if (!daily || daily.thrownBy || !enemies) return;
+  const [py, px] = daily.plate;
+  // Already pressed (or the bed never got built)? Nothing to do.
+  const cell = mapData.subtypes[py]?.[px];
+  if (!cell || !cell.includes(TileSubtype.PRESSURE_PLATE)) return;
+  for (const e of enemies) {
+    if (e.y !== py || e.x !== px) continue;
+    const chasing = e.state === EnemyState.HUNTING;
+    const chance = chasing
+      ? SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE
+      : SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE;
+    if (rng() < chance) {
+      pressPlate(state, mapData, py, px, "enemy");
+    }
+    // Only one entity can occupy a tile, so there is no second enemy to consider.
+    return;
   }
 }
 
@@ -4545,6 +4659,7 @@ function movePlayerCore(
         },
       }
     );
+    maybeEnemiesPressSwitchGate(newGameState, newMapData, newGameState.enemies);
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
     newGameState.recentEnemyAttacks = result.attackingEnemies;
     enemyAttacksThisTurn = result.attackingEnemies ?? [];
@@ -4951,6 +5066,7 @@ function movePlayerCore(
             },
           }
         );
+        maybeEnemiesPressSwitchGate(newGameState, newMapData, newGameState.enemies);
         // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
         newGameState.recentEnemyAttacks = result.attackingEnemies;
         // Guarantee at least 1 immediate damage from an ambush

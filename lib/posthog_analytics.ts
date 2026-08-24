@@ -172,7 +172,7 @@ export function trackGameComplete(params: {
   // variant is earning its place or just being walked around.
   switchGateFloor?: number;
   switchGateAccess?: "open" | "behind-bed";
-  switchGateThrownBy?: "rock" | "boot";
+  switchGateThrownBy?: "rock" | "boot" | "enemy";
 }) {
   captureEvent('game_complete', {
     outcome: params.outcome,
@@ -214,9 +214,15 @@ export function trackGameComplete(params: {
     // Derived so the funnel is one filter each rather than a formula. Both are undefined (not
     // false) when the day had no gate, which keeps "days without a gate" out of the denominator
     // when measuring the throw rate.
+    //
+    // "thrown" is PLAYER engagement only — a rock across the bed or a boot on the plate. An
+    // enemy blundering across it (thrownBy === "enemy") opens the gate but is not the player
+    // solving it, so it counts as present-but-not-thrown, exactly like an ignored gate.
     switch_gate_present: params.switchGateFloor != null ? true : undefined,
     switch_gate_thrown:
-      params.switchGateFloor != null ? params.switchGateThrownBy != null : undefined,
+      params.switchGateFloor != null
+        ? params.switchGateThrownBy === "rock" || params.switchGateThrownBy === "boot"
+        : undefined,
   });
 }
 

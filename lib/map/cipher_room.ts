@@ -297,16 +297,21 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
     break;
   }
   if (!switches) return null;
-  // Stamp the switches onto the MAP — the lock alone only wires the mechanic; without this the tiles
-  // render as plain floor and the puzzle is invisible (you see the mural but nothing to solve).
-  for (const [y, x] of switches) map.subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH];
+  // TRANSACTIONAL: everything below only COMPUTES placements and returns null on failure. Not one
+  // tile of the map is written until switches, gate AND mural are all guaranteed (the commit block
+  // at the end). This is load-bearing: an earlier version stamped the switches here, then could
+  // `return null` at the gate/mural steps — leaving orphaned TOGGLE_SWITCH tiles with no lock (they
+  // render as an inert blue lamp), and in the reward:"exit" case a spike gate sealing the relocated
+  // key with no switch able to open it (a soft-lock). The caller falls back to the all-same puzzle on
+  // a null return, and that fallback must inherit a CLEAN map. Placement order is unchanged, so the
+  // only rng draw here (the mural pick) still fires last — success-path output is byte-identical.
   const usedFloor = new Set(switches.map(([y, x]) => `${y},${x}`));
   const centroid: [number, number] = [
     switches.reduce((s, [y]) => s + y, 0) / N,
     switches.reduce((s, [, x]) => s + x, 0) / N,
   ];
 
-  // ---- 2) GATE + REWARD POCKET, carved beside a wall nearest the switches ----
+  // ---- 2) GATE + REWARD POCKET, carved beside a wall nearest the switches (compute; carve at commit) ----
   const inB = (y: number, x: number) => y >= 1 && y < H - 1 && x >= 1 && x < Wd - 1;
   // A wall we may open. Skip walls wearing a WALL_SEAL crack: carving one would drop the crack tile
   // but leave its sealPayloads entry orphaned (the seal-count invariant would break).
@@ -328,9 +333,34 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
         bases.push({ gate: [y, x], pocket: [py, px] });
       }
     }
-  if (bases.length === 0) return null;
+  if (bases.length === 0) return null; // nothing written yet — safe to bail
   bases.sort((a, b) => euclid(a.gate, centroid) - euclid(b.gate, centroid));
   const base = bases[0];
+
+  // ---- 3) MURAL: two adjacent wall tiles with floor below, 8-14 tiles from the switches (compute; paint at commit) ----
+  const muralCands: Array<{ tiles: [[number, number], [number, number]]; d: number }> = [];
+  for (let y = 1; y < H - 1; y++)
+    for (let x = 1; x < Wd - 2; x++) {
+      if (map.tiles[y][x] !== WALL || map.tiles[y][x + 1] !== WALL) continue;
+      // Don't paint the mural over a decoy crack — it would overwrite the WALL_SEAL and orphan its
+      // sealPayloads entry.
+      if ((map.subtypes[y][x] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
+      if ((map.subtypes[y][x + 1] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
+      if (map.tiles[y + 1][x] !== FLOOR || map.tiles[y + 1][x + 1] !== FLOOR) continue;
+      const f1 = `${y + 1},${x}`, f2 = `${y + 1},${x + 1}`;
+      if (!reach.has(f1) || !reach.has(f2) || usedFloor.has(f1) || usedFloor.has(f2)) continue;
+      const d = euclid([y + 1, x], centroid);
+      if (d < minDist || d > maxDist) continue;
+      muralCands.push({ tiles: [[y, x], [y, x + 1]], d });
+    }
+  if (muralCands.length === 0) return null; // still nothing written — safe to bail
+  muralCands.sort((a, b) => b.d - a.d); // farthest first — prefer the mural as far offscreen as possible
+  const pick = muralCands[ri(rng, 0, Math.min(muralCands.length - 1, 4))]; // one of the farthest few
+
+  // ---- COMMIT: switches, gate and mural are all guaranteed, so write the map now (and only now). ----
+  // Stamp the switches onto the MAP — the lock alone only wires the mechanic; without this the tiles
+  // render as plain floor and the puzzle is invisible (you see the mural but nothing to solve).
+  for (const [y, x] of switches) map.subtypes[y][x] = [TileSubtype.TOGGLE_SWITCH];
   map.tiles[base.gate[0]][base.gate[1]] = FLOOR;
   map.subtypes[base.gate[0]][base.gate[1]] = [TileSubtype.SPIKES];
   map.tiles[base.pocket[0]][base.pocket[1]] = FLOOR;
@@ -348,26 +378,6 @@ export function stampCipherRoom(map: MapData, rng: Rng, opts: StampCipherOptions
     map.subtypes[base.pocket[0]][base.pocket[1]] = [TileSubtype.EXITKEY];
   }
   const gates: Array<[number, number]> = [base.gate];
-
-  // ---- 3) MURAL: two adjacent wall tiles with floor below, 8-14 tiles from the switches ----
-  const muralCands: Array<{ tiles: [[number, number], [number, number]]; d: number }> = [];
-  for (let y = 1; y < H - 1; y++)
-    for (let x = 1; x < Wd - 2; x++) {
-      if (map.tiles[y][x] !== WALL || map.tiles[y][x + 1] !== WALL) continue;
-      // Don't paint the mural over a decoy crack — it would overwrite the WALL_SEAL and orphan its
-      // sealPayloads entry.
-      if ((map.subtypes[y][x] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
-      if ((map.subtypes[y][x + 1] ?? []).includes(TileSubtype.WALL_SEAL)) continue;
-      if (map.tiles[y + 1][x] !== FLOOR || map.tiles[y + 1][x + 1] !== FLOOR) continue;
-      const f1 = `${y + 1},${x}`, f2 = `${y + 1},${x + 1}`;
-      if (!reach.has(f1) || !reach.has(f2) || usedFloor.has(f1) || usedFloor.has(f2)) continue;
-      const d = euclid([y + 1, x], centroid);
-      if (d < minDist || d > maxDist) continue;
-      muralCands.push({ tiles: [[y, x], [y, x + 1]], d });
-    }
-  if (muralCands.length === 0) return null;
-  muralCands.sort((a, b) => b.d - a.d); // farthest first — prefer the mural as far offscreen as possible
-  const pick = muralCands[ri(rng, 0, Math.min(muralCands.length - 1, 4))]; // one of the farthest few
   map.subtypes[pick.tiles[0][0]][pick.tiles[0][1]] = [TileSubtype.MURAL_PANEL];
   map.subtypes[pick.tiles[1][0]][pick.tiles[1][1]] = [TileSubtype.MURAL_PANEL];
 

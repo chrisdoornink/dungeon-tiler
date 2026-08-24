@@ -1,10 +1,16 @@
 import {
   advanceToNextFloor,
   initializeGameStateForMultiTier,
+  maybeEnemiesPressSwitchGate,
   movePlayer,
   performThrowRockCore,
   type GameState,
 } from "../../lib/map/game-state";
+import { Enemy, EnemyState } from "../../lib/enemy";
+import {
+  SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE,
+  SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE,
+} from "../../lib/map/switch-gates";
 import { Direction, TileSubtype } from "../../lib/map/constants";
 import type { MapData } from "../../lib/map/types";
 import { findPlayerPosition } from "../../lib/map/player";
@@ -616,5 +622,131 @@ describe("variants and engagement reporting", () => {
         expect(reach.has(`${plan.plate[0]},${plan.plate[1]}`)).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * Enemies aren't aware enough to solve the gate on purpose, but a pursuer following the fleeing
+ * hero's path across the plate can stomp it by accident. The chance is higher while chasing than
+ * while idle, and either way it only ever fires on THE DAY'S gate.
+ */
+describe("enemies tripping the switch by accident", () => {
+  function gatedFloor2(seed: number): GameState | undefined {
+    const f1 = withPatchedMathRandom(mulberry32(seed), () =>
+      initializeGameStateForMultiTier(1, { switchGates: true })
+    );
+    const f2 = advanceToNextFloor(f1, seed);
+    const f3 = advanceToNextFloor(f2, seed);
+    for (const s of [f1, f2, f3]) if (s.switchGate) return s;
+    return undefined;
+  }
+
+  function firstGatedState(): GameState {
+    for (let seed = 1; seed <= 200; seed++) {
+      const s = gatedFloor2(seed);
+      if (s?.switchGate) return s;
+    }
+    throw new Error("no seed produced a daily switch gate");
+  }
+
+  /** An enemy standing squarely on the day's plate, in the given state. */
+  function enemyOnPlate(state: GameState, kind: EnemyState): Enemy {
+    const [py, px] = state.switchGate!.plate;
+    const e = new Enemy({ y: py, x: px });
+    e.state = kind;
+    return e;
+  }
+
+  it("a chasing enemy on the plate trips it when the roll lands", () => {
+    const state = firstGatedState();
+    const [py, px] = state.switchGate!.plate;
+    const enemy = enemyOnPlate(state, EnemyState.HUNTING);
+    // Roll strictly below the chase chance -> pressed.
+    maybeEnemiesPressSwitchGate(state, state.mapData, [enemy], () => 0);
+    expect(state.mapData.subtypes[py][px]).toContain(
+      TileSubtype.PRESSURE_PLATE_PRESSED
+    );
+    expect(state.switchGate?.thrownBy).toBe("enemy");
+  });
+
+  it("a chasing enemy leaves it alone when the roll misses", () => {
+    const state = firstGatedState();
+    const [py, px] = state.switchGate!.plate;
+    const enemy = enemyOnPlate(state, EnemyState.HUNTING);
+    // Roll at the ceiling -> above the chase chance, so nothing happens.
+    maybeEnemiesPressSwitchGate(state, state.mapData, [enemy], () => 0.999);
+    expect(state.mapData.subtypes[py][px]).toContain(TileSubtype.PRESSURE_PLATE);
+    expect(state.switchGate?.thrownBy).toBeUndefined();
+  });
+
+  it("an idle enemy is far less likely to trip it than a chasing one", () => {
+    // A roll that sits between the idle and chase chances: a chaser would press, an idler won't.
+    expect(SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE).toBeLessThan(
+      SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE
+    );
+    const between =
+      (SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE + SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE) / 2;
+
+    const idleState = firstGatedState();
+    const [iy, ix] = idleState.switchGate!.plate;
+    maybeEnemiesPressSwitchGate(
+      idleState,
+      idleState.mapData,
+      [enemyOnPlate(idleState, EnemyState.IDLE)],
+      () => between
+    );
+    expect(idleState.mapData.subtypes[iy][ix]).toContain(TileSubtype.PRESSURE_PLATE);
+
+    const chaseState = firstGatedState();
+    const [cy, cx] = chaseState.switchGate!.plate;
+    maybeEnemiesPressSwitchGate(
+      chaseState,
+      chaseState.mapData,
+      [enemyOnPlate(chaseState, EnemyState.HUNTING)],
+      () => between
+    );
+    expect(chaseState.mapData.subtypes[cy][cx]).toContain(
+      TileSubtype.PRESSURE_PLATE_PRESSED
+    );
+  });
+
+  it("an idle enemy still trips it on a low enough roll (rare but possible)", () => {
+    const state = firstGatedState();
+    const [py, px] = state.switchGate!.plate;
+    maybeEnemiesPressSwitchGate(
+      state,
+      state.mapData,
+      [enemyOnPlate(state, EnemyState.IDLE)],
+      () => 0
+    );
+    expect(state.mapData.subtypes[py][px]).toContain(
+      TileSubtype.PRESSURE_PLATE_PRESSED
+    );
+  });
+
+  it("does nothing when no enemy is standing on the plate", () => {
+    const state = firstGatedState();
+    const [py, px] = state.switchGate!.plate;
+    const e = new Enemy({ y: py + 1, x: px });
+    e.state = EnemyState.HUNTING;
+    maybeEnemiesPressSwitchGate(state, state.mapData, [e], () => 0);
+    expect(state.mapData.subtypes[py][px]).toContain(TileSubtype.PRESSURE_PLATE);
+    expect(state.switchGate?.thrownBy).toBeUndefined();
+  });
+
+  it("retracts the spike bed when an enemy trips the gate", () => {
+    const state = firstGatedState();
+    const bed = state.gateGroups?.[0]?.gates ?? [];
+    expect(bed.length).toBeGreaterThan(0);
+    maybeEnemiesPressSwitchGate(
+      state,
+      state.mapData,
+      [enemyOnPlate(state, EnemyState.HUNTING)],
+      () => 0
+    );
+    for (const [by, bx] of bed) {
+      expect(state.mapData.subtypes[by][bx]).not.toContain(TileSubtype.SPIKES);
+    }
+    expect(state.gateGroups?.[0]?.open).toBe(true);
   });
 });
