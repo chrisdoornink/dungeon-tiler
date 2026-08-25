@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   parseHogQLRows,
   groupRowsByDay,
+  attachStartTimes,
   type EndgameStatsResponse,
   type StatsDayPayload,
 } from "../../../lib/stats/endgame_stats";
@@ -201,7 +202,28 @@ export async function GET(req: NextRequest) {
     `;
     const rowsRes = await runHogQL(rowsQuery, cfg);
     const rows = parseHogQLRows([...ROW_COLUMNS], rowsRes.results);
-    const grouped = groupRowsByDay(rows);
+
+    // Query 3: game_start events for the same days — used to compute run duration.
+    const startsQuery = `
+      SELECT
+        distinct_id AS distinct_id,
+        ${DAY_EXPR} AS day,
+        timestamp AS timestamp
+      FROM events
+      WHERE event = 'game_start'
+        AND properties.game_mode = 'daily'
+        AND ${DAY_EXPR} IN (${inList})
+      LIMIT ${MAX_ROWS}
+    `;
+    const startsRes = await runHogQL(startsQuery, cfg);
+    const startRows = startsRes.results.map((r) => ({
+      distinctId: String(r[0] ?? ""),
+      day: String(r[1] ?? ""),
+      timestamp: String(r[2] ?? ""),
+    }));
+    const rowsWithStart = attachStartTimes(rows, startRows);
+
+    const grouped = groupRowsByDay(rowsWithStart);
     const groupedByDate = new Map(grouped.map((g) => [g.date, g]));
 
     // Preserve the newest-first order from query 1, and attach the deterministic

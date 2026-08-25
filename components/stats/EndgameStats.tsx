@@ -148,6 +148,15 @@ function StatChip({
 
 type LootItem = { icon: string; label: string };
 
+function formatDuration(ms: number): string {
+  if (ms <= 0) return "0s";
+  const totalSec = Math.round(ms / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  if (m === 0) return `${s}s`;
+  return `${m}m ${s}s`;
+}
+
 /**
  * Reconstruct the chest loot a run collected. We don't store per-item chest
  * contents, but we can infer them: the two Floor-1 chests are always sword +
@@ -251,6 +260,16 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
         <span style={{ fontSize: 13 }}>👣</span>
         <span style={{ color: C.text, fontSize: 13 }}>{g.steps ?? 0}</span>
       </div>
+
+      {/* duration */}
+      {g.startedAt ? (
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }} title="Run duration">
+          <span style={{ fontSize: 13 }}>⏱</span>
+          <span style={{ color: C.muted, fontSize: 13 }}>
+            {formatDuration(new Date(g.timestamp).getTime() - new Date(g.startedAt).getTime())}
+          </span>
+        </div>
+      ) : null}
 
       {/* chest + collected loot (chest icon, then an icon per item they got) */}
       <div

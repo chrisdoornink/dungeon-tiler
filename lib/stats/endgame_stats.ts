@@ -23,6 +23,7 @@ import type { PuzzleDayInfo } from "./puzzle_day";
 export interface GameCompleteRow {
   day: string; // date_seed, YYYY-MM-DD (the daily-challenge identity)
   timestamp: string; // ISO string of when the run ended
+  startedAt: string | null; // ISO string of when the run started (from game_start), null if unmatched
   distinctId: string;
   outcome: "win" | "dead";
   levelReached: number | null;
@@ -147,6 +148,7 @@ export function toGameCompleteRow(rec: Record<string, unknown>): GameCompleteRow
   return {
     day: String(rec.day ?? ""),
     timestamp: String(rec.timestamp ?? ""),
+    startedAt: null,
     distinctId: String(rec.distinct_id ?? ""),
     outcome,
     levelReached: toNumberOrNull(rec.level_reached),
@@ -189,6 +191,40 @@ export function parseHogQLRows(
       rec[col] = row[i];
     });
     return toGameCompleteRow(rec);
+  });
+}
+
+/**
+ * Match `game_start` events onto complete rows.
+ * For each complete row, finds the latest start with the same (distinctId, day)
+ * that occurred at or before the complete timestamp.
+ *
+ * startRows: plain objects with { distinct_id, day, timestamp } from a HogQL
+ * query over `game_start` events.
+ */
+export function attachStartTimes(
+  rows: GameCompleteRow[],
+  startRows: { distinctId: string; day: string; timestamp: string }[]
+): GameCompleteRow[] {
+  // Group start timestamps by "distinctId::day" for fast lookup.
+  const byKey = new Map<string, string[]>();
+  for (const s of startRows) {
+    const key = `${s.distinctId}::${s.day}`;
+    const list = byKey.get(key);
+    if (list) list.push(s.timestamp);
+    else byKey.set(key, [s.timestamp]);
+  }
+  // Sort each bucket ascending so we can binary-search or just filter.
+  for (const list of byKey.values()) list.sort();
+
+  return rows.map((row) => {
+    const key = `${row.distinctId}::${row.day}`;
+    const starts = byKey.get(key);
+    if (!starts) return row;
+    // Latest start that is <= complete timestamp.
+    const candidates = starts.filter((ts) => ts <= row.timestamp);
+    if (candidates.length === 0) return row;
+    return { ...row, startedAt: candidates[candidates.length - 1] };
   });
 }
 
