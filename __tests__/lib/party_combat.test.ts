@@ -102,7 +102,7 @@ describe("controlled-member permadeath", () => {
     expect(next.mapData.subtypes[annieHome[0]][annieHome[1]]).toContain(
       TileSubtype.PLAYER
     );
-    expect(next.heroSprite).toBe("/images/family/annie-front.png");
+    expect(next.heroSprite).toBe("/images/npcs/girl-1.png");
   });
 
   it("dead members cannot be possessed and stay out of the roster", () => {

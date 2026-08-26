@@ -80,6 +80,11 @@ export interface FamilyMember {
   spriteSide?: string;
   /** Render height as % of the tile when playing as this member (85 = NPC standard, 51 = dog). */
   heroSpriteScale?: number;
+  /** Tiles per turn as an NPC (fractional; accumulates). Emerson is quick,
+   * Claire unhurried. Default 1. */
+  speed?: number;
+  /** This member's locked bedroom chest (holds a sword). Omitted for Opal. */
+  chest?: [number, number];
   /** Where they hang out when they're an NPC. */
   home: [number, number];
   facing: Direction;
@@ -100,7 +105,9 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     spriteBack: "/images/family/chris-back.png",
     spriteSide: "/images/family/chris-side.png",
     heroSpriteScale: 126,
+    speed: 1.15,
     home: [13, 2],
+    chest: [6, 10],
     facing: Direction.DOWN,
     canMove: true,
     // metadata.scale is the NPC-layer size (heroSpriteScale / 85, the NPC standard)
@@ -111,11 +118,15 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     id: "annie",
     npcId: "npc-annie",
     name: "Annie",
-    sprite: "/images/family/annie-front.png",
-    spriteBack: "/images/family/annie-back.png",
-    spriteSide: "/images/family/annie-side.png",
+    // Town-NPC look (Chris's pick): girl-1 front, generated back (see
+    // scripts/make-family-npc-variants.mjs). No side art — front is the fallback.
+    sprite: "/images/npcs/girl-1.png",
+    spriteBack: "/images/family/annie-girl1-back.png",
     heroSpriteScale: 126,
+    speed: 1.15,
     home: [6, 3],
+    // Annie has NO chest — there are only three swords for four hands, so she
+    // ends up empty-handed and says so (the intro's "...none for me?" beat).
     facing: Direction.DOWN,
     canMove: true,
     metadata: { scale: 1.48 },
@@ -126,11 +137,13 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     id: "emerson",
     npcId: "npc-emerson",
     name: "Emerson",
-    sprite: "/images/family/emerson-front.png",
-    spriteBack: "/images/family/emerson-back.png",
-    spriteSide: "/images/family/emerson-side.png",
+    // Town-NPC look (Chris's pick): boy-3 front, generated back.
+    sprite: "/images/npcs/boy-3.png",
+    spriteBack: "/images/family/emerson-boy3-back.png",
     heroSpriteScale: 110,
+    speed: 1.4,
     home: [13, 8],
+    chest: [15, 9],
     facing: Direction.LEFT,
     canMove: true,
     metadata: { scale: 1.29 },
@@ -140,11 +153,14 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     id: "claire",
     npcId: "npc-claire",
     name: "Claire",
-    sprite: "/images/family/claire-front.png",
-    spriteBack: "/images/family/claire-back.png",
-    spriteSide: "/images/family/claire-side.png",
+    // Town-NPC look (Chris's pick): girl-2 recolored to Claire (her hair
+    // color, dark shirt, blue shorts) + generated back.
+    sprite: "/images/family/claire-girl2-front.png",
+    spriteBack: "/images/family/claire-girl2-back.png",
     heroSpriteScale: 116,
+    speed: 0.85,
     home: [10, 8],
+    chest: [11, 9],
     facing: Direction.DOWN,
     canMove: true,
     metadata: { scale: 1.36 },
@@ -157,6 +173,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     sprite: "/images/dog-golden/dog-front-1.png",
     // Opal is 6lbs in real life: 30% under the standard dog render (51).
     heroSpriteScale: 36,
+    speed: 1.25,
     home: [15, 2],
     facing: Direction.DOWN,
     canMove: true,
@@ -185,6 +202,7 @@ export function createFamilyNpc(
     followOrder: number;
     health?: number;
     maxHealth?: number;
+    armed?: boolean;
   }
 ): NPC {
   return new NPC({
@@ -203,10 +221,16 @@ export function createFamilyNpc(
       // Marks this NPC as a combat-capable party member and links it back to
       // its roster entry (game-state's party combat keys off this).
       partyId: member.id,
-      // The family moves as a party: everyone trails the controlled hero
-      // in roster order (the good guys fight together).
-      behavior: "follow",
+      // Movement pace for goto/follow (see takeMovementBudget).
+      ...(member.speed ? { speed: member.speed } : {}),
+      // Family members hold their own space by default — they do NOT trail the
+      // hero (that trapped you in the house). The combat AI wakes them when an
+      // enemy comes near; scenarios can assign "goto"/"follow" for a specific
+      // job. followOrder is retained for any future party-line use.
+      behavior: "idle",
       followOrder: at.followOrder,
+      // Drives the code-driven sword overlay on armed family members.
+      ...(at.armed ? { armed: true } : {}),
       // Members with real directional art render it by facing; the NPC
       // layer falls back to legacy single-sprite behavior otherwise.
       ...(member.spriteBack || member.spriteSide
@@ -251,14 +275,13 @@ export function buildFamilyHouse(activeHeroId?: FamilyMemberId): StoryRoom {
   };
   const room = buildRoom(config);
 
-  // Intro beat 1: a locked chest in every bedroom with a sword inside. The
-  // keys are hidden in the living-room bookshelf (see lib/story/hearth_scenario.ts).
-  const chestTiles: Array<[number, number]> = [
-    [7, 10], // Chris & Annie's room
-    [11, 9], // Claire's room
-    [15, 9], // Emerson's room
-  ];
-  for (const [y, x] of chestTiles) {
+  // Intro beat 1: one locked, sword-filled chest per human, at their assigned
+  // tile (FamilyMember.chest). Once the keys are found, each family member
+  // opens their own — the hero by hand, the NPCs autonomously (see
+  // lib/story/hearth_scenario.ts). Opal has none.
+  for (const member of FAMILY_MEMBERS) {
+    if (!member.chest) continue;
+    const [y, x] = member.chest;
     room.mapData.subtypes[y][x] = [
       TileSubtype.CHEST,
       TileSubtype.LOCK,

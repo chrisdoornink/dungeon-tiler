@@ -545,51 +545,12 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
     priority: PRIORITIES.DEFAULT,
   },
 
-  // Hearth & Home (/home) — family house NPCs. The kids call you "Dad" only
-  // when Chris is the active hero; everyone else gets the generic greeting.
-  {
-    npcId: "npc-chris",
-    scriptId: "home-chris-default",
-    priority: PRIORITIES.DEFAULT,
-  },
-  {
-    npcId: "npc-annie",
-    scriptId: "home-annie-default",
-    priority: PRIORITIES.DEFAULT,
-  },
-  {
-    npcId: "npc-emerson",
-    scriptId: "home-emerson-dad",
-    priority: 10,
-    customCondition: (gameState: GameState) =>
-      gameState.activeHeroId === "chris",
-  },
-  {
-    npcId: "npc-emerson",
-    scriptId: "home-emerson-default",
-    priority: PRIORITIES.DEFAULT,
-  },
-  {
-    npcId: "npc-claire",
-    scriptId: "home-claire-dad",
-    priority: 10,
-    customCondition: (gameState: GameState) =>
-      gameState.activeHeroId === "chris",
-  },
-  {
-    npcId: "npc-claire",
-    scriptId: "home-claire-default",
-    priority: PRIORITIES.DEFAULT,
-  },
-  {
-    npcId: "npc-opal",
-    scriptId: "home-opal-default",
-    priority: PRIORITIES.DEFAULT,
-  },
-  // Hearth & Home intro scenario stages, highest priority first: battle
-  // (goblins inside), aftermath (house defended), chest hints (before the
-  // bookshelf gives up the keys). All gated on the party being present.
-  ...(["annie", "emerson", "claire"] as const).flatMap((member) => [
+  // Hearth & Home (/home) — the whole intro is about the swords. The ladder,
+  // highest priority first: battle (goblins inside) -> defended (aftermath) ->
+  // armed (we have swords, why?) -> chest-hint (before the keys are found).
+  // "armed" is the unconditional fallback, so no one ever drops back to
+  // unrelated domestic chatter. Opal is a dog — she just barks.
+  ...(["chris", "annie", "emerson", "claire"] as const).flatMap((member) => [
     {
       npcId: `npc-${member}`,
       scriptId: `home-${member}-battle`,
@@ -610,9 +571,19 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
       scriptId: `home-${member}-chest-hint`,
       priority: 20,
       customCondition: (gameState: GameState) =>
-        !!gameState.party && !gameState.scenarioFlags?.hearthKeysFound,
+        !gameState.scenarioFlags?.hearthKeysFound,
+    },
+    {
+      npcId: `npc-${member}`,
+      scriptId: `home-${member}-armed`,
+      priority: PRIORITIES.DEFAULT,
     },
   ]),
+  {
+    npcId: "npc-opal",
+    scriptId: "home-opal-default",
+    priority: PRIORITIES.DEFAULT,
+  },
 ];
 
 export function listNpcDialogueRules(): NPCDialogueRule[] {
