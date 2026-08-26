@@ -46,8 +46,12 @@ export interface DailySwitchGate {
   floor: number;
   access: PlateAccess;
   plate: [number, number];
-  /** How the switch was thrown, if it was. "rock" = thrown across the bed, "boot" = walked onto. */
-  thrownBy?: "rock" | "boot";
+  /**
+   * How the switch was thrown, if it was. "rock" = thrown across the bed, "boot" = the hero
+   * walked onto it, "enemy" = an enemy blundered across it (see maybeEnemiesPressSwitchGate).
+   * The enemy case is NOT player engagement, so analytics must not count it as "solved".
+   */
+  thrownBy?: "rock" | "boot" | "enemy";
 }
 
 export interface SwitchGatePlan {
@@ -588,6 +592,23 @@ export function maybePlaceSwitchGate(
   if (plan) state.switchGate = { floor, access, plate: plan.plate };
   return plan;
 }
+
+/**
+ * Chance a CHASING enemy that ends its tick standing on the day's switch trips it.
+ *
+ * Enemies aren't aware enough to press a switch on purpose — they never path toward one. But
+ * when the hero flees across the plate, a pursuer following the same lane can stomp it by
+ * accident, which is exactly the moment the player is least able to stop them. This is that
+ * accident's probability, rolled each tick the enemy occupies the plate.
+ */
+export const SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE = 0.35;
+
+/**
+ * Chance an idle / wandering enemy that ends its tick on the plate trips it. Much lower than
+ * the chasing rate: a goblin milling around the room stepping on it is possible but should be
+ * a rare surprise, not a reliable way for the gate to open itself.
+ */
+export const SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE = 0.08;
 
 /** Tiles occupied by entities that do not appear in `subtypes`, for `avoid`. */
 export function occupiedTiles(

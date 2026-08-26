@@ -1,8 +1,10 @@
 import {
   Enemy,
+  EnemyState,
   placeEnemies,
   updateEnemies,
   rehydrateEnemies,
+  enemyAttackVariance,
   type PlainEnemy,
   type EnemyAttackInfo,
 } from "../enemy";
@@ -78,6 +80,7 @@ import {
 import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { stampColorSwitchLock } from "./color_switch_puzzle";
+import { stampCipherRoom } from "./cipher_room";
 import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
 import {
   advanceMachinery,
@@ -89,6 +92,8 @@ import {
 import {
   maybePlaceSwitchGate,
   occupiedTiles,
+  SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE,
+  SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE,
   type DailySwitchGate,
 } from "./switch-gates";
 import { buildOutsideWorld, buildNightmareRoom, innerEdgeForDirection } from "./outside-world";
@@ -125,7 +130,12 @@ const BOSS_ENTRANCE_FALLBACK_SEED_SALT = 0xb529_7a4d;
  * of past days untouched.
  */
 const COLOR_PUZZLE_SEED_SALT = 0x9e37_79b1;
-const COLOR_PUZZLE_CHANCE = 0.2; // rolls ~20% of floor-2 days; nets ~15-20% (rare while the feature is vetted)
+const COLOR_PUZZLE_CHANCE = 0.34; // rolls ~34% -> nets ~30% of floor-2 days (floor-1 suppression + the
+// rare no-fit day eat the rest). Of those, this fraction is the mandatory CIPHER ROOM (match rule +
+// distant mural + exit-key gate); the rest is the all-same-colour puzzle. Variants of one slot, so a
+// run still gets at most one colour-switch puzzle. 0.56 of 0.34 (~0.19 threshold) -> ~17% cipher /
+// ~13% all-same net (cipher's ~12% no-fit days fall back to all-same).
+const CIPHER_VARIANT_SHARE = 0.56;
 // Floor 1 gets a rarer, smaller variant (3 switches). Its builder never receives the daily seed, so
 // the puzzle stream is seeded from the day's generated map instead — see the stamp in
 // initializeGameStateForMultiTier. A distinct salt keeps it uncorrelated with the floor-2 stream.
@@ -590,6 +600,33 @@ function perTurnDamageCap(state: { inPinkRealm?: boolean }): number {
   return state.inPinkRealm ? PINK_REALM_DAMAGE_CAP : 4;
 }
 
+// --- Melee-exchange risk (anti-kite balance) --------------------------------
+// Two moves used to be entirely risk-free, which let a patient player melee down
+// even a stone goblin with zero danger (step away, step back, repeat):
+//
+//   1. Retreating from an adjacent enemy. The enemy's attack was fully cancelled
+//      whenever the hero stepped off (see the `suppress` hook in movePlayerCore).
+//   2. Closing a one-tile gap and striking. The enemy spent its turn walking into
+//      the gap (no attack), then the hero's move resolved as a free melee hit.
+//
+// Both now carry a chance the enemy still lands its blow, restoring a risk gradient:
+// standing toe-to-toe (attack an already-adjacent enemy) is the riskiest — the enemy
+// always gets its swing; closing in to strike is a bit safer; retreating is the safest
+// but no longer free. Rolled against the run's combat RNG (Math.random in real play, so
+// daily-seed reconstruction is unaffected — combat variance is already non-deterministic).
+const RETREAT_PARTING_HIT_CHANCE = 0.4;
+const CLOSE_IN_COUNTER_CHANCE = 0.6;
+
+// Damage a single enemy's contact hit lands right now, using the same variance model as
+// the enemy turn (see enemyAttackVariance) and subtracting the hero's shield defense.
+function enemyContactDamage(
+  enemy: Enemy,
+  rng: () => number,
+  defense: number
+): number {
+  return Math.max(0, enemy.attack + enemyAttackVariance(enemy.kind, rng()) - defense);
+}
+
 /**
  * Record which enemy killed the hero on an action turn (throw/use-item). Ranged
  * attackers like pink goblins fire from a distance and then move, so an adjacency
@@ -650,7 +687,17 @@ export function performWait(gameState: GameState): GameState {
           skipEnemy: mistBlindSkip(preTickState),
         }
       );
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
         applyHeroDamage(preTickState, applied);
@@ -711,7 +758,17 @@ function performUseFoodCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -784,7 +841,17 @@ function performUsePotionCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -866,7 +933,17 @@ function performUsePinkHeartCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -938,7 +1015,17 @@ function performUseBerryCore(gameState: GameState): GameState {
         }
       );
       // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
-      preTickState.recentEnemyAttacks = result.attackingEnemies;
+      maybeEnemiesPressSwitchGate(
+        preTickState,
+        preTickState.mapData,
+        preTickState.enemies
+      );
+      maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
+    preTickState.recentEnemyAttacks = result.attackingEnemies;
 
       if (result.damage > 0) {
         const applied = Math.max(0, result.damage - (preTickState.hasShield ? 1 : 0));
@@ -1110,6 +1197,11 @@ export function performThrowRockCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -1513,6 +1605,11 @@ function performThrowRuneCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -2084,6 +2181,11 @@ function performThrowBombCore(gameState: GameState): GameState {
       }
     );
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
+    maybeEnemiesPressSwitchGate(
+      preTickState,
+      preTickState.mapData,
+      preTickState.enemies
+    );
     preTickState.recentEnemyAttacks = result.attackingEnemies;
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(preTickState), result.damage);
@@ -3291,11 +3393,23 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   let colorLocks: ColorLock[] | undefined;
   if (nextFloor === 2 && playerPos && !floor1HasColorPuzzle) {
     const puzRng = mulberry32Fn(dailySeed ^ COLOR_PUZZLE_SEED_SALT);
-    if (puzRng.next() < COLOR_PUZZLE_CHANCE) {
+    const roll = puzRng.next();
+    if (roll < COLOR_PUZZLE_CHANCE) {
       const avoid: Array<[number, number]> = (snakesAdded ?? []).map((e) => [e.y, e.x]);
       avoid.push([playerPos[0], playerPos[1]]);
-      colorLocks =
-        stampColorSwitchLock(withRunes, puzRng, { switches: 4, colors: 4, avoid }) ?? undefined;
+      // The cipher room takes the first slice of the colour-puzzle budget; the rest stays the
+      // all-same-colour puzzle. Reusing `roll` (no extra draw) keeps all-same days byte-identical to
+      // before. Cipher gates the exit key (mandatory) and falls back to all-same if it can't place —
+      // so a colour-puzzle day always gets some puzzle. All from the SAME separate salted stream that
+      // is stamped LAST, so the shared rng (enemies/chests/boss) and /stats stay untouched.
+      let lock: ColorLock | null = null;
+      if (roll < COLOR_PUZZLE_CHANCE * CIPHER_VARIANT_SHARE) {
+        lock = stampCipherRoom(withRunes, puzRng, { reward: { kind: "exit" }, avoid });
+      }
+      if (!lock) {
+        lock = stampColorSwitchLock(withRunes, puzRng, { switches: 4, colors: 4, avoid })?.[0] ?? null;
+      }
+      colorLocks = lock ? [lock] : undefined;
     }
   }
 
@@ -4168,7 +4282,7 @@ function pressPlate(
   mapData: MapData,
   y: number,
   x: number,
-  by: "rock" | "boot"
+  by: "rock" | "boot" | "enemy"
 ): void {
   const cell = mapData.subtypes[y]?.[x];
   if (cell) {
@@ -4197,6 +4311,52 @@ function pressPlate(
     if (!bed) continue;
     const i = bed.indexOf(TileSubtype.SPIKES);
     if (i >= 0) bed[i] = TileSubtype.SPIKE_HOLES;
+  }
+}
+
+/**
+ * Let an enemy standing on THE DAILY'S switch trip it by accident.
+ *
+ * Enemies never path toward a plate — they aren't aware enough to solve the gate on purpose —
+ * but when the hero flees across it, a pursuer walking the same lane can stomp it. Call this
+ * once per enemy tick, AFTER updateEnemies has committed every enemy's move for the turn, so
+ * an enemy's final tile for the turn is what counts.
+ *
+ * Scoped hard to `state.switchGate.plate`: it only ever fires on the one daily gate, matched by
+ * coordinate exactly as pressPlate's analytics guard is. That is what keeps a wandering
+ * Quarrymaster add from opening its own cage — arena plates carry gateGroups but never a
+ * `switchGate`, so this is a no-op in every boss fight and on every floor with no gate.
+ *
+ * The chasing vs. idle split is the whole ask: a pursuer is far likelier to be following the
+ * hero's path over the plate than a goblin milling around the room. Rolls on Math.random rather
+ * than any seeded stream — this is runtime play, not map generation, so it never touches daily
+ * reconstruction (lib/stats replays the MAP, not the turn-by-turn).
+ *
+ * Mutates `state` (gateGroups/switchGate) and `mapData` in place via pressPlate.
+ */
+export function maybeEnemiesPressSwitchGate(
+  state: { gateGroups?: GateGroup[]; switchGate?: DailySwitchGate },
+  mapData: MapData,
+  enemies: Enemy[] | undefined,
+  rng: () => number = Math.random
+): void {
+  const daily = state.switchGate;
+  if (!daily || daily.thrownBy || !enemies) return;
+  const [py, px] = daily.plate;
+  // Already pressed (or the bed never got built)? Nothing to do.
+  const cell = mapData.subtypes[py]?.[px];
+  if (!cell || !cell.includes(TileSubtype.PRESSURE_PLATE)) return;
+  for (const e of enemies) {
+    if (e.y !== py || e.x !== px) continue;
+    const chasing = e.state === EnemyState.HUNTING;
+    const chance = chasing
+      ? SWITCH_GATE_ENEMY_CHASE_PRESS_CHANCE
+      : SWITCH_GATE_ENEMY_IDLE_PRESS_CHANCE;
+    if (rng() < chance) {
+      pressPlate(state, mapData, py, px, "enemy");
+    }
+    // Only one entity can occupy a tile, so there is no second enemy to consider.
+    return;
   }
 }
 
@@ -4496,6 +4656,14 @@ function movePlayerCore(
   let moved = false;
   let checkpointTouched = false;
 
+  // Carried from the enemy tick to the melee block below (which lives outside the
+  // enemy-turn `if`): who attacked, how much cap the tick already spent, and where every
+  // enemy stood BEFORE it moved — the last one lets the melee resolver tell a "closing"
+  // enemy (walked into the hero's path this turn) from one that was already adjacent.
+  let enemyTurnDamageApplied = 0;
+  let enemyAttacksThisTurn: EnemyAttackInfo[] = [];
+  const prevEnemyPositions = new Map<Enemy, { y: number; x: number }>();
+
   // Tick enemies BEFORE resolving player movement so adjacent enemies can attack
   const playerPosNow = [currentY, currentX] as [number, number];
   // Predict where the hero will stand once this move resolves, so ranged attackers
@@ -4535,6 +4703,8 @@ function movePlayerCore(
         ) ?? null
       : null;
   if (newGameState.enemies && Array.isArray(newGameState.enemies)) {
+    // Snapshot pre-move positions so the melee resolver can detect a "closing" enemy.
+    for (const e of newGameState.enemies) prevEnemyPositions.set(e, { y: e.y, x: e.x });
     // console.log(`[ENEMY TURN] Starting enemy turn. Player at (${currentY},${currentX}), moving ${direction}. Enemies:`, newGameState.enemies.map(e => `${e.kind} at (${e.y},${e.x})`).join(', '));
     const result = updateEnemies(
       newMapData.tiles,
@@ -4558,24 +4728,43 @@ function movePlayerCore(
         // behavior can see where the mist is.
         skipEnemy: mistBlindSkip(gameState, true),
         mist: gameState.mist,
-        // Suppress only when the player moves directly away from an adjacent enemy along the same axis
+        // Retreat parting shot: an adjacent enemy the hero steps away from (any direction,
+        // not just directly-away) used to have its attack fully cancelled — the free retreat
+        // that let a player kite anything to death. Now it lands a reduced-chance parting hit
+        // instead. Stepping INTO the enemy to strike it is unchanged: that enemy still gets its
+        // full swing (toe-to-toe is the riskiest option). Snakes always bite when adjacent, and
+        // non-adjacent (e.g. ranged) attacks are never suppressed here.
         suppress: (e: Enemy) => {
-          const dy = newY - currentY;
-          const dx = newX - currentX;
           const adj = Math.abs(e.y - currentY) + Math.abs(e.x - currentX) === 1;
-          const movingAway =
-            (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
-            (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
-          // Do not suppress snakes; they should bite if adjacent
-          if (e.kind === 'snake') return false;
-          return adj && movingAway;
+          if (!adj) return false;
+          const attackingThisEnemy = newY === e.y && newX === e.x;
+          if (attackingThisEnemy) return false;
+          if (e.kind === "snake") return false;
+          // Bosses keep their own bespoke anti-kite tuning (the Coilwyrm's split-on-cut, the
+          // Fisher's spike moat, ...) and their deterministic policy sims, so leave them on the
+          // original rule: a retreat is only free when moving directly away, never a parting
+          // shot. The general risk is for ordinary enemies — the ones the kite exploit trivialized.
+          if (isBossPart(e)) {
+            const dy = newY - currentY;
+            const dx = newX - currentX;
+            const movingAway =
+              (dy !== 0 && Math.sign(dy) === Math.sign(currentY - e.y)) ||
+              (dx !== 0 && Math.sign(dx) === Math.sign(currentX - e.x));
+            return movingAway;
+          }
+          const rng = newGameState.combatRng ?? Math.random;
+          // Suppress (the enemy misses) unless the parting-shot roll connects.
+          return rng() >= RETREAT_PARTING_HIT_CHANCE;
         },
       }
     );
+    maybeEnemiesPressSwitchGate(newGameState, newMapData, newGameState.enemies);
     // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
     newGameState.recentEnemyAttacks = result.attackingEnemies;
+    enemyAttacksThisTurn = result.attackingEnemies ?? [];
     if (result.damage > 0) {
       const applied = Math.min(perTurnDamageCap(newGameState), result.damage);
+      enemyTurnDamageApplied = applied;
       applyHeroDamage(newGameState, applied);
       newGameState.stats.damageTaken += applied;
 
@@ -5005,6 +5194,7 @@ function movePlayerCore(
             },
           }
         );
+        maybeEnemiesPressSwitchGate(newGameState, newMapData, newGameState.enemies);
         // Transient: expose this tick's attacks for render-layer VFX (pink beam etc.)
         newGameState.recentEnemyAttacks = result.attackingEnemies;
         // Guarantee at least 1 immediate damage from an ambush
@@ -5212,6 +5402,76 @@ function movePlayerCore(
           newGameState.heroTorchLit = true;
         }
 
+        // Closing-enemy counter (anti-kite): a struck enemy that walked into the hero's
+        // path THIS turn — it wasn't already adjacent, and it spent its move closing rather
+        // than attacking — used to eat the hero's blow for free (the one-tile-gap exploit).
+        // Now that clash carries a chance it lands a hit too. A killing blow avoids the
+        // counter (the enemy is cut down mid-lunge), so one-shotting weak enemies stays safe
+        // while a tanky one like a stone goblin, which survives the hero's chip damage, bites
+        // back. Already-adjacent enemies are handled by the enemy turn (they got their swing),
+        // and a blinded/suppressed one never counts as "closing" since it couldn't move here.
+        if (enemy.health > 0) {
+          const prev = prevEnemyPositions.get(enemy);
+          const wasAdjacentBefore =
+            !!prev &&
+            Math.abs(prev.y - currentY) + Math.abs(prev.x - currentX) === 1;
+          const attackedThisTurn = enemyAttacksThisTurn.some(
+            (a) => a.y === enemy.y && a.x === enemy.x
+          );
+          // Bosses are exempt (see the suppress hook): their fights are tuned and sim-tested
+          // on their own terms, so the general closing-counter does not apply to them.
+          const isClosingEnemy =
+            !wasAdjacentBefore && !attackedThisTurn && !isBossPart(enemy);
+          if (isClosingEnemy && rng() < CLOSE_IN_COUNTER_CHANCE) {
+            const defense = newGameState.hasShield ? 1 : 0;
+            const remainingCap = Math.max(
+              0,
+              perTurnDamageCap(newGameState) - enemyTurnDamageApplied
+            );
+            const counter = Math.min(
+              remainingCap,
+              enemyContactDamage(enemy, rng, defense)
+            );
+            if (counter > 0) {
+              applyHeroDamage(newGameState, counter);
+              newGameState.stats.damageTaken += counter;
+              enemyTurnDamageApplied += counter;
+              // Tutorial guardrail: mirror the enemy-turn floor (never die in the tutorial).
+              if (newGameState.mode === "tutorial" && newGameState.heroHealth < 1) {
+                newGameState.heroHealth = 1;
+              }
+              // Surface the counter to the render layer so the hit is visible.
+              newGameState.recentEnemyAttacks = [
+                ...(newGameState.recentEnemyAttacks ?? []),
+                {
+                  kind: enemy.kind,
+                  damage: counter,
+                  y: enemy.y,
+                  x: enemy.x,
+                  ranged: false,
+                },
+              ];
+              // A closing snake still delivers venom.
+              if (enemy.kind === "snake") {
+                if (!newGameState.conditions) newGameState.conditions = {};
+                if (!newGameState.conditions.poisoned) {
+                  newGameState.conditions.poisoned = {
+                    active: true,
+                    stepsSinceLastDamage: 0,
+                    damagePerInterval: 1,
+                    stepInterval: 8,
+                  };
+                } else {
+                  newGameState.conditions.poisoned.active = true;
+                }
+              }
+              if (newGameState.heroHealth <= 0 && !newGameState.deathCause) {
+                newGameState.deathCause = { type: "enemy", enemyKind: enemy.kind };
+              }
+            }
+          }
+        }
+
         if (enemy.health <= 0) {
           // Clean up pink ring if a pink goblin dies
           cleanupPinkRing(enemy, newGameState.mapData.subtypes);
@@ -5386,6 +5646,20 @@ function movePlayerCore(
       killEnemiesAt(newGameState, crushed);
     }
 
+    // A CODE_TORCH is a cipher-room legend sconce (lib/map/cipher_room.ts). Stepping onto it with a lit
+    // torch ignites it, revealing that switch's target colour; unlit it shows nothing, so lighting the
+    // row is what makes the code readable. Lit state lives on the owning ColorLock's legend. Rebuilt
+    // immutably (newGameState is only a shallow copy of gameState, so its colorLocks are still shared).
+    if (subtype.includes(TileSubtype.CODE_TORCH) && newGameState.heroTorchLit) {
+      newGameState.colorLocks = (newGameState.colorLocks ?? []).map((lock) => {
+        const i = lock.legend?.torches.findIndex(([ty, tx]) => ty === newY && tx === newX) ?? -1;
+        if (i < 0 || !lock.legend || lock.legend.lit[i]) return lock;
+        const lit = lock.legend.lit.slice();
+        lit[i] = true;
+        return { ...lock, legend: { ...lock.legend, lit } };
+      });
+    }
+
     // If it's a chest, handle opening logic (supports optional lock)
     if (subtype.includes(TileSubtype.CHEST)) {
       const isLocked = subtype.includes(TileSubtype.LOCK);
@@ -5451,6 +5725,10 @@ function movePlayerCore(
       // A toggle stays on its tile so it can be thrown again — that is the whole difference
       // from a latching plate. The slab and its track decal are floor the hero stands on.
       destSubtypes.includes(TileSubtype.TOGGLE_SWITCH) ||
+      // A code torch is a walkable floor sconce — the hero passes over it (and lights it doing so).
+      destSubtypes.includes(TileSubtype.CODE_TORCH) ||
+      // A mural panel is a walkable painted inlay — the hero can stand on/by it to read the code.
+      destSubtypes.includes(TileSubtype.MURAL_PANEL) ||
       destSubtypes.includes(TileSubtype.MOVING_PLATFORM) ||
       destSubtypes.includes(TileSubtype.PLATFORM_TRACK) ||
       // Retracted spike beds are walkable floor decals. Without this the hero standing on

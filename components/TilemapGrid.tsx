@@ -2397,6 +2397,41 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     return m;
   })();
 
+  // CODE_TORCH legend state, keyed "y,x": which colour a cipher-room torch reveals, and whether it has
+  // been lit yet. The colour is the switch's target; an unlit torch renders dark (code hidden).
+  const codeTorches: Map<string, { color: number; lit: boolean }> | undefined = (() => {
+    const locks = gameState.colorLocks ?? [];
+    const m = new Map<string, { color: number; lit: boolean }>();
+    for (const l of locks) {
+      const leg = l.legend;
+      if (!leg) continue;
+      leg.torches.forEach(([ty, tx], i) =>
+        m.set(`${ty},${tx}`, { color: (l.target ?? [])[i] ?? 0, lit: leg.lit[i] ?? false })
+      );
+    }
+    return m.size ? m : undefined;
+  })();
+
+  // MURAL_PANEL glyph-colours, keyed "y,x": which colours a cipher-room mural tile engraves (as the
+  // canonical cave-art glyphs). The code is split as evenly as possible across the mural's tiles — e.g.
+  // a 4-colour code on two tiles is two glyphs per tile, so each mark stays big enough to read. No lit
+  // state — a mural is always readable.
+  const muralPanels: Map<string, number[]> | undefined = (() => {
+    const locks = gameState.colorLocks ?? [];
+    const m = new Map<string, number[]>();
+    for (const l of locks) {
+      const mu = l.mural;
+      if (!mu || mu.tiles.length === 0) continue;
+      const target = l.target ?? [];
+      const perTile = Math.ceil(target.length / mu.tiles.length);
+      mu.tiles.forEach(([ty, tx], i) => {
+        const chunk = target.slice(i * perTile, (i + 1) * perTile);
+        if (chunk.length) m.set(`${ty},${tx}`, chunk);
+      });
+    }
+    return m.size ? m : undefined;
+  })();
+
   // One deck descriptor per platform, keyed by its ANCHOR tile: the topmost tile of a vertical rail
   // or the leftmost of a horizontal one, since the element grows down/right from there.
   const platformDecks:
@@ -6222,9 +6257,11 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     smoothPlatformSteps,
                     toggleStates,
                     toggleColors,
+                    codeTorches,
                     platformDecks,
                     heroOverrideSprite,
                     gameState.heroSpriteScale,
+                    muralPanels,
                     !!gameState.activeHeroId && !!gameState.hasSword
                   )}
                 </div>
@@ -6893,6 +6930,7 @@ function renderTileGrid(
   // Colour count per COLOUR switch, keyed "y,x". Present only for colour switches; drives the
   // four-corner palette display (absent => keep the binary toggle's single lamp).
   toggleColors?: Map<string, number>,
+  codeTorches?: Map<string, { color: number; lit: boolean }>,
   // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
   decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>,
   // Hearth & Home: static sprite replacing the hero art for all facings,
@@ -6900,6 +6938,9 @@ function renderTileGrid(
   // and whether the family hero holds a sword (code-driven overlay).
   heroSpriteOverride?: string,
   heroSpriteScale?: number,
+  // Cipher-room mural: which target colours each MURAL_PANEL tile engraves (whole code on a single
+  // tile, or one per tile), keyed "y,x".
+  muralPanels?: Map<string, number[]>,
   heroArmedOverride?: boolean
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
@@ -7039,9 +7080,18 @@ function renderTileGrid(
       // orthogonal arms brightest (.fov-tier-torch-adj), diagonal corners dimmer
       // (.fov-tier-torch-diag), and the rounded second ring faintest
       // (.fov-tier-torch-far) — instead of a hard cross with black corners.
-      const isTorchAdjacentGlow = g === ADJACENT_GLOW;
-      const isTorchDiagonalGlow = g === DIAGONAL_GLOW;
-      const isTorchSecondRingGlow = g === SECOND_RING_GLOW;
+      // A tile that is ITSELF a light source (wall torch, lava, torch-carrier,
+      // dark-portal beacon) must never be classified by another nearby torch's
+      // borrowed glow. Two torches within Chebyshev distance 2 each land in the
+      // other's glow ring, so absent this guard a torch sitting in a neighbour's
+      // SECOND_RING would render as `fov-tier-torch-far` (brightness 0.25 + heavy
+      // black inset) while the hero's torch is out — the torch tile goes black
+      // even though it is lighting the tiles around it. Light sources stay at
+      // full brightness (they fall through to fov-tier-3).
+      const isLightSource = isSelfTorch || isTorchCarrier || isDarkPortalBeacon;
+      const isTorchAdjacentGlow = !isLightSource && g === ADJACENT_GLOW;
+      const isTorchDiagonalGlow = !isLightSource && g === DIAGONAL_GLOW;
+      const isTorchSecondRingGlow = !isLightSource && g === SECOND_RING_GLOW;
       const isVisible = tier > 0;
 
       // Get neighboring tiles
@@ -7323,6 +7373,8 @@ function renderTileGrid(
             deck={decks?.get(`${rowIndex},${colIndex}`)}
             toggleState={toggleStates?.get(`${rowIndex},${colIndex}`)}
             toggleColors={toggleColors?.get(`${rowIndex},${colIndex}`)}
+            codeTorch={codeTorches?.get(`${rowIndex},${colIndex}`)}
+            muralPanel={muralPanels?.get(`${rowIndex},${colIndex}`)}
             heroLunge={isPlayerTile ? combatLunges?.get("hero") : undefined}
             enemyLunge={
               hasEnemy ? combatLunges?.get(`e:${rowIndex},${colIndex}`) : undefined

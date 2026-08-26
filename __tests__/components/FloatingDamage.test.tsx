@@ -77,8 +77,15 @@ describe('Floating combat damage numbers', () => {
   it('shows a non-green hero damage number when enemies hit the hero on their turn', async () => {
     jest.useFakeTimers();
     // Player at (5,5), enemy adjacent at (5,6). Do not move into enemy; move up to trigger enemy attack phase.
+    // Stepping away is now a retreat, so the enemy's swing rolls a parting shot first: feed
+    // [0.1, 0.9] -> 0.1 < 0.4 connects, then 0.9 -> +1 variance (base 1 + 1 = 2 damage).
     const base = makeBaseState(5, 5);
-    const state: GameState = withEnemy(base, 5, 6);
+    let i = 0;
+    const seq = [0.1, 0.9];
+    const state: GameState = {
+      ...withEnemy(base, 5, 6),
+      combatRng: () => seq[Math.min(i++, seq.length - 1)],
+    };
 
     render(<TilemapGrid tileTypes={{}} initialGameState={state} />);
 

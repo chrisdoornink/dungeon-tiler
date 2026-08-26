@@ -604,6 +604,26 @@ export type EnemyAttackInfo = {
   ranged: boolean;
 };
 
+// The +/- swing applied to an enemy's base attack, given a single rng roll in [0,1).
+// Goblins (and the two bosses that share their feel) roll a gentle -1/0/+1 weighted
+// toward their base; everything else can land a +2 crit. Extracted so the melee
+// counter-hit in game-state (a closing enemy that clashes onto the hero's sword)
+// uses the exact same model as the enemy turn — see updateEnemies below.
+export function enemyAttackVariance(kind: EnemyKind, r: number): number {
+  const goblinBucket =
+    kind === "fire-goblin" ||
+    kind === "water-goblin" ||
+    kind === "water-goblin-spear" ||
+    kind === "earth-goblin" ||
+    kind === "earth-goblin-knives" ||
+    kind === "pink-goblin" ||
+    kind === "white-goblin" ||
+    kind === "coilwyrm" ||
+    kind === "quarrymaster";
+  if (goblinBucket) return r < 0.4 ? -1 : r < 0.8 ? 0 : 1;
+  return r >= 0.75 ? 2 : r < 1 / 3 ? -1 : r < 2 / 3 ? 0 : 1;
+}
+
 export function updateEnemies(
   grid: number[][],
   enemies: Enemy[],
@@ -857,23 +877,13 @@ export function updateEnemies(
     // Optionally suppress this enemy's attack for this tick
     if (base > 0 && !suppress?.(e)) {
       // Variance: goblins weighted toward base damage (50% 0, 25% -1, 25% +1). Other enemies keep 25% crit (+2).
-      let variance = 0;
-      let rVal: number | null = null;
-      if (rng) {
-        rVal = rng();
-        // Both bosses sit in the goblin bucket deliberately, for the same reason: the
-        // 'other' branch below hands out a 25% +2 crit. On the Coilwyrm's head that made
-        // its base-2 bite roll 4 — the entire per-turn cap — so two bites killed a
-        // full-health hero with no tell; here it reads 1-3 and a bite is a mistake you can
-        // survive learning from. The Quarrymaster is meant to hit like a spear goblin, and
-        // the crit would make him spikier than his design brief allows.
-        if (e.kind === 'fire-goblin' || e.kind === 'water-goblin' || e.kind === 'water-goblin-spear' || e.kind === 'earth-goblin' || e.kind === 'earth-goblin-knives' || e.kind === 'pink-goblin' || e.kind === 'white-goblin' || e.kind === 'coilwyrm' || e.kind === 'quarrymaster') {
-          // Weighted: 40% chance -1, 40% chance 0, 20% chance +1
-          variance = rVal < 0.40 ? -1 : rVal < 0.80 ? 0 : 1;
-        } else {
-          variance = rVal >= 0.75 ? 2 : rVal < 1/3 ? -1 : rVal < 2/3 ? 0 : 1;
-        }
-      }
+      // Both bosses sit in the goblin bucket deliberately (see enemyAttackVariance): the
+      // 'other' branch hands out a 25% +2 crit. On the Coilwyrm's head that made its base-2
+      // bite roll 4 — the entire per-turn cap — so two bites killed a full-health hero with
+      // no tell; there it reads 1-3 and a bite is a mistake you can survive learning from.
+      // The Quarrymaster is meant to hit like a spear goblin, and the crit would make him
+      // spikier than his design brief allows.
+      const variance = rng ? enemyAttackVariance(e.kind, rng()) : 0;
       const effective = Math.max(0, base + variance - defense);
       // debug log removed
       totalDamage += effective;

@@ -3,8 +3,9 @@ import {
   advanceToNextFloor,
   type GameState,
 } from "../../lib/map/game-state";
-import { mulberry32, withPatchedMathRandom } from "../../lib/rng";
+import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../../lib/rng";
 import { FLOOR, TileSubtype } from "../../lib/map/constants";
+import { SWITCH_GATE_START_DATE } from "../../lib/map";
 import { findPlayerPosition } from "../../lib/map/player";
 import { colorLockSatisfied } from "../../lib/map/machinery";
 import type { MapData } from "../../lib/map/types";
@@ -78,7 +79,14 @@ describe("daily floor-2 colour puzzle", () => {
       if (locks.length === 0) continue;
       checked++;
       const lock = locks[0];
-      expect(lock.rule).toBe("allEqual");
+      // Two variants share the floor-2 slot: the all-same-colour puzzle (allEqual) and the cipher
+      // room (match + a two-tile mural placed well away from the switches). Both are mandatory and
+      // seal the exit key the same way — only the rule and the mural differ.
+      expect(["allEqual", "match"]).toContain(lock.rule);
+      if (lock.rule === "match") {
+        expect(lock.target?.length).toBe(4);
+        expect(lock.mural?.tiles.length).toBe(2);
+      }
       expect(lock.switches.length).toBe(4);
       expect(lock.colors).toBe(4);
       expect(colorLockSatisfied(lock)).toBe(false); // starts unsolved
@@ -119,6 +127,70 @@ describe("daily floor-2 colour puzzle", () => {
       expect(f2.colorLocks ?? []).toEqual([]);
     }
     expect(floor1PuzzleDays).toBeGreaterThan(0); // the sample actually exercised the rule
+  });
+
+  it("NEVER leaves an orphaned switch: every TOGGLE_SWITCH tile is wired to a ColorLock", () => {
+    // Regression for the cipher stamper stamping switches (and carving its gate + relocating the key)
+    // BEFORE it could bail out and return null — leaving inert blue switches, and sometimes a spike gate
+    // sealing the exit key that no switch could open (a soft-lock). stampCipherRoom is now transactional:
+    // it computes switches + gate + mural first and only writes the map once all three are guaranteed.
+    // Scan the REAL daily date stream (hashStringToSeed + date-gated switch gates) across a wide window,
+    // every floor, and assert the map never carries a switch tile that isn't in some lock's `switches`.
+    const countSwitchTiles = (map: MapData): number => find(map, TileSubtype.TOGGLE_SWITCH).length;
+    const lockSwitchCount = (s: GameState): number =>
+      (s.colorLocks ?? []).reduce((a, l) => a + l.switches.length, 0);
+
+    let sawPuzzle = false;
+    const offenders: string[] = [];
+    const start = new Date("2026-08-01").getTime();
+    for (let i = 0; i < 200; i++) {
+      const dateStr = new Date(start + i * 86400000).toISOString().slice(0, 10);
+      const seed = hashStringToSeed(dateStr);
+      const f1 = withPatchedMathRandom(mulberry32(seed), () =>
+        initializeGameStateForMultiTier(1, { switchGates: dateStr >= SWITCH_GATE_START_DATE })
+      );
+      const f2 = advanceToNextFloor(f1, seed);
+      const f3 = advanceToNextFloor(f2, seed);
+      [f1, f2, f3].forEach((s, fi) => {
+        const onMap = countSwitchTiles(s.mapData);
+        const inLocks = lockSwitchCount(s);
+        if (inLocks > 0) sawPuzzle = true;
+        // The invariant: no switch tile exists that isn't wired to a lock.
+        if (onMap !== inLocks) {
+          offenders.push(`${dateStr} F${fi + 1}: mapSwitches=${onMap} lockSwitches=${inLocks}`);
+        }
+      });
+    }
+    expect(offenders).toEqual([]);
+    expect(sawPuzzle).toBe(true); // the sweep actually exercised puzzle days
+  });
+
+  it("NEVER seals the exit key with no lock able to open it (no soft-lock)", () => {
+    // The nastier face of the same bug: cipher bailed AFTER carving its gate + relocating the key, so the
+    // key sat behind a spike gate with no working switch. Assert that whenever the exit key is
+    // unreachable on foot, there is at least one ColorLock whose gates, once opened, free it.
+    const start = new Date("2026-08-01").getTime();
+    for (let i = 0; i < 200; i++) {
+      const dateStr = new Date(start + i * 86400000).toISOString().slice(0, 10);
+      const seed = hashStringToSeed(dateStr);
+      const f1 = withPatchedMathRandom(mulberry32(seed), () =>
+        initializeGameStateForMultiTier(1, { switchGates: dateStr >= SWITCH_GATE_START_DATE })
+      );
+      for (const s of [f1, advanceToNextFloor(f1, seed)]) {
+        const map = s.mapData;
+        const hero = findPlayerPosition(map);
+        const keys = find(map, TileSubtype.EXITKEY);
+        if (!hero || keys.length === 0) continue;
+        const [ky, kx] = keys[0];
+        if (reachable(map, hero).has(`${ky},${kx}`)) continue; // key reachable on foot — fine
+        // Key is sealed. There must be a lock whose opened gates make it reachable.
+        const locks = s.colorLocks ?? [];
+        expect(locks.length).toBeGreaterThan(0); // <- would FAIL on the orphaned-gate soft-lock
+        const open = JSON.parse(JSON.stringify(map)) as MapData;
+        for (const l of locks) for (const [gy, gx] of l.gates) open.subtypes[gy][gx] = [TileSubtype.SPIKE_HOLES];
+        expect(reachable(open, hero).has(`${ky},${kx}`)).toBe(true);
+      }
+    }
   });
 
   it("is deterministic per daily seed and resets on the next floor", () => {

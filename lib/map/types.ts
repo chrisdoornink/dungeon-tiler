@@ -134,6 +134,25 @@ export interface ColorLock {
   gates: Array<[number, number]>;
   /** Beds with opposite polarity: rise while satisfied, retract while not. */
   invertedGates: Array<[number, number]>;
+  /**
+   * Optional CODE_TORCH legend (prescribed cipher rooms only). `torches` are the torch tile
+   * positions, parallel to `switches`/`target`: torch i displays `target[i]`'s colour once lit.
+   * `lit[i]` is whether torch i has been lit yet — an unlit torch shows no colour, so the combination
+   * stays hidden until the hero lights the row. Lighting mutates `lit`; nothing else reads it.
+   */
+  legend?: {
+    torches: Array<[number, number]>;
+    lit: boolean[];
+  };
+  /**
+   * Optional MURAL legend (the mural cipher-room variant): painted stone panels, parallel to `target`,
+   * that spell the combination. Unlike `legend` torches these carry no lit state (always readable) and
+   * live in a DIFFERENT chamber from the switches, so the code must be memorised and carried back. Panel
+   * i shows `target[i]`'s colour.
+   */
+  mural?: {
+    tiles: Array<[number, number]>;
+  };
 }
 
 /**

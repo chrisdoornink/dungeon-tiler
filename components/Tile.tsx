@@ -35,6 +35,7 @@ import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { CoilPiece, CoilHeadPose } from "../lib/bosses/coilwyrm";
 import { CoilwyrmStench } from "./CoilwyrmStench";
+import { ColorGlyph } from "./ColorGlyph";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
 import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
@@ -345,6 +346,16 @@ interface TileProps {
    * binary toggle, which keeps its single indicator lamp.
    */
   toggleColors?: number;
+  /**
+   * CODE_TORCH legend state (cipher rooms): the target colour this torch reveals and whether it has
+   * been lit. Unlit renders a dark sconce (colour hidden); lit renders a flame in the target colour.
+   */
+  codeTorch?: { color: number; lit: boolean };
+  /**
+   * MURAL_PANEL colours (cipher rooms, mural variant): the code this wall engraving spells, drawn as
+   * the canonical cave-art glyphs (one per colour). Usually the whole sequence on one tile.
+   */
+  muralPanel?: number[];
   // Smooth movement Phase 3: white-goblin swarms render as N overlaid single
   // goblins instead of the baked 1-4 pack images (smooth mode only).
   smoothMode?: boolean;
@@ -449,6 +460,8 @@ export const Tile: React.FC<TileProps> = ({
   deck,
   toggleState,
   toggleColors,
+  codeTorch,
+  muralPanel,
   smoothMode = false,
   enemyRingUnder = false,
   heroLunge,
@@ -1031,6 +1044,10 @@ export const Tile: React.FC<TileProps> = ({
         subtype !== TileSubtype.TOGGLE_SWITCH &&
         subtype !== TileSubtype.MOVING_PLATFORM &&
         subtype !== TileSubtype.PLATFORM_TRACK &&
+        // Cipher-room legends draw their own overlays (torch flame / carved mural engraving) — without
+        // this a stray "?" placeholder pip sat on top of each one.
+        subtype !== TileSubtype.CODE_TORCH &&
+        subtype !== TileSubtype.MURAL_PANEL &&
         // Sealed doorway: a crack decal on the wall face
         subtype !== TileSubtype.WALL_SEAL
     );
@@ -1147,6 +1164,91 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.PRESSURE_PLATE_PRESSED}`}
             className={`${styles.assetIcon} ${styles.platePressed} ${styles.switchIcon}`}
           />
+        )}
+
+        {/* Code torch — the cipher-room legend. Lit, it burns in its switch's target colour, so the
+            row of flames spells the combination; unlit, it is a dark ember and the code stays hidden
+            until the hero walks the row and lights them. Inline-styled (no sprite yet). */}
+        {codeTorch && subtypes?.includes(TileSubtype.CODE_TORCH) && (
+          <div
+            key="code-torch"
+            data-testid={`subtype-icon-${TileSubtype.CODE_TORCH}`}
+            data-lit={codeTorch.lit ? "true" : "false"}
+            style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+          >
+            {/* sconce bracket */}
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                bottom: "20%",
+                width: "14%",
+                height: "30%",
+                transform: "translateX(-50%)",
+                background: "#3a332a",
+                borderRadius: "2px",
+              }}
+            />
+            {codeTorch.lit ? (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: "42%",
+                  width: "34%",
+                  height: "42%",
+                  transform: "translateX(-50%)",
+                  background: toggleStateColor(codeTorch.color),
+                  borderRadius: "50% 50% 50% 50% / 72% 72% 38% 38%",
+                  boxShadow: `0 0 9px 3px ${toggleStateColor(codeTorch.color)}`,
+                  filter: "brightness(1.2)",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  bottom: "48%",
+                  width: "14%",
+                  height: "14%",
+                  transform: "translateX(-50%)",
+                  background: "#2b2620",
+                  borderRadius: "50%",
+                }}
+              />
+            )}
+          </div>
+        )}
+
+        {/* Cipher-room mural: the code carved into the wall as the canonical cave-art glyphs — faint
+            and coloured, in a shallow recess low on the wall's face (where the forced perspective
+            shows stone, same place WALL_SEAL sits). One glyph per colour, the row spelling the code. */}
+        {muralPanel && muralPanel.length > 0 && subtypes?.includes(TileSubtype.MURAL_PANEL) && (
+          <div
+            key="mural-engraving"
+            data-testid={`subtype-icon-${TileSubtype.MURAL_PANEL}`}
+            style={{
+              position: "absolute",
+              left: "2%",
+              right: "2%",
+              bottom: "14%",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              gap: "8%",
+              pointerEvents: "none",
+            }}
+          >
+            {muralPanel.map((c, i) => (
+              <div
+                key={i}
+                style={{ flex: "1 1 0", minWidth: 0, aspectRatio: "1 / 1", display: "flex" }}
+              >
+                <ColorGlyph colorIndex={c} color={toggleStateColor(c)} size="100%" strokeWidth={2} opacity={0.82} />
+              </div>
+            ))}
+          </div>
         )}
 
         {/* Toggle switch. Cold blue where a latching plate is warm brass, and it keeps its glow
