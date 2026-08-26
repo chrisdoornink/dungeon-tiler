@@ -148,6 +148,12 @@ function StatChip({
 
 type LootItem = { icon: string; label: string };
 
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "?";
+  return d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function formatDuration(ms: number): string {
   if (ms <= 0) return "0s";
   const totalSec = Math.round(ms / 1000);
@@ -261,15 +267,25 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
         <span style={{ color: C.text, fontSize: 13 }}>{g.steps ?? 0}</span>
       </div>
 
-      {/* duration */}
+      {/* duration + timestamps */}
       {g.startedAt ? (
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }} title="Run duration">
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 4 }}
+          title={`Started ${formatTime(g.startedAt)} → ended ${formatTime(g.timestamp)}`}
+        >
           <span style={{ fontSize: 13 }}>⏱</span>
           <span style={{ color: C.muted, fontSize: 13 }}>
-            {formatDuration(new Date(g.timestamp).getTime() - new Date(g.startedAt).getTime())}
+            {formatTime(g.startedAt)} – {formatTime(g.timestamp)}
+            {" "}
+            ({formatDuration(new Date(g.timestamp).getTime() - new Date(g.startedAt).getTime())})
           </span>
         </div>
-      ) : null}
+      ) : (
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }} title="Run ended">
+          <span style={{ fontSize: 13 }}>⏱</span>
+          <span style={{ color: C.muted, fontSize: 13 }}>{formatTime(g.timestamp)}</span>
+        </div>
+      )}
 
       {/* chest + collected loot (chest icon, then an icon per item they got) */}
       <div
