@@ -1,4 +1,8 @@
-import { updateFollowBehavior } from "../../lib/npc_behaviors";
+import {
+  takeMovementBudget,
+  updateFollowBehavior,
+  updateGotoBehavior,
+} from "../../lib/npc_behaviors";
 import { NPC } from "../../lib/npc";
 import { Direction, FLOOR, WALL } from "../../lib/map";
 
@@ -65,6 +69,29 @@ describe("updateFollowBehavior", () => {
     const result = updateFollowBehavior(ctx(a, [a], grid, { y: 5, x: 2 }));
     expect(result.moved).toBe(true);
     expect([a.y, a.x]).toEqual([1, 2]); // sidestep instead
+  });
+
+  it("speed weights movement: quick members bank extra steps, slow ones skip turns", () => {
+    const quick = makeFollower("quick", 0, 0, 0, { speed: 1.4 });
+    expect([1, 2, 3, 4, 5].map(() => takeMovementBudget(quick))).toEqual([
+      1, 1, 2, 1, 2,
+    ]); // 7 tiles in 5 turns
+    const slow = makeFollower("slow", 0, 0, 0, { speed: 0.85 });
+    expect([1, 2, 3, 4, 5].map(() => takeMovementBudget(slow))).toEqual([
+      0, 1, 1, 1, 1,
+    ]); // 4 tiles in 5 turns
+  });
+
+  it("a fast goto walker covers two tiles in one turn when banked", () => {
+    const npc = makeFollower("dash", 1, 1, 0, {
+      speed: 1.4,
+      gotoTarget: { y: 1, x: 8 },
+    });
+    npc.metadata = { ...npc.metadata, behavior: "goto" };
+    npc.setMemory("stepAcc", 0.8); // banked from earlier turns
+    const result = updateGotoBehavior(ctx(npc, [npc], makeGrid(10)));
+    expect(result.moved).toBe(true);
+    expect(npc.x).toBe(3); // two steps this turn
   });
 
   it("never steps onto the player or another NPC", () => {

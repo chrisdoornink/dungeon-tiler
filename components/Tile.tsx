@@ -1,6 +1,36 @@
 import React from "react";
 import { TileType, TileSubtype, Direction, toggleStateColor } from "../lib/map";
 import { assetUrl } from "../lib/asset_url";
+
+// Hearth & Home: the game's item sword held at an armed family member's side
+// (hero or NPC) — same code-driven approach as the torch flame. Rendered as a
+// CHILD of the animated sprite element so it inherits movement, facing flips,
+// and character scale automatically. Positions are tunable knobs.
+const SWORD_SIDE_OFFSET_PCT = 14; // in from the character's edge
+const SWORD_BOTTOM_PCT = 12; // up from the sprite's floor line
+const SWORD_HEIGHT_PCT = 38; // of the sprite box (parents apply character scale)
+const SWORD_ASPECT = 0.57; // width / height of items/sword.png (279 / 492)
+
+function renderSwordOverlay(keyPrefix: string): React.ReactElement {
+  return (
+    <div
+      key={`${keyPrefix}-sword`}
+      aria-hidden="true"
+      style={{
+        position: "absolute",
+        bottom: `${SWORD_BOTTOM_PCT}%`,
+        right: `${SWORD_SIDE_OFFSET_PCT}%`,
+        height: `${SWORD_HEIGHT_PCT}%`,
+        width: `${SWORD_HEIGHT_PCT * SWORD_ASPECT}%`,
+        backgroundImage: `url(${assetUrl("/images/items/sword.png")})`,
+        backgroundSize: "contain",
+        backgroundRepeat: "no-repeat",
+        backgroundPosition: "bottom center",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
 import { getEnemyIcon } from "../lib/enemies/registry";
 import type { EnemyKind, Facing } from "../lib/enemies/registry";
 import type { CoilPiece, CoilHeadPose } from "../lib/bosses/coilwyrm";
@@ -217,6 +247,7 @@ interface TileProps {
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
   heroSpriteOverride?: string; // Static sprite replacing the hero art for all facings (Hearth & Home)
   heroSpriteScale?: number; // Override render height as % of tile (85 = NPC standard, 51 = dog)
+  heroArmed?: boolean; // Family hero holds a sword (code-driven overlay, Hearth & Home)
   heroTorchSnuffing?: boolean; // brief window after a snuff: show the blue flame flutter-out
   heroPoisoned?: boolean; // Whether the hero is poisoned (for visual overlay)
   hasEnemy?: boolean; // Whether this tile contains an enemy
@@ -394,6 +425,7 @@ export const Tile: React.FC<TileProps> = ({
   heroTorchLit = true,
   heroSpriteOverride,
   heroSpriteScale,
+  heroArmed = false,
   heroTorchSnuffing = false,
   heroPoisoned = false,
   hasEnemy = false,
@@ -2707,6 +2739,9 @@ export const Tile: React.FC<TileProps> = ({
                   />
                 );
               })()}
+              {/* Armed family hero (Hearth & Home): inherits this div's
+                  facing flip / scale / visibility (hidden in smooth mode) */}
+              {heroArmed && renderSwordOverlay('hero')}
             </div>
           )}
           {/* Hero poison visuals: glow + stench wisps */}
@@ -2735,7 +2770,11 @@ export const Tile: React.FC<TileProps> = ({
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
-            />
+            >
+              {/* Armed family NPC (Hearth & Home): inherits the sprite's
+                  step slide, facing flip, and scale */}
+              {npc.metadata?.armed ? renderSwordOverlay('npc') : null}
+            </div>
           )}
           {showNpcPrompt && (
             <div className={styles.npcDialogueIcon} aria-hidden="true">
@@ -3244,7 +3283,11 @@ export const Tile: React.FC<TileProps> = ({
               }}
               aria-hidden="true"
               data-testid="npc-sprite"
-            />
+            >
+              {/* Armed family NPC (Hearth & Home): inherits the sprite's
+                  step slide, facing flip, and scale */}
+              {npc.metadata?.armed ? renderSwordOverlay('npc') : null}
+            </div>
           )}
           {showNpcPrompt && (
             <div className={styles.npcDialogueIcon} aria-hidden="true">

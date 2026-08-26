@@ -185,6 +185,7 @@ function projectControlTo(
         followOrder: index,
         health: entry?.health,
         maxHealth: entry?.maxHealth,
+        armed: !!entry?.hasSword,
       });
     }
     const live = liveById.get(m.npcId);
@@ -195,6 +196,7 @@ function projectControlTo(
       followOrder: index,
       health: live?.health ?? entry?.health,
       maxHealth: live?.maxHealth ?? entry?.maxHealth,
+      armed: !!entry?.hasSword,
     });
   });
 

@@ -27,7 +27,9 @@ export interface NPCBehaviorContext {
   subtypes?: number[][][];
   player: { y: number; x: number };
   npcs: NPC[];
-  enemies?: Array<{ y: number; x: number }>;
+  // Combatant AI reads attack/health when present (Enemy satisfies this);
+  // movement-only behaviors just use y/x.
+  enemies?: Array<{ y: number; x: number; attack?: number; health?: number }>;
   rng?: () => number;
 }
 
@@ -312,6 +314,168 @@ export function getRandomDogBackSprite(rng?: () => number): string {
   return `/images/dog-golden/dog-back-${index}.png`;
 }
 
+/** How close an enemy must be (Manhattan) before a family member reacts to it. */
+const COMBAT_AWARENESS = 5;
+/**
+ * Nerve threshold. An armed member engages when their power (attack x health)
+ * is at least this fraction of the enemy's — i.e. they'll take a fair fight or
+ * a slightly losing one, but flee a hopeless one. Unarmed members never clear
+ * this bar (they always avoid until cornered).
+ */
+const ENGAGE_RATIO = 0.6;
+
+const facingToward = (
+  fromY: number,
+  fromX: number,
+  toY: number,
+  toX: number
+): Direction => {
+  if (Math.abs(toY - fromY) >= Math.abs(toX - fromX)) {
+    return toY < fromY ? Direction.UP : Direction.DOWN;
+  }
+  return toX < fromX ? Direction.LEFT : Direction.RIGHT;
+};
+
+function applyStepFacing(npc: NPC, moveY: number, moveX: number): void {
+  if (npc.tags?.includes("dog")) {
+    updateDogSprite(npc, moveY, moveX);
+  } else if (npc.metadata?.directionalSprites) {
+    npc.facing =
+      moveY < 0
+        ? Direction.UP
+        : moveY > 0
+        ? Direction.DOWN
+        : moveX < 0
+        ? Direction.LEFT
+        : Direction.RIGHT;
+  }
+}
+
+/**
+ * Combat AI for a party member (Hearth & Home), run only when an enemy is
+ * within COMBAT_AWARENESS. Overrides the member's idle/base movement for the
+ * tick. Rules:
+ *   - Armed AND not badly outmatched -> ENGAGE: close on the nearest enemy,
+ *     or hold and face it when already adjacent (the strike lands in
+ *     runPartyCombat). `engaging` memory = true.
+ *   - Unarmed, or armed-but-outmatched -> AVOID: step to the tile that most
+ *     increases distance from nearby enemies. `engaging` = false (no strike).
+ *   - No safe retreat (cornered) -> hold and fight desperately. `engaging` = true.
+ *
+ * Returns { reacted } — true means combat handled movement this tick and the
+ * caller should skip the base behavior.
+ */
+export function updateCombatantBehavior(
+  ctx: NPCBehaviorContext,
+  opts: { armed: boolean; attack: number }
+): { reacted: boolean } {
+  const { npc, grid, player, npcs, enemies } = ctx;
+  const near = (enemies ?? []).filter(
+    (e) => Math.abs(e.y - npc.y) + Math.abs(e.x - npc.x) <= COMBAT_AWARENESS
+  );
+  if (near.length === 0) {
+    npc.setMemory("engaging", null);
+    return { reacted: false };
+  }
+
+  // Nearest enemy drives targeting and the strength check.
+  let nearest = near[0];
+  let nearestDist = Infinity;
+  for (const e of near) {
+    const d = Math.abs(e.y - npc.y) + Math.abs(e.x - npc.x);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = e;
+    }
+  }
+
+  const myPower = opts.attack * Math.max(1, npc.health);
+  const enemyPower = (nearest.attack ?? 1) * Math.max(1, nearest.health ?? 1);
+  const willing = opts.armed && myPower >= enemyPower * ENGAGE_RATIO;
+
+  const canStand = (ty: number, tx: number): boolean => {
+    if (!isValidPosition(grid, ty, tx)) return false;
+    const subs = ctx.subtypes?.[ty]?.[tx];
+    if (
+      subs?.some(
+        (s) =>
+          s === TileSubtype.WALL_TORCH ||
+          s === TileSubtype.TOWN_SIGN ||
+          s === TileSubtype.CHECKPOINT ||
+          s === TileSubtype.BOOKSHELF
+      )
+    ) {
+      return false;
+    }
+    if (ty === player.y && tx === player.x) return false;
+    if (npcs.some((o) => o.id !== npc.id && o.y === ty && o.x === tx)) return false;
+    if ((enemies ?? []).some((e) => e.y === ty && e.x === tx)) return false;
+    return true;
+  };
+
+  const STEPS: Array<[number, number]> = [
+    [-1, 0],
+    [1, 0],
+    [0, -1],
+    [0, 1],
+  ];
+  const minDistToEnemies = (y: number, x: number): number =>
+    Math.min(...near.map((e) => Math.abs(e.y - y) + Math.abs(e.x - x)));
+
+  if (willing) {
+    npc.setMemory("engaging", true);
+    if (nearestDist <= 1) {
+      // Already in reach — square up and let runPartyCombat swing.
+      npc.facing = facingToward(npc.y, npc.x, nearest.y, nearest.x);
+      return { reacted: true };
+    }
+    // Close the larger gap first, fall back to the other axis.
+    const dy = Math.sign(nearest.y - npc.y);
+    const dx = Math.sign(nearest.x - npc.x);
+    const order: Array<[number, number]> =
+      Math.abs(nearest.y - npc.y) >= Math.abs(nearest.x - npc.x)
+        ? [[dy, 0], [0, dx]]
+        : [[0, dx], [dy, 0]];
+    for (const [my, mx] of order) {
+      if ((my === 0 && mx === 0) || !canStand(npc.y + my, npc.x + mx)) continue;
+      npc.y += my;
+      npc.x += mx;
+      applyStepFacing(npc, my, mx);
+      return { reacted: true };
+    }
+    // Blocked from closing — hold and face the threat.
+    npc.facing = facingToward(npc.y, npc.x, nearest.y, nearest.x);
+    return { reacted: true };
+  }
+
+  // AVOID: find the retreat tile that most increases distance from the pack.
+  const current = minDistToEnemies(npc.y, npc.x);
+  let best: [number, number] | null = null;
+  let bestDist = current;
+  for (const [my, mx] of STEPS) {
+    const ty = npc.y + my;
+    const tx = npc.x + mx;
+    if (!canStand(ty, tx)) continue;
+    const d = minDistToEnemies(ty, tx);
+    if (d > bestDist) {
+      bestDist = d;
+      best = [my, mx];
+    }
+  }
+  if (best) {
+    npc.setMemory("engaging", false);
+    npc.y += best[0];
+    npc.x += best[1];
+    applyStepFacing(npc, best[0], best[1]);
+    return { reacted: true };
+  }
+
+  // Cornered: nowhere better to run — turn and fight.
+  npc.setMemory("engaging", true);
+  npc.facing = facingToward(npc.y, npc.x, nearest.y, nearest.x);
+  return { reacted: true };
+}
+
 /**
  * Follow behavior: the party line. Each follower steps toward its leader —
  * the previous follower in `metadata.followOrder`, or the player for the
@@ -320,27 +484,7 @@ export function getRandomDogBackSprite(rng?: () => number): string {
  * walk frames instead.
  */
 export function updateFollowBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
-  const { npc, grid, player, npcs, enemies } = ctx;
-
-  // Hold the line: a follower standing next to an enemy squares up and
-  // fights (the strike itself lands in the party-combat pass) instead of
-  // trailing off after its leader.
-  const engaged = enemies?.find(
-    (e) => Math.abs(e.y - npc.y) + Math.abs(e.x - npc.x) === 1
-  );
-  if (engaged) {
-    if (npc.metadata?.directionalSprites) {
-      npc.facing =
-        engaged.y < npc.y
-          ? Direction.UP
-          : engaged.y > npc.y
-          ? Direction.DOWN
-          : engaged.x < npc.x
-          ? Direction.LEFT
-          : Direction.RIGHT;
-    }
-    return { moved: false };
-  }
+  const { npc, player, npcs } = ctx;
 
   const myOrder = (npc.metadata?.followOrder as number) ?? 0;
   const leader =
@@ -357,84 +501,41 @@ export function updateFollowBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult
           ((a.metadata?.followOrder as number) ?? 0)
       )[0] ?? player;
 
-  const dy = leader.y - npc.y;
-  const dx = leader.x - npc.x;
-  if (Math.abs(dy) + Math.abs(dx) <= 1) {
-    return { moved: false }; // already in line
+  let moved = false;
+  const budget = takeMovementBudget(npc);
+  for (let step = 0; step < budget; step++) {
+    if (Math.abs(leader.y - npc.y) + Math.abs(leader.x - npc.x) <= 1) break;
+    if (!stepToward(ctx, leader.y, leader.x)) break;
+    moved = true;
   }
-
-  // Close the larger gap first; fall back to the other axis when blocked.
-  const stepY: Array<[number, number]> = dy !== 0 ? [[Math.sign(dy), 0]] : [];
-  const stepX: Array<[number, number]> = dx !== 0 ? [[0, Math.sign(dx)]] : [];
-  const candidates =
-    Math.abs(dy) >= Math.abs(dx) ? [...stepY, ...stepX] : [...stepX, ...stepY];
-
-  for (const [moveY, moveX] of candidates) {
-    const targetY = npc.y + moveY;
-    const targetX = npc.x + moveX;
-
-    if (!isValidPosition(grid, targetY, targetX)) continue;
-
-    const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
-    if (targetSubtypes) {
-      const hasBlockingSubtype = targetSubtypes.some(
-        (subtype) =>
-          subtype === TileSubtype.WALL_TORCH ||
-          subtype === TileSubtype.TOWN_SIGN ||
-          subtype === TileSubtype.CHECKPOINT ||
-          subtype === TileSubtype.BOOKSHELF
-      );
-      if (hasBlockingSubtype) continue;
-    }
-
-    if (targetY === player.y && targetX === player.x) continue;
-    if (
-      npcs.some(
-        (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
-      )
-    ) {
-      continue;
-    }
-    if (enemies?.some((e) => e.y === targetY && e.x === targetX)) continue;
-
-    npc.y = targetY;
-    npc.x = targetX;
-
-    if (npc.tags?.includes("dog")) {
-      updateDogSprite(npc, moveY, moveX);
-    } else if (npc.metadata?.directionalSprites) {
-      npc.facing =
-        moveY < 0
-          ? Direction.UP
-          : moveY > 0
-          ? Direction.DOWN
-          : moveX < 0
-          ? Direction.LEFT
-          : Direction.RIGHT;
-    }
-
-    return { moved: true };
-  }
-
-  return { moved: false };
+  return { moved };
 }
 
 /**
- * Goto behavior: walk to `metadata.gotoTarget` and wait there (scenario
- * direction — Opal leading the family to the bookshelf). Same stepping and
- * blocking rules as follow; arrival means standing on or beside the target.
+ * Turn-based "speed": tiles-per-turn as a fractional budget accumulated in
+ * npc.memory.stepAcc. Speed 1.4 takes a second step two turns out of five;
+ * speed 0.85 skips a turn now and then. Default (no metadata.speed) is 1.
  */
-export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
+export function takeMovementBudget(npc: NPC): number {
+  const speed = (npc.metadata?.speed as number) ?? 1;
+  // Rounded to dodge float drift (0.6 + 1.4 = 1.9999... would eat a step).
+  const acc =
+    Math.round((((npc.memory?.stepAcc as number) || 0) + speed) * 1e6) / 1e6;
+  const steps = Math.floor(acc);
+  npc.setMemory("stepAcc", acc - steps);
+  return steps;
+}
+
+/** One movement step toward (ty,tx) under the shared blocking rules.
+ * Returns true when a step was taken. */
+function stepToward(
+  ctx: NPCBehaviorContext,
+  ty: number,
+  tx: number
+): boolean {
   const { npc, grid, player, npcs, enemies } = ctx;
-  const target = npc.metadata?.gotoTarget as { y: number; x: number } | undefined;
-  if (!target) return { moved: false };
-
-  const dy = target.y - npc.y;
-  const dx = target.x - npc.x;
-  if (Math.abs(dy) + Math.abs(dx) <= 1) {
-    return { moved: false }; // arrived
-  }
-
+  const dy = ty - npc.y;
+  const dx = tx - npc.x;
   const stepY: Array<[number, number]> = dy !== 0 ? [[Math.sign(dy), 0]] : [];
   const stepX: Array<[number, number]> = dx !== 0 ? [[0, Math.sign(dx)]] : [];
   const candidates =
@@ -480,9 +581,29 @@ export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
           ? Direction.LEFT
           : Direction.RIGHT;
     }
-    return { moved: true };
+    return true;
   }
-  return { moved: false };
+  return false;
+}
+
+/**
+ * Goto behavior: walk to `metadata.gotoTarget` and wait there (scenario
+ * direction — Opal leading the family to the bookshelf, or a rally point).
+ * Speed-weighted; arrival means standing on or beside the target.
+ */
+export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
+  const { npc } = ctx;
+  const target = npc.metadata?.gotoTarget as { y: number; x: number } | undefined;
+  if (!target) return { moved: false };
+
+  let moved = false;
+  const budget = takeMovementBudget(npc);
+  for (let step = 0; step < budget; step++) {
+    if (Math.abs(target.y - npc.y) + Math.abs(target.x - npc.x) <= 1) break;
+    if (!stepToward(ctx, target.y, target.x)) break;
+    moved = true;
+  }
+  return { moved };
 }
 
 /**

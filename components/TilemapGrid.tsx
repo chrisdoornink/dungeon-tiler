@@ -6261,7 +6261,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     platformDecks,
                     heroOverrideSprite,
                     gameState.heroSpriteScale,
-                    muralPanels
+                    muralPanels,
+                    !!gameState.activeHeroId && !!gameState.hasSword
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6369,6 +6370,30 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             })(),
                           }}
                         >
+                          {/* Armed family hero (Hearth & Home): the game's
+                              item sword, riding INSIDE the sprite div so the
+                              gait animation, the parent's facing flip, and the
+                              possession scale all apply — no transforms of its
+                              own. Mirrors Tile.tsx's SWORD_* constants. */}
+                          {!!gameState.activeHeroId && !!gameState.hasSword && (
+                            <div
+                              aria-hidden="true"
+                              style={{
+                                position: "absolute",
+                                bottom: "12%",
+                                right: "14%",
+                                height: "38%",
+                                width: `${38 * 0.57}%`,
+                                backgroundImage: `url(${assetUrl(
+                                  "/images/items/sword.png"
+                                )})`,
+                                backgroundSize: "contain",
+                                backgroundRepeat: "no-repeat",
+                                backgroundPosition: "bottom center",
+                                pointerEvents: "none",
+                              }}
+                            />
+                          )}
                           {/* Torch flame rides inside the sprite div so the
                               procedural step animation carries it along */}
                           {heroFlameLit && (() => {
@@ -6909,12 +6934,14 @@ function renderTileGrid(
   // Deck descriptors keyed by ANCHOR tile "y,x" — one per platform, not one per covered tile.
   decks?: Map<string, { length: number; axis: "col" | "row"; step?: SmoothEntityStep }>,
   // Hearth & Home: static sprite replacing the hero art for all facings,
-  // plus its render height as % of the tile (85 = NPC standard, 51 = dog).
+  // plus its render height as % of the tile (85 = NPC standard, 51 = dog),
+  // and whether the family hero holds a sword (code-driven overlay).
   heroSpriteOverride?: string,
   heroSpriteScale?: number,
   // Cipher-room mural: which target colours each MURAL_PANEL tile engraves (whole code on a single
   // tile, or one per tile), keyed "y,x".
-  muralPanels?: Map<string, number[]>
+  muralPanels?: Map<string, number[]>,
+  heroArmedOverride?: boolean
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7210,6 +7237,7 @@ function renderTileGrid(
             heroTorchLit={heroTorchLit}
             heroSpriteOverride={isPlayerTile ? heroSpriteOverride : undefined}
             heroSpriteScale={isPlayerTile ? heroSpriteScale : undefined}
+            heroArmed={isPlayerTile && !!heroArmedOverride}
             heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}

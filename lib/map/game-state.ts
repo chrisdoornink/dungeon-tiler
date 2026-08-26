@@ -17,7 +17,10 @@ import {
   type NPCInteractionEvent,
 } from "../npc";
 import { resolveNpcDialogueScript } from "../story/npc_script_registry";
-import { runHearthScenario } from "../story/hearth_scenario";
+import {
+  handleHearthBookshelf,
+  runHearthScenario,
+} from "../story/hearth_scenario";
 import {
   createInitialStoryFlags,
   type StoryCondition,
@@ -27,6 +30,7 @@ import { processEnemyDefeat, createDefeatedEnemyInfo } from "./enemy-defeat-hand
 import { updateConditionalNpcs } from "../story/story_mode";
 import { determineRoomNpcs } from "../story/npc_conditions";
 import {
+  updateCombatantBehavior,
   updateDogBehavior,
   updateFollowBehavior,
   updateGotoBehavior,
@@ -311,10 +315,33 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
   const [py, px] = playerPos;
   
   for (const npc of state.npcs) {
+    // Party members (Hearth & Home) react to nearby danger regardless of their
+    // idle/base behavior: the combat AI decides whether to close in or flee,
+    // and pre-empts the base behavior for that tick. Away from danger they do
+    // NOT trail the hero — they hold their space (idle) unless a scenario
+    // explicitly gives them a follow/goto job.
+    if (npc.metadata?.partyId) {
+      const roster = state.party?.find((p) => p.id === npc.metadata?.partyId);
+      const combatCtx = {
+        npc,
+        grid: state.mapData.tiles,
+        subtypes: state.mapData.subtypes,
+        player: { y: py, x: px },
+        npcs: state.npcs,
+        enemies: state.enemies,
+        rng: state.combatRng,
+      };
+      const { reacted } = updateCombatantBehavior(combatCtx, {
+        armed: !!roster?.hasSword,
+        attack: roster?.hasSword ? 2 : roster?.attack ?? 1,
+      });
+      if (reacted) continue;
+    }
+
     // Check if this NPC has a special behavior
     const behavior = npc.metadata?.behavior as string | undefined;
-    if (!behavior) continue;
-    
+    if (!behavior || behavior === "idle") continue;
+
     if (behavior === "dog") {
       // Update dog behavior
       const ctx = {
@@ -376,6 +403,70 @@ function updateNPCBehaviors(state: GameState, playerPos: [number, number]): void
 }
 
 /**
+ * Move a blocking family member one tile out of the hero's way (Hearth &
+ * Home). Prefers stepping perpendicular to the hero's approach, then straight
+ * ahead (getting nudged along); never into the hero, a wall, furniture,
+ * another NPC, or an enemy. Returns true when they found somewhere to go.
+ */
+function stepAsideNpc(
+  state: GameState,
+  npc: NPC,
+  heroDirection: Direction
+): boolean {
+  const grid = state.mapData.tiles;
+  const subtypes = state.mapData.subtypes;
+  const playerPos = findPlayerPosition(state.mapData);
+  const BLOCKED = [
+    TileSubtype.WALL_TORCH,
+    TileSubtype.TOWN_SIGN,
+    TileSubtype.CHECKPOINT,
+    TileSubtype.BOOKSHELF,
+    TileSubtype.CHEST,
+    TileSubtype.OPEN_CHEST,
+    TileSubtype.BED_EMPTY_1,
+    TileSubtype.BED_EMPTY_2,
+    TileSubtype.BED_EMPTY_3,
+    TileSubtype.BED_EMPTY_4,
+    TileSubtype.BED_FULL_1,
+    TileSubtype.BED_FULL_2,
+    TileSubtype.BED_FULL_3,
+    TileSubtype.BED_FULL_4,
+  ];
+  const free = (y: number, x: number): boolean => {
+    if (grid[y]?.[x] !== FLOOR) return false;
+    if ((subtypes[y]?.[x] ?? []).some((t) => BLOCKED.includes(t))) return false;
+    if (playerPos && playerPos[0] === y && playerPos[1] === x) return false;
+    if (state.npcs?.some((o) => o !== npc && o.y === y && o.x === x)) {
+      return false;
+    }
+    if (state.enemies?.some((e) => e.y === y && e.x === x)) return false;
+    return true;
+  };
+  const vertical =
+    heroDirection === Direction.UP || heroDirection === Direction.DOWN;
+  const push: [number, number] =
+    heroDirection === Direction.UP
+      ? [-1, 0]
+      : heroDirection === Direction.DOWN
+      ? [1, 0]
+      : heroDirection === Direction.LEFT
+      ? [0, -1]
+      : [0, 1];
+  const candidates: Array<[number, number]> = vertical
+    ? [[0, -1], [0, 1], push]
+    : [[-1, 0], [1, 0], push];
+  for (const [dy, dx] of candidates) {
+    const ty = npc.y + dy;
+    const tx = npc.x + dx;
+    if (!free(ty, tx)) continue;
+    npc.y = ty;
+    npc.x = tx;
+    return true;
+  }
+  return false;
+}
+
+/**
  * Tiles occupied by living party allies (Hearth & Home). Handed to
  * updateEnemies as blockedTiles so enemies can't end a tick standing inside a
  * family member. Undefined everywhere a party doesn't exist.
@@ -410,8 +501,10 @@ export function runPartyCombat(
     b: { y: number; x: number }
   ) => Math.abs(a.y - b.y) + Math.abs(a.x - b.x) === 1;
 
-  // 1. Family strikes.
+  // 1. Family strikes. Only members in a fighting stance swing — a member the
+  // combat AI set to flee (engaging === false) is running, not trading blows.
   for (const ally of allies) {
+    if (ally.memory?.engaging === false) continue;
     const target: Enemy | undefined = enemies.find((e) => adjacent(e, ally));
     if (!target) continue;
     const entry = party.find((p) => p.id === ally.metadata?.partyId);
@@ -2345,6 +2438,12 @@ export interface GameState {
   // Hearth & Home (/home) only — scripted-scenario progress flags (see
   // lib/story/hearth_scenario.ts). Unset in daily/story/endless.
   scenarioFlags?: Record<string, boolean>;
+  // Hearth & Home (/home) only — an active family regroup point. While set,
+  // the family walks to it; scenarios clear it once everyone has gathered.
+  rallyPoint?: [number, number] | null;
+  // Hearth & Home (/home) only — numeric scenario progress (rally wait ticks,
+  // goblins spawned so far, last spawn step). Companion to scenarioFlags.
+  scenarioCounters?: Record<string, number>;
   // Hearth & Home (/home) only — sprite paths that replace the hero art.
   // heroSprite is the front view and the fallback for all facings; back/side
   // are optional (side art faces right, mirrored for left). Unset = default
@@ -4909,6 +5008,12 @@ function movePlayerCore(
 
     // Check if tile has a bookshelf - blocks movement but triggers interaction
     if (subtype.includes(TileSubtype.BOOKSHELF)) {
+      // Hearth & Home: the bookshelf hides the chest keys. Handled here at the
+      // bump (deterministic, with an on-screen line) so it can't race the
+      // library reader. When it claims the interaction, skip the reader.
+      if (handleHearthBookshelf(newGameState)) {
+        return newGameState;
+      }
       // Queue bookshelf interaction
       if (newGameState.currentRoomId) {
         const bookshelfId = `${newGameState.currentRoomId}-shelf-${newY}-${newX}`;
@@ -4958,6 +5063,29 @@ function movePlayerCore(
       (npc) => npc.y === newY && npc.x === newX && !npc.isDead()
     );
     if (blockingNpc) {
+      // Hearth & Home: a family member bumped TWICE without the hero moving
+      // in between reads it as "you're in my way" and steps aside instead of
+      // talking again. Consecutiveness is keyed to stats.steps, which only
+      // advances on successful moves — any real step resets the count.
+      if (blockingNpc.metadata?.partyId) {
+        const stepNow = newGameState.stats.steps ?? 0;
+        const lastStep = blockingNpc.getMemory("blockedAtStep") as
+          | number
+          | null;
+        const bumps =
+          lastStep === stepNow
+            ? ((blockingNpc.getMemory("blockedBumps") as number) || 0) + 1
+            : 1;
+        blockingNpc.setMemory("blockedAtStep", stepNow);
+        blockingNpc.setMemory("blockedBumps", bumps);
+        if (bumps >= 2 && stepAsideNpc(newGameState, blockingNpc, direction)) {
+          blockingNpc.setMemory("blockedBumps", 0);
+          if (newGameState.npcs) {
+            newGameState.npcs = [...newGameState.npcs];
+          }
+          return newGameState; // they yielded — no repeat dialogue
+        }
+      }
       // Special handling for dog NPCs - petting interaction
       const isDog = blockingNpc.tags?.includes("dog") || blockingNpc.tags?.includes("pet");
       if (isDog) {

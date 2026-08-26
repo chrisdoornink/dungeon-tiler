@@ -86,7 +86,7 @@ describe("character toggle", () => {
     const ids = (state.npcs ?? []).map((npc) => npc.id);
     expect(ids).toContain("npc-chris");
     expect(ids).not.toContain("npc-emerson");
-    expect(state.heroSprite).toBe("/images/family/emerson-front.png");
+    expect(state.heroSprite).toBe("/images/npcs/boy-3.png");
   });
 
   it("renders the kids at kid size", () => {
@@ -119,7 +119,7 @@ describe("directional sprites", () => {
     );
     const emerson = buildHearthHomeState("emerson");
     expect(resolveHeroSpriteOverride(Direction.UP, emerson)).toBe(
-      "/images/family/emerson-back.png"
+      "/images/family/emerson-boy3-back.png"
     );
     // No directional art (Opal): every facing falls back to the front sprite.
     const opal = buildHearthHomeState("opal");
@@ -130,17 +130,17 @@ describe("directional sprites", () => {
     expect(resolveHeroSpriteOverride(Direction.UP, {})).toBeUndefined();
   });
 
-  it("puts the whole family in the party line, in roster order", () => {
+  it("family members idle by default (they do not trail the hero)", () => {
     const state = buildHearthHomeState("chris");
     const party = (state.npcs ?? []).map((npc) => [
       npc.metadata?.behavior,
       npc.metadata?.followOrder,
     ]);
     expect(party).toEqual([
-      ["follow", 0],
-      ["follow", 1],
-      ["follow", 2],
-      ["follow", 3],
+      ["idle", 0],
+      ["idle", 1],
+      ["idle", 2],
+      ["idle", 3],
     ]);
   });
 
@@ -148,8 +148,8 @@ describe("directional sprites", () => {
     const state = buildHearthHomeState("chris");
     const annie = (state.npcs ?? []).find((npc) => npc.id === "npc-annie");
     expect(annie?.metadata?.directionalSprites).toEqual({
-      back: "/images/family/annie-back.png",
-      side: "/images/family/annie-side.png",
+      back: "/images/family/annie-girl1-back.png",
+      side: undefined, // no side art — the resolver falls back to the front
     });
   });
 });
@@ -185,7 +185,7 @@ describe("possession (switchPartyMember)", () => {
     expect([chrisNpc.y, chrisNpc.x]).toEqual(FAMILY_HOUSE_SPAWN);
     expect((next.npcs ?? []).some((n) => n.id === "npc-annie")).toBe(false);
 
-    expect(next.heroSprite).toBe("/images/family/annie-front.png");
+    expect(next.heroSprite).toBe("/images/npcs/girl-1.png");
     expect(next.playerDirection).toBe(annie.facing);
     expect((next.npcs ?? []).map((n) => n.metadata?.followOrder)).toEqual([
       0, 1, 2, 3,
@@ -223,33 +223,43 @@ describe("possession (switchPartyMember)", () => {
   });
 });
 
-describe("hero-aware dialogue", () => {
-  it("kids call you Dad only when Chris is playing", () => {
-    // Past the intro's chest-hint stage, so the everyday lines resolve.
-    const asChris = {
+describe("sword-focused intro dialogue", () => {
+  it("before keys: chest hints; after keys: everyone talks about the swords", () => {
+    const preKeys = buildHearthHomeState("chris");
+    for (const id of ["npc-annie", "npc-emerson", "npc-claire"]) {
+      expect(resolveNpcDialogueScript(id, preKeys.storyFlags, preKeys)).toBe(
+        `${id.replace("npc-", "home-")}-chest-hint`
+      );
+    }
+
+    // Once armed, the fallback is the "why do we have swords?" line — never
+    // the old domestic banter (which no longer exists).
+    const armed = {
       ...buildHearthHomeState("chris"),
       scenarioFlags: { hearthKeysFound: true },
     };
-    const asClaire = {
-      ...buildHearthHomeState("claire"),
-      scenarioFlags: { hearthKeysFound: true },
-    };
+    for (const id of ["npc-annie", "npc-emerson", "npc-claire"]) {
+      expect(resolveNpcDialogueScript(id, armed.storyFlags, armed)).toBe(
+        `${id.replace("npc-", "home-")}-armed`
+      );
+    }
+    // Opal just barks throughout.
+    expect(resolveNpcDialogueScript("npc-opal", armed.storyFlags, armed)).toBe(
+      "home-opal-default"
+    );
+  });
 
-    expect(
-      resolveNpcDialogueScript("npc-emerson", asChris.storyFlags, asChris)
-    ).toBe("home-emerson-dad");
-    expect(
-      resolveNpcDialogueScript("npc-emerson", asClaire.storyFlags, asClaire)
-    ).toBe("home-emerson-default");
-    expect(
-      resolveNpcDialogueScript("npc-claire", asChris.storyFlags, asChris)
-    ).toBe("home-claire-dad");
-    expect(
-      resolveNpcDialogueScript("npc-opal", asChris.storyFlags, asChris)
-    ).toBe("home-opal-default");
-    expect(
-      resolveNpcDialogueScript("npc-chris", asClaire.storyFlags, asClaire)
-    ).toBe("home-chris-default");
+  it("the retired domestic/dad scripts are gone", () => {
+    for (const dead of [
+      "home-chris-default",
+      "home-annie-default",
+      "home-emerson-default",
+      "home-emerson-dad",
+      "home-claire-default",
+      "home-claire-dad",
+    ]) {
+      expect(getDialogueScript(dead)).toBeUndefined();
+    }
   });
 
   it("every family script resolves to real dialogue with lines", () => {

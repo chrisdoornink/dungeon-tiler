@@ -1162,48 +1162,6 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   // Hearth & Home (/home) — the family house. Placeholder v1 lines; real
   // quest dialogue arrives with the Game of the House phase. The "-dad"
   // variants play only when Chris is the active hero (activeHeroId rule).
-  "home-chris-default": {
-    id: "home-chris-default",
-    lines: [
-      { speaker: "Chris", text: "Hang on. I've almost got this riff." },
-      { speaker: "Chris", text: "Okay, listen to this. ...Nope. One more try. It'll be worth it, promise." },
-    ],
-  },
-  "home-annie-default": {
-    id: "home-annie-default",
-    lines: [
-      { speaker: "Annie", text: "Oh good, you're home! Quick question. Be honest." },
-      { speaker: "Annie", text: "Does the dining room feel more terracotta or more burnt sienna to you? Wait. Don't answer. I'm repainting it either way." },
-    ],
-  },
-  "home-emerson-default": {
-    id: "home-emerson-default",
-    lines: [
-      { speaker: "Emerson", text: "Hey! Hey! I made up a new song! It's about Opal!" },
-      { speaker: "Emerson", text: "It goes: OPAL, OPAL, OPAL! That's the whole song. Wanna race to the kitchen?" },
-    ],
-  },
-  "home-emerson-dad": {
-    id: "home-emerson-dad",
-    lines: [
-      { speaker: "Emerson", text: "Dad! Dad! I made up a new song! It's about Opal!" },
-      { speaker: "Emerson", text: "It goes: OPAL, OPAL, OPAL! That's the whole song. Wanna race to the kitchen?" },
-    ],
-  },
-  "home-claire-default": {
-    id: "home-claire-default",
-    lines: [
-      { speaker: "Claire", text: "...hi." },
-      { speaker: "Claire", text: "I learned the quiet part of that song on the piano. The part everyone skips. It's my favorite part." },
-    ],
-  },
-  "home-claire-dad": {
-    id: "home-claire-dad",
-    lines: [
-      { speaker: "Claire", text: "...hi, Dad." },
-      { speaker: "Claire", text: "I learned the quiet part of that song on the piano. The part everyone skips. It's my favorite part." },
-    ],
-  },
   "home-opal-default": {
     id: "home-opal-default",
     lines: [
@@ -1211,9 +1169,17 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     ],
   },
 
-  // Hearth & Home intro scenario stages (see lib/story/hearth_scenario.ts):
-  // chest hints before the keys are found, battle lines during the break-in,
-  // aftermath lines once the house is defended.
+  // Hearth & Home intro scenario stages (see lib/story/hearth_scenario.ts).
+  // The whole intro is about the swords — chest hints before the keys are
+  // found, then "why do we have swords?" once armed, then the fight, then the
+  // aftermath. There is deliberately no domestic small-talk fallback.
+  "home-chris-chest-hint": {
+    id: "home-chris-chest-hint",
+    lines: [
+      { speaker: "Chris", text: "There are locked chests in the bedrooms that were NOT here this morning." },
+      { speaker: "Chris", text: "And Opal won't leave the bookshelf alone. Let's start there." },
+    ],
+  },
   "home-annie-chest-hint": {
     id: "home-annie-chest-hint",
     lines: [
@@ -1233,6 +1199,50 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       { speaker: "Claire", text: "...there's a chest in my room. I didn't put it there." },
       { speaker: "Claire", text: "Opal's trying to tell us something. Follow her." },
+    ],
+  },
+
+  // "armed" stage: swords in hand, before the goblins. Every line is about the
+  // swords / the strangeness — this is the fallback, so no one goes off-topic.
+  "home-chris-armed": {
+    id: "home-chris-armed",
+    lines: [
+      { speaker: "Chris", text: "A real sword. In a locked chest. In our house. None of this adds up." },
+      { speaker: "Chris", text: "Keep it on you. I don't think these were hidden for no reason." },
+    ],
+  },
+  "home-annie-armed": {
+    id: "home-annie-armed",
+    lines: [
+      { speaker: "Annie", text: "So we all just... own swords now? And there wasn't even one for me?" },
+      { speaker: "Annie", text: "Somebody put these here on purpose. I want to know who, and I want to know why." },
+    ],
+  },
+  "home-emerson-armed": {
+    id: "home-emerson-armed",
+    lines: [
+      { speaker: "Emerson", text: "I have a SWORD. An actual sword. Do NOT tell me to put it down." },
+      { speaker: "Emerson", text: "Why'd they hide swords in our ROOMS though? Are we gonna need them?" },
+    ],
+  },
+  "home-claire-armed": {
+    id: "home-claire-armed",
+    lines: [
+      { speaker: "Claire", text: "...mine was locked up tight. Like someone was saving it for exactly today." },
+      { speaker: "Claire", text: "I don't think we found these by accident, Dad." },
+    ],
+  },
+  "home-chris-battle": {
+    id: "home-chris-battle",
+    lines: [
+      { speaker: "Chris", text: "THAT'S why we have swords. Everyone together — protect the little ones!" },
+    ],
+  },
+  "home-chris-defended": {
+    id: "home-chris-defended",
+    lines: [
+      { speaker: "Chris", text: "Everyone okay? ...Okay." },
+      { speaker: "Chris", text: "Someone armed this whole house before those things came. I need to know who knew." },
     ],
   },
   "home-annie-battle": {
@@ -1270,6 +1280,57 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     lines: [
       { speaker: "Claire", text: "...we did good. The house is safe." },
       { speaker: "Claire", text: "I'm keeping the sword." },
+    ],
+  },
+
+  // The bookshelf discovery — narrator voice (speaker "" hides the name banner).
+  "home-bookshelf-keys": {
+    id: "home-bookshelf-keys",
+    lines: [
+      { speaker: "", text: "Tucked behind the books: a heavy ring of iron keys. So THAT'S why Opal wouldn't leave this shelf alone." },
+      { speaker: "", text: "(These will open the locked chests in the bedrooms.)" },
+    ],
+  },
+
+  // The regroup beat: swords in hand, the family reconvenes and wonders why —
+  // and Annie realizes there wasn't one for her.
+  "home-arsenal": {
+    id: "home-arsenal",
+    lines: [
+      { speaker: "Emerson", text: "Okay. We each found a SWORD hidden in our rooms. ...What do we even do with these?" },
+      { speaker: "Claire", text: "I don't know. But they were locked up for a reason. I don't love that." },
+      { speaker: "Annie", text: "Hang on — everybody got one but me? There wasn't a sword in a single one of MY chests." },
+      { speaker: "Chris", text: "That's... probably fine. Stay close, everyone. Something feels off." },
+    ],
+  },
+
+  // The break-in alarm — whoever is nearest the front door shouts first.
+  "home-chris-goblins": {
+    id: "home-chris-goblins",
+    lines: [
+      { speaker: "Chris", text: "Goblins. In the house. ...Okay. THAT'S what the swords were for." },
+      { speaker: "Chris", text: "Everybody grab a blade. Stay close, watch each other's backs." },
+    ],
+  },
+  "home-annie-goblins": {
+    id: "home-annie-goblins",
+    lines: [
+      { speaker: "Annie", text: "GOBLINS?! Absolutely not — I just cleaned these floors!" },
+      { speaker: "Annie", text: "Kids, grab the swords from the chests. We are NOT losing the house tonight." },
+    ],
+  },
+  "home-emerson-goblins": {
+    id: "home-emerson-goblins",
+    lines: [
+      { speaker: "Emerson", text: "GOBLINS! Actual goblins! In our LIVING ROOM!" },
+      { speaker: "Emerson", text: "This is the best day of my entire life. I'm getting a sword!" },
+    ],
+  },
+  "home-claire-goblins": {
+    id: "home-claire-goblins",
+    lines: [
+      { speaker: "Claire", text: "...they came through the front door. Stay behind me." },
+      { speaker: "Claire", text: "Get a sword if you can. If you can't — run, don't freeze." },
     ],
   },
 };
