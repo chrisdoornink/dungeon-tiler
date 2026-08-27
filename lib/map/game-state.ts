@@ -2562,6 +2562,13 @@ export interface GameState {
    * it stays absent from every serialized save that predates it.
    */
   tuningV2Enabled?: boolean;
+  /**
+   * Whether the day's boss roll excludes the Fisher (see FISHER_RETIRED_START_DATE). Set at
+   * floor-1 build from the date gate and carried forward by advanceToNextFloor's spread,
+   * exactly like tuningV2Enabled — so the roll on floor 3 agrees with whichever cutover this
+   * run started under, and left undefined rather than false when off.
+   */
+  bossFisherRetired?: boolean;
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -3148,7 +3155,7 @@ function addWaterAmbushers(
  */
 export function initializeGameStateForMultiTier(
   floor: number = 1,
-  opts: { switchGates?: boolean; tuningV2?: boolean } = {}
+  opts: { switchGates?: boolean; tuningV2?: boolean; fisherRetired?: boolean } = {}
 ): GameState {
   // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
@@ -3283,6 +3290,7 @@ export function initializeGameStateForMultiTier(
     // gate has already been spent. advanceToNextFloor reads both.
     switchGatesEnabled: opts.switchGates ? true : undefined,
     tuningV2Enabled: opts.tuningV2 ? true : undefined,
+    bossFisherRetired: opts.fisherRetired ? true : undefined,
     switchGate: gateWiring.switchGate,
     gateGroups: gateWiring.gateGroups,
     showFullMap: false,
@@ -3464,9 +3472,8 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Deterministic from the date, so every player gets the same boss; independent of it, so
   // adding bosses later never disturbs existing daily maps.
   const dailyBossKind = bossEntrance
-    ? withPatchedMathRandom(
-        mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT),
-        rollDailyBossKind
+    ? withPatchedMathRandom(mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT), () =>
+        rollDailyBossKind({ excludeFisher: currentState.bossFisherRetired === true })
       )
     : undefined;
 

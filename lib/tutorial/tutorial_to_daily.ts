@@ -2,6 +2,7 @@ import {
   advanceToNextFloor,
   initializeGameStateForMultiTier,
   SWITCH_GATE_START_DATE,
+  fisherRetiredForDate,
   type GameState,
 } from "../map";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
@@ -44,6 +45,7 @@ export function buildDailyFloor2FromTutorial(
     // tutorial hand-off would generate a different floor 2 than the normal route.
     return initializeGameStateForMultiTier(1, {
       switchGates: localToday >= SWITCH_GATE_START_DATE,
+      fisherRetired: fisherRetiredForDate(localToday),
     });
   });
   if (!floor1) {

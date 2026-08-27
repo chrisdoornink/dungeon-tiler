@@ -82,6 +82,11 @@ export {
 } from "./map/daily_tuning";
 
 export {
+  FISHER_RETIRED_START_DATE,
+  fisherRetiredForDate,
+} from "./bosses/boss_roster";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,

@@ -22,7 +22,7 @@ import {
 } from "../map/game-state";
 import { dailyTuningV2ForDate } from "../map/daily_tuning";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
-import { bossInfo, type BossKind } from "../bosses/boss_roster";
+import { bossInfo, fisherRetiredForDate, type BossKind } from "../bosses/boss_roster";
 
 export type BossEntranceKind = "bomb" | "douse" | "moat-lava" | "moat-water";
 
@@ -102,7 +102,10 @@ export function bossDayInfoForDate(dateStr: string): BossDayInfo {
   // floor 3 nobody saw. Switch gates stay un-passed here on purpose — they are the floor's
   // LAST draw and cannot move anything this replay reads.
   const f1 = withPatchedMathRandom(mulberry32(seed), () =>
-    initializeGameStateForMultiTier(1, { tuningV2: dailyTuningV2ForDate(dateStr) })
+    initializeGameStateForMultiTier(1, {
+      tuningV2: dailyTuningV2ForDate(dateStr),
+      fisherRetired: fisherRetiredForDate(dateStr),
+    })
   );
   const f2 = advanceToNextFloor(f1, seed);
   const f3 = advanceToNextFloor(f2, seed);

@@ -76,6 +76,23 @@ export const BOSS_ROSTER: Record<BossKind, BossInfo> = {
 
 export const BOSS_KINDS = Object.keys(BOSS_ROSTER) as BossKind[];
 
+/**
+ * The Fisher can dead-end: once every snake on its bank is dead, its only rungs left are
+ * "walk to a snake" (none) and "retreat to the fishing row, deliberately out of rock range"
+ * — and if the arena geometry doesn't hand it a lane back into brace range, it just retreats
+ * forever with nothing left to do and no way for the hero to reach it. Same failure shape as
+ * the Coilwyrm's stranded-head bug (a boss that drops its own offense must stay reachable),
+ * but this path wasn't covered. Pulled from rotation rather than deleted, so the code/art/
+ * tests survive if it's ever fixed. Kept withOUT touching BOSS_ROSTER/BOSS_KINDS so `bossInfo`
+ * still resolves historic rows that recorded it.
+ */
+export const FISHER_RETIRED_START_DATE = "2026-08-27";
+
+/** Whether the Fisher has been pulled from the daily roll as of this date string. */
+export function fisherRetiredForDate(dateStr: string): boolean {
+  return dateStr >= FISHER_RETIRED_START_DATE;
+}
+
 /** Roster entry for a kind, tolerating unknown/legacy values from stored analytics rows. */
 export function bossInfo(kind: string | null | undefined): BossInfo | null {
   if (!kind) return null;
@@ -108,10 +125,16 @@ export function bossNameFor(kind: string | null | undefined): string {
  * adding an entry to BOSS_ROSTER above is the whole of "put this boss in the rotation" —
  * there is no second place to update and forget. An even split is what makes "which boss did
  * you get?" a real question between players.
+ *
+ * `excludeFisher` drops it from the pool (see FISHER_RETIRED_START_DATE) without touching
+ * BOSS_KINDS itself, so a replay of a PRE-cutover date can still pass `false` and draw from
+ * the full historical roster — the same "the table must stay the size it was on that date"
+ * discipline BOSS_KINDS itself exists for.
  */
-export function rollDailyBossKind(): BossKind {
-  const i = Math.floor(Math.random() * BOSS_KINDS.length);
-  return BOSS_KINDS[Math.min(i, BOSS_KINDS.length - 1)];
+export function rollDailyBossKind(opts: { excludeFisher?: boolean } = {}): BossKind {
+  const pool = opts.excludeFisher ? BOSS_KINDS.filter((k) => k !== "fisher") : BOSS_KINDS;
+  const i = Math.floor(Math.random() * pool.length);
+  return pool[Math.min(i, pool.length - 1)];
 }
 
 /**
@@ -140,5 +163,9 @@ export function rollEndlessBossOrder(seed: number): BossKind[] {
     const j = Math.floor(rng.next() * (i + 1));
     [order[i], order[j]] = [order[j], order[i]];
   }
-  return order;
+  // Filter AFTER shuffling, not before: the Fisher-Yates pass still walks all of BOSS_KINDS
+  // and consumes exactly as many rng draws as it always has, so this stays stable for a run
+  // already in progress rather than reshuffling the surviving three relative to each other.
+  // See FISHER_RETIRED_START_DATE.
+  return order.filter((k) => k !== "fisher");
 }
