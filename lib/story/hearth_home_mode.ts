@@ -19,12 +19,15 @@ import {
   type MapData,
   type PartyMemberState,
 } from "../map";
+import { Enemy } from "../enemy";
 import { rehydrateNPCs, serializeNPCs } from "../npc";
 import { createInitialStoryFlags } from "./event_registry";
 import {
+  buildBackyard,
   buildFamilyHouse,
   createFamilyNpc,
   getFamilyMember,
+  BACKYARD_ENTRY,
   FAMILY_HOUSE_SPAWN,
   FAMILY_MEMBERS,
   type FamilyMemberId,
@@ -62,7 +65,8 @@ function freshPartyMember(id: FamilyMemberId): PartyMemberState {
 }
 
 export function buildHearthHomeState(
-  heroId: FamilyMemberId = "chris"
+  heroId: FamilyMemberId = "chris",
+  opts: { startOutside?: boolean } = {}
 ): GameState {
   const hero = getFamilyMember(heroId);
   const house = buildFamilyHouse(heroId);
@@ -123,7 +127,144 @@ export function buildHearthHomeState(
     diaryEntries: [],
   };
 
+  // Shortcut: skip the whole in-house intro and start in the backyard with the
+  // family already armed (for testing the survival core, and for replays).
+  if (opts.startOutside) {
+    return enterBackyard(gameState, { armAll: true });
+  }
+
   return gameState;
+}
+
+/**
+ * Move the scene out to the backyard arena — the handoff from the authored
+ * prologue into the survival core. Preserves the live party roster (health,
+ * inventory, who's alive); with `armAll` it's a fresh, fully-armed start (the
+ * shortcut). The hero lands at the back-yard entry, living family cluster
+ * around them, and the first outdoor threat is on the field.
+ */
+export function enterBackyard(
+  state: GameState,
+  opts: { armAll?: boolean } = {}
+): GameState {
+  const yard = buildBackyard();
+  const heroId = (state.activeHeroId ?? "chris") as FamilyMemberId;
+  const heroMember = getFamilyMember(heroId);
+
+  let party =
+    state.party ?? FAMILY_MEMBERS.map((m) => freshPartyMember(m.id));
+  // Sync the controlled hero's LIVE stats back to the roster first — mid-game
+  // they live in the projected hero fields and may be ahead of the entry.
+  party = party.map((p) =>
+    p.id === heroId
+      ? {
+          ...p,
+          health: state.heroHealth ?? p.health,
+          maxHealth: state.heroMaxHealth ?? p.maxHealth,
+          attack: state.heroAttack ?? p.attack,
+          hasSword: !!state.hasSword,
+          hasShield: !!state.hasShield,
+          rockCount: state.rockCount ?? p.rockCount,
+          runeCount: state.runeCount ?? p.runeCount,
+          bombCount: state.bombCount ?? p.bombCount,
+          foodCount: state.foodCount ?? p.foodCount,
+          potionCount: state.potionCount ?? p.potionCount,
+        }
+      : p
+  );
+  if (opts.armAll) {
+    party = party.map((p) => ({
+      ...p,
+      alive: true,
+      hasSword: true,
+      health: p.maxHealth,
+    }));
+  }
+  const heroEntry =
+    party.find((p) => p.id === heroId) ?? freshPartyMember(heroId);
+
+  // Living family (minus the hero) arrive clustered around the entry.
+  const spots: Array<[number, number]> = [
+    [11, 5],
+    [11, 7],
+    [10, 6],
+    [10, 5],
+    [10, 7],
+  ];
+  let si = 0;
+  const npcObjects = FAMILY_MEMBERS.filter(
+    (m) => m.id !== heroId && party.find((p) => p.id === m.id)?.alive
+  ).map((m, index) => {
+    const [ny, nx] = spots[si++] ?? [9, 4 + index];
+    const entry = party.find((p) => p.id === m.id);
+    const npc = createFamilyNpc(m, {
+      y: ny,
+      x: nx,
+      facing: Direction.UP,
+      followOrder: index,
+      health: entry?.health,
+      maxHealth: entry?.maxHealth,
+      armed: !!entry?.hasSword,
+    });
+    // The company advances together into the fight.
+    npc.metadata = { ...npc.metadata, behavior: "follow" };
+    return npc;
+  });
+  const npcsPlain = serializeNPCs(npcObjects) ?? [];
+
+  // The first outdoor threat — where the real game begins.
+  const enemies = ([
+    [2, 4],
+    [2, 6],
+    [2, 8],
+  ] as Array<[number, number]>).map(([y, x]) => {
+    const e = new Enemy({ y, x });
+    e.kind = "fire-goblin";
+    return e;
+  });
+
+  const mapData = addPlayer(cloneMapData(yard.mapData), BACKYARD_ENTRY);
+
+  return {
+    ...state,
+    mapData,
+    npcs: rehydrateNPCs(npcsPlain),
+    enemies,
+    party,
+    activeHeroId: heroId,
+    heroSprite: heroMember.sprite,
+    heroSpriteBack: heroMember.spriteBack,
+    heroSpriteSide: heroMember.spriteSide,
+    heroSpriteScale: heroMember.heroSpriteScale,
+    playerDirection: Direction.UP,
+    heroHealth: heroEntry.health,
+    heroMaxHealth: heroEntry.maxHealth,
+    heroAttack: heroEntry.attack,
+    hasSword: heroEntry.hasSword,
+    hasShield: heroEntry.hasShield,
+    rockCount: heroEntry.rockCount,
+    runeCount: heroEntry.runeCount,
+    bombCount: heroEntry.bombCount,
+    foodCount: heroEntry.foodCount,
+    potionCount: heroEntry.potionCount,
+    currentRoomId: yard.id,
+    rooms: {
+      ...(state.rooms ?? {}),
+      [yard.id]: {
+        mapData: cloneMapData(yard.mapData),
+        entryPoint: BACKYARD_ENTRY,
+        enemies: [],
+        npcs: npcsPlain,
+        metadata: yard.metadata
+          ? (JSON.parse(JSON.stringify(yard.metadata)) as Record<string, unknown>)
+          : undefined,
+      },
+    },
+    rallyPoint: null,
+    scenarioCounters: {},
+    hearthExitTiles: undefined,
+    scenarioFlags: { ...(state.scenarioFlags ?? {}), hearthOutside: true },
+  };
 }
 
 /**

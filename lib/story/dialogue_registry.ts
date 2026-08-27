@@ -1319,6 +1319,26 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
     ],
   },
 
+  // Beat 7: the family catches its breath in the kitchen after the first wave.
+  "home-kitchen": {
+    id: "home-kitchen",
+    lines: [
+      { speaker: "Chris", text: "Everyone in the kitchen — regroup. Is anyone hurt?" },
+      { speaker: "Annie", text: "That was the FIRST wave. Listen — there are more of them at the front door." },
+      { speaker: "Claire", text: "...a lot more. This isn't stopping." },
+    ],
+  },
+
+  // Beat 8: overwhelmed — the front is lost, the only way is out the back.
+  "home-out-the-back": {
+    id: "home-out-the-back",
+    lines: [
+      { speaker: "Emerson", text: "There's TOO MANY! They're coming right through the front!" },
+      { speaker: "Chris", text: "We can't hold the house. Everyone — OUT THE BACK. Go, go, go!" },
+      { speaker: "Annie", text: "Stay together and keep moving. Whatever's out there, we face it as a family." },
+    ],
+  },
+
   // The break-in alarm — whoever is nearest the front door shouts first.
   "home-chris-goblins": {
     id: "home-chris-goblins",

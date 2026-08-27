@@ -299,6 +299,86 @@ describe("hearth intro scenario", () => {
     }
   });
 
+  it("post-defense: kitchen regroup -> escalating front-door waves -> overwhelmed -> out the back", () => {
+    const state = buildHearthHomeState("chris");
+    state.scenarioFlags = {
+      hearthKeysFound: true,
+      hearthWondered: true,
+      hearthBreached: true,
+      hearthDefended: true,
+    };
+    // Park the (non-dog) family at the kitchen rally so it completes at once.
+    state
+      .npcs!.filter((n) => n.metadata?.partyId && !n.tags?.includes("dog"))
+      .forEach((n, i) => {
+        n.y = 5;
+        n.x = 2 + (i % 3);
+      });
+
+    runHearthScenario(state, HERO_POS);
+    expect(state.scenarioFlags?.hearthKitchenRallied).toBe(true);
+
+    // Escalation: goblins keep coming from the FRONT door (top row never opens
+    // a NEW spawn here — they all come from the bottom door), tougher over time.
+    let sawFrontDoorSpawn = false;
+    for (let t = 0; t < 60 && !state.scenarioFlags?.hearthOverwhelmed; t++) {
+      state.stats.steps = (state.stats.steps ?? 0) + 1;
+      state.enemies = []; // simulate the family cutting them down
+      runHearthScenario(state, HERO_POS);
+      if ((state.enemies?.length ?? 0) > 0) {
+        const e = state.enemies![0];
+        if (e.y >= 8) sawFrontDoorSpawn = true; // front door is at the bottom
+      }
+    }
+    expect(state.scenarioFlags?.hearthOverwhelmed).toBe(true);
+    expect(sawFrontDoorSpawn).toBe(true);
+    expect(state.scenarioCounters?.escSpawned).toBe(12);
+    expect(state.mapData.tiles[0][5]).toBe(FLOOR); // back door is open to flee
+
+    // The out-the-back beat was queued.
+    expect(
+      (state.npcInteractionQueue ?? []).some(
+        (e) => e.availableHooks[0]?.payload?.dialogueId === "home-out-the-back"
+      )
+    ).toBe(true);
+
+    // The back-door exit tiles are published for the render layer to watch —
+    // it hands off when the hero's COMMITTED position lands on one.
+    expect(state.hearthExitTiles).toEqual([
+      [0, 5],
+      [1, 5],
+    ]);
+  });
+
+  it("escalation can't stall a stand-and-fight player (tick cap forces overwhelm)", () => {
+    const state = buildHearthHomeState("chris");
+    state.scenarioFlags = {
+      hearthKeysFound: true,
+      hearthWondered: true,
+      hearthBreached: true,
+      hearthDefended: true,
+      hearthKitchenRallied: true,
+    };
+    // Never advance stats.steps (simulate only swinging / bumping walls), and
+    // keep the doorway jammed so no spawn ever succeeds.
+    for (let t = 0; t < 200 && !state.scenarioFlags?.hearthOverwhelmed; t++) {
+      runHearthScenario(state, HERO_POS);
+    }
+    expect(state.scenarioFlags?.hearthOverwhelmed).toBe(true);
+    expect(state.hearthExitTiles).toBeDefined();
+  });
+
+  it("stops running the intro once the family is out in the backyard", () => {
+    const state = buildHearthHomeState("chris");
+    state.scenarioFlags = { hearthOutside: true };
+    const opal = state.npcs!.find((n) => n.id === "npc-opal")!;
+    opal.metadata = { ...opal.metadata, behavior: "idle" };
+    runHearthScenario(state, HERO_POS);
+    // The intro's Opal-lead logic must NOT run out here (its target is the
+    // bookshelf, which doesn't exist in the backyard).
+    expect(opal.metadata?.behavior).toBe("idle");
+  });
+
   it("defended only after the whole wave has come AND been cleared", () => {
     const state = buildHearthHomeState("chris");
     state.scenarioFlags = { hearthKeysFound: true, hearthWondered: true };

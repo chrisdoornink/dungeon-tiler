@@ -48,6 +48,17 @@ const RALLY_STALL_CAP = 60;
  * idle player. */
 const ARMING_STALL_CAP = 120;
 
+/** After the first wave, the family regroups here — a fixed spot in the kitchen. */
+const KITCHEN_RALLY: [number, number] = [5, 3];
+
+/** The escalation: goblins keep coming through the FRONT door, getting tougher,
+ * until this many have come — then "there's too many, out the back!". */
+const OVERWHELM_TOTAL = 12;
+const ESCALATION_CADENCE = 2; // a fresh goblin every couple of moves
+/** Backstop so a player who never takes a real step (stands and swings) still
+ * gets overwhelmed and can flee — mirrors the rally stall caps. */
+const ESCALATION_STALL_CAP = 90;
+
 /** Queue one scripted dialogue line to auto-open after the move resolves. */
 function pushDialogue(
   state: GameState,
@@ -101,6 +112,12 @@ export function runHearthScenario(
 ): void {
   if (!state.party) return;
   const flags = (state.scenarioFlags ??= {});
+
+  // Once the family is out in the backyard the authored intro is over — none of
+  // its beats (Opal leading to the now-out-of-bounds bookshelf, arming, waves)
+  // should run. The survival core is separate. (Also covers the ?start=outside
+  // shortcut, which boots straight into the backyard.)
+  if (flags.hearthOutside) return;
 
   // Beat 2 (the bookshelf keys) is handled at the moment of the bump in
   // handleHearthBookshelf — deterministic and with an on-screen line — rather
@@ -208,6 +225,65 @@ export function runHearthScenario(
     if (spawned >= BREACH_TOTAL && (state.enemies?.length ?? 0) === 0) {
       flags.hearthDefended = true;
     }
+    return;
+  }
+
+  // Beat 7: the house is defended — regroup in the KITCHEN to catch a breath.
+  if (flags.hearthDefended && !flags.hearthKitchenRallied) {
+    const counters = (state.scenarioCounters ??= {});
+    if (!state.rallyPoint) startFixedRally(state, KITCHEN_RALLY);
+    counters.kitchenTicks = (counters.kitchenTicks ?? 0) + 1;
+    if (
+      isFamilyRallied(state) ||
+      counters.kitchenTicks >= RALLY_STALL_CAP ||
+      !state.rallyPoint
+    ) {
+      pushDialogue(
+        state,
+        "npc-family",
+        "",
+        "home-kitchen",
+        500000 + (state.stats.steps ?? 0)
+      );
+      flags.hearthKitchenRallied = true;
+      clearFamilyRally(state);
+    }
+    return;
+  }
+
+  // Beat 8: it isn't over — goblins keep pouring in the FRONT door, tougher and
+  // tougher, until the house is overwhelmed. A tick cap force-completes it so a
+  // stand-and-fight player (melee doesn't advance the step counter) can't stall.
+  if (flags.hearthKitchenRallied && !flags.hearthOverwhelmed) {
+    const counters = (state.scenarioCounters ??= {});
+    counters.escTicks = (counters.escTicks ?? 0) + 1;
+    const spawned = counters.escSpawned ?? 0;
+    const step = state.stats.steps ?? 0;
+    if (
+      spawned < OVERWHELM_TOTAL &&
+      step - (counters.lastEscStep ?? -ESCALATION_CADENCE) >= ESCALATION_CADENCE
+    ) {
+      // Later goblins hit harder (roughly +1 HP per 3 that have come).
+      if (spawnGoblinAtGate(state, playerPos, DOORS[0], Math.floor(spawned / 3))) {
+        counters.escSpawned = spawned + 1;
+        counters.lastEscStep = step;
+      }
+    }
+    if (spawned >= OVERWHELM_TOTAL || counters.escTicks >= ESCALATION_STALL_CAP) {
+      flags.hearthOverwhelmed = true;
+      openDoors(state); // make sure the back door is open to flee through
+      // The hero hands off to the backyard by standing on either back-door
+      // tile. The render layer checks the COMMITTED position (no move-lag).
+      state.hearthExitTiles = [DOORS[1].door, DOORS[1].inner];
+      pushDialogue(
+        state,
+        "npc-family",
+        "",
+        "home-out-the-back",
+        400000 + (state.stats.steps ?? 0)
+      );
+    }
+    return;
   }
 }
 
@@ -363,6 +439,22 @@ export function computeRallyPoint(
   return best;
 }
 
+/** Send every family NPC walking to a specific rally tile. */
+export function startFixedRally(
+  state: GameState,
+  point: [number, number]
+): void {
+  state.rallyPoint = point;
+  for (const npc of state.npcs ?? []) {
+    if (!npc.metadata?.partyId) continue;
+    npc.metadata = {
+      ...npc.metadata,
+      behavior: "goto",
+      gotoTarget: { y: point[0], x: point[1] },
+    };
+  }
+}
+
 /** Send every family NPC walking to a freshly computed rally point. */
 export function startFamilyRally(
   state: GameState,
@@ -409,10 +501,13 @@ export function clearFamilyRally(state: GameState): void {
 }
 
 /**
- * Drive each NPC family member to arm themselves: walk to their own chest
- * (goto), and once adjacent, open it — strip the CHEST/LOCK, mark it opened,
- * and set their roster sword. Armed members drop back to idle. The controlled
- * hero is not in the NPC list, so they open their chest by hand.
+ * Drive each un-armed NPC family member to their chest: walk there (goto), open
+ * it when adjacent, and take the sword. Once a member is armed, armFamily LEAVES
+ * THEM ALONE — it must not touch their behavior, or it clobbers whatever the
+ * rally/combat systems set them to (this is exactly why the family never
+ * gathered: armFamily reset every armed member's rally goto back to idle each
+ * tick, so they'd take one step and freeze). The controlled hero isn't in the
+ * NPC list, so they open their chest by hand.
  */
 function armFamily(state: GameState): void {
   for (const npc of state.npcs ?? []) {
@@ -423,18 +518,23 @@ function armFamily(state: GameState): void {
     const entry = state.party?.find((p) => p.id === id);
     if (!entry) continue;
 
+    // Done arming — hands off. Only make sure the sword overlay flag is set.
+    if (entry.hasSword) {
+      if (!npc.metadata?.armed) {
+        npc.metadata = { ...npc.metadata, armed: true };
+      }
+      continue;
+    }
+
     const [cy, cx] = chest;
     const subs = state.mapData.subtypes[cy]?.[cx] ?? [];
     const stillClosed = subs.includes(TileSubtype.CHEST);
 
-    if (entry.hasSword || !stillClosed) {
-      // Already armed (or the chest is open) — take the sword and settle.
-      if (!entry.hasSword) entry.hasSword = true;
-      npc.metadata = {
-        ...npc.metadata,
-        armed: true,
-        ...(npc.metadata?.behavior === "goto" ? { behavior: "idle" } : {}),
-      };
+    if (!stillClosed) {
+      // Their chest was already opened (by the hero, or forceOpenChests) —
+      // pick up the sword and settle where they are.
+      entry.hasSword = true;
+      npc.metadata = { ...npc.metadata, armed: true, behavior: "idle" };
       continue;
     }
 
@@ -495,8 +595,24 @@ function spawnNextGoblin(state: GameState, playerPos: [number, number]): void {
   const counters = (state.scenarioCounters ??= {});
   const n = counters.goblinsSpawned ?? 0;
   if (n >= BREACH_TOTAL) return;
+  const gate = DOORS[n % DOORS.length]; // alternate front / back
+  if (spawnGoblinAtGate(state, playerPos, gate, 0)) {
+    counters.goblinsSpawned = n + 1;
+    counters.lastSpawnStep = state.stats.steps ?? 0;
+  }
+}
 
-  const gate = DOORS[n % DOORS.length];
+/**
+ * Try to place one goblin at a gate (its inner tile, then the doorway, then a
+ * couple of nudge tiles so a crowded threshold never silently drops a spawn).
+ * `extraHp` toughens later arrivals. Returns true if one was placed.
+ */
+function spawnGoblinAtGate(
+  state: GameState,
+  playerPos: [number, number],
+  gate: { door: [number, number]; inner: [number, number] },
+  extraHp: number
+): boolean {
   const [py, px] = playerPos;
   const occupied = (y: number, x: number) =>
     state.mapData.tiles[y]?.[x] !== FLOOR ||
@@ -514,13 +630,13 @@ function spawnNextGoblin(state: GameState, playerPos: [number, number]): void {
     [iy + (gate.door[0] === 0 ? 1 : -1), ix],
   ];
   const spot = candidates.find(([y, x]) => !occupied(y, x));
-  if (!spot) return; // every threshold tile jammed this turn; try again next
+  if (!spot) return false; // every threshold tile jammed this turn; retry next
 
   const goblin = new Enemy({ y: spot[0], x: spot[1] });
   goblin.kind = "fire-goblin";
+  if (extraHp > 0) goblin.health += extraHp;
   state.enemies = [...(state.enemies ?? []), goblin];
-  counters.goblinsSpawned = n + 1;
-  counters.lastSpawnStep = state.stats.steps ?? 0;
+  return true;
 }
 
 /**
