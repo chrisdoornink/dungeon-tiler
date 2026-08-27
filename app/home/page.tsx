@@ -15,6 +15,7 @@ import {
 } from "../../lib/map";
 import {
   buildHearthHomeState,
+  enterBackyard,
   handleControlledMemberDeath,
   switchPartyMember,
 } from "../../lib/story/hearth_home_mode";
@@ -41,6 +42,9 @@ export default function HearthHomePage() {
   const seqRef = useRef(0);
   // Live roster mirror from the grid: who's alive, who's controlled.
   const [party, setParty] = useState<PartyMemberState[] | undefined>(undefined);
+  // Shortcut: /home?start=outside boots straight into the backyard, skipping
+  // the whole intro (for testing the survival core and for replays).
+  const [bootOutside, setBootOutside] = useState(false);
 
   const handlePartyChange = useCallback(
     (roster: PartyMemberState[], activeHeroId?: string) => {
@@ -63,7 +67,25 @@ export default function HearthHomePage() {
     });
   }, []);
 
+  // The intro reached the back door — hand off to the backyard in place.
+  const handleHearthExit = useCallback(() => {
+    seqRef.current += 1;
+    setExternalAction({
+      seq: seqRef.current,
+      apply: (state) => enterBackyard(state),
+    });
+  }, []);
+
   useEffect(() => {
+    try {
+      if (
+        new URLSearchParams(window.location.search).get("start") === "outside"
+      ) {
+        setBootOutside(true);
+      }
+    } catch {
+      // no query string available — stay in the intro
+    }
     try {
       const saved = window.localStorage.getItem(HERO_CHOICE_KEY);
       if (isFamilyMemberId(saved)) {
@@ -108,8 +130,8 @@ export default function HearthHomePage() {
   }, [pickHero]);
 
   const initialState = useMemo(
-    () => buildHearthHomeState(initialHeroId),
-    [initialHeroId]
+    () => buildHearthHomeState(initialHeroId, { startOutside: bootOutside }),
+    [initialHeroId, bootOutside]
   );
 
   return (
@@ -158,7 +180,7 @@ export default function HearthHomePage() {
           </p>
         </div>
         <TilemapGrid
-          key={initialHeroId}
+          key={`${initialHeroId}-${bootOutside ? "yard" : "house"}`}
           tileTypes={tileTypes}
           initialGameState={initialState}
           forceDaylight={true}
@@ -166,6 +188,7 @@ export default function HearthHomePage() {
           externalAction={externalAction}
           onPartyChange={handlePartyChange}
           onDeath={handleDeath}
+          onHearthExit={handleHearthExit}
         />
       </div>
     </div>

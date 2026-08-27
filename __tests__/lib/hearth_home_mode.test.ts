@@ -1,7 +1,9 @@
 import {
   buildHearthHomeState,
+  enterBackyard,
   switchPartyMember,
 } from "../../lib/story/hearth_home_mode";
+import { BACKYARD_ROOM_ID } from "../../lib/story/rooms/home";
 import {
   FAMILY_HOUSE_ROOM_ID,
   FAMILY_HOUSE_SPAWN,
@@ -286,6 +288,51 @@ describe("sword-focused intro dialogue", () => {
       const script = getDialogueScript(scriptId!);
       expect(script).toBeDefined();
       expect(script!.lines.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("the backyard handoff", () => {
+  it("the outside shortcut boots straight into the backyard, armed", () => {
+    const state = buildHearthHomeState("chris", { startOutside: true });
+    expect(state.currentRoomId).toBe(BACKYARD_ROOM_ID);
+    expect(state.scenarioFlags?.hearthOutside).toBe(true);
+    expect(state.mapData.subtypes[11][6]).toContain(TileSubtype.PLAYER); // entry
+    expect(state.party?.every((p) => p.hasSword)).toBe(true);
+    expect(state.hasSword).toBe(true);
+    expect(state.heroHealth).toBe(state.heroMaxHealth); // fresh full health
+    expect(state.enemies?.length ?? 0).toBeGreaterThan(0);
+    // Living non-hero family arrived as allies.
+    expect((state.npcs ?? []).some((n) => n.id === "npc-annie")).toBe(true);
+    expect((state.npcs ?? []).some((n) => n.id === "npc-chris")).toBe(false); // is the hero
+  });
+
+  it("entering the backyard mid-game preserves the live roster", () => {
+    const state = buildHearthHomeState("emerson");
+    // Emerson is hurt and armed; Claire has fallen; Annie is unarmed.
+    state.heroHealth = 3;
+    state.hasSword = true;
+    state.party = state.party!.map((p) =>
+      p.id === "claire"
+        ? { ...p, alive: false, health: 0 }
+        : p.id === "annie"
+        ? { ...p, hasSword: false }
+        : { ...p, hasSword: true }
+    );
+
+    const yard = enterBackyard(state);
+
+    expect(yard.scenarioFlags?.hearthOutside).toBe(true);
+    expect(yard.activeHeroId).toBe("emerson");
+    expect(yard.heroHealth).toBe(3); // live hero health carried over
+    expect(yard.hasSword).toBe(true);
+    // The fallen member does not come along; the living do.
+    expect((yard.npcs ?? []).some((n) => n.id === "npc-claire")).toBe(false);
+    expect((yard.npcs ?? []).some((n) => n.id === "npc-chris")).toBe(true);
+    expect((yard.npcs ?? []).some((n) => n.id === "npc-annie")).toBe(true);
+    // Everyone in the yard is at the entry cluster.
+    for (const npc of yard.npcs ?? []) {
+      expect(npc.y).toBeGreaterThanOrEqual(9);
     }
   });
 });

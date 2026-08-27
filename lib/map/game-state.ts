@@ -2444,6 +2444,11 @@ export interface GameState {
   // Hearth & Home (/home) only — numeric scenario progress (rally wait ticks,
   // goblins spawned so far, last spawn step). Companion to scenarioFlags.
   scenarioCounters?: Record<string, number>;
+  // Hearth & Home (/home) only — tiles that, when the hero stands on one, hand
+  // the scene off to the backyard (set when the house is overwhelmed). Checked
+  // against the COMMITTED player position by the render layer, so there's no
+  // one-move lag. Unset in daily/story/endless.
+  hearthExitTiles?: Array<[number, number]>;
   // Hearth & Home (/home) only — sprite paths that replace the hero art.
   // heroSprite is the front view and the fallback for all facings; back/side
   // are optional (side art faces right, mirrored for left). Unset = default

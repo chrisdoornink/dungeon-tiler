@@ -317,6 +317,8 @@ interface TilemapGridProps {
   externalAction?: { seq: number; apply: (state: GameState) => GameState };
   /** Fires when the party roster or controlled member changes (Hearth & Home picker). */
   onPartyChange?: (party: PartyMemberState[], activeHeroId?: string) => void;
+  /** Fires once when the Hearth & Home intro asks to hand off to the backyard. */
+  onHearthExit?: () => void;
   /**
    * /daily-preview date override (YYYY-MM-DD). When set, floor advancement is seeded from THIS
    * date instead of today, and every analytics event /stats reads is suppressed so a test replay
@@ -345,6 +347,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   storageSlot,
   externalAction,
   onPartyChange,
+  onHearthExit,
   dailyDateOverride,
   onLocationChange,
 }) => {
@@ -431,10 +434,28 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     onPartyChange(gameState.party, gameState.activeHeroId);
   }, [onPartyChange, gameState.party, gameState.activeHeroId]);
 
+
   // Find player position in the grid
   const [playerPosition, setPlayerPosition] = useState<[number, number] | null>(
     null
   );
+
+  // Hearth & Home: once the house is overwhelmed the scenario publishes the
+  // back-door exit tiles; when the hero's COMMITTED position lands on one, hand
+  // off to the backyard. Using the committed position (not a scenario flag set
+  // mid-move) means stepping onto the door triggers it that turn, no lag. The
+  // parent owns the actual scene swap via externalAction.
+  const hearthOutside = !!gameState.scenarioFlags?.hearthOutside;
+  const hearthExitTiles = gameState.hearthExitTiles;
+  useEffect(() => {
+    if (!onHearthExit || hearthOutside || !hearthExitTiles || !playerPosition) {
+      return;
+    }
+    const [py, px] = playerPosition;
+    if (hearthExitTiles.some(([ey, ex]) => ey === py && ex === px)) {
+      onHearthExit();
+    }
+  }, [onHearthExit, hearthOutside, hearthExitTiles, playerPosition]);
 
   // Track if game completion has already been processed to prevent duplicate saves
   const [gameCompletionProcessed, setGameCompletionProcessed] = useState(false);

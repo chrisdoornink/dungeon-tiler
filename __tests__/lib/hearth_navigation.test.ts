@@ -111,6 +111,40 @@ describe("full intro plays out in-engine (playing as a kid)", () => {
     expect(state.enemies?.every((e) => e.kind === "fire-goblin")).toBe(true);
   });
 
+  it("the family actually gathers on its own (rally completes before the stall cap)", () => {
+    // Regression: armFamily used to reset every armed member's rally goto back
+    // to idle each tick, so nobody ever walked to the rally and the beat only
+    // fired via the 60-tick stall cap. Here the rally must complete NATURALLY.
+    let state = buildHearthHomeState("emerson");
+    state.hasKey = true;
+    state.scenarioFlags = { hearthKeysFound: true };
+    // Hero already armed, so completion hinges purely on the NPCs gathering.
+    state.mapData.subtypes[15][9] = [TileSubtype.OPEN_CHEST];
+    state.party!.find((p) => p.id === "emerson")!.hasSword = true;
+
+    const start = findPlayerPosition(state.mapData)!;
+    state.mapData.subtypes[start[0]][start[1]] = state.mapData.subtypes[
+      start[0]
+    ][start[1]].filter((t) => t !== TileSubtype.PLAYER);
+    state.mapData.subtypes[14][4] = [
+      ...(state.mapData.subtypes[14][4] ?? []),
+      TileSubtype.PLAYER,
+    ];
+
+    let rallyTicksWhenWondered = -1;
+    for (let t = 0; t < 120 && !state.scenarioFlags?.hearthWondered; t++) {
+      state = movePlayer(state, t % 2 === 0 ? Direction.RIGHT : Direction.LEFT);
+      if (state.scenarioFlags?.hearthWondered) {
+        rallyTicksWhenWondered = state.scenarioCounters?.rallyTicks ?? -1;
+      }
+    }
+    expect(state.scenarioFlags?.hearthWondered).toBe(true);
+    // Natural gather converges in ~20 moves; the stall cap is 60. If the
+    // clobber were back, this would be pinned at the cap.
+    expect(rallyTicksWhenWondered).toBeGreaterThan(0);
+    expect(rallyTicksWhenWondered).toBeLessThan(55);
+  });
+
   // When the hero is an adult or Opal, EVERY chest owner is an NPC, so the whole
   // intro must complete automatically as the player just moves around.
   for (const hero of ["chris", "opal"] as const) {
