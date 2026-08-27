@@ -5,6 +5,7 @@ import {
   runHearthScenario,
 } from "../../lib/story/hearth_scenario";
 import { resolveNpcDialogueScript } from "../../lib/story/npc_script_registry";
+import { getDialogueScript } from "../../lib/story/dialogue_registry";
 import {
   Direction,
   FLOOR,
@@ -20,6 +21,13 @@ const CHEST_TILES: Array<[number, number]> = [
   [11, 9], // Claire
   [15, 9], // Emerson
 ];
+
+/** Mark every sword chest opened — arming is "finished" when none stay closed. */
+function openAllChests(state: GameState) {
+  for (const [y, x] of CHEST_TILES) {
+    state.mapData.subtypes[y][x] = [TileSubtype.OPEN_CHEST];
+  }
+}
 
 function teleportHero(state: GameState, y: number, x: number) {
   const pos = findPlayerPosition(state.mapData)!;
@@ -99,18 +107,32 @@ describe("hearth intro scenario", () => {
     expect(opal.metadata?.behavior).toBe("idle");
   });
 
-  it("once keys are found, NPC family members head for their own chests", () => {
-    const state = buildHearthHomeState("chris");
+  it("once keys are found, NPC family members head for their chests (playing as a kid)", () => {
+    // Playing as Emerson: Chris takes the master chest, Claire hers, Annie is
+    // the empty-handed adult (no chest to fetch).
+    const state = buildHearthHomeState("emerson");
     state.scenarioFlags = { hearthKeysFound: true };
     runHearthScenario(state, HERO_POS);
 
-    // Emerson's chest is [15,9]; he is sent to it. (Annie has no chest.)
-    const emerson = state.npcs!.find((n) => n.id === "npc-emerson")!;
-    expect(emerson.metadata?.behavior).toBe("goto");
-    expect(emerson.metadata?.gotoTarget).toEqual({ y: 15, x: 9 });
+    const chris = state.npcs!.find((n) => n.id === "npc-chris")!;
+    expect(chris.metadata?.behavior).toBe("goto");
+    expect(chris.metadata?.gotoTarget).toEqual({ y: 6, x: 10 }); // master bedroom
+
+    const claire = state.npcs!.find((n) => n.id === "npc-claire")!;
+    expect(claire.metadata?.gotoTarget).toEqual({ y: 11, x: 9 });
 
     const annie = state.npcs!.find((n) => n.id === "npc-annie")!;
-    expect(annie.metadata?.behavior).not.toBe("goto"); // nothing to fetch
+    expect(annie.metadata?.behavior).not.toBe("goto"); // empty-handed, nothing to fetch
+  });
+
+  it("the master-bedroom chest is claimed by the non-hero adult", () => {
+    // Playing as Chris: Annie takes the master chest instead of Chris.
+    const state = buildHearthHomeState("chris");
+    state.scenarioFlags = { hearthKeysFound: true };
+    runHearthScenario(state, HERO_POS);
+    const annie = state.npcs!.find((n) => n.id === "npc-annie")!;
+    expect(annie.metadata?.behavior).toBe("goto");
+    expect(annie.metadata?.gotoTarget).toEqual({ y: 6, x: 10 });
   });
 
   it("an NPC adjacent to its chest opens it and arms itself", () => {
@@ -132,9 +154,7 @@ describe("hearth intro scenario", () => {
   it("after arming, a rally point is pinned and the family walks to it", () => {
     const state = buildHearthHomeState("chris");
     state.scenarioFlags = { hearthKeysFound: true };
-    for (const id of ["chris", "emerson", "claire"]) {
-      state.party!.find((p) => p.id === id)!.hasSword = true;
-    }
+    openAllChests(state); // arming is finished once every chest is opened
     runHearthScenario(state, HERO_POS);
 
     expect(state.rallyPoint).toBeTruthy();
@@ -178,9 +198,7 @@ describe("hearth intro scenario", () => {
   it("rally -> 'what do we do with these?' -> goblins", () => {
     const state = buildHearthHomeState("chris");
     state.scenarioFlags = { hearthKeysFound: true };
-    for (const id of ["chris", "emerson", "claire"]) {
-      state.party!.find((p) => p.id === id)!.hasSword = true;
-    }
+    openAllChests(state);
     runHearthScenario(state, HERO_POS); // pins the rally
     const [ry, rx] = state.rallyPoint!;
 
@@ -237,6 +255,48 @@ describe("hearth intro scenario", () => {
     expect(seenDoors.has("back")).toBe(true);
     // At its peak the wave never dumped all six at once.
     expect((state.enemies?.length ?? 0)).toBeLessThanOrEqual(6);
+  });
+
+  it("never dead-ends: a stalled arming phase is rescued by the arming cap", () => {
+    // Play as Emerson but keep everyone frozen far from their chests so nobody
+    // arms on their own — arming would otherwise stall forever.
+    const state = buildHearthHomeState("emerson");
+    state.scenarioFlags = { hearthKeysFound: true };
+    let broke = false;
+    for (let t = 0; t < 200; t++) {
+      // Re-freeze each tick so armFamily can't make progress (a hard stall).
+      for (const npc of state.npcs!.filter((n) => n.metadata?.partyId)) {
+        npc.metadata = { ...npc.metadata, behavior: "idle" };
+        npc.y = 1;
+        npc.x = 1;
+      }
+      runHearthScenario(state, HERO_POS);
+      if (state.scenarioFlags?.hearthBreached) {
+        broke = true;
+        break;
+      }
+    }
+    expect(broke).toBe(true); // reached the break-in despite the stall
+    for (const [y, x] of CHEST_TILES) {
+      expect(state.mapData.subtypes[y][x]).not.toContain(TileSubtype.CHEST);
+    }
+  });
+
+  it("the break-in alarm never references a missing script, for any hero", () => {
+    for (const hero of ["chris", "annie", "emerson", "claire", "opal"] as const) {
+      const state = buildHearthHomeState(hero);
+      state.scenarioFlags = { hearthKeysFound: true, hearthWondered: true };
+      runHearthScenario(state, HERO_POS); // fires the breach + alarm
+      const alarm = (state.npcInteractionQueue ?? []).find((e) =>
+        (e.availableHooks[0]?.payload?.dialogueId as string | undefined)?.endsWith(
+          "-goblins"
+        )
+      );
+      expect(alarm).toBeDefined();
+      const id = alarm!.availableHooks[0].payload!.dialogueId as string;
+      expect(id).not.toBe("home-opal-goblins"); // dogs don't shout
+      expect(getDialogueScript(id)).toBeDefined(); // the script exists
+    }
   });
 
   it("defended only after the whole wave has come AND been cleared", () => {

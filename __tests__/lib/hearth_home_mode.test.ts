@@ -232,19 +232,31 @@ describe("sword-focused intro dialogue", () => {
       );
     }
 
-    // Once armed, the fallback is the "why do we have swords?" line — never
-    // the old domestic banter (which no longer exists).
-    const armed = {
+    // Once armed, everyone talks about the swords — never the old domestic
+    // banter (which no longer exists). Playing as Chris, Annie owns the master
+    // sword, so all three NPCs get the "why do we have swords?" line.
+    const asChris = {
       ...buildHearthHomeState("chris"),
       scenarioFlags: { hearthKeysFound: true },
     };
     for (const id of ["npc-annie", "npc-emerson", "npc-claire"]) {
-      expect(resolveNpcDialogueScript(id, armed.storyFlags, armed)).toBe(
+      expect(resolveNpcDialogueScript(id, asChris.storyFlags, asChris)).toBe(
         `${id.replace("npc-", "home-")}-armed`
       );
     }
+    // Playing as a kid, Annie is the empty-handed adult and says so.
+    const asKid = {
+      ...buildHearthHomeState("emerson"),
+      scenarioFlags: { hearthKeysFound: true },
+    };
+    expect(
+      resolveNpcDialogueScript("npc-annie", asKid.storyFlags, asKid)
+    ).toBe("home-annie-noweapon");
+    expect(
+      resolveNpcDialogueScript("npc-claire", asKid.storyFlags, asKid)
+    ).toBe("home-claire-armed");
     // Opal just barks throughout.
-    expect(resolveNpcDialogueScript("npc-opal", armed.storyFlags, armed)).toBe(
+    expect(resolveNpcDialogueScript("npc-opal", asChris.storyFlags, asChris)).toBe(
       "home-opal-default"
     );
   });

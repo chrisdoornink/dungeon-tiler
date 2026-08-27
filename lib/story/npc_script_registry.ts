@@ -579,6 +579,20 @@ const NPC_DIALOGUE_RULES: NPCDialogueRule[] = [
       priority: PRIORITIES.DEFAULT,
     },
   ]),
+  // The empty-handed adult speaks to it once the keys are found. The master
+  // bedroom sword goes to the non-hero adult (preferring Chris), so the empty
+  // one is deterministic: Chris only when he's the hero (then there's no NPC
+  // line anyway), otherwise Annie. This never mis-fires mid-arming the way a
+  // transient roster check would. Sits just above the "armed" fallback.
+  ...(["chris", "annie"] as const).map((member) => ({
+    npcId: `npc-${member}`,
+    scriptId: `home-${member}-noweapon`,
+    priority: 15,
+    customCondition: (gameState: GameState) =>
+      !!gameState.scenarioFlags?.hearthKeysFound &&
+      !gameState.scenarioFlags?.hearthBreached &&
+      member === (gameState.activeHeroId === "chris" ? "chris" : "annie"),
+  })),
   {
     npcId: "npc-opal",
     scriptId: "home-opal-default",

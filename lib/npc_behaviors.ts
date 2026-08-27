@@ -505,7 +505,7 @@ export function updateFollowBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult
   const budget = takeMovementBudget(npc);
   for (let step = 0; step < budget; step++) {
     if (Math.abs(leader.y - npc.y) + Math.abs(leader.x - npc.x) <= 1) break;
-    if (!stepToward(ctx, leader.y, leader.x)) break;
+    if (!stepAlongPath(ctx, leader.y, leader.x)) break;
     moved = true;
   }
   return { moved };
@@ -526,70 +526,106 @@ export function takeMovementBudget(npc: NPC): number {
   return steps;
 }
 
-/** One movement step toward (ty,tx) under the shared blocking rules.
- * Returns true when a step was taken. */
-function stepToward(
+/** Static-passable for pathfinding: floor with nothing solid on it. Dynamic
+ * occupants (player/npcs/enemies) are NOT considered here — they'd punch false
+ * dead-ends into the plan; the caller waits if the next tile is occupied. */
+function pathPassable(ctx: NPCBehaviorContext, y: number, x: number): boolean {
+  if (ctx.grid[y]?.[x] !== FLOOR) return false;
+  const subs = ctx.subtypes?.[y]?.[x];
+  return !subs?.some(
+    (s) =>
+      s === TileSubtype.WALL_TORCH ||
+      s === TileSubtype.TOWN_SIGN ||
+      s === TileSubtype.CHECKPOINT ||
+      s === TileSubtype.BOOKSHELF ||
+      s === TileSubtype.CHEST ||
+      s === TileSubtype.BED_EMPTY_1 ||
+      s === TileSubtype.BED_EMPTY_2 ||
+      s === TileSubtype.BED_EMPTY_3 ||
+      s === TileSubtype.BED_EMPTY_4 ||
+      s === TileSubtype.BED_FULL_1 ||
+      s === TileSubtype.BED_FULL_2 ||
+      s === TileSubtype.BED_FULL_3 ||
+      s === TileSubtype.BED_FULL_4
+  );
+}
+
+/**
+ * Shortest-path next tile toward a target, navigating AROUND walls (BFS over
+ * static-passable tiles). The house is a maze of walled rooms, so greedy
+ * axis-stepping gets stuck against the first wall — this doesn't. Returns the
+ * next [y,x] to move to, or null when already adjacent to the target or no
+ * route exists. Goal is a tile adjacent to the target (chests/rally points are
+ * reached by standing next to them).
+ */
+export function bfsNextStep(
   ctx: NPCBehaviorContext,
   ty: number,
   tx: number
-): boolean {
-  const { npc, grid, player, npcs, enemies } = ctx;
-  const dy = ty - npc.y;
-  const dx = tx - npc.x;
-  const stepY: Array<[number, number]> = dy !== 0 ? [[Math.sign(dy), 0]] : [];
-  const stepX: Array<[number, number]> = dx !== 0 ? [[0, Math.sign(dx)]] : [];
-  const candidates =
-    Math.abs(dy) >= Math.abs(dx) ? [...stepY, ...stepX] : [...stepX, ...stepY];
+): [number, number] | null {
+  const { npc, grid } = ctx;
+  const H = grid.length;
+  const W = grid[0]?.length ?? 0;
+  const start = npc.y * W + npc.x;
+  const goalReached = (y: number, x: number) =>
+    Math.abs(y - ty) + Math.abs(x - tx) <= 1;
+  if (goalReached(npc.y, npc.x)) return null;
 
-  for (const [moveY, moveX] of candidates) {
-    const targetY = npc.y + moveY;
-    const targetX = npc.x + moveX;
-    if (!isValidPosition(grid, targetY, targetX)) continue;
-    const targetSubtypes = ctx.subtypes?.[targetY]?.[targetX];
-    if (
-      targetSubtypes?.some(
-        (subtype) =>
-          subtype === TileSubtype.WALL_TORCH ||
-          subtype === TileSubtype.TOWN_SIGN ||
-          subtype === TileSubtype.CHECKPOINT ||
-          subtype === TileSubtype.BOOKSHELF
-      )
-    ) {
-      continue;
+  const prev = new Int32Array(H * W).fill(-2); // -2 unseen, -1 start
+  prev[start] = -1;
+  const queue = [start];
+  let goal = -1;
+  for (let i = 0; i < queue.length && goal === -1; i++) {
+    const p = queue[i];
+    const py = (p / W) | 0;
+    const pxx = p % W;
+    for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ny = py + dy;
+      const nx = pxx + dx;
+      if (ny < 0 || nx < 0 || ny >= H || nx >= W) continue;
+      const n = ny * W + nx;
+      if (prev[n] !== -2 || !pathPassable(ctx, ny, nx)) continue;
+      prev[n] = p;
+      if (goalReached(ny, nx)) {
+        goal = n;
+        break;
+      }
+      queue.push(n);
     }
-    if (targetY === player.y && targetX === player.x) continue;
-    if (
-      npcs.some(
-        (other) => other.id !== npc.id && other.y === targetY && other.x === targetX
-      )
-    ) {
-      continue;
-    }
-    if (enemies?.some((e) => e.y === targetY && e.x === targetX)) continue;
-
-    npc.y = targetY;
-    npc.x = targetX;
-    if (npc.tags?.includes("dog")) {
-      updateDogSprite(npc, moveY, moveX);
-    } else if (npc.metadata?.directionalSprites) {
-      npc.facing =
-        moveY < 0
-          ? Direction.UP
-          : moveY > 0
-          ? Direction.DOWN
-          : moveX < 0
-          ? Direction.LEFT
-          : Direction.RIGHT;
-    }
-    return true;
   }
-  return false;
+  if (goal === -1) return null;
+  // Walk the predecessor chain back to the first step out of `start`.
+  let cur = goal;
+  while (prev[cur] !== start && prev[cur] !== -1) cur = prev[cur];
+  return [(cur / W) | 0, cur % W];
+}
+
+/**
+ * Take one BFS-planned step toward (ty,tx), waiting (no move) if the planned
+ * tile is transiently occupied by the player, another NPC, or an enemy.
+ * Returns true only when a step was actually taken.
+ */
+function stepAlongPath(ctx: NPCBehaviorContext, ty: number, tx: number): boolean {
+  const { npc, player, npcs, enemies } = ctx;
+  const next = bfsNextStep(ctx, ty, tx);
+  if (!next) return false;
+  const [ny, nx] = next;
+  if (ny === player.y && nx === player.x) return false;
+  if (npcs.some((o) => o.id !== npc.id && o.y === ny && o.x === nx)) return false;
+  if (enemies?.some((e) => e.y === ny && e.x === nx)) return false;
+  const my = ny - npc.y;
+  const mx = nx - npc.x;
+  npc.y = ny;
+  npc.x = nx;
+  applyStepFacing(npc, my, mx);
+  return true;
 }
 
 /**
  * Goto behavior: walk to `metadata.gotoTarget` and wait there (scenario
- * direction — Opal leading the family to the bookshelf, or a rally point).
- * Speed-weighted; arrival means standing on or beside the target.
+ * direction — Opal leading to the bookshelf, family arming at chests, or a
+ * rally point). Speed-weighted, and BFS-routed so it navigates the house's
+ * walled rooms instead of jamming against the first wall.
  */
 export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
   const { npc } = ctx;
@@ -600,7 +636,7 @@ export function updateGotoBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
   const budget = takeMovementBudget(npc);
   for (let step = 0; step < budget; step++) {
     if (Math.abs(target.y - npc.y) + Math.abs(target.x - npc.x) <= 1) break;
-    if (!stepToward(ctx, target.y, target.x)) break;
+    if (!stepAlongPath(ctx, target.y, target.x)) break;
     moved = true;
   }
   return { moved };
