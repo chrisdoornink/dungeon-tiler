@@ -131,11 +131,34 @@ function placeEntranceNearCorner(map: MapData, cornerY: number, cornerX: number)
 }
 
 /**
- * Drown the map corner farthest from the hero in lava or deep water, and set a
- * lockless cave mouth at its tip. Only bare FLOOR is flooded, so the room's exit,
- * key, rocks, pots, torches and faulty floors all survive as dry islands.
+ * Drown a map corner in lava or deep water, and set a lockless cave mouth at its tip.
+ * Only bare FLOOR is flooded, so the room's exit, key, rocks, pots, torches and faulty
+ * floors all survive as dry islands.
+ *
+ * Base behavior (pre daily-tuning v2): the corner FARTHEST from the hero, a fixed
+ * 0.42H × 0.42W rectangle. The 90-day census showed that exact block in that exact spot
+ * was a certificate — every moat-water day flooded 18-43% of floor 3 in the far corner,
+ * fully separable from natural lake days — so the day type was readable at a glance.
+ *
+ * `opts.vary` (daily tuning v2, see lib/map/daily_tuning.ts) breaks the certificate on
+ * all three axes while keeping every safety rule:
+ *   - CORNER: seeded-random among the three corners that are not the one nearest the
+ *     hero (so the spawn room never drowns), instead of always the farthest.
+ *   - SIZE: each block dimension draws 0.26-0.45 of the grid independently, so the moat
+ *     ranges from lake-sized to the old quarter-map and is rarely square.
+ *   - SHAPE: a boundary erosion pass then a dilation pass rag the rectangle's edges so
+ *     it reads as a body of water rather than a stamped block.
+ * Draw discipline: `vary` consumes seeded draws (corner, dims, per-edge-cell rolls), so
+ * it MUST stay behind the date gate — an ungated change here would shift every later
+ * roll on historical floors. The fallback path already runs this under its own salted
+ * stream (see stampBossEntranceWithFallback), which remains correct: draws there come
+ * from the salted rng, not the floor's.
  */
-function stampCornerMoat(map: MapData, element: MoatElement): void {
+function stampCornerMoat(
+  map: MapData,
+  element: MoatElement,
+  opts?: { vary?: boolean }
+): void {
   const H = map.tiles.length;
   const W = map.tiles[0].length;
   const [hy, hx] = findPlayerPos(map);
@@ -145,40 +168,110 @@ function stampCornerMoat(map: MapData, element: MoatElement): void {
     [H - 2, 1],
     [H - 2, W - 2],
   ];
-  const corner = corners.reduce((best, c) =>
-    Math.hypot(c[0] - hy, c[1] - hx) > Math.hypot(best[0] - hy, best[1] - hx) ? c : best
-  );
+  let corner: [number, number];
+  let fracH = 0.42;
+  let fracW = 0.42;
+  if (opts?.vary) {
+    const nearest = corners.reduce((best, c) =>
+      Math.hypot(c[0] - hy, c[1] - hx) < Math.hypot(best[0] - hy, best[1] - hx) ? c : best
+    );
+    const eligible = corners.filter((c) => c !== nearest);
+    corner = eligible[Math.floor(Math.random() * eligible.length)];
+    fracH = 0.26 + Math.random() * 0.19; // 0.26-0.45
+    fracW = 0.26 + Math.random() * 0.19;
+  } else {
+    corner = corners.reduce((best, c) =>
+      Math.hypot(c[0] - hy, c[1] - hx) > Math.hypot(best[0] - hy, best[1] - hx) ? c : best
+    );
+  }
   const [cy, cx] = corner;
-  const blockH = Math.round(H * 0.42);
-  const blockW = Math.round(W * 0.42);
+  const blockH = Math.round(H * fracH);
+  const blockW = Math.round(W * fracW);
   const y0 = cy < H / 2 ? 1 : H - 1 - blockH;
   const y1 = cy < H / 2 ? blockH : H - 2;
   const x0 = cx < W / 2 ? 1 : W - 1 - blockW;
   const x1 = cx < W / 2 ? blockW : W - 2;
 
   const deepSub = element === "lava" ? TileSubtype.LAVA : TileSubtype.DEEP_WATER;
+  // Track exactly the tiles THIS stamp floods: the rag passes and the shallow lip must
+  // only ever touch our own water, never a pre-existing pool from the floor's water plan.
+  const stamped = new Set<string>();
   for (let y = y0; y <= y1; y++) {
     for (let x = x0; x <= x1; x++) {
       if (map.tiles[y][x] === FLOOR && map.subtypes[y][x].length === 0) {
         map.subtypes[y][x] = [deepSub];
+        stamped.add(`${y},${x}`);
       }
     }
   }
-  // Water gets a wadeable shallow lip wherever it meets dry land (readability).
-  if (element === "water") {
+
+  const ORTHO_STEPS: Array<[number, number]> = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  if (opts?.vary) {
+    // Erode: boundary cells (our water touching a non-water tile) un-flood at 35%.
+    // Row-major order keeps the seeded draw sequence deterministic.
+    const boundary: Array<[number, number]> = [];
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
-        if (!map.subtypes[y]?.[x]?.includes(TileSubtype.DEEP_WATER)) continue;
-        const touchesDry = ([[-1, 0], [1, 0], [0, -1], [0, 1]] as Array<[number, number]>).some(
-          ([dy, dx]) => {
-            const ny = y + dy;
-            const nx = x + dx;
-            if (ny < 0 || nx < 0 || ny >= H || nx >= W) return false;
-            return map.tiles[ny][nx] === FLOOR && map.subtypes[ny][nx].length === 0;
-          }
-        );
-        if (touchesDry) map.subtypes[y][x] = [TileSubtype.SHALLOW_WATER];
+        if (!stamped.has(`${y},${x}`)) continue;
+        const onEdge = ORTHO_STEPS.some(([dy, dx]) => !stamped.has(`${y + dy},${x + dx}`));
+        if (onEdge) boundary.push([y, x]);
       }
+    }
+    for (const [y, x] of boundary) {
+      if (Math.random() < 0.35) {
+        map.subtypes[y][x] = [];
+        stamped.delete(`${y},${x}`);
+      }
+    }
+    // Dilate: bare floor hugging two or more of our water cells floods at 30%, pushing
+    // soft lobes past the rectangle line.
+    const grow: Array<[number, number]> = [];
+    for (let y = Math.max(1, y0 - 1); y <= Math.min(H - 2, y1 + 1); y++) {
+      for (let x = Math.max(1, x0 - 1); x <= Math.min(W - 2, x1 + 1); x++) {
+        if (map.tiles[y][x] !== FLOOR || map.subtypes[y][x].length !== 0) continue;
+        const touching = ORTHO_STEPS.filter(([dy, dx]) => stamped.has(`${y + dy},${x + dx}`)).length;
+        if (touching >= 2) grow.push([y, x]);
+      }
+    }
+    for (const [y, x] of grow) {
+      if (Math.random() < 0.3) {
+        map.subtypes[y][x] = [deepSub];
+        stamped.add(`${y},${x}`);
+      }
+    }
+  }
+
+  // Water gets a wadeable shallow lip wherever it meets dry land (readability).
+  //
+  // Which tiles get lipped differs by mode, and the difference is load-bearing:
+  //  - base: EVERY deep tile inside the rectangle, exactly as this always worked —
+  //    including a pre-existing water-plan pool tile that happens to sit in the rect.
+  //    Historical replays require this path byte-identical, quirk included (a shallow
+  //    vs deep tile changes isDryWalkable, which changes where the day's switch gate
+  //    could go).
+  //  - vary: only the tiles THIS stamp flooded, so a natural lake the moat brushes up
+  //    against keeps its own banks (including deliberately-cut sheer ones).
+  if (element === "water") {
+    const lipTargets: Array<[number, number]> = [];
+    if (opts?.vary) {
+      for (const key of Array.from(stamped)) {
+        const [y, x] = key.split(",").map(Number);
+        lipTargets.push([y, x]);
+      }
+    } else {
+      for (let y = y0; y <= y1; y++) {
+        for (let x = x0; x <= x1; x++) lipTargets.push([y, x]);
+      }
+    }
+    for (const [y, x] of lipTargets) {
+      if (!map.subtypes[y]?.[x]?.includes(TileSubtype.DEEP_WATER)) continue;
+      const touchesDry = ORTHO_STEPS.some(([dy, dx]) => {
+        const ny = y + dy;
+        const nx = x + dx;
+        if (ny < 0 || nx < 0 || ny >= H || nx >= W) return false;
+        return map.tiles[ny][nx] === FLOOR && map.subtypes[ny][nx].length === 0;
+      });
+      if (touchesDry) map.subtypes[y][x] = [TileSubtype.SHALLOW_WATER];
     }
   }
   placeEntranceNearCorner(map, cy, cx);
@@ -1065,7 +1158,8 @@ export function arenaSeedForEntrance(kind: BossEntranceKind): MoatElement {
  */
 export function stampBossEntranceOnFloor(
   map: MapData,
-  kind: BossEntranceKind
+  kind: BossEntranceKind,
+  opts?: { varyMoat?: boolean }
 ): { placed: boolean; sealPayloads?: SealPayloads } {
   const [hy, hx] = findPlayerPos(map);
   if (kind === "bomb") {
@@ -1078,7 +1172,7 @@ export function stampBossEntranceOnFloor(
   }
   if (kind === "moat-water") {
     const before = countSubtype(map, TileSubtype.BOSS_ENTRANCE);
-    stampCornerMoat(map, "water");
+    stampCornerMoat(map, "water", { vary: opts?.varyMoat });
     return { placed: countSubtype(map, TileSubtype.BOSS_ENTRANCE) > before };
   }
   // douse: a few deep-water tiles to snuff the torch, plus the dark portal itself.
@@ -1119,26 +1213,28 @@ export function stampBossEntranceOnFloor(
 export function stampBossEntranceWithFallback(
   map: MapData,
   kind: BossEntranceKind,
-  fallbackRng: Rng
+  fallbackRng: Rng,
+  opts?: { varyMoat?: boolean }
 ): { kind: BossEntranceKind; sealPayloads?: SealPayloads } | null {
   // Primary: ambient (daily) stream, on a copy, committed only on success — so this path is
   // byte-identical to the old inline stamp when the rolled kind places, and leaves the real
   // map untouched when it does not.
   const primary = cloneMap(map);
-  const stampedPrimary = stampBossEntranceOnFloor(primary, kind);
+  const stampedPrimary = stampBossEntranceOnFloor(primary, kind, opts);
   if (stampedPrimary.placed) {
     map.tiles = primary.tiles;
     map.subtypes = primary.subtypes;
     return { kind, sealPayloads: stampedPrimary.sealPayloads };
   }
   // Fallback: a reachable non-bomb kind, drawn from the salted stream so the daily sequence
-  // never shifts. moat-water first (deterministic and near-certain to place).
+  // never shifts. moat-water first (near-certain to place; under varyMoat it draws its
+  // corner/size/shape rolls from this salted stream, which is exactly where they belong).
   const FALLBACK_ORDER: BossEntranceKind[] = ["moat-water", "douse", "moat-lava"];
   for (const alt of FALLBACK_ORDER) {
     if (alt === kind) continue;
     const trial = cloneMap(map);
     const stamped = withPatchedMathRandom(fallbackRng, () =>
-      stampBossEntranceOnFloor(trial, alt)
+      stampBossEntranceOnFloor(trial, alt, opts)
     );
     if (stamped.placed) {
       map.tiles = trial.tiles;

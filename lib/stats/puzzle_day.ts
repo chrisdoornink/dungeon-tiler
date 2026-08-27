@@ -14,7 +14,7 @@ import {
   advanceToNextFloor,
   type GameState,
 } from "../map/game-state";
-import { SWITCH_GATE_START_DATE } from "../map";
+import { SWITCH_GATE_START_DATE, dailyTuningV2ForDate } from "../map";
 
 export const PUZZLE_TRACKING_START_DATE = "2026-08-22";
 
@@ -43,9 +43,14 @@ export function puzzleDayInfoForDate(dateStr: string): PuzzleDayInfo {
   const seed = hashStringToSeed(dateStr);
   // Enable switch gates exactly as the live daily does (date-gated) so the recomputed gate matches.
   // The switch gate is the floor's LAST shared-rng draw and the colour puzzle uses its own stream, so
-  // enabling it never disturbs the colour-puzzle read.
+  // enabling it never disturbs the colour-puzzle read. tuningV2 must ALSO mirror the live daily:
+  // it changes mid-stream draws (extra enemy placements shift the snake positions the colour
+  // puzzle's avoid-list is built from) and changes the gate planner itself.
   const f1 = withPatchedMathRandom(mulberry32(seed), () =>
-    initializeGameStateForMultiTier(1, { switchGates: dateStr >= SWITCH_GATE_START_DATE })
+    initializeGameStateForMultiTier(1, {
+      switchGates: dateStr >= SWITCH_GATE_START_DATE,
+      tuningV2: dailyTuningV2ForDate(dateStr),
+    })
   );
   const f2 = advanceToNextFloor(f1, seed);
   const f3 = advanceToNextFloor(f2, seed);

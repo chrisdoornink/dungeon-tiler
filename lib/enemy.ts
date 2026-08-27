@@ -351,7 +351,24 @@ export type PlaceEnemiesArgs = {
   // 2 faulty tiles/floor, common once lava adds 6-12 hazard tiles) — a free turn-1 kill
   // or an enemy standing in instant-death terrain.
   subtypes?: number[][][];
+  // Restrict candidates to these "y,x" tiles (on top of every other rule). Used by the
+  // daily's path-biased placement to seed part of the count along the spawn→key→exit
+  // corridor instead of uniformly across the floor.
+  allowedTiles?: ReadonlySet<string>;
+  // Tiles already occupied by previously-placed entities ("y,x"). Excluded from the
+  // candidate list up front, so multi-batch placement (path-biased + uniform + ambushers)
+  // never stacks two enemies and never wastes seeded draws on collision retries.
+  takenTiles?: ReadonlySet<string>;
+  // Invert the water rule: candidates must BE deep water (and nothing else). For the
+  // daily's pool ambushers — a kind that swims (water-goblin) is assigned by the caller,
+  // never rolled, so the "randomly-assigned kind might drown" hazard that keeps water in
+  // SPAWN_BLOCKING_SUBTYPES does not apply.
+  inDeepWater?: boolean;
 };
+
+// Deep water's subtype id, for the inDeepWater candidate rule (same id space as
+// SPAWN_BLOCKING_SUBTYPES below; see TileSubtype.DEEP_WATER in lib/map/constants.ts).
+const DEEP_WATER_SUBTYPE = 59;
 
 // Subtypes that make a floor tile an illegal spawn location (lethal, blocking, or
 // terrain a randomly-assigned kind might not be able to leave/survive — enemy kinds
@@ -490,7 +507,17 @@ function isSafeFloorForEnemy(
 }
 
 export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
-  const { grid, player, count, minDistanceFromPlayer = 2, rng = Math.random, subtypes } = args;
+  const {
+    grid,
+    player,
+    count,
+    minDistanceFromPlayer = 2,
+    rng = Math.random,
+    subtypes,
+    allowedTiles,
+    takenTiles,
+    inDeepWater,
+  } = args;
   const h = grid.length;
   const w = grid[0]?.length ?? 0;
 
@@ -498,8 +525,15 @@ export function placeEnemies(args: PlaceEnemiesArgs): Enemy[] {
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (!isFloor(grid, y, x)) continue;
-      // Never spawn an enemy on a lethal/blocking hazard tile (abyss/faulty/lava).
-      if (subtypes) {
+      if (allowedTiles && !allowedTiles.has(`${y},${x}`)) continue;
+      if (takenTiles?.has(`${y},${x}`)) continue;
+      if (inDeepWater) {
+        // Ambusher mode: the tile must be deep water and nothing but deep water — a pool
+        // tile carrying a stepping stone or any other furniture is left alone.
+        const subs = subtypes?.[y]?.[x];
+        if (!subs || subs.length !== 1 || subs[0] !== DEEP_WATER_SUBTYPE) continue;
+      } else if (subtypes) {
+        // Never spawn an enemy on a lethal/blocking hazard tile (abyss/faulty/lava).
         const subs = subtypes[y]?.[x];
         if (subs && subs.some((s) => SPAWN_BLOCKING_SUBTYPES.has(s))) continue;
       }

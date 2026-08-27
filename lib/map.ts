@@ -77,6 +77,11 @@ export {
 } from "./map/switch-gates";
 
 export {
+  DAILY_TUNING_V2_START_DATE,
+  dailyTuningV2ForDate,
+} from "./map/daily_tuning";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,

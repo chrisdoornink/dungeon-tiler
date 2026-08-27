@@ -124,27 +124,43 @@ function getGhostCount(floor: number | undefined, rng: () => number): number {
 
 /**
  * Get white goblin swarm count for a given floor.
+ *
+ * Base rates (live since 2026-03-06):
  * Floor 1: 0 swarms
  * Floor 2: 1 swarm (10% chance)
- * Floor 3: any swarms (26% chance) 
- *  - 1 swarm (20% chance), 
- *  - 2 swarms (5% chance), 
+ * Floor 3: any swarms (26% chance)
+ *  - 1 swarm (20% chance),
+ *  - 2 swarms (5% chance),
  *  - 3 swarms (1% chance)
- * 
- * Uses multiple rng() calls for floor 3 to ensure independence from floor 2.
- * Until ready to deploy I'm keeping this simple and just returning 0 for all floors.
+ *
+ * `boosted` (daily tuning v2, see lib/map/daily_tuning.ts) raises them to the rates the
+ * 2026-04 "weeks without seeing a swarm" report asked for — F2 25%, F3 50% total
+ * (40% / 8% / 2%) — which had been planned but never actually shipped. Same single draw
+ * either way, so the flag never shifts the seeded stream by itself; only the outcome
+ * (and the extra placement draws a swarm then makes) differs, which is why the flag is
+ * date-gated by the caller.
  */
-function getWhiteGoblinSwarmCount(floor: number | undefined, rng: () => number): number {  
+function getWhiteGoblinSwarmCount(
+  floor: number | undefined,
+  rng: () => number,
+  boosted?: boolean
+): number {
   if (floor === 1) return 0;
-  if (floor === 2) return rng() < 0.1 ? 1 : 0;
+  if (floor === 2) return rng() < (boosted ? 0.25 : 0.1) ? 1 : 0;
   if (floor === 3) {
     const roll = rng();
+    if (boosted) {
+      if (roll < 0.4) return 1;
+      if (roll < 0.48) return 2;
+      if (roll < 0.5) return 3;
+      return 0;
+    }
     if (roll >= 0.08 && roll < 0.28) return 1;
     if (roll >= 0.29 && roll < 0.34) return 2;
     if (roll >= 0.35 && roll < 0.36) return 3;
     return 0;
   }
-  
+
   return 0;
 }
 
@@ -156,6 +172,9 @@ export function enemyTypeAssignement(
     // Custom goblin weight table (endless mode has its own, more gradual
     // difficulty ramp than the daily's three floor tables).
     goblinWeights?: Array<{ kind: EnemyKind; weight: number }>;
+    // Daily tuning v2: white-goblin swarm rates at the boosted table (F2 25%, F3 50%).
+    // Only the date-gated daily passes this; endless/story/legacy keep the base rates.
+    boostedSwarms?: boolean;
   }
 ): { ghostCount: number; whiteGoblinCount: number } {
   const rng = opts?.rng ?? Math.random;
@@ -165,7 +184,7 @@ export function enemyTypeAssignement(
   // Ghost count is additive — does not consume goblin slots
   const ghostCount = getGhostCount(floor, rng);
   // White goblin swarm count (each swarm = 4 members)
-  const swarmCount = getWhiteGoblinSwarmCount(floor, rng);
+  const swarmCount = getWhiteGoblinSwarmCount(floor, rng, opts?.boostedSwarms);
   const whiteGoblinCount = swarmCount * 4;
 
   if (target === 0) return { ghostCount, whiteGoblinCount };
