@@ -1211,6 +1211,22 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
       { speaker: "Chris", text: "Keep it on you. I don't think these were hidden for no reason." },
     ],
   },
+  // "noweapon" — whichever adult came up empty (roster-driven, so it's said by
+  // whoever actually has no sword).
+  "home-chris-noweapon": {
+    id: "home-chris-noweapon",
+    lines: [
+      { speaker: "Chris", text: "Everyone's holding a blade but me. There wasn't one in a chest for me." },
+      { speaker: "Chris", text: "Stay close to me anyway. I'll figure something out." },
+    ],
+  },
+  "home-annie-noweapon": {
+    id: "home-annie-noweapon",
+    lines: [
+      { speaker: "Annie", text: "Hang on — everybody got a sword except ME? There wasn't one in any of my chests." },
+      { speaker: "Annie", text: "Great. Whoever set this up owes me an explanation. And a sword." },
+    ],
+  },
   "home-annie-armed": {
     id: "home-annie-armed",
     lines: [
@@ -1297,10 +1313,9 @@ const DIALOGUE_SCRIPTS: Record<string, DialogueScript> = {
   "home-arsenal": {
     id: "home-arsenal",
     lines: [
-      { speaker: "Emerson", text: "Okay. We each found a SWORD hidden in our rooms. ...What do we even do with these?" },
-      { speaker: "Claire", text: "I don't know. But they were locked up for a reason. I don't love that." },
-      { speaker: "Annie", text: "Hang on — everybody got one but me? There wasn't a sword in a single one of MY chests." },
-      { speaker: "Chris", text: "That's... probably fine. Stay close, everyone. Something feels off." },
+      { speaker: "Emerson", text: "Okay. We found SWORDS hidden in our rooms. ...What do we even do with these?" },
+      { speaker: "Claire", text: "Not all of us found one, even. Somebody came up empty-handed." },
+      { speaker: "Chris", text: "Someone stocked this house with weapons before today. On purpose. Everyone stay close — something's coming." },
     ],
   },
 

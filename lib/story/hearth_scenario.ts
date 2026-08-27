@@ -17,11 +17,7 @@
 
 import { Direction, FLOOR, TileSubtype } from "../map/constants";
 import { Enemy } from "../enemy";
-import {
-  FAMILY_MEMBERS,
-  getFamilyMember,
-  type FamilyMemberId,
-} from "./rooms/home";
+import { getFamilyMember, type FamilyMemberId } from "./rooms/home";
 import type { GameState } from "../map/game-state";
 
 /** Where Opal waits: beside the living-room bookshelf. */
@@ -44,6 +40,13 @@ const BREACH_CADENCE = 1; // one new goblin per player move
 /** If a rally somehow can't complete, force it after this many ticks so the
  * scenario can never stall (the monsters must always come). */
 const RALLY_STALL_CAP = 60;
+
+/** Likewise for arming: if a chest is never opened (e.g. a kid hero never opens
+ * their own room chest, or an NPC can't reach one), force the rest open after
+ * this many post-keys ticks so the intro can never dead-end. Generous — normal
+ * play finishes arming in ~20 moves, so this only rescues a genuinely stuck or
+ * idle player. */
+const ARMING_STALL_CAP = 120;
 
 /** Queue one scripted dialogue line to auto-open after the move resolves. */
 function pushDialogue(
@@ -117,8 +120,21 @@ export function runHearthScenario(
           gotoTarget: OPAL_LEAD_TARGET,
         };
       }
-    } else if (opal.metadata?.behavior === "goto") {
-      opal.metadata = { ...opal.metadata, behavior: "idle" };
+    } else {
+      // Keys found: stop LEADING to the bookshelf — but only if she's still
+      // headed there. A rally later gives her a different goto target, and
+      // this must not clobber it every tick (that stranded her out of the
+      // rally so it never completed naturally).
+      const t = opal.metadata?.gotoTarget as
+        | { y: number; x: number }
+        | undefined;
+      const stillLeading =
+        opal.metadata?.behavior === "goto" &&
+        t?.y === OPAL_LEAD_TARGET.y &&
+        t?.x === OPAL_LEAD_TARGET.x;
+      if (stillLeading) {
+        opal.metadata = { ...opal.metadata, behavior: "idle" };
+      }
     }
   }
 
@@ -136,9 +152,15 @@ export function runHearthScenario(
   // wandering player must not stall the scene), and a tick cap forces it if
   // pathing ever fails, so the monsters always come.
   if (flags.hearthKeysFound && !flags.hearthWondered) {
-    if (!armingFinished(state)) return;
-    if (!state.rallyPoint) startFamilyRally(state, playerPos);
     const counters = (state.scenarioCounters ??= {});
+    counters.armTicks = (counters.armTicks ?? 0) + 1;
+    if (!armingFinished(state)) {
+      // Still arming — unless we've waited too long, in which case force the
+      // rest open so the intro can never dead-end (see ARMING_STALL_CAP).
+      if (counters.armTicks < ARMING_STALL_CAP) return;
+      forceOpenChests(state);
+    }
+    if (!state.rallyPoint) startFamilyRally(state, playerPos);
     counters.rallyTicks = (counters.rallyTicks ?? 0) + 1;
     if (
       isFamilyRallied(state) ||
@@ -189,12 +211,63 @@ export function runHearthScenario(
   }
 }
 
-/** True once every chest-owner has drawn their sword (the hero included). */
+/** The three sword chests on the map (kids' rooms + the master bedroom). */
+const CHEST_TILES: Array<[number, number]> = [
+  [15, 9], // Emerson's room
+  [11, 9], // Claire's room
+  [6, 10], // master bedroom (shared by the adults)
+];
+
+/**
+ * Which chest, if any, an NPC family member should walk to and open. Kids own
+ * their room chests. The master bedroom [6,10] is claimed by the non-hero
+ * adult, preferring Chris — so it's always claimed by an NPC (never stranded
+ * on the hero), and whichever adult doesn't claim it ends up empty-handed.
+ */
+function chestForMember(
+  state: GameState,
+  id: FamilyMemberId
+): [number, number] | null {
+  if (id === "emerson") return [15, 9];
+  if (id === "claire") return [11, 9];
+  const masterOwner: FamilyMemberId =
+    state.activeHeroId === "chris" ? "annie" : "chris";
+  if (id === masterOwner) return [6, 10];
+  return null; // the other adult, and Opal
+}
+
+/** True once all three sword chests have been opened (by hero or NPCs) —
+ * hero-agnostic, so it can't stall on who happens to own the master chest. */
 function armingFinished(state: GameState): boolean {
-  const chestOwners = FAMILY_MEMBERS.filter((m) => m.chest).map((m) => m.id);
-  return (state.party ?? [])
-    .filter((p) => chestOwners.includes(p.id as FamilyMemberId))
-    .every((p) => p.hasSword);
+  return CHEST_TILES.every(
+    ([y, x]) => !(state.mapData.subtypes[y]?.[x]?.includes(TileSubtype.CHEST))
+  );
+}
+
+/** Anti-softlock: pop open any still-closed chest and arm its NPC owner.
+ * Called only when arming has stalled past ARMING_STALL_CAP — SWORD is kept on
+ * the tile so a late hero can still pick theirs up. */
+function forceOpenChests(state: GameState): void {
+  const humans: FamilyMemberId[] = ["chris", "annie", "emerson", "claire"];
+  for (const [y, x] of CHEST_TILES) {
+    const subs = state.mapData.subtypes[y]?.[x] ?? [];
+    if (!subs.includes(TileSubtype.CHEST)) continue;
+    state.mapData.subtypes[y][x] = [
+      ...subs.filter((t) => t !== TileSubtype.CHEST && t !== TileSubtype.LOCK),
+      TileSubtype.OPEN_CHEST,
+    ];
+    const ownerId = humans.find((id) => {
+      const c = chestForMember(state, id);
+      return c && c[0] === y && c[1] === x;
+    });
+    if (!ownerId) continue;
+    const entry = state.party?.find((p) => p.id === ownerId);
+    if (entry) entry.hasSword = true;
+    const npc = (state.npcs ?? []).find(
+      (n) => n.metadata?.partyId === ownerId
+    );
+    if (npc) npc.metadata = { ...npc.metadata, armed: true, behavior: "idle" };
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -314,7 +387,11 @@ export function isFamilyRallied(state: GameState): boolean {
   const point = state.rallyPoint;
   if (!point) return false;
   const [ry, rx] = point;
-  const family = (state.npcs ?? []).filter((n) => n.metadata?.partyId);
+  // The dog isn't required to gather — she shouldn't be able to hold up the
+  // beat, and she may be off doing dog things.
+  const family = (state.npcs ?? []).filter(
+    (n) => n.metadata?.partyId && !n.tags?.includes("dog")
+  );
   if (family.length === 0) return true;
   return family.every(
     (n) => Math.abs(n.y - ry) + Math.abs(n.x - rx) <= RALLY_RADIUS
@@ -341,12 +418,12 @@ function armFamily(state: GameState): void {
   for (const npc of state.npcs ?? []) {
     const id = npc.metadata?.partyId as FamilyMemberId | undefined;
     if (!id) continue;
-    const member = getFamilyMember(id);
-    if (!member.chest) continue; // Opal
+    const chest = chestForMember(state, id);
+    if (!chest) continue; // the empty-handed adult, and Opal
     const entry = state.party?.find((p) => p.id === id);
     if (!entry) continue;
 
-    const [cy, cx] = member.chest;
+    const [cy, cx] = chest;
     const subs = state.mapData.subtypes[cy]?.[cx] ?? [];
     const stillClosed = subs.includes(TileSubtype.CHEST);
 
@@ -455,16 +532,18 @@ function raiseAlarm(state: GameState, playerPos: [number, number]): void {
   const [dy, dx] = DOORS[0].door; // front door, the first breach point
   const dist = (y: number, x: number) => Math.abs(y - dy) + Math.abs(x - dx);
 
-  // Candidates: every living family member — the allies as NPCs, plus the
-  // controlled hero standing on the PLAYER tile.
+  // Candidates: every living family member who can actually SHOUT — the human
+  // allies as NPCs, plus the controlled hero (if human). Opal is a dog: she
+  // can't yell "goblins!", and there is no home-opal-goblins line, so she is
+  // never a spotter.
   type Spotter = { id: FamilyMemberId; npcId: string; y: number; x: number };
   const spotters: Spotter[] = [];
   for (const npc of state.npcs ?? []) {
     const id = npc.metadata?.partyId as FamilyMemberId | undefined;
-    if (id) spotters.push({ id, npcId: npc.id, y: npc.y, x: npc.x });
+    if (id && id !== "opal") spotters.push({ id, npcId: npc.id, y: npc.y, x: npc.x });
   }
   const heroId = state.activeHeroId as FamilyMemberId | undefined;
-  if (heroId) {
+  if (heroId && heroId !== "opal") {
     const [py, px] = playerPos;
     spotters.push({ id: heroId, npcId: `npc-${heroId}`, y: py, x: px });
   }
