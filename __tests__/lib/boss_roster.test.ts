@@ -5,6 +5,7 @@ import {
   bossEmojiFor,
   bossNameFor,
   rollDailyBossKind,
+  fisherRetiredForDate,
   type BossKind,
 } from "../../lib/bosses/boss_roster";
 import { bossDayInfoForDate } from "../../lib/stats/boss_day";
@@ -20,7 +21,7 @@ import type { GameState } from "../../lib/map/game-state";
 function buildFloor3(dateStr: string): GameState {
   const seed = hashStringToSeed(dateStr);
   const f1 = withPatchedMathRandom(mulberry32(seed), () =>
-    initializeGameStateForMultiTier(1)
+    initializeGameStateForMultiTier(1, { fisherRetired: fisherRetiredForDate(dateStr) })
   );
   return advanceToNextFloor(advanceToNextFloor(f1, seed), seed);
 }

@@ -57,20 +57,30 @@ describe("endless boss cadence", () => {
   });
 });
 
+// The Fisher is retired from rotation (softlock: it can run out of both a firing lane and
+// snakes to throw, and just retreats forever — see FISHER_RETIRED_START_DATE), so the active
+// endless order is BOSS_KINDS minus one. Derived rather than hardcoded so this stays correct
+// if the roster changes again.
+const ACTIVE_ENDLESS_BOSS_KINDS = BOSS_KINDS.filter((k) => k !== "fisher");
+
 describe("endless boss order", () => {
-  it("uses every boss exactly once before repeating any", () => {
+  it("uses every active boss exactly once before repeating any", () => {
     for (const seed of [1, 7, 99, 4242, 0x7ffffffe]) {
       const order = rollEndlessBossOrder(seed);
-      expect(order.length).toBe(BOSS_KINDS.length);
-      expect(new Set(order).size).toBe(BOSS_KINDS.length);
-      expect([...order].sort()).toEqual([...BOSS_KINDS].sort());
+      expect(order.length).toBe(ACTIVE_ENDLESS_BOSS_KINDS.length);
+      expect(new Set(order).size).toBe(ACTIVE_ENDLESS_BOSS_KINDS.length);
+      expect([...order].sort()).toEqual([...ACTIVE_ENDLESS_BOSS_KINDS].sort());
+      expect(order).not.toContain("fisher");
     }
   });
 
   it("recycles that same order rather than reshuffling", () => {
     const seed = 20260731;
-    const first = [6, 12, 18, 24].map((f) => endlessBossKindForFloor(f, seed));
-    const second = [30, 36, 42, 48].map((f) => endlessBossKindForFloor(f, seed));
+    const n = ACTIVE_ENDLESS_BOSS_KINDS.length;
+    const firstCycle = Array.from({ length: n }, (_, i) => (i + 1) * ENDLESS_BOSS_CADENCE);
+    const secondCycle = firstCycle.map((f) => f + n * ENDLESS_BOSS_CADENCE);
+    const first = firstCycle.map((f) => endlessBossKindForFloor(f, seed));
+    const second = secondCycle.map((f) => endlessBossKindForFloor(f, seed));
     expect(first).toEqual(rollEndlessBossOrder(seed));
     expect(second).toEqual(first);
   });

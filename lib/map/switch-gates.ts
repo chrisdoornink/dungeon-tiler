@@ -52,6 +52,12 @@ export interface DailySwitchGate {
    * The enemy case is NOT player engagement, so analytics must not count it as "solved".
    */
   thrownBy?: "rock" | "boot" | "enemy";
+  /**
+   * What the bed stands between the hero and (daily tuning v2 only; absent on earlier days).
+   * "chest" = the detour was scored against treasure, so the spikes guard loot; "corridor" =
+   * the classic longest-walk shortcut.
+   */
+  target?: "chest" | "corridor";
 }
 
 export interface SwitchGatePlan {
@@ -84,6 +90,25 @@ export interface PlanSwitchGateOptions {
    * snakes exist, so without this a spike bed can be built directly on top of one.
    */
   avoid?: ReadonlySet<string>;
+  /**
+   * Daily tuning v2: restrict candidate beds by walking distance from the hero's start.
+   * "near" = within NEAR_SPAWN_BED_STEPS, "far" = beyond it. Absent = any bed (the v1
+   * behavior). The near/far split is rolled per day in maybePlaceSwitchGate so gates stop
+   * defaulting to the hero's doorstep — see SWITCH_GATE_NEAR_SPAWN_SHARE.
+   */
+  bedPool?: "near" | "far";
+  /**
+   * Daily tuning v2: score the detour against CHESTS only, so the chosen bed specifically
+   * stands between the hero and treasure rather than just the longest corridor. The
+   * no-soft-lock severing check still covers every essential tile either way. Returns null
+   * when the floor has no reachable chest — callers fall back to corridor mode.
+   */
+  targetMode?: "chest";
+  /**
+   * Detour bars to walk down when the caller wants a different quality/coverage trade than
+   * the default DETOUR_LADDER (only planSwitchGateBestEffort reads this).
+   */
+  detourLadder?: readonly number[];
 }
 
 const ROCK_THROW_RANGE = 4;
@@ -280,8 +305,14 @@ function passageBed(
  * that satisfies the rules.
  *
  * Ranking is by `detour`: the bed that costs the player the most walking while it is shut
- * is the bed most worth a rock. Ties break toward the bed nearest the hero's start, so the
- * gate is something met early and remembered rather than stumbled on at the exit.
+ * is the bed most worth a rock. Base tie-break is toward the bed nearest the hero's start
+ * ("met early and remembered") — the census showed that stacked 40% of all beds within six
+ * steps of spawn, where they read as furniture, so daily tuning v2 flips the tie toward the
+ * FAR bed whenever opts.bedPool is "far" (the 70% case; see SWITCH_GATE_NEAR_SPAWN_SHARE).
+ *
+ * opts.targetMode === "chest" scores the detour against chests only, so the winning bed is
+ * the one most in the way of treasure. The severing check is unchanged — every essential
+ * tile (keys, exit, chests) must survive the bed being shut, whatever is being scored.
  */
 export function planSwitchGate(
   mapData: MapData,
@@ -291,15 +322,23 @@ export function planSwitchGate(
   const access = opts.access ?? "behind-bed";
   const minDetour = opts.minDetour ?? 4;
   const avoid = opts.avoid;
+  const preferFar = opts.bedPool === "far";
 
   const targets = essentialTargets(mapData);
   const baseline = bfsDistances(mapData, hero, new Set());
   // Only score targets the hero can already reach; an unreachable-at-baseline target is a
   // pre-existing property of the floor and not something this gate should be blamed for.
   const scored = targets.filter((t) => baseline.has(`${t[0]},${t[1]}`));
+  const detourTargets =
+    opts.targetMode === "chest"
+      ? findSubtype(mapData, TileSubtype.CHEST).filter((t) => baseline.has(`${t[0]},${t[1]}`))
+      : scored;
+  // Nothing to score a detour against (chest mode on a chestless floor, or a floor whose
+  // essentials are all unreachable) — no gate is better than a meaningless one.
+  if (detourTargets.length === 0) return null;
 
   let best: SwitchGatePlan | null = null;
-  let bestRank: [number, number] = [-1, Number.MAX_SAFE_INTEGER];
+  let bestRank: [number, number] = [-1, preferFar ? -1 : Number.MAX_SAFE_INTEGER];
 
   for (let y = 0; y < mapData.tiles.length; y++) {
     for (let x = 0; x < mapData.tiles[y].length; x++) {
@@ -308,13 +347,31 @@ export function planSwitchGate(
         const run = passageBed(mapData, y, x, axis, avoid);
         if (!run) continue;
 
+        // Pool screen (v2): the bed's walking distance from the start, before paying for a
+        // closed-bed BFS. An unreachable bed (isolated pocket) can never be "near".
+        if (opts.bedPool) {
+          const bedDist = run.bed.reduce(
+            (m, [by, bx]) => Math.min(m, baseline.get(`${by},${bx}`) ?? Number.MAX_SAFE_INTEGER),
+            Number.MAX_SAFE_INTEGER
+          );
+          const isNear = bedDist <= NEAR_SPAWN_BED_STEPS;
+          if (opts.bedPool === "near" ? !isNear : isNear) continue;
+        }
+
         const blocked = new Set(run.bed.map(([by, bx]) => `${by},${bx}`));
         const closed = bfsDistances(mapData, hero, blocked);
 
         // Hard reject: anything the run needs must survive the bed being shut.
         let severed = false;
-        let detour = 0;
         for (const [ty, tx] of scored) {
+          if (closed.get(`${ty},${tx}`) === undefined) {
+            severed = true;
+            break;
+          }
+        }
+        if (severed) continue;
+        let detour = 0;
+        for (const [ty, tx] of detourTargets) {
           const key = `${ty},${tx}`;
           const after = closed.get(key);
           if (after === undefined) {
@@ -330,9 +387,10 @@ export function planSwitchGate(
         const plate = choosePlate(mapData, run, closed, access, hero, avoid);
         if (!plate) continue;
 
-        const nearer = Math.abs(run.bed[0][0] - hero[0]) + Math.abs(run.bed[0][1] - hero[1]);
-        if (detour > bestRank[0] || (detour === bestRank[0] && nearer < bestRank[1])) {
-          bestRank = [detour, nearer];
+        const prox = Math.abs(run.bed[0][0] - hero[0]) + Math.abs(run.bed[0][1] - hero[1]);
+        const tieBetter = preferFar ? prox > bestRank[1] : prox < bestRank[1];
+        if (detour > bestRank[0] || (detour === bestRank[0] && tieBetter)) {
+          bestRank = [detour, prox];
           best = {
             bed: run.bed,
             plate: plate.pos,
@@ -470,15 +528,35 @@ export function applySwitchGate(
 const DETOUR_LADDER = [4, 2] as const;
 
 /**
+ * The v2 ladder (daily tuning v2): starts twice as high and never drops to the old
+ * bottom rung. The census put the median shipped detour barely above the old floor —
+ * "genuinely nearly pointless" gates were common enough to read as furniture. Raising
+ * the bar costs some coverage on cramped floors (the near/far cascade in
+ * maybePlaceSwitchGate already retries the other pool before giving up), which is the
+ * intended trade: a missing gate beats a meaningless one.
+ */
+const DETOUR_LADDER_V2 = [8, 5, 3] as const;
+
+/**
+ * Chest-target gates get one extra, lower rung. A corridor gate saving 2 steps is
+ * meaningless, but a spike bed sitting between the hero and a chest reads as "the spikes
+ * guard the treasure" even at a 2-step detour — the value is the picture, not the walk.
+ * Without this rung, chest beds (already rare: chests sit in open rooms) almost never
+ * clear the corridor bars and the chest mode barely ships.
+ */
+const DETOUR_LADDER_V2_CHEST = [8, 5, 3, 2] as const;
+
+/**
  * Plan a gate for a floor, relaxing the detour bar until one is found, or null if the floor
- * has nowhere legal at all.
+ * has nowhere legal at all. opts.detourLadder swaps in a different set of bars (v2).
  */
 export function planSwitchGateBestEffort(
   mapData: MapData,
   hero: [number, number],
   opts: PlanSwitchGateOptions = {}
 ): SwitchGatePlan | null {
-  const bars = opts.minDetour === undefined ? DETOUR_LADDER : [opts.minDetour, ...DETOUR_LADDER];
+  const ladder = opts.detourLadder ?? DETOUR_LADDER;
+  const bars = opts.minDetour === undefined ? ladder : [opts.minDetour, ...ladder];
   for (const minDetour of bars) {
     const plan = planSwitchGate(mapData, hero, { ...opts, minDetour });
     if (plan) return plan;
@@ -541,6 +619,34 @@ export function rollPlateAccess(): PlateAccess {
   return Math.random() < SWITCH_GATE_ON_PATH_CHANCE ? "open" : "behind-bed";
 }
 
+/**
+ * Daily tuning v2: the near/far split. A bed within NEAR_SPAWN_BED_STEPS walking steps of
+ * the hero's start counts as "near"; this is the share of gate days that deliberately KEEP
+ * the old met-early placement. The rest are pushed beyond it, where opening the lane is a
+ * memory and a walk rather than a shrug.
+ *
+ * The knob is FAR lower than the 30%-within-8 target it aims for, because near beds are
+ * mostly structural, not chosen: whenever a floor offers no far bed at all the far pool
+ * falls back to near, and small floor-1 grids (a fifth of gates) plus cramped floors
+ * supply near beds on ~20% of far-preferring days by themselves. The knob only adds the
+ * last few deliberate points on top of that floor. Census fit: knob 0.30 → 41% within 8,
+ * knob 0.15 → 37%, knob 0.05 → target. Re-fit against the census harness if the ladder,
+ * pools, or floor-cascade change. Both pools fall back to the other when a floor only
+ * offers one kind, so coverage does not pay for the split.
+ */
+export const SWITCH_GATE_NEAR_SPAWN_SHARE = 0.05;
+export const NEAR_SPAWN_BED_STEPS = 8;
+
+/**
+ * Daily tuning v2: share of gate days that score the bed against CHESTS instead of the
+ * longest corridor, so the spikes visibly guard treasure. The knob is intent, not outcome —
+ * the effective rate is much lower: floor 3 (half of all gates) has no chests at all, and
+ * even chest-bearing floors rarely offer a bed that detours a chest by much. Census: at
+ * 0.35 only ~7% of shipped gates were chest gates; 0.5 plus the softer chest ladder below
+ * lands the "occasionally" the design asks for (~1 gate in 8).
+ */
+export const SWITCH_GATE_CHEST_TARGET_CHANCE = 0.5;
+
 /** The last floor, which takes the gate without rolling for it. */
 const SWITCH_GATE_LAST_FLOOR = 3;
 
@@ -577,7 +683,7 @@ export function maybePlaceSwitchGate(
   },
   floor: number,
   hero: [number, number] | null,
-  opts: PlanSwitchGateOptions = {}
+  opts: PlanSwitchGateOptions & { tuningV2?: boolean } = {}
 ): SwitchGatePlan | null {
   if (state.switchGate) return null;
   if (!hero) return null;
@@ -588,9 +694,49 @@ export function maybePlaceSwitchGate(
   // AFTER the floor check so a floor that never gets a gate draws only the one value — keeps
   // the stream cost of a skipped floor at exactly one draw.
   const access = opts.access ?? rollPlateAccess();
-  const plan = injectSwitchGate(state, hero, { ...opts, access });
-  if (plan) state.switchGate = { floor, access, plate: plan.plate };
-  return plan;
+
+  if (!opts.tuningV2) {
+    const plan = injectSwitchGate(state, hero, { ...opts, access });
+    if (plan) state.switchGate = { floor, access, plate: plan.plate };
+    return plan;
+  }
+
+  // Daily tuning v2. Exactly two more draws, made up front whatever happens next, so an
+  // attempting floor always costs access + these two — planning itself draws nothing.
+  const wantChest = Math.random() < SWITCH_GATE_CHEST_TARGET_CHANCE;
+  const wantNear = Math.random() < SWITCH_GATE_NEAR_SPAWN_SHARE;
+
+  // Preference cascade: POOL outranks MODE. The 30%-within-8-steps distance target is the
+  // calibrated promise (SWITCH_GATE_NEAR_SPAWN_SHARE); chest-targeting is a flavor
+  // preference within it — nesting the other way round leaks near beds onto far days
+  // whenever the only chest-worthy beds sit near spawn, which measurably blows the
+  // distance target. Pools are exhaustive (near ∪ far covers every bed), so trying the
+  // preferred pool then the other preserves v1's coverage guarantee; chest mode degrades
+  // to corridor mode inside each pool the same way.
+  const pools: Array<"near" | "far"> = wantNear ? ["near", "far"] : ["far", "near"];
+  const modes: Array<"chest" | undefined> = wantChest ? ["chest", undefined] : [undefined];
+  for (const bedPool of pools) {
+    for (const targetMode of modes) {
+      const plan = planSwitchGateBestEffort(state.mapData, hero, {
+        ...opts,
+        access,
+        targetMode,
+        bedPool,
+        detourLadder: targetMode === "chest" ? DETOUR_LADDER_V2_CHEST : DETOUR_LADDER_V2,
+      });
+      if (plan) {
+        applySwitchGate(state, state.mapData, plan);
+        state.switchGate = {
+          floor,
+          access,
+          plate: plan.plate,
+          target: targetMode === "chest" ? "chest" : "corridor",
+        };
+        return plan;
+      }
+    }
+  }
+  return null;
 }
 
 /**

@@ -77,6 +77,16 @@ export {
 } from "./map/switch-gates";
 
 export {
+  DAILY_TUNING_V2_START_DATE,
+  dailyTuningV2ForDate,
+} from "./map/daily_tuning";
+
+export {
+  FISHER_RETIRED_START_DATE,
+  fisherRetiredForDate,
+} from "./bosses/boss_roster";
+
+export {
   cloneMapData,
   clonePlainEnemies,
   clonePotOverrides,

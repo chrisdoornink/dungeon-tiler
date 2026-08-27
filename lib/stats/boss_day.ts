@@ -20,8 +20,9 @@ import {
   initializeGameStateForMultiTier,
   advanceToNextFloor,
 } from "../map/game-state";
+import { dailyTuningV2ForDate } from "../map/daily_tuning";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
-import { bossInfo, type BossKind } from "../bosses/boss_roster";
+import { bossInfo, fisherRetiredForDate, type BossKind } from "../bosses/boss_roster";
 
 export type BossEntranceKind = "bomb" | "douse" | "moat-lava" | "moat-water";
 
@@ -95,8 +96,16 @@ export function reconcileBossDay(
  */
 export function bossDayInfoForDate(dateStr: string): BossDayInfo {
   const seed = hashStringToSeed(dateStr);
+  // tuningV2 must mirror what players' clients ran on that date: it changes draws
+  // mid-stream (extra enemy placements) and can even change which entrance PLACED via the
+  // moat-variance fallback path, so replaying a post-gate date without it reconstructs a
+  // floor 3 nobody saw. Switch gates stay un-passed here on purpose — they are the floor's
+  // LAST draw and cannot move anything this replay reads.
   const f1 = withPatchedMathRandom(mulberry32(seed), () =>
-    initializeGameStateForMultiTier(1)
+    initializeGameStateForMultiTier(1, {
+      tuningV2: dailyTuningV2ForDate(dateStr),
+      fisherRetired: fisherRetiredForDate(dateStr),
+    })
   );
   const f2 = advanceToNextFloor(f1, seed);
   const f3 = advanceToNextFloor(f2, seed);

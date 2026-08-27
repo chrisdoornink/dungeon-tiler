@@ -2559,6 +2559,21 @@ export interface GameState {
    */
   switchGatesEnabled?: boolean;
   switchGate?: DailySwitchGate;
+  /**
+   * Daily tuning v2 (see lib/map/daily_tuning.ts): boosted swarms, path-biased enemy
+   * placement, water ambushers, varied moats, and the switch-gate near/far split. Set at
+   * floor-1 build from the date gate and carried forward by advanceToNextFloor's spread,
+   * exactly like switchGatesEnabled — and left undefined rather than false when off, so
+   * it stays absent from every serialized save that predates it.
+   */
+  tuningV2Enabled?: boolean;
+  /**
+   * Whether the day's boss roll excludes the Fisher (see FISHER_RETIRED_START_DATE). Set at
+   * floor-1 build from the date gate and carried forward by advanceToNextFloor's spread,
+   * exactly like tuningV2Enabled — so the roll on floor 3 agrees with whichever cutover this
+   * run started under, and left undefined rather than false when off.
+   */
+  bossFisherRetired?: boolean;
   // The floor to restore when the hero walks back out of a boss arena. Kept
   // separate from dungeonReturn/realmReturn (a boss room can be entered from the
   // dungeon OR from inside another sub-area, so the stashes must nest).
@@ -2931,6 +2946,202 @@ function enemyCountForFloor(floor: number): number {
 }
 
 /**
+ * Daily tuning v2 (lib/map/daily_tuning.ts): share of a floor's base enemy count that is
+ * seeded along the spawn→key→exit corridor instead of uniformly across the floor.
+ *
+ * The census behind this: intended counts were always met (mean 27.9/run, zero shortfall
+ * days), yet floors FELT empty — uniform placement over floor 2's 900 tiles put most
+ * enemies off the route, where combat is optional scenery. Biasing a third of the count
+ * onto the corridor raises encounters without raising counts. minDistanceFromPlayer 8
+ * still applies, so this seeds the middle and far stretch of the route, never the
+ * doorstep.
+ */
+const PATH_BIAS_SHARE = 0.35;
+/** How far from the walked line still counts as "on the corridor" (Chebyshev tiles). */
+const PATH_CORRIDOR_RADIUS = 2;
+
+/**
+ * Daily tuning v2: water-goblin ambushers in big pools. Enemies never SPAWN in water
+ * (SPAWN_BLOCKING_SUBTYPES), so lake/flood/moat days ship a large certified-safe region —
+ * the census measured moat-water days flooding 18-43% of floor 3 with nothing in it. On a
+ * floor whose deep water covers at least MIN of the floor tiles, 1 swimmer spawns IN the
+ * pool (2 at BIG+), kind water-goblin — a swimming kind by the movement rules, so it can
+ * chase out of the pool and haunt the banks. Douse days' 4-6 tile torch-snuffing patch
+ * stays below MIN by construction, so the douse mechanism is never contested.
+ */
+const WATER_AMBUSH_MIN_DEEP_FRAC = 0.08;
+const WATER_AMBUSH_BIG_DEEP_FRAC = 0.15;
+
+/**
+ * The tiles within PATH_CORRIDOR_RADIUS of the hero's natural route: spawn → exit key
+ * (when the floor has one) → exit. Dry-walk BFS (lava, deep water, abyss, cracks and
+ * spikes all block, mirroring switch-gates' isDryWalkable), so the corridor is the route
+ * a player actually walks. Returns null when the floor has no exit-ish target or no dry
+ * path to it — callers fall back to uniform placement. Draws no randomness.
+ */
+export function corridorTilesForMap(mapData: MapData): Set<string> | null {
+  const tiles = mapData.tiles;
+  const h = tiles.length;
+  const w = tiles[0]?.length ?? 0;
+  const spawn = findPlayerPosition(mapData);
+  if (!spawn) return null;
+
+  const findSub = (sub: TileSubtype): [number, number] | null => {
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if ((mapData.subtypes[y]?.[x] ?? []).includes(sub)) return [y, x];
+      }
+    }
+    return null;
+  };
+  const keyPos = findSub(TileSubtype.EXITKEY);
+  const exitPos = findSub(TileSubtype.EXIT);
+  if (!keyPos && !exitPos) return null;
+
+  const walkable = (y: number, x: number): boolean => {
+    if (y < 0 || x < 0 || y >= h || x >= w) return false;
+    if (tiles[y][x] !== FLOOR) return false;
+    const subs = mapData.subtypes[y]?.[x] ?? [];
+    return !(
+      subs.includes(TileSubtype.LAVA) ||
+      subs.includes(TileSubtype.DEEP_WATER) ||
+      subs.includes(TileSubtype.OPEN_ABYSS) ||
+      subs.includes(TileSubtype.FAULTY_FLOOR) ||
+      subs.includes(TileSubtype.SPIKES)
+    );
+  };
+
+  const bfsPath = (
+    from: [number, number],
+    to: [number, number]
+  ): Array<[number, number]> | null => {
+    const parent = new Map<string, string | null>();
+    parent.set(`${from[0]},${from[1]}`, null);
+    let frontier: Array<[number, number]> = [from];
+    while (frontier.length) {
+      const next: Array<[number, number]> = [];
+      for (const [y, x] of frontier) {
+        if (y === to[0] && x === to[1]) {
+          const path: Array<[number, number]> = [];
+          let cur: string | null = `${y},${x}`;
+          while (cur) {
+            const [cy, cx] = cur.split(",").map(Number);
+            path.push([cy, cx]);
+            cur = parent.get(cur) ?? null;
+          }
+          return path;
+        }
+        for (const [dy, dx] of [[-1, 0], [1, 0], [0, -1], [0, 1]] as const) {
+          const ny = y + dy;
+          const nx = x + dx;
+          const key = `${ny},${nx}`;
+          if (parent.has(key) || !walkable(ny, nx)) continue;
+          parent.set(key, `${y},${x}`);
+          next.push([ny, nx]);
+        }
+      }
+      frontier = next;
+    }
+    return null;
+  };
+
+  const legs: Array<[number, number]> = [];
+  let cursor: [number, number] = spawn;
+  for (const target of [keyPos, exitPos]) {
+    if (!target) continue;
+    const path = bfsPath(cursor, target);
+    if (path) {
+      legs.push(...path);
+      cursor = target;
+    }
+  }
+  if (legs.length === 0) return null;
+
+  const corridor = new Set<string>();
+  for (const [py, px] of legs) {
+    for (let dy = -PATH_CORRIDOR_RADIUS; dy <= PATH_CORRIDOR_RADIUS; dy++) {
+      for (let dx = -PATH_CORRIDOR_RADIUS; dx <= PATH_CORRIDOR_RADIUS; dx++) {
+        corridor.add(`${py + dy},${px + dx}`);
+      }
+    }
+  }
+  return corridor;
+}
+
+/**
+ * The daily's base enemy placement for one floor. v1: the whole count uniform-random at
+ * distance ≥8. v2 (daily tuning): PATH_BIAS_SHARE of the count restricted to the corridor
+ * first, the rest uniform — with any corridor shortfall (a short floor whose route sits
+ * mostly inside the 8-tile spawn ring) rolled back into the uniform batch, so the count
+ * itself is untouchable either way.
+ */
+function placeDailyBaseEnemies(
+  mapData: MapData,
+  playerPos: [number, number],
+  floor: number,
+  tuningV2: boolean
+): Enemy[] {
+  const count = enemyCountForFloor(floor);
+  const base = {
+    grid: mapData.tiles,
+    subtypes: mapData.subtypes,
+    player: { y: playerPos[0], x: playerPos[1] },
+    minDistanceFromPlayer: 8,
+  };
+  if (!tuningV2) return placeEnemies({ ...base, count });
+
+  const corridor = corridorTilesForMap(mapData);
+  const pathTarget = corridor ? Math.round(count * PATH_BIAS_SHARE) : 0;
+  const onPath =
+    pathTarget > 0
+      ? placeEnemies({ ...base, count: pathTarget, allowedTiles: corridor ?? undefined })
+      : [];
+  const taken = new Set(onPath.map((e) => `${e.y},${e.x}`));
+  const uniform = placeEnemies({ ...base, count: count - onPath.length, takenTiles: taken });
+  return [...onPath, ...uniform];
+}
+
+/**
+ * Daily tuning v2: add the big-pool ambushers (see WATER_AMBUSH_MIN_DEEP_FRAC). Mutates
+ * `enemies` in place. No-op on floors whose deep water is below the threshold — which is
+ * every douse patch, every puddle tier, and every dry floor.
+ */
+function addWaterAmbushers(
+  mapData: MapData,
+  enemies: Enemy[],
+  playerPos: [number, number]
+): void {
+  let deep = 0;
+  let floorTiles = 0;
+  for (let y = 0; y < mapData.tiles.length; y++) {
+    for (let x = 0; x < mapData.tiles[y].length; x++) {
+      if (mapData.tiles[y][x] !== FLOOR) continue;
+      floorTiles++;
+      if ((mapData.subtypes[y]?.[x] ?? []).includes(TileSubtype.DEEP_WATER)) deep++;
+    }
+  }
+  if (floorTiles === 0) return;
+  const frac = deep / floorTiles;
+  if (frac < WATER_AMBUSH_MIN_DEEP_FRAC) return;
+  const wanted = frac >= WATER_AMBUSH_BIG_DEEP_FRAC ? 2 : 1;
+
+  const taken = new Set(enemies.map((e) => `${e.y},${e.x}`));
+  const ambushers = placeEnemies({
+    grid: mapData.tiles,
+    subtypes: mapData.subtypes,
+    player: { y: playerPos[0], x: playerPos[1] },
+    count: wanted,
+    minDistanceFromPlayer: 6,
+    inDeepWater: true,
+    takenTiles: taken,
+  });
+  for (const a of ambushers) {
+    a.kind = "water-goblin";
+    enemies.push(a);
+  }
+}
+
+/**
  * Initialize a new game state for floor 1 of multi-tier daily mode.
  * Computes the chest/key allocation for all floors and generates floor 1's map accordingly.
  */
@@ -2940,10 +3151,16 @@ function enemyCountForFloor(floor: number): number {
  *   endless, and the historical replays in lib/stats — is unaffected by construction. The two
  *   daily entry points turn it on, gated on SWITCH_GATE_START_DATE, because they are the only
  *   callers that know what date's map they are building.
+ * @param opts.tuningV2 Opt in to the daily tuning v2 batch (lib/map/daily_tuning.ts):
+ *   boosted swarms, path-biased placement, water ambushers, varied moats, switch-gate
+ *   near/far split. Same discipline as switchGates — off by default, date-gated by the
+ *   callers that know the date (GameView and the lib/stats replayers). Unlike switchGates
+ *   it changes draws MID-STREAM, so a replayer that forgets it reconstructs a map nobody
+ *   played on post-gate dates.
  */
 export function initializeGameStateForMultiTier(
   floor: number = 1,
-  opts: { switchGates?: boolean } = {}
+  opts: { switchGates?: boolean; tuningV2?: boolean; fisherRetired?: boolean } = {}
 ): GameState {
   // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
@@ -2966,16 +3183,13 @@ export function initializeGameStateForMultiTier(
 
   const playerPos = findPlayerPosition(mapData);
   const enemies = playerPos
-    ? placeEnemies({
-        grid: mapData.tiles,
-        subtypes: mapData.subtypes,
-        player: { y: playerPos[0], x: playerPos[1] },
-        count: enemyCountForFloor(floor),
-        minDistanceFromPlayer: 8,
-      })
+    ? placeDailyBaseEnemies(mapData, playerPos, floor, opts.tuningV2 === true)
     : [];
 
-  const { ghostCount, whiteGoblinCount } = enemyTypeAssignement(enemies, { floor });
+  const { ghostCount, whiteGoblinCount } = enemyTypeAssignement(enemies, {
+    floor,
+    boostedSwarms: opts.tuningV2 === true,
+  });
   if (ghostCount > 0 && playerPos) {
     const ghosts = placeEnemies({
       grid: mapData.tiles,
@@ -3056,6 +3270,7 @@ export function initializeGameStateForMultiTier(
       for (const [ty, tx] of [...l.switches, ...l.gates]) gateAvoid.add(`${ty},${tx}`);
     maybePlaceSwitchGate(gateWiring, floor, findPlayerPosition(withRunes), {
       avoid: gateAvoid,
+      tuningV2: opts.tuningV2 === true,
     });
   }
 
@@ -3079,6 +3294,8 @@ export function initializeGameStateForMultiTier(
     // Carried across floors: whether the feature is on for this run, and whether the day's one
     // gate has already been spent. advanceToNextFloor reads both.
     switchGatesEnabled: opts.switchGates ? true : undefined,
+    tuningV2Enabled: opts.tuningV2 ? true : undefined,
+    bossFisherRetired: opts.fisherRetired ? true : undefined,
     switchGate: gateWiring.switchGate,
     gateGroups: gateWiring.gateGroups,
     showFullMap: false,
@@ -3231,7 +3448,8 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
         const placed = stampBossEntranceWithFallback(
           mapData,
           kind,
-          mulberry32Fn(dailySeed ^ BOSS_ENTRANCE_FALLBACK_SEED_SALT)
+          mulberry32Fn(dailySeed ^ BOSS_ENTRANCE_FALLBACK_SEED_SALT),
+          { varyMoat: currentState.tuningV2Enabled === true }
         );
         if (placed) {
           bossEntrance = placed.kind;
@@ -3259,24 +3477,21 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
   // Deterministic from the date, so every player gets the same boss; independent of it, so
   // adding bosses later never disturbs existing daily maps.
   const dailyBossKind = bossEntrance
-    ? withPatchedMathRandom(
-        mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT),
-        rollDailyBossKind
+    ? withPatchedMathRandom(mulberry32Fn(dailySeed ^ BOSS_KIND_SEED_SALT), () =>
+        rollDailyBossKind({ excludeFisher: currentState.bossFisherRetired === true })
       )
     : undefined;
 
   // Find player position to place enemies
   const playerPos = findPlayerPosition(newMapData);
+  const tuningV2 = currentState.tuningV2Enabled === true;
   const enemies = playerPos
     ? withPatchedMathRandom(rng, () => {
-        const placed = placeEnemies({
-          grid: newMapData.tiles,
-          subtypes: newMapData.subtypes,
-          player: { y: playerPos[0], x: playerPos[1] },
-          count: enemyCountForFloor(nextFloor),
-          minDistanceFromPlayer: 8,
+        const placed = placeDailyBaseEnemies(newMapData, playerPos, nextFloor, tuningV2);
+        const { ghostCount: gc, whiteGoblinCount: wgc } = enemyTypeAssignement(placed, {
+          floor: nextFloor,
+          boostedSwarms: tuningV2,
         });
-        const { ghostCount: gc, whiteGoblinCount: wgc } = enemyTypeAssignement(placed, { floor: nextFloor });
         if (gc > 0) {
           const ghosts = placeEnemies({
             grid: newMapData.tiles,
@@ -3331,6 +3546,12 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
             });
           }
         }
+        // Daily tuning v2: big-pool ambushers, after every additive kind above so their
+        // tile picks exclude everything already standing, before the guard so the guard
+        // stays the floor's last enemy draw.
+        if (tuningV2) {
+          addWaterAmbushers(newMapData, placed, playerPos);
+        }
         // Floor 3 (escape floor): station one static guard next to the exit key so
         // collecting it always requires a fight. Inside this seeded block so the
         // guard position is deterministic per daily seed, like the rest of floor 3.
@@ -3376,6 +3597,7 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     withPatchedMathRandom(rng, () =>
       maybePlaceSwitchGate(gateWiring, nextFloor, findPlayerPosition(withRunes), {
         avoid: occupiedTiles(snakesAdded),
+        tuningV2,
       })
     );
   }
