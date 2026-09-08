@@ -7,7 +7,9 @@ import type {
   EndgameStatsResponse,
   StatsDayPayload,
   GameCompleteRow,
+  PlayerStatsResponse,
 } from "../../lib/stats/endgame_stats";
+import type { ReturningPlayer } from "../../lib/stats/player_names";
 
 // Retro palette, borrowed from the in-game .pixel-* styles so the dashboard
 // reads like part of the game rather than an admin panel.
@@ -60,6 +62,10 @@ const BOSS_ENTRANCE_META: Record<string, { emoji: string; label: string }> = {
 };
 
 const DAYS_PER_PAGE = 3;
+const PLAYER_WINDOW_DAYS = 14;
+
+type PlayerMap = Record<string, ReturningPlayer>;
+type PlayerClick = (distinctId: string) => void;
 
 function PixelImg({
   src,
@@ -199,10 +205,66 @@ function deriveLoot(
   return { items, mystery };
 }
 
-function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
+/** Clickable pseudonym chip for a returning player. */
+function PlayerChip({
+  player,
+  onClick,
+  active,
+}: {
+  player: ReturningPlayer;
+  onClick?: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="pixel-text"
+      title={`${player.name} — completed dailies on ${player.days} different days recently. Click for their last ${PLAYER_WINDOW_DAYS} days.`}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        fontSize: 10,
+        padding: "3px 7px",
+        borderRadius: 3,
+        color: active ? C.borderDark : C.text,
+        background: active ? C.border : C.panel2,
+        border: `1px solid ${C.border}`,
+        cursor: onClick ? "pointer" : "default",
+        lineHeight: 1.2,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span>{player.name}</span>
+      <span style={{ color: active ? C.borderDark : C.muted, fontSize: 9 }}>×{player.days}d</span>
+    </button>
+  );
+}
+
+const MODE_META: Record<string, { label: string; color: string }> = {
+  endless: { label: "ENDLESS", color: C.bomb },
+  normal: { label: "STORY", color: C.muted },
+};
+
+function GameRow({
+  g,
+  l2Items,
+  player,
+  onPlayerClick,
+  showMode = false,
+}: {
+  g: GameCompleteRow;
+  l2Items: LootItem[];
+  player?: ReturningPlayer;
+  onPlayerClick?: PlayerClick;
+  /** In the per-player view, tag non-daily runs so endless/story rows read differently. */
+  showMode?: boolean;
+}) {
   const win = g.outcome === "win";
   const loot = deriveLoot(g, l2Items);
   const emptyChest = loot != null && loot.items.length === 0 && loot.mystery === 0;
+  const mode = showMode && g.gameMode && g.gameMode !== "daily" ? MODE_META[g.gameMode] : null;
   return (
     <div
       style={{
@@ -231,6 +293,31 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
         <span style={{ fontSize: 15 }}>{win ? "🏆" : "💀"}</span>
         {win ? "ESCAPED" : "FELL"}
       </div>
+
+      {/* returning-player pseudonym (only players seen on 2+ days get one) */}
+      {player ? (
+        <PlayerChip
+          player={player}
+          onClick={onPlayerClick ? () => onPlayerClick(g.distinctId) : undefined}
+        />
+      ) : null}
+
+      {/* game mode, when this row is not a daily (per-player view only) */}
+      {mode ? (
+        <span
+          className="pixel-text"
+          title={`${mode.label.toLowerCase()} mode run`}
+          style={{
+            fontSize: 9,
+            padding: "2px 5px",
+            borderRadius: 3,
+            color: mode.color,
+            border: `1px solid ${mode.color}`,
+          }}
+        >
+          {mode.label}
+        </span>
+      ) : null}
 
       {/* floor reached */}
       <div
@@ -360,9 +447,18 @@ function GameRow({ g, l2Items }: { g: GameCompleteRow; l2Items: LootItem[] }) {
   );
 }
 
-function DayCard({ day }: { day: StatsDayPayload }) {
+function DayCard({
+  day,
+  players,
+  onPlayerClick,
+}: {
+  day: StatsDayPayload;
+  players: PlayerMap;
+  onPlayerClick: PlayerClick;
+}) {
   const { weekday, rest } = formatDay(day.date);
   const s = day.summary;
+  const returning = day.games.filter((g) => players[g.distinctId]).length;
   return (
     <section
       style={{
@@ -393,6 +489,7 @@ function DayCard({ day }: { day: StatsDayPayload }) {
           </div>
           <div style={{ color: C.muted, fontSize: 12 }}>
             {weekday} · {s.total} game{s.total === 1 ? "" : "s"}
+            {returning > 0 ? ` · ${returning} by returning players` : ""}
           </div>
         </div>
 
@@ -582,7 +679,13 @@ function DayCard({ day }: { day: StatsDayPayload }) {
           </div>
         ) : (
           day.games.map((g, i) => (
-            <GameRow key={`${g.distinctId}-${g.timestamp}-${i}`} g={g} l2Items={day.chests.items} />
+            <GameRow
+              key={`${g.distinctId}-${g.timestamp}-${i}`}
+              g={g}
+              l2Items={day.chests.items}
+              player={players[g.distinctId]}
+              onPlayerClick={onPlayerClick}
+            />
           ))
         )}
       </div>
@@ -590,8 +693,221 @@ function DayCard({ day }: { day: StatsDayPayload }) {
   );
 }
 
+/**
+ * Slide-over showing everything one player completed in the last PLAYER_WINDOW_DAYS
+ * days, across all modes. Fetched on demand when a pseudonym chip is clicked.
+ */
+function PlayerPanel({
+  distinctId,
+  player,
+  onClose,
+}: {
+  distinctId: string;
+  player: ReturningPlayer | undefined;
+  onClose: () => void;
+}) {
+  const [data, setData] = useState<PlayerStatsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setError(null);
+    const params = new URLSearchParams({ id: distinctId, days: String(PLAYER_WINDOW_DAYS) });
+    fetch(`/api/player-stats?${params.toString()}`)
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
+        return (await res.json()) as PlayerStatsResponse;
+      })
+      .then((d) => {
+        if (!cancelled) setData(d);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load player.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [distinctId]);
+
+  // Escape closes the panel.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const name = data?.name ?? player?.name ?? "Player";
+  const games = data?.days.flatMap((d) => d.games) ?? [];
+  const wins = games.filter((g) => g.outcome === "win").length;
+  const dailies = games.filter((g) => g.gameMode === "daily" || g.gameMode == null);
+  const dailyWins = dailies.filter((g) => g.outcome === "win").length;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`${name} — last ${PLAYER_WINDOW_DAYS} days`}
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(13, 11, 26, 0.75)",
+        zIndex: 50,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <aside
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "min(720px, 100%)",
+          height: "100%",
+          overflowY: "auto",
+          background: C.bg,
+          borderLeft: `3px solid ${C.border}`,
+          boxShadow: `-3px 0 0 ${C.borderDark}`,
+          padding: "18px 16px 60px",
+          boxSizing: "border-box",
+        }}
+      >
+        <header
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 12,
+            borderBottom: `2px solid ${C.borderDark}`,
+            paddingBottom: 10,
+            marginBottom: 12,
+          }}
+        >
+          <div>
+            <div className="pixel-text" style={{ color: C.gold, fontSize: 16, lineHeight: 1.4 }}>
+              {name}
+            </div>
+            <div style={{ color: C.muted, fontSize: 12 }}>
+              Last {PLAYER_WINDOW_DAYS} days · all modes
+            </div>
+            <div
+              style={{ color: C.muted, fontSize: 10, marginTop: 4, wordBreak: "break-all" }}
+              title="PostHog distinct_id"
+            >
+              {distinctId}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="pixel-text"
+            style={{
+              background: C.panel2,
+              color: C.text,
+              border: `2px solid ${C.border}`,
+              boxShadow: `0 0 0 2px ${C.borderDark}`,
+              borderRadius: 4,
+              padding: "6px 10px",
+              fontSize: 11,
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            CLOSE
+          </button>
+        </header>
+
+        {data ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 14 }}>
+            <StatChip emoji="📅" value={data.activeDays} label="active days" accent={C.gold} />
+            <StatChip emoji="🎮" value={data.totalGames} label="runs" accent={C.text} />
+            <StatChip
+              emoji="🏆"
+              value={games.length > 0 ? `${Math.round((wins / games.length) * 100)}%` : "—"}
+              label={`${wins}/${games.length} win`}
+              accent={C.win}
+            />
+            <StatChip
+              emoji="🗓"
+              value={dailies.length > 0 ? `${Math.round((dailyWins / dailies.length) * 100)}%` : "—"}
+              label={`${dailyWins}/${dailies.length} daily win`}
+              accent={C.win}
+            />
+          </div>
+        ) : null}
+
+        {error ? (
+          <div
+            style={{
+              color: C.loss,
+              fontSize: 13,
+              border: `2px solid ${C.loss}`,
+              borderRadius: 4,
+              padding: 12,
+            }}
+          >
+            {error}
+          </div>
+        ) : null}
+
+        {!data && !error ? (
+          <div className="pixel-text" style={{ color: C.muted, fontSize: 12, padding: "12px 0" }}>
+            Loading…
+          </div>
+        ) : null}
+
+        {data && !data.configured ? (
+          <div style={{ color: C.muted, fontSize: 12 }}>{data.message}</div>
+        ) : null}
+
+        {data && data.configured && data.days.length === 0 ? (
+          <div style={{ color: C.muted, fontSize: 13, fontStyle: "italic" }}>
+            No completed runs in the last {PLAYER_WINDOW_DAYS} days.
+          </div>
+        ) : null}
+
+        {data?.days.map((day) => {
+          const { weekday, rest } = formatDay(day.date);
+          return (
+            <section key={day.date} style={{ marginBottom: 16 }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: 8,
+                  marginBottom: 6,
+                }}
+              >
+                <span className="pixel-text" style={{ color: C.gold, fontSize: 12 }}>
+                  {rest}
+                </span>
+                <span style={{ color: C.muted, fontSize: 11 }}>
+                  {weekday} · {day.games.length} run{day.games.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {day.games.map((g, i) => (
+                  <GameRow
+                    key={`${g.timestamp}-${i}`}
+                    g={g}
+                    l2Items={day.chests.items}
+                    showMode
+                  />
+                ))}
+              </div>
+            </section>
+          );
+        })}
+      </aside>
+    </div>
+  );
+}
+
 export default function EndgameStats() {
   const [days, setDays] = useState<StatsDayPayload[]>([]);
+  const [players, setPlayers] = useState<PlayerMap>({});
+  const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -617,6 +933,7 @@ export default function EndgameStats() {
       setConfigured(data.configured);
       if (data.message) setNotice(data.message);
       setDays((prev) => [...prev, ...data.days]);
+      setPlayers((prev) => ({ ...prev, ...(data.players ?? {}) }));
       setCursor(data.nextCursor);
       setHasMore(data.hasMore);
     } catch (e) {
@@ -684,7 +1001,14 @@ export default function EndgameStats() {
         ) : null}
 
         {configured &&
-          days.map((day, i) => <DayCard key={`${day.date}-${i}`} day={day} />)}
+          days.map((day, i) => (
+            <DayCard
+              key={`${day.date}-${i}`}
+              day={day}
+              players={players}
+              onPlayerClick={setSelectedPlayer}
+            />
+          ))}
 
         {configured && initialized && days.length === 0 && !error ? (
           <div style={{ color: C.muted, fontSize: 13, fontStyle: "italic" }}>
@@ -741,6 +1065,14 @@ export default function EndgameStats() {
           </div>
         ) : null}
       </div>
+
+      {selectedPlayer ? (
+        <PlayerPanel
+          distinctId={selectedPlayer}
+          player={players[selectedPlayer]}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -12,6 +12,7 @@ function makeRow(overrides: Partial<GameCompleteRow> = {}): GameCompleteRow {
     timestamp: "2026-07-24T12:00:00.000Z",
     startedAt: null,
     distinctId: "user_1",
+    gameMode: "daily",
     outcome: "win",
     levelReached: 3,
     heroHealth: 4,

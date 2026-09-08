@@ -18,6 +18,7 @@
 import type { ChestItemMeta } from "./daily_chest";
 import type { BossDayInfo } from "./boss_day";
 import type { PuzzleDayInfo } from "./puzzle_day";
+import type { ReturningPlayer } from "./player_names";
 
 /** One completed daily game, normalized from a PostHog `game_complete` row. */
 export interface GameCompleteRow {
@@ -25,6 +26,8 @@ export interface GameCompleteRow {
   timestamp: string; // ISO string of when the run ended
   startedAt: string | null; // ISO string of when the run started (from game_start), null if unmatched
   distinctId: string;
+  /** "daily" | "endless" | "normal" — null for runs recorded before the mode was tagged. */
+  gameMode: string | null;
   outcome: "win" | "dead";
   levelReached: number | null;
   heroHealth: number | null;
@@ -90,10 +93,37 @@ export interface StatsDayPayload {
 
 export interface EndgameStatsResponse {
   days: StatsDayPayload[];
+  /**
+   * Players seen on 2+ distinct daily days within the recent lookback window (see the
+   * route), keyed by distinct_id. Rows whose distinctId is here get a stable pseudonym
+   * so the same person can be followed from day to day; everyone else stays anonymous.
+   */
+  players: Record<string, ReturningPlayer>;
   /** Pass as `beforeDay` to load the next (older) page; null when no more. */
   nextCursor: string | null;
   hasMore: boolean;
   /** False when PostHog read credentials are not configured on the server. */
+  configured: boolean;
+  message?: string;
+}
+
+/** One calendar day of a single player's runs (any game mode). */
+export interface PlayerDayPayload {
+  date: string; // YYYY-MM-DD (date_seed for daily runs, run-end date otherwise)
+  /** Level 2 chest status for the DAILY of that date — what the day's chests held. */
+  chests: ChestStatusPayload;
+  games: GameCompleteRow[];
+}
+
+export interface PlayerStatsResponse {
+  distinctId: string;
+  name: string;
+  /** Lookback window in days that was queried. */
+  windowDays: number;
+  totalGames: number;
+  /** Distinct calendar days with at least one completed run. */
+  activeDays: number;
+  days: PlayerDayPayload[];
   configured: boolean;
   message?: string;
 }
@@ -150,6 +180,7 @@ export function toGameCompleteRow(rec: Record<string, unknown>): GameCompleteRow
     timestamp: String(rec.timestamp ?? ""),
     startedAt: null,
     distinctId: String(rec.distinct_id ?? ""),
+    gameMode: rec.game_mode == null || rec.game_mode === "" ? null : String(rec.game_mode),
     outcome,
     levelReached: toNumberOrNull(rec.level_reached),
     heroHealth: toNumberOrNull(rec.hero_health),
