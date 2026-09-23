@@ -2708,6 +2708,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const environment: EnvironmentId =
     (gameState.mapData.environment as EnvironmentId | undefined) ??
     DEFAULT_ENVIRONMENT;
+
+  const [caveBrightnessOverride, setCaveBrightnessOverride] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search);
+      const v = p.get("brightness");
+      if (v && !isNaN(Number(v)) && Number(v) > 0) {
+        setCaveBrightnessOverride(v);
+      }
+    } catch { /* SSR or missing window */ }
+  }, []);
   const environmentConfig = getEnvironmentConfig(environment);
   const environmentDaylight = environmentConfig.daylight;
   const autoPhaseVisibility = environmentDaylight;
@@ -6216,7 +6227,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   );
                 })()}
                 <div
-                  className={styles.gridContainer}
+                  className={`${styles.gridContainer}${environment === "cave" ? " cave-env" : ""}`}
                   style={{
                     gridTemplateRows: `repeat(${gameState.mapData.tiles.length}, 40px)`,
                     gridTemplateColumns: `repeat(${(gameState.mapData.tiles[0]?.length ?? 0)}, 40px)`,
@@ -6225,6 +6236,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     // the transparent center of the vignette.
                     backgroundColor:
                       heroTorchLitForVisibility && !inNightmare ? undefined : "#000",
+                    ...(caveBrightnessOverride ? { "--cave-brightness": caveBrightnessOverride } as React.CSSProperties : {}),
                   }}
                   tabIndex={0} // Make div focusable for keyboard events
                   onMouseMove={(e) => {
