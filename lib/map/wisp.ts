@@ -13,7 +13,8 @@
  * The core loop being tested:
  *
  *  - WILD wisps appear from a spawn source (smashed pot, a defeated enemy's spark,
- *    or "pity" — one senses a hero at their last heart). They drift one tile per
+ *    or "pity" — one senses a hero at their last heart, but never one poison is
+ *    draining, so venom can't summon its own rescue). They drift one tile per
  *    hero step, floating 8-directionally over any floor tile, and gutter out after
  *    `lifespan` steps — flashing for the last WISP_FLASH_MOVES so you know the
  *    window is closing.
@@ -92,7 +93,8 @@ export interface WispConfig {
    * When true, the FIRST time each floor the hero falls to exactly 1 heart, a
    * wisp is drawn out at the edge of view (4-8 tiles). Guaranteed, once per
    * floor: deterministic (nothing to seed, fair across players) and a hard cap
-   * against yo-yo farming.
+   * against yo-yo farming. Suppressed while the hero is poisoned — poison must
+   * not be able to summon its own rescue (see the pity block in advanceWispTurn).
    */
   pity?: boolean;
   /** Wild lifespan override in hero steps. */
@@ -127,6 +129,14 @@ function isSafeLanding(state: GameState, y: number, x: number): boolean {
   if (!isFloatable(state, y, x)) return false;
   const subs = state.mapData.subtypes[y]?.[x] ?? [];
   if (subs.includes(TileSubtype.LAVA) && !subs.includes(TileSubtype.OBSIDIAN))
+    return false;
+  // Never tug the hero into a hole. A trail tile can open into an abyss after the
+  // hero crossed it (a bomb blast cracks the floor, the Quarrymaster drops it), so
+  // a rescue from a fall must not just deposit them in the next one over.
+  if (
+    subs.includes(TileSubtype.OPEN_ABYSS) ||
+    subs.includes(TileSubtype.FAULTY_FLOOR)
+  )
     return false;
   if (subs.includes(TileSubtype.POT)) return false;
   return !(state.enemies ?? []).some((e) => e.y === y && e.x === x);
@@ -374,11 +384,19 @@ export function advanceWispTurn(
   // WispConfig.pity), spawning at the edge of view so you glimpse it and have to
   // decide whether to chase a light while nearly dead. Latched only on a
   // successful spawn, so a cramped map can retry on a later dip.
+  //
+  // NOT while poisoned. A caught wisp CURES the poison when it saves you
+  // (wispDeathSave clears it), so a fairy conjured the instant venom walks you to
+  // your last heart would let poison neutralize itself for free. It doesn't get to
+  // summon its own antidote — you have to have caught a wisp the ordinary way before
+  // the venom took over. A wisp caught by other means still saves (and cures) a
+  // poison death; poison just can't CONJURE the rescue.
   let wispPityFloors = after.wispPityFloors;
   if (
     config.pity &&
     before.heroHealth > 1 &&
     after.heroHealth === 1 &&
+    !after.conditions?.poisoned?.active &&
     heroPos &&
     !(wispPityFloors ?? []).includes(after.currentFloor ?? 1)
   ) {
@@ -446,6 +464,16 @@ export function advanceWispTurn(
  * the wisp's perch (or the nearest safe trail tile) so a ground-hazard death can't
  * immediately repeat. Returns a fresh state object for React.
  *
+ * Cause-agnostic by design: it reads heroHealth, not deathCause, so it rescues a
+ * fall, a lava/spike step, a mauling, darkness, a bomb, or a poison tick all the
+ * same. A wisp that can flood the body with WISP_RESTORE_HEARTS of life purges the
+ * venom in the same breath — an active poison is CLEARED here, so the rescue isn't
+ * quietly undone a few steps later. (This is a heal, not the Amber Moth's time
+ * rewind — the two saves read differently on purpose.) Poison can't abuse that:
+ * advanceWispTurn suppresses the pity spawn while poisoned, so a fairy has to have
+ * been caught the ordinary way before the venom took over. Clears deathCause too,
+ * since the hero is no longer dead.
+ *
  * Runs BEFORE the Amber Moth's death rewind in the component: the wisp is the
  * cheaper save, so it goes first and the charm is preserved.
  */
@@ -485,11 +513,22 @@ export function wispDeathSave(state: GameState): GameState | null {
     });
   }
 
+  // Purge an active poison as part of the heal (see the doc comment). Rebuild the
+  // conditions object immutably so the caller's pre-save state is never mutated —
+  // wispDeathSave must return a fresh object for React.
+  const conditions = state.conditions?.poisoned?.active
+    ? {
+        ...state.conditions,
+        poisoned: { ...state.conditions.poisoned, active: false },
+      }
+    : state.conditions;
+
   const remaining = companions - 1;
   return {
     ...state,
     mapData: { ...state.mapData, subtypes },
     heroHealth: Math.min(WISP_RESTORE_HEARTS, state.heroMaxHealth ?? 5),
+    conditions,
     wispCompanions: remaining > 0 ? remaining : undefined,
     // The spent wisp's perch is where the hero now stands; the survivors re-perch
     // on the next step.

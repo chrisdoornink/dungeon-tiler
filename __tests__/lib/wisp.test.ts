@@ -292,6 +292,31 @@ describe("spawning", () => {
     expect(result2.wisps).toHaveLength(1);
     expect(result2.wispPityFloors).toEqual([1, 2]);
   });
+
+  it("does NOT draw a pity wisp when poison is what walked the hero to 1 heart", () => {
+    const poisoned = {
+      poisoned: {
+        active: true,
+        stepsSinceLastDamage: 0,
+        damagePerInterval: 1,
+        stepInterval: 3,
+      },
+    };
+    const before = baseState({
+      heroHealth: 2,
+      wispConfig: { pity: true },
+      conditions: poisoned,
+    });
+    const after = baseState({
+      heroHealth: 1,
+      wispConfig: { pity: true },
+      conditions: poisoned,
+    });
+    const result = advanceWispTurn(before, after, () => 0.85);
+    expect(result.wisps).toBeUndefined();
+    // The floor's pity latch is untouched, so a later non-poison dip can still fire.
+    expect(result.wispPityFloors).toBeUndefined();
+  });
 });
 
 describe("stampWispPots", () => {
@@ -410,6 +435,70 @@ describe("the death save", () => {
     state.mapData.subtypes[5][3] = [TileSubtype.LAVA];
     const saved = wispDeathSave(state)!;
     expect(findPlayerPosition(saved.mapData)).toEqual([5, 1]);
+    expect(saved.heroHealth).toBe(WISP_RESTORE_HEARTS);
+  });
+
+  it("rescues a fall the same as any other death, and never leaves the hero in the hole", () => {
+    // Full-engine path: carry a companion, step RIGHT onto a faulty floor.
+    const state = baseState({
+      wispCompanions: 1,
+      wispConfig: WISP_STANDARD_CONFIG,
+    });
+    state.mapData.subtypes[5][2] = [TileSubtype.FAULTY_FLOOR];
+    const dead = movePlayer(state, Direction.RIGHT);
+    // The step is lethal and the companion survives the death step...
+    expect(dead.deathCause?.type).toBe("faulty_floor");
+    expect(dead.heroHealth).toBe(0);
+    expect(dead.wispCompanions).toBe(1);
+    // ...then the wisp spends itself, exactly as it would for lava or a goblin.
+    const saved = wispDeathSave(dead)!;
+    expect(saved).not.toBeNull();
+    expect(saved.heroHealth).toBe(WISP_RESTORE_HEARTS);
+    expect(saved.wispCompanions).toBeUndefined();
+    // Tugged back onto the tile it came from — not left standing on the abyss.
+    const revived = findPlayerPosition(saved.mapData)!;
+    expect(revived).toEqual([5, 1]);
+    expect(saved.mapData.subtypes[revived[0]][revived[1]]).not.toContain(
+      TileSubtype.OPEN_ABYSS
+    );
+  });
+
+  it("heals a poison death AND purges the venom (a heal, not a rewind)", () => {
+    const state = baseState({
+      heroHealth: 0,
+      wispCompanions: 1,
+      deathCause: { type: "poison", enemyKind: "snake" },
+      conditions: {
+        poisoned: {
+          active: true,
+          stepsSinceLastDamage: 0,
+          damagePerInterval: 1,
+          stepInterval: 3,
+        },
+      },
+    });
+    const saved = wispDeathSave(state)!;
+    expect(saved.heroHealth).toBe(WISP_RESTORE_HEARTS);
+    expect(saved.deathCause).toBeUndefined();
+    // The five hearts of life come with the antidote — poison is cleared.
+    expect(saved.conditions?.poisoned?.active).toBe(false);
+    // ...without mutating the caller's pre-save state (fresh object for React).
+    expect(state.conditions?.poisoned?.active).toBe(true);
+  });
+
+  it("skips a trail tile that has opened into an abyss when choosing a landing", () => {
+    const state = baseState({
+      heroHealth: 0,
+      wispCompanions: 1,
+      deathCause: { type: "lava" },
+      // Nearest perch [5,3] has since cracked open; [5,4] is the safe fallback.
+      wispPos: [5, 3],
+      heroTrail: [[5, 4], [5, 3]],
+    });
+    state.mapData.subtypes[5][1] = [TileSubtype.LAVA, TileSubtype.PLAYER];
+    state.mapData.subtypes[5][3] = [TileSubtype.OPEN_ABYSS];
+    const saved = wispDeathSave(state)!;
+    expect(findPlayerPosition(saved.mapData)).toEqual([5, 4]);
     expect(saved.heroHealth).toBe(WISP_RESTORE_HEARTS);
   });
 });
