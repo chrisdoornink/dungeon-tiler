@@ -74,7 +74,7 @@ export default function RootLayout({
         <link rel="icon" type="image/x-icon" href="/images/favicon.ico" />
         {/* Critical floor textures */}
         <link rel="preload" as="image" href="/images/floor/floor-try-1.png" />
-        <link rel="preload" as="image" href="/images/floor/floor-1000.png" />
+        <link rel="preload" as="image" href="/images/floor/generated/cave-floor-sheet-v1.webp" />
         {/* Critical wall variants commonly used at top-of-screen overlays */}
         <link rel="preload" as="image" href="/images/wall/wall-0010.png" />
         <link rel="preload" as="image" href="/images/wall/wall-0110.png" />

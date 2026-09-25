@@ -195,6 +195,11 @@ import {
   getFloorAsset,
   getWallAsset,
 } from "../lib/environment";
+import {
+  type FloorStyle,
+  floorShadeMaskFromNeighbors,
+  generatedFloorBackground,
+} from "../lib/floor_sheet";
 
 type NeighborInfo = {
   top: number | null;
@@ -374,6 +379,11 @@ interface TileProps {
   // animation on consecutive hits (see combatLungeStyle).
   heroLunge?: CombatLunge;
   enemyLunge?: CombatLunge;
+  // Floor art: "generated" draws ground tiles from the environment's seamless sheet with
+  // wall shading layered on (lib/floor_sheet.ts); floorShade is its SHADE_* wall mask.
+  // Environments without a sheet keep the classic tile either way.
+  floorStyle?: FloorStyle;
+  floorShade?: number;
 }
 
 export type CombatLunge = { dy: number; dx: number; seq: number };
@@ -466,8 +476,31 @@ export const Tile: React.FC<TileProps> = ({
   enemyRingUnder = false,
   heroLunge,
   enemyLunge,
+  floorStyle = "generated",
+  floorShade,
 }) => {
   const environmentConfig = getEnvironmentConfig(environment);
+  // Ground background for floor-like tiles (floor, flowers, trees): the generated sheet
+  // when this environment has one (and classic wasn't asked for), otherwise the single tile.
+  const groundBackground = (
+    floorAsset: string
+  ): Pick<
+    React.CSSProperties,
+    "backgroundImage" | "backgroundSize" | "backgroundPosition" | "backgroundRepeat"
+  > =>
+    (floorStyle === "generated" && process.env.NODE_ENV !== "test"
+      ? generatedFloorBackground(
+          environment,
+          row ?? 0,
+          col ?? 0,
+          floorShade ?? floorShadeMaskFromNeighbors(neighbors)
+        )
+      : null) ?? {
+      backgroundImage: `url(${floorAsset})`,
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+    };
   // Smooth movement: tracks the enemy slide animation finishing (via
   // onAnimationEnd) so sprites that change pose with motion — the snake's
   // coiled <-> slither swap — revert the moment the tween lands instead of
@@ -2514,19 +2547,20 @@ export const Tile: React.FC<TileProps> = ({
             // spike beds rendered as plain floor). Leave it unset. ANY new terrain that
             // paints itself from a CSS class must be added here or it will silently lose
             // to this inline style — the class is not the thing that wins.
-            backgroundImage:
-              isLava ||
-              isObsidian ||
-              isShallowWater ||
-              isDeepWater ||
-              isSteppingStone ||
-              isSpikes ||
-              isSpikeHoles
-                ? undefined
-                : `url(${floorAsset})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
+            ...(isLava ||
+            isObsidian ||
+            isShallowWater ||
+            isDeepWater ||
+            isSteppingStone ||
+            isSpikes ||
+            isSpikeHoles
+              ? {
+                  backgroundImage: undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  backgroundRepeat: "no-repeat",
+                }
+              : groundBackground(floorAsset)),
             position: "relative", // Ensure relative positioning for absolute children
             backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent',
             // No z-index here. Lifting the tile was the old fix for a per-tile slab needing to
@@ -3155,10 +3189,7 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            backgroundImage: `url(${floorAsset})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
+            ...groundBackground(floorAsset),
             position: "relative",
             backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent'
           }}
@@ -3369,10 +3400,7 @@ export const Tile: React.FC<TileProps> = ({
         <div
           className={floorClasses}
           style={{
-            backgroundImage: `url(${floorAsset})`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
-            backgroundRepeat: "no-repeat",
+            ...groundBackground(floorAsset),
             position: "relative",
             backgroundColor: process.env.NODE_ENV === 'test' ? '#c8c8c8' : 'transparent'
           }}

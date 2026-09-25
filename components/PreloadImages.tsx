@@ -11,6 +11,7 @@ export default function PreloadImages() {
     const urls: string[] = [
       // Floors (known variants)
       "/images/floor/floor-try-1.png",
+      "/images/floor/generated/cave-floor-sheet-v1.webp",
       "/images/floor/floor-1000.png",
       "/images/floor/floor-1001.png",
       "/images/floor/floor-0001.png",

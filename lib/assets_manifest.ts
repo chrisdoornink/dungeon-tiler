@@ -3,9 +3,10 @@
 
 // Critical assets only - load the minimum needed to start the game
 export const CRITICAL_ASSETS: string[] = [
-  // Essential floors and walls
+  // Essential floors and walls. The cave floor is the generated sheet (lib/floor_sheet.ts);
+  // floor-try-1 still paints platform slabs and the ?floor=classic fallback.
   "/images/floor/floor-try-1.png",
-  "/images/floor/floor-1000.png",
+  "/images/floor/generated/cave-floor-sheet-v1.webp",
   "/images/wall/wall-0010.png",
   "/images/wall/wall-0110.png",
   "/images/wall/wall-0011.png",
@@ -29,6 +30,8 @@ export const ASSET_URLS: string[] = [
   ...CRITICAL_ASSETS,
   
   // Additional floors
+  "/images/floor/generated/grass-floor-sheet-v1.webp",
+  "/images/floor/floor-1000.png",
   "/images/floor/floor-1001.png",
   "/images/floor/floor-0001.png",
   "/images/floor/outdoor-floor-0000.png",

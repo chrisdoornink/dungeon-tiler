@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useLayoutEffect, useRef } from "react";
 import {
   TileType,
   GameState,
@@ -143,6 +143,7 @@ import {
   type EnvironmentId,
   getEnvironmentConfig,
 } from "../lib/environment";
+import { type FloorStyle, floorShadeMask, parseFloorStyle } from "../lib/floor_sheet";
 import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
@@ -332,6 +333,12 @@ interface TilemapGridProps {
     inPinkRealm: boolean;
     inBossRoom: boolean;
   }) => void;
+  /**
+   * Floor art: the "generated" seamless sheets (lib/floor_sheet.ts, the default) or the
+   * "classic" single tiles. When omitted, a `?floor=classic` URL flag can still ask for
+   * the old tiles.
+   */
+  floorStyle?: FloorStyle;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -350,6 +357,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onHearthExit,
   dailyDateOverride,
   onLocationChange,
+  floorStyle: floorStyleProp,
 }) => {
   const router = useRouter();
 
@@ -366,6 +374,17 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   // daily/endless, so death reads as a transition instead of an instant cut to results.
   const shouldAnimateHeroDeath =
     resolvedStorageSlot === 'story' || isDailyChallenge || isEndless;
+
+  // Floors draw from the generated sheets by default; `?floor=classic` on any game page
+  // brings back the single-tile floors for comparison. Read on mount, so the server render
+  // and first paint are the default.
+  const [urlFloorStyle, setUrlFloorStyle] = useState<FloorStyle | null>(null);
+  useEffect(() => {
+    try {
+      setUrlFloorStyle(parseFloorStyle(new URLSearchParams(window.location.search).get("floor")));
+    } catch {}
+  }, []);
+  const floorStyle: FloorStyle = floorStyleProp ?? urlFloorStyle ?? "generated";
 
 
   // Router removed; daily flow handled via onDailyComplete callback
@@ -2285,6 +2304,27 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const mobileHoldTimeoutRef = useRef<number | null>(null);
   const mobileHoldIntervalRef = useRef<number | null>(null);
   const smoothMapNodeRef = useRef<HTMLDivElement | null>(null);
+  // Device pixels per CSS pixel of the camera offset (see snapToDevicePixels). State for the
+  // rendered transform, ref for the rAF loop. Re-measured after every render: it's one
+  // property read, and it catches resizes, zoom-breakpoint and DPR changes and the map
+  // container mounting late.
+  const [mapDeviceScale, setMapDeviceScale] = useState(1);
+  const mapDeviceScaleRef = useRef(1);
+  useLayoutEffect(() => {
+    const el = smoothMapNodeRef.current;
+    if (!el) return;
+    const s = measureMapDeviceScale(el);
+    mapDeviceScaleRef.current = s;
+    setMapDeviceScale(s);
+  });
+  useEffect(() => {
+    const onResize = () => {
+      const el = smoothMapNodeRef.current;
+      if (el) setMapDeviceScale((mapDeviceScaleRef.current = measureMapDeviceScale(el)));
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
   // Map-space anchor for the hero (inside mapContainer so walls/trees occlude
   // him via the map's z-order); the rAF loop moves it with the camera.
   const smoothHeroAnchorRef = useRef<HTMLDivElement | null>(null);
@@ -4454,11 +4494,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       const v = smoothVisualRef.current;
       if (v && smoothMapNodeRef.current) {
         const [rows, cols] = mapDimsRef.current;
-        smoothMapNodeRef.current.style.transform = `translate(${calculateMapTransform(
+        smoothMapNodeRef.current.style.transform = mapTranslateStyle(
           [v[0], v[1]],
           rows,
-          cols
-        )})`;
+          cols,
+          mapDeviceScaleRef.current
+        );
         // Keep the torch/vignette glued to the hero: he leaves viewport
         // center whenever the camera is clamped at a map edge.
         if (smoothLightAnchorRef.current) {
@@ -5547,12 +5588,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                   // mid-tween don't snap the camera. Legacy: CSS transition.
                   transform: smoothEnabled
                     ? smoothVisualRef.current
-                      ? `translate(${calculateMapTransform(smoothVisualRef.current, mapRows, mapCols)})`
+                      ? mapTranslateStyle(smoothVisualRef.current, mapRows, mapCols, mapDeviceScale)
                       : playerPosition
-                      ? `translate(${calculateMapTransform(playerPosition, mapRows, mapCols)})`
+                      ? mapTranslateStyle(playerPosition, mapRows, mapCols, mapDeviceScale)
                       : "none"
                     : playerPosition
-                    ? `translate(${calculateMapTransform(playerPosition, mapRows, mapCols)})`
+                    ? mapTranslateStyle(playerPosition, mapRows, mapCols, mapDeviceScale)
                     : "none",
                   transition: smoothEnabled ? "none" : undefined,
                 }}
@@ -6283,7 +6324,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     heroOverrideSprite,
                     gameState.heroSpriteScale,
                     muralPanels,
-                    !!gameState.activeHeroId && !!gameState.hasSword
+                    !!gameState.activeHeroId && !!gameState.hasSword,
+                    floorStyle
                   )}
                 </div>
                 {/* Smooth-movement hero: lives INSIDE the map container at the
@@ -6962,7 +7004,8 @@ function renderTileGrid(
   // Cipher-room mural: which target colours each MURAL_PANEL tile engraves (whole code on a single
   // tile, or one per tile), keyed "y,x".
   muralPanels?: Map<string, number[]>,
-  heroArmedOverride?: boolean
+  heroArmedOverride?: boolean,
+  floorStyle: FloorStyle = "generated"
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7363,6 +7406,12 @@ function renderTileGrid(
             }
             playerHasExitKey={hasExitKey}
             environment={resolvedEnvironment}
+            floorStyle={floorStyle}
+            floorShade={
+              floorStyle === "generated"
+                ? floorShadeMask(getTileAt, rowIndex, colIndex)
+                : undefined
+            }
             suppressDarknessOverlay={suppressDarknessOverlay}
             inNightmare={inNightmare}
             activeCheckpoint={activeCheckpoint}
@@ -7574,6 +7623,49 @@ function calculateMapOffsets(
   }
 
   return { tx, ty };
+}
+
+// Round a camera offset to whole device pixels.
+//
+// On desktop the game box is scaled with `zoom: 0.9167` (.game-scale), so a whole-CSS-pixel
+// offset lands between device pixels (on a 2x screen a tile is 73.33 of them). The map moves
+// by transform, which paints without pixel snapping, so every tile edge falls mid-pixel: the
+// browser anti-aliases the two tiles meeting there and the grid's dark background bleeds
+// through as a hairline along every row and column. It reads as a dark line across bright
+// floors (grass, the pink realm); the cave floor happens to match --forest-dark, which is the
+// only reason it never showed there. Whole-device-pixel offsets keep the edges on the pixel
+// grid. Checked in headless Chrome at 2x: the seams go, sharpness is unchanged. (Promoting
+// the map to its own layer with will-change also hides them, but that layer is resampled at
+// the fractional offset and every sprite goes soft.)
+export function snapToDevicePixels(px: number, deviceScale: number): number {
+  if (!(deviceScale > 0) || !Number.isFinite(deviceScale)) return px;
+  return Math.round(px * deviceScale) / deviceScale;
+}
+
+// The map container's transform for a (possibly fractional, mid-slide) camera position.
+function mapTranslateStyle(
+  position: [number, number],
+  mapRows: number | undefined,
+  mapCols: number | undefined,
+  deviceScale: number
+): string {
+  const { tx, ty } = calculateMapOffsets(position, mapRows, mapCols);
+  return `translate(${snapToDevicePixels(tx, deviceScale)}px, ${snapToDevicePixels(ty, deviceScale)}px)`;
+}
+
+// Device pixels per CSS pixel of the map's own coordinates: its effective CSS zoom times
+// devicePixelRatio. currentCSSZoom answers directly where supported; otherwise the viewport
+// box's rendered width over its layout width gives the same ratio.
+function measureMapDeviceScale(mapEl: HTMLElement): number {
+  const dpr = window.devicePixelRatio || 1;
+  const zoom = (mapEl as HTMLElement & { currentCSSZoom?: number }).currentCSSZoom;
+  if (typeof zoom === "number" && zoom > 0) return zoom * dpr;
+  const box = mapEl.parentElement;
+  if (box && box.offsetWidth > 0) {
+    const ratio = box.getBoundingClientRect().width / box.offsetWidth;
+    if (ratio > 0 && Number.isFinite(ratio)) return ratio * dpr;
+  }
+  return dpr;
 }
 
 // Calculate the transform to center the map on the player
