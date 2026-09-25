@@ -41,7 +41,7 @@ const ItemPickupAnimation: React.FC<ItemPickupAnimationProps> = ({
       case "shield":
         return assetUrl("/images/items/shield-clean.png");
       case "rock":
-        return assetUrl("/images/items/rock-1-clean.png");
+        return assetUrl("/images/items/rock-1-clean-v2.png");
       case 'rune':
         return assetUrl('/images/items/rune1.png');
       case 'bomb':

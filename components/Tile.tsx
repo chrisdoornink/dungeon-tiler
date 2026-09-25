@@ -1540,7 +1540,7 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
               backgroundImage: `url(${pickVariant([
-                assetUrl('/images/items/rock-1-clean.png'),
+                assetUrl('/images/items/rock-1-clean-v2.png'),
                 assetUrl('/images/items/rock-2-clean.png'),
               ])})`,
             }}

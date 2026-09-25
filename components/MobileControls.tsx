@@ -279,7 +279,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rock',
       testId: 'mobile-action-rock',
-      icon: assetUrl('/images/items/rock-1-clean.png'),
+      icon: assetUrl('/images/items/rock-1-clean-v2.png'),
       count: rockCount ?? 0,
       onUse: onThrowRock,
       label: 'Throw Rock',

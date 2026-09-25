@@ -74,7 +74,7 @@ export default function PreloadImages() {
       "/images/items/pot-1-clean.png",
       "/images/items/pot-2-clean.png",
       "/images/items/pot-3-clean.png",
-      "/images/items/rock-1-clean.png",
+      "/images/items/rock-1-clean-v2.png",
       "/images/items/rock-2-clean.png",
       "/images/items/food-1-clean.png",
       "/images/items/food-2-clean.png",

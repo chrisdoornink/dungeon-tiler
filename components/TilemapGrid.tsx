@@ -5228,7 +5228,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/rock-1-clean.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/rock-1-clean-v2.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5622,7 +5622,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           width: `${size}px`,
                           height: `${size}px`,
                           zIndex: 11900,
-                          backgroundImage: `url(${assetUrl("/images/items/rock-1-clean.png")})`,
+                          backgroundImage: `url(${assetUrl("/images/items/rock-1-clean-v2.png")})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -6753,7 +6753,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "rock",
                 label: "Rock",
-                icon: assetUrl("/images/items/rock-1-clean.png"),
+                icon: assetUrl("/images/items/rock-1-clean-v2.png"),
                 count: gameState.rockCount,
                 onUse: handleThrowRock,
               }]

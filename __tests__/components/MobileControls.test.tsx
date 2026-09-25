@@ -107,7 +107,7 @@ describe('MobileControls', () => {
       <MobileControls
         onMove={jest.fn()}
         inventoryItems={[
-          { key: 'rock', label: 'Rock', icon: '/images/items/rock-1-clean.png', count: 3, onUse: jest.fn() },
+          { key: 'rock', label: 'Rock', icon: '/images/items/rock-1-clean-v2.png', count: 3, onUse: jest.fn() },
           { key: 'food', label: 'Food', icon: '/images/items/food-1-clean.png', count: 2, onUse: handleUseFood },
           { key: 'sword', label: 'Sword', icon: '/images/items/sword-clean.png' },
         ]}
