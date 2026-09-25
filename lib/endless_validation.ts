@@ -62,9 +62,23 @@ const BOSS_FLOOR_CADENCE = 6;
 const MAX_KILLS_ON_BOSS_FLOOR = 60;
 
 /**
+ * Snakes on one floor during a snake swarm: addSnakesPerRules in lib/map/enemy-features.ts
+ * rolls it at 5% on EVERY floor it runs on, whatever the depth, and places 7 (6 loose +
+ * 1 in a pot). That tops every ordinary snake table (0-1 early, up to 4 on floor 10+), so
+ * it is the per-floor snake ceiling.
+ *
+ * Budgeted on every floor, not once per run, for the same reason white-goblin swarms are
+ * budgeted at their 1% three-swarm maximum: a second swarm is not rare (at 5% a floor, about
+ * one 20-floor run in five sees two), and under a once-per-run allowance the player it
+ * flags is the one who killed everything, which is exactly who this module must not flag.
+ */
+const SNAKE_SWARM_SIZE = 7;
+
+/**
  * Maximum enemies that can possibly exist on endless floor f, with margin:
  * goblins min(1+f,12)+1, ghosts (2 corner wisps on f1; 1-2 early, 2-3 deep),
- * white goblin swarms (phase 2: 1x4, phase 3: up to 3x4), snakes (up to 3 deep).
+ * white goblin swarms (phase 2: 1x4, phase 3: up to 3x4), snakes (a full swarm on any
+ * floor but the first: the blind floor returns before snakes are rolled at all).
  *
  * Boss floors take the arena ceiling instead, whichever is larger.
  */
@@ -72,7 +86,7 @@ export function maxKillsOnFloor(floor: number): number {
   const goblins = Math.min(1 + floor, 12) + 1;
   const ghosts = floor === 1 ? 2 : floor <= 6 ? 2 : 3;
   const swarmGoblins = floor <= 3 ? 0 : floor <= 7 ? 4 : 12;
-  const snakes = floor === 1 ? 0 : floor <= 6 ? 1 : 3;
+  const snakes = floor === 1 ? 0 : SNAKE_SWARM_SIZE;
   const ordinary = goblins + ghosts + swarmGoblins + snakes;
   const isBossFloor = floor >= BOSS_FLOOR_CADENCE && floor % BOSS_FLOOR_CADENCE === 0;
   return isBossFloor ? Math.max(ordinary, MAX_KILLS_ON_BOSS_FLOOR) : ordinary;

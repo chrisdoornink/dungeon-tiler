@@ -1,6 +1,7 @@
 import {
   MIN_SECONDS_PER_FLOOR,
   MIN_STEPS_PER_FLOOR,
+  maxKillsOnFloor,
   maxKillsThroughFloor,
   maxHeartsEnteringFloor,
   validateCheckpoint,
@@ -9,6 +10,14 @@ import {
   type CheckpointStats,
   type RunRecord,
 } from "../../lib/endless_validation";
+import {
+  advanceToNextEndlessFloor,
+  initializeGameStateForEndless,
+  isEndlessBossFloor,
+} from "../../lib/map/endless";
+import { TileSubtype } from "../../lib/map/constants";
+import type { GameState } from "../../lib/map/game-state";
+import { mulberry32, withPatchedMathRandom } from "../../lib/rng";
 
 const T0 = 1_000_000_000_000;
 
@@ -178,6 +187,83 @@ describe("boss floors stay inside the plausibility bounds", () => {
       later
     );
     expect(flags).toEqual([]);
+  });
+});
+
+/**
+ * The kill ceiling is only as good as its copy of the spawn tables. A snake swarm (5% on
+ * any floor but the first, 7 snakes) used to push an honest full clear of floors 1-2 past
+ * the cumulative ceiling, and a flagged checkpoint silently keeps the run off the board.
+ * Before floor 6 there is no boss-arena allowance to hide a gap like that, so these walk
+ * real generated floors rather than trusting the arithmetic.
+ */
+describe("kill ceiling covers what endless generation places", () => {
+  const RUNS = 60;
+  const FLOORS = 11; // past floor 10, where the ordinary snake table peaks
+
+  // Everything the hero could kill on the floor as generated: the live enemies plus the
+  // snakes still coiled in pots (breaking the pot spawns them).
+  function killableOn(state: GameState): number {
+    let potSnakes = 0;
+    for (const row of state.mapData.subtypes) {
+      for (const cell of row) if (cell.includes(TileSubtype.SNAKE)) potSnakes++;
+    }
+    return (state.enemies ?? []).length + potSnakes;
+  }
+
+  // One endless run, floors 1..FLOORS, with its run seed drawn from a fixed stream.
+  function walkRun(i: number): GameState[] {
+    return withPatchedMathRandom(mulberry32(9000 + i), () => {
+      const floors = [initializeGameStateForEndless()];
+      while (floors.length < FLOORS) {
+        floors.push(advanceToNextEndlessFloor(floors[floors.length - 1]));
+      }
+      return floors;
+    });
+  }
+
+  const runs = Array.from({ length: RUNS }, (_, i) => walkRun(i));
+
+  it("never places more on an ordinary floor than that floor's ceiling", () => {
+    let swarmFloors = 0;
+    const over: string[] = [];
+    runs.forEach((run, i) => {
+      for (const state of run) {
+        const floor = state.currentFloor ?? 1;
+        if (isEndlessBossFloor(floor)) continue; // arena populations are open-ended
+        if (state.mapData.snakeSwarm) swarmFloors++;
+        const killable = killableOn(state);
+        if (killable > maxKillsOnFloor(floor)) {
+          over.push(`run ${i} floor ${floor}: ${killable} > ${maxKillsOnFloor(floor)}`);
+        }
+      }
+    });
+    expect(over).toEqual([]);
+    // Guard against a vacuous pass: the sample has to contain real swarms.
+    expect(swarmFloors).toBeGreaterThan(0);
+  });
+
+  it("passes an honest full clear through an early snake swarm", () => {
+    let checked = 0;
+    for (const run of runs) {
+      let killed = 0;
+      let steps = 0;
+      for (const state of run.slice(0, 5)) {
+        const floor = state.currentFloor ?? 1;
+        killed += killableOn(state);
+        steps += 40;
+        if (!state.mapData.snakeSwarm) continue;
+        checked++;
+        const flags = validateCheckpoint(
+          freshRun({ floor, steps: steps - 40 }),
+          floor + 1,
+          stats({ steps, enemiesDefeated: killed }),
+          T0 + 600_000
+        );
+        expect(flags.filter((f) => f.startsWith("kills"))).toEqual([]);
+      }
+    }
+    expect(checked).toBeGreaterThan(0);
   });
 });
 
