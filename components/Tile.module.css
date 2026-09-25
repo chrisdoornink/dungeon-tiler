@@ -712,7 +712,8 @@
   position: absolute;
   left: 50%;
   top: 50%;
-  /* transform is set inline with random rotation */
+  /* translate (centring) and rotate are set inline as the standalone properties, not
+     `transform`, so the `scale` in crackSpread grows the crack about its own centre */
   width: 32px;
   height: 32px;
   z-index: 2;
@@ -769,74 +770,120 @@
   border: 1px solid #1a1a1a;
 }
 
-/* Open abyss: triggered faulty floor with subtle pink sparkle. Keeps the floor
-   texture as its base so that, on the frame the pit first opens, the tile still
-   looks like solid floor until the black ::before "breaks" in (see abyssOpen). */
+/* Open abyss: a triggered faulty floor. The tile keeps its normal floor (the generated
+   sheet, or the classic tile) and the hole is cut into it by .abyssPit, so the floor
+   shows around the jagged edge instead of the whole tile going black. */
 .openAbyss {
   position: relative;
-  background-color: var(--floor-bg);
-  background-image: url("/images/floor/floor-try-1.png");
-  background-size: cover;
-  background-repeat: no-repeat;
-  background-position: center;
 }
 
-/* Solid black background to completely hide floor texture. It opens AFTER the
-   step (animation-delay) with `backwards` fill so the floor reads as intact
-   while the enemy walks on, then the pit breaks open from the centre — timed to
-   the hold beat of enemyAbyssFall. */
-.openAbyss::before {
-  content: '';
+/* The crack spreads to the tile's full size as the floor gives way, and stays: its
+   branch tips run on past the pit's edge into the floor that is left. Same delay and
+   duration as abyssOpen, and `backwards` fill, so the intact 32px crack holds during
+   the step and the pit and crack break open together. */
+.faultyFloorIconBreaking {
+  width: 100%;
+  height: 100%;
+  animation: crackSpread 220ms ease-in 200ms backwards;
+}
+
+@keyframes crackSpread {
+  from {
+    scale: 0.8; /* 0.8 x the 40px tile = the intact crack's 32px */
+  }
+}
+
+/* The pit: the jagged hole where the crack's branches meet, cut from the mask made by
+   scripts/gen-abyss-pit.mjs. It lives in the crack's 40px frame and turns with it
+   (--pit-rot is the crack's rotation), so the hole's spikes run down the crack's
+   branches at any angle. It opens AFTER the step (animation delay, `backwards` fill),
+   so the floor reads as intact while the enemy walks on, then punches open from the
+   centre, timed to the hold beat of enemyAbyssFall.
+
+   Depth: the stacked layers below are the same hole, each moved further DOWN the
+   screen and clipped to the hole. What shows between them is a band under every
+   north-facing edge: the far inner wall, the one face of a pit a 3/4 top-down camera
+   sees. The band is a lit lip, then dark stone, then black. The layers are moved
+   by counter-rotating, so the band stays under the north edges at any rotation,
+   and the lighting matches the walls'. The drop-shadow darkens the floor at the rim. */
+.abyssPit {
   position: absolute;
   inset: 0;
-  background-color: #000000;
-  box-shadow: inset 0 0 20px 5px rgba(0, 0, 0, 0.9);
-  border: 1px solid #0a0a0a;
-  z-index: 1;
-  transform-origin: center;
+  z-index: 2; /* over the crack (same z, later in the DOM), under enemies and the hero */
+  rotate: var(--pit-rot);
+  filter: drop-shadow(0 0 1.5px rgba(0, 0, 0, 0.7));
   animation: abyssOpen 220ms ease-in 200ms backwards;
+  pointer-events: none;
+  /* Cave stone, from the floor sheet's mean colour rgb(28, 41, 26). Faulty floors
+     only exist in caves: the pink realm drops them. */
+  --pit-lip: rgb(40, 56, 40);
+  --pit-face: rgb(16, 24, 17);
+  --pit-deep: rgb(8, 12, 9);
+  --pit-void: rgb(2, 3, 2);
 }
 
-/* The crack breaks away as the pit opens — same delay/duration as abyssOpen so
-   the cracked floor reads as intact during the step, then shatters into the pit
-   (opacity only, so the inline rotate transform is preserved). */
-.faultyFloorIconBreaking {
-  animation: crackBreak 220ms ease-in 200ms forwards;
+.abyssPitLayer {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: url("/images/floor/abyss-pit-mask-v1.png");
+  mask-image: url("/images/floor/abyss-pit-mask-v1.png");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
 }
 
-@keyframes crackBreak {
-  0% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
+/* A layer moved --pit-drop straight down the screen, whatever the pit's rotation. */
+.abyssPitDrop {
+  transform: rotate(calc(-1 * var(--pit-rot))) translateY(var(--pit-drop))
+    rotate(var(--pit-rot));
+}
+
+.abyssPitLip {
+  background-color: var(--pit-lip);
+}
+
+.abyssPitFace {
+  --pit-drop: 1px;
+  background-color: var(--pit-face);
+}
+
+.abyssPitDeep {
+  --pit-drop: 2px;
+  background-color: var(--pit-deep);
+}
+
+.abyssPitVoid {
+  --pit-drop: 3px;
+  background-color: var(--pit-void);
+}
+
+/* The faint pink glow deep in the pit, centred on the hole (not the tile). */
+.abyssPitVoid::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle 14px at 48% 62%,
+    rgba(236, 72, 153, 0.15) 0%,
+    transparent 100%
+  );
+  animation: pinkSparkle 3s ease-in-out infinite;
 }
 
 /* The floor giving way: the pit punches open from the centre. */
 @keyframes abyssOpen {
   0% {
     opacity: 0;
-    transform: scale(0.25);
+    scale: 0.25;
   }
   55% {
     opacity: 1;
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    scale: 1;
   }
-}
-
-/* Pink sparkle effect on top */
-.openAbyss::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 50% 50%, rgba(236, 72, 153, 0.15) 0%, transparent 60%);
-  animation: pinkSparkle 3s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 2;
 }
 
 @keyframes pinkSparkle {

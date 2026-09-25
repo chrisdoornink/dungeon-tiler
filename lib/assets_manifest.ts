@@ -42,6 +42,9 @@ export const ASSET_URLS: string[] = [
   "/images/floor/dirt-road-r.png",
   "/images/floor/dirt-road-t.png",
   "/images/floor/dirt-road-end.png",
+  // The open-abyss pit is a CSS mask: until it loads the whole pit is invisible, so it
+  // must be cached before the first crack breaks.
+  "/images/floor/abyss-pit-mask-v1.png",
 
   // Remaining walls
   "/images/wall/wall-0000.png",

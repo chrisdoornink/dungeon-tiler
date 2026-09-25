@@ -23,6 +23,7 @@ export default function PreloadImages() {
       "/images/floor/dirt-road-r.png",
       "/images/floor/dirt-road-t.png",
       "/images/floor/dirt-road-end.png",
+      "/images/floor/abyss-pit-mask-v1.png", // CSS mask: the pit is invisible until it loads
 
       // Walls (all 8 NESW variants implemented)
       "/images/wall/wall-0000.png",

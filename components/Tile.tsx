@@ -1770,20 +1770,39 @@ export const Tile: React.FC<TileProps> = ({
 
         {/* Render faulty floor cracks overlay. Kept mounted (same key) through the
             faulty -> open-abyss transition so it never blinks to plain floor; once
-            the tile opens, it breaks away in sync with the pit (see abyssOpen). */}
+            the tile opens, it spreads to the tile's size and the pit breaks open over
+            its heart (see .abyssPit). */}
         {(hasFaultyFloor(subtypes) || hasOpenAbyss(subtypes)) && (
           <div
             key="faulty-floor"
             data-testid={`subtype-icon-${TileSubtype.FAULTY_FLOOR}`}
             className={`${styles.assetIcon} ${styles.faultyFloorIcon}${
-              hasOpenAbyss(subtypes) && !hasFaultyFloor(subtypes)
-                ? ` ${styles.faultyFloorIconBreaking}`
-                : ""
+              hasOpenAbyss(subtypes) ? ` ${styles.faultyFloorIconBreaking}` : ""
             }`}
             style={{
-              transform: `translate(-50%, -50%) rotate(${getFaultyFloorRotation()}deg)`,
+              translate: "-50% -50%",
+              rotate: `${getFaultyFloorRotation()}deg`,
             }}
           />
+        )}
+
+        {/* The hole a broken crack leaves, cut into the floor and turned with the
+            crack so its spikes follow the branches. The drop layers draw the pit's
+            far inner wall (see .abyssPit). */}
+        {hasOpenAbyss(subtypes) && (
+          <div
+            key="abyss-pit"
+            aria-hidden="true"
+            data-testid="abyss-pit"
+            className={styles.abyssPit}
+            style={{ "--pit-rot": `${getFaultyFloorRotation()}deg` } as React.CSSProperties}
+          >
+            <div className={`${styles.abyssPitLayer} ${styles.abyssPitLip}`}>
+              <div className={`${styles.abyssPitLayer} ${styles.abyssPitDrop} ${styles.abyssPitFace}`} />
+              <div className={`${styles.abyssPitLayer} ${styles.abyssPitDrop} ${styles.abyssPitDeep}`} />
+              <div className={`${styles.abyssPitLayer} ${styles.abyssPitDrop} ${styles.abyssPitVoid}`} />
+            </div>
+          </div>
         )}
 
         {/* Render remaining subtypes with standard icons */}
