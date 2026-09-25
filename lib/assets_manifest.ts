@@ -45,7 +45,7 @@ export const ASSET_URLS: string[] = [
 
   // Remaining walls
   "/images/wall/wall-0000.png",
-  "/images/wall/wall-0001.png",
+  "/images/wall/wall-0001-thin-edge.png",
   "/images/wall/wall-0100.png",
   "/images/wall/wall-0101.png",
   "/images/wall/wall-0010.png",

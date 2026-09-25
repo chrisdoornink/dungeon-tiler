@@ -7158,12 +7158,15 @@ function renderTileGrid(
       const isTorchSecondRingGlow = !isLightSource && g === SECOND_RING_GLOW;
       const isVisible = tier > 0;
 
-      // Get neighboring tiles
+      // Get neighboring tiles (the lower diagonals are the sides of the wall below, whose
+      // top face this tile draws; see wallTopPattern)
       const neighbors = {
         top: getTileAt(rowIndex - 1, colIndex),
         right: getTileAt(rowIndex, colIndex + 1),
         bottom: getTileAt(rowIndex + 1, colIndex),
         left: getTileAt(rowIndex, colIndex - 1),
+        bottomLeft: getTileAt(rowIndex + 1, colIndex - 1),
+        bottomRight: getTileAt(rowIndex + 1, colIndex + 1),
       };
 
       // Terrain-family neighbors for elemental tiles, so pools shade only their real

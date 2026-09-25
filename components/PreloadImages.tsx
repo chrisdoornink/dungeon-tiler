@@ -26,7 +26,7 @@ export default function PreloadImages() {
 
       // Walls (all 8 NESW variants implemented)
       "/images/wall/wall-0000.png",
-      "/images/wall/wall-0001.png",
+      "/images/wall/wall-0001-thin-edge.png",
       "/images/wall/wall-0010.png",
       "/images/wall/wall-0011.png",
       "/images/wall/wall-0100.png",

@@ -194,6 +194,7 @@ import {
   getEnvironmentConfig,
   getFloorAsset,
   getWallAsset,
+  wallTopPattern,
 } from "../lib/environment";
 import {
   type FloorStyle,
@@ -206,6 +207,9 @@ type NeighborInfo = {
   right: number | null;
   bottom: number | null;
   left: number | null;
+  // The wall below's own sides, for the top face drawn over this tile (see wallTopPattern).
+  bottomLeft?: number | null;
+  bottomRight?: number | null;
 };
 
 export type HeroDeathPhase =
@@ -2511,30 +2515,9 @@ export const Tile: React.FC<TileProps> = ({
       const hasWallBelow = neighbors.bottom === 1;
       // Check if bottom neighbor is a roof - floor tiles behind the house have ROOF tiles below them
       const hasRoofBelowForBackOverhang = neighbors.bottom === 4;
-      
-      // Determine which wall image to use for the overlay based on neighboring walls
-      let wallPattern = '0111';
 
-      if (hasWallBelow) {
-        // Check if there are walls to the left and right
-        const hasWallLeft = neighbors.left === 1;
-        const hasWallRight = neighbors.right === 1;
-        
-        if (!hasWallLeft && !hasWallRight) {
-          // No walls on sides, use wall-0010.png (just top wall)
-          wallPattern = '0010';
-        } else if (hasWallLeft && !hasWallRight) {
-          // Wall on left only
-          wallPattern = '0110';
-        } else if (!hasWallLeft && hasWallRight) {
-          // Wall on right only
-          wallPattern = '0011';
-        } else {
-          // Walls on both sides
-          wallPattern = '0111';
-        }
-      }
-      const wallTopImage = getWallAsset(environment, wallPattern);
+      // The top face of the wall below, drawn over this tile's bottom third
+      const wallTopImage = getWallAsset(environment, wallTopPattern(neighbors));
       const roofBackOverhangImage = assetUrl('/images/roof/spanish-roof-back-overhang.png');
 
       return (
@@ -3359,30 +3342,9 @@ export const Tile: React.FC<TileProps> = ({
       // Check if bottom neighbor is a roof - if so, we'll render the roof back overhang
       const hasRoofBelow = neighbors.bottom === 4;
       const roofBackOverhangImage = assetUrl('/images/roof/spanish-roof-back-overhang.png');
-      
-      // Determine which wall image to use for the overlay based on neighboring walls
-      let wallPattern = '0111';
 
-      if (hasWallBelow) {
-        // Check if there are walls to the left and right
-        const hasWallLeft = neighbors.left === 1;
-        const hasWallRight = neighbors.right === 1;
-        
-        if (!hasWallLeft && !hasWallRight) {
-          // No walls on sides, use wall-0010.png (just top wall)
-          wallPattern = '0010';
-        } else if (hasWallLeft && !hasWallRight) {
-          // Wall on left only
-          wallPattern = '0110';
-        } else if (!hasWallLeft && hasWallRight) {
-          // Wall on right only
-          wallPattern = '0011';
-        } else {
-          // Walls on both sides
-          wallPattern = '0111';
-        }
-      }
-      const wallTopImage = getWallAsset(environment, wallPattern);
+      // The top face of the wall below, drawn over this tile's bottom third
+      const wallTopImage = getWallAsset(environment, wallTopPattern(neighbors));
 
       // Deterministically pick a tree asset based on tile coordinates
       const y = typeof row === 'number' ? row : 0;
