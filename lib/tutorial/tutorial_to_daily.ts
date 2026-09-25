@@ -2,6 +2,7 @@ import {
   advanceToNextFloor,
   initializeGameStateForMultiTier,
   SWITCH_GATE_START_DATE,
+  dailyTuningV2ForDate,
   fisherRetiredForDate,
   snakeSpawnBufferForDate,
   type GameState,
@@ -41,11 +42,13 @@ export function buildDailyFloor2FromTutorial(
   // advanceToNextFloor reads when generating floor 2.
   const rng = mulberry32(seed);
   const floor1 = withPatchedMathRandom(rng, () => {
-    // Same date gate as the daily route in GameView — this path also builds a real daily map
-    // from the date seed, so it has to agree about whether the day has switch gates or the
-    // tutorial hand-off would generate a different floor 2 than the normal route.
+    // Same date gates as the daily route in GameView — this path also builds a real daily map
+    // from the date seed, so it has to agree about every one of them or the tutorial hand-off
+    // generates a different floor 2 than the normal route. tuningV2 matters beyond floor 1:
+    // advanceToNextFloor carries the flag forward and it changes draws mid-stream on floors 2-3.
     return initializeGameStateForMultiTier(1, {
       switchGates: localToday >= SWITCH_GATE_START_DATE,
+      tuningV2: dailyTuningV2ForDate(localToday),
       fisherRetired: fisherRetiredForDate(localToday),
       snakeSpawnBuffer: snakeSpawnBufferForDate(localToday),
     });
