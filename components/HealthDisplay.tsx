@@ -43,7 +43,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src={isPoisoned ? assetUrl("/images/presentational/heart-poison-green.png") : assetUrl("/images/presentational/heart-red.png")}
+          src={isPoisoned ? assetUrl("/images/presentational/heart-poison-green-clean.png") : assetUrl("/images/presentational/heart-red-clean.png")}
           alt={isPoisoned ? "💚" : "❤️"}
           width={16}
           height={16}
@@ -55,7 +55,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src={assetUrl("/images/presentational/heart-empty.png")}
+          src={assetUrl("/images/presentational/heart-empty-clean.png")}
           alt="🤍"
           width={16}
           height={16}
@@ -74,7 +74,7 @@ const HealthDisplay: React.FC<HealthDisplayProps> = ({
     hearts.push(
       <Image
         key={`bonus-${b}`}
-        src={assetUrl("/images/presentational/heart-pink.png")}
+        src={assetUrl("/images/presentational/heart-pink-clean.png")}
         alt="💗"
         width={16}
         height={16}

@@ -33,27 +33,27 @@ const ItemPickupAnimation: React.FC<ItemPickupAnimationProps> = ({
   const getItemImage = (type: string) => {
     switch (type) {
       case "key":
-        return assetUrl("/images/items/key.png");
+        return assetUrl("/images/items/key-clean.png");
       case "exitKey":
-        return assetUrl("/images/items/exit-key.png");
+        return assetUrl("/images/items/exit-key-clean.png");
       case "sword":
-        return assetUrl("/images/items/sword.png");
+        return assetUrl("/images/items/sword-clean.png");
       case "shield":
-        return assetUrl("/images/items/shield.png");
+        return assetUrl("/images/items/shield-clean.png");
       case "rock":
-        return assetUrl("/images/items/rock-1.png");
+        return assetUrl("/images/items/rock-1-clean.png");
       case 'rune':
         return assetUrl('/images/items/rune1.png');
       case 'bomb':
-        return assetUrl('/images/items/bomb-black.png');
+        return assetUrl('/images/items/bomb-black-clean.png');
       case 'food':
-        return assetUrl('/images/items/food-1.png');
+        return assetUrl('/images/items/food-1-clean.png');
       case 'pinkHeart':
-        return assetUrl('/images/items/pink-heart.png');
+        return assetUrl('/images/items/pink-heart-clean.png');
       case 'berry':
         return assetUrl('/images/items/berry.png');
       default:
-        return assetUrl('/images/items/key.png');
+        return assetUrl('/images/items/key-clean.png');
     }
   };
 

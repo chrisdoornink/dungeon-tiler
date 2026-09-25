@@ -38,7 +38,7 @@ export function buildLibrary(): StoryRoom {
   const eldra = new NPC({
     id: "npc-eldra",
     name: "Eldra",
-    sprite: "/images/npcs/torch-town/eldra.png",
+    sprite: "/images/npcs/torch-town/eldra-clean.png",
     y: 3,
     x: 5,
     facing: Direction.DOWN,

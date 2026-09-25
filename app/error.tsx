@@ -33,7 +33,7 @@ export default function Error({
       <div
         className="w-20 h-20"
         style={{
-          backgroundImage: "url(/images/hero/hero-front-static.png)",
+          backgroundImage: "url(/images/hero/hero-front-static-clean.png)",
           backgroundSize: "contain",
           backgroundRepeat: "no-repeat",
           backgroundPosition: "center",

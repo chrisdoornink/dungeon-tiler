@@ -44,6 +44,8 @@ Deployed on Vercel. Merges to `main` trigger automatic production deploys. Use `
 
 - **Recolor or redraw → new filename**, ideally one that says what changed (`snake-medalion.png` → `snake-medallion-blue.png`). Then update every reference: `grep -rn "old-name" components lib app`. Expect hits beyond the obvious render component — the preload lists (`lib/assets_manifest.ts`, `components/PreloadImages.tsx`) and the end-screen/stats icon maps (`components/daily/DailyCompleted.tsx`, `components/stats/EndgameStats.tsx`, `lib/stats/daily_chest.ts`) each carry their own copy of the path.
 - **A brand-new sprite at a new path needs none of this** — only in-place edits to an existing filename are the hazard.
+- **Hand-cut sprites go through `scripts/clean-sprites.py IN.png OUT.png --diag DIAG.png`** (needs `pip install numpy scipy pillow`). It strips what a manual cut leaves: specks, hairlines, light halos, shadow residue, pinholes. Sprites cleaned on 2026-09-24 (every changed one was reviewed by eye) carry a `-clean` suffix. Check the diag (red = removed, cyan = recoloured) on a light and a dark background. Translucent decals and glow effects have per-file settings or a skip entry in `scripts/clean-sprites.config.json`.
+- **Saves store NPC/family sprite paths verbatim.** Renaming one of those means adding the old path to `lib/legacy_sprite_paths.ts`, or old story/home saves render that character invisible.
 - **The cache header is a backstop, not the fix.** `max-age=604800, stale-while-revalidate=2592000` caps a forgotten rename at roughly a week; it does nothing for clients that already cached a file under the older `immutable` header. Only a new URL reaches those.
 
 ## Standalone HTML5 build (`standalone/`)

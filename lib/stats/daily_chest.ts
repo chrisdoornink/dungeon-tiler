@@ -42,17 +42,17 @@ const ITEM_META: Partial<Record<TileSubtype, Omit<ChestItemMeta, "subtype">>> = 
   [TileSubtype.BOMB]: {
     key: "bomb",
     label: "Bomb",
-    icon: "/images/items/bomb-black.png",
+    icon: "/images/items/bomb-black-clean.png",
   },
   [TileSubtype.SNAKE_MEDALLION]: {
     key: "snake_medallion",
     label: "Snake Medallion",
-    icon: "/images/items/snake-medallion-blue.png",
+    icon: "/images/items/snake-medallion-blue-clean.png",
   },
   [TileSubtype.EXTRA_HEART]: {
     key: "extra_heart",
     label: "Extra Heart",
-    icon: "/images/items/heart.png",
+    icon: "/images/items/heart-clean.png",
   },
   [TileSubtype.AMBER_MOTH]: {
     key: "amber_moth",
@@ -62,12 +62,12 @@ const ITEM_META: Partial<Record<TileSubtype, Omit<ChestItemMeta, "subtype">>> = 
   [TileSubtype.SWORD]: {
     key: "sword",
     label: "Sword",
-    icon: "/images/items/sword.png",
+    icon: "/images/items/sword-clean.png",
   },
   [TileSubtype.SHIELD]: {
     key: "shield",
     label: "Shield",
-    icon: "/images/items/shield.png",
+    icon: "/images/items/shield-clean.png",
   },
 };
 

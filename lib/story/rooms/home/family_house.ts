@@ -101,9 +101,9 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     id: "chris",
     npcId: "npc-chris",
     name: "Chris",
-    sprite: "/images/family/chris-front.png",
-    spriteBack: "/images/family/chris-back.png",
-    spriteSide: "/images/family/chris-side.png",
+    sprite: "/images/family/chris-front-clean.png",
+    spriteBack: "/images/family/chris-back-clean.png",
+    spriteSide: "/images/family/chris-side-clean.png",
     heroSpriteScale: 126,
     speed: 1.15,
     home: [13, 2],
@@ -120,8 +120,8 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     name: "Annie",
     // Town-NPC look (Chris's pick): girl-1 front, generated back (see
     // scripts/make-family-npc-variants.mjs). No side art — front is the fallback.
-    sprite: "/images/npcs/girl-1.png",
-    spriteBack: "/images/family/annie-girl1-back.png",
+    sprite: "/images/npcs/girl-1-clean.png",
+    spriteBack: "/images/family/annie-girl1-back-clean.png",
     heroSpriteScale: 126,
     speed: 1.15,
     home: [6, 3],
@@ -138,8 +138,8 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     npcId: "npc-emerson",
     name: "Emerson",
     // Town-NPC look (Chris's pick): boy-3 front, generated back.
-    sprite: "/images/npcs/boy-3.png",
-    spriteBack: "/images/family/emerson-boy3-back.png",
+    sprite: "/images/npcs/boy-3-clean.png",
+    spriteBack: "/images/family/emerson-boy3-back-clean.png",
     heroSpriteScale: 110,
     speed: 1.4,
     home: [13, 8],
@@ -155,8 +155,8 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     name: "Claire",
     // Town-NPC look (Chris's pick): girl-2 recolored to Claire (her hair
     // color, dark shirt, blue shorts) + generated back.
-    sprite: "/images/family/claire-girl2-front.png",
-    spriteBack: "/images/family/claire-girl2-back.png",
+    sprite: "/images/family/claire-girl2-front-clean.png",
+    spriteBack: "/images/family/claire-girl2-back-clean.png",
     heroSpriteScale: 116,
     speed: 0.85,
     home: [10, 8],
@@ -170,7 +170,7 @@ export const FAMILY_MEMBERS: FamilyMember[] = [
     id: "opal",
     npcId: "npc-opal",
     name: "Opal",
-    sprite: "/images/dog-golden/dog-front-1.png",
+    sprite: "/images/dog-golden/dog-front-1-clean.png",
     // Opal is 6lbs in real life: 30% under the standard dog render (51).
     heroSpriteScale: 36,
     speed: 1.25,

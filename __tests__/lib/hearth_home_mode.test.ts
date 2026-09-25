@@ -38,7 +38,7 @@ describe("buildHearthHomeState", () => {
 
   it("defaults to Chris: he is the hero (his own sprite), not an NPC", () => {
     expect(state.activeHeroId).toBe("chris");
-    expect(state.heroSprite).toBe("/images/family/chris-front.png");
+    expect(state.heroSprite).toBe("/images/family/chris-front-clean.png");
     const ids = (state.npcs ?? []).map((npc) => npc.id).sort();
     expect(ids).toEqual(["npc-annie", "npc-claire", "npc-emerson", "npc-opal"]);
   });
@@ -88,7 +88,7 @@ describe("character toggle", () => {
     const ids = (state.npcs ?? []).map((npc) => npc.id);
     expect(ids).toContain("npc-chris");
     expect(ids).not.toContain("npc-emerson");
-    expect(state.heroSprite).toBe("/images/npcs/boy-3.png");
+    expect(state.heroSprite).toBe("/images/npcs/boy-3-clean.png");
   });
 
   it("renders the kids at kid size", () => {
@@ -98,7 +98,7 @@ describe("character toggle", () => {
 
   it("supports dog mode at dog size", () => {
     const state = buildHearthHomeState("opal");
-    expect(state.heroSprite).toBe("/images/dog-golden/dog-front-1.png");
+    expect(state.heroSprite).toBe("/images/dog-golden/dog-front-1-clean.png");
     expect(state.heroSpriteScale).toBe(36);
     // Humans with real art render larger than the NPC standard.
     expect(buildHearthHomeState("chris").heroSpriteScale).toBe(126);
@@ -111,22 +111,22 @@ describe("directional sprites", () => {
   it("resolves hero art by facing, falling back to front", () => {
     const chris = buildHearthHomeState("chris");
     expect(resolveHeroSpriteOverride(Direction.UP, chris)).toBe(
-      "/images/family/chris-back.png"
+      "/images/family/chris-back-clean.png"
     );
     expect(resolveHeroSpriteOverride(Direction.LEFT, chris)).toBe(
-      "/images/family/chris-side.png"
+      "/images/family/chris-side-clean.png"
     );
     expect(resolveHeroSpriteOverride(Direction.DOWN, chris)).toBe(
-      "/images/family/chris-front.png"
+      "/images/family/chris-front-clean.png"
     );
     const emerson = buildHearthHomeState("emerson");
     expect(resolveHeroSpriteOverride(Direction.UP, emerson)).toBe(
-      "/images/family/emerson-boy3-back.png"
+      "/images/family/emerson-boy3-back-clean.png"
     );
     // No directional art (Opal): every facing falls back to the front sprite.
     const opal = buildHearthHomeState("opal");
     expect(resolveHeroSpriteOverride(Direction.UP, opal)).toBe(
-      "/images/dog-golden/dog-front-1.png"
+      "/images/dog-golden/dog-front-1-clean.png"
     );
     // Daily/story/endless states carry no override at all.
     expect(resolveHeroSpriteOverride(Direction.UP, {})).toBeUndefined();
@@ -150,7 +150,7 @@ describe("directional sprites", () => {
     const state = buildHearthHomeState("chris");
     const annie = (state.npcs ?? []).find((npc) => npc.id === "npc-annie");
     expect(annie?.metadata?.directionalSprites).toEqual({
-      back: "/images/family/annie-girl1-back.png",
+      back: "/images/family/annie-girl1-back-clean.png",
       side: undefined, // no side art — the resolver falls back to the front
     });
   });
@@ -187,7 +187,7 @@ describe("possession (switchPartyMember)", () => {
     expect([chrisNpc.y, chrisNpc.x]).toEqual(FAMILY_HOUSE_SPAWN);
     expect((next.npcs ?? []).some((n) => n.id === "npc-annie")).toBe(false);
 
-    expect(next.heroSprite).toBe("/images/npcs/girl-1.png");
+    expect(next.heroSprite).toBe("/images/npcs/girl-1-clean.png");
     expect(next.playerDirection).toBe(annie.facing);
     expect((next.npcs ?? []).map((n) => n.metadata?.followOrder)).toEqual([
       0, 1, 2, 3,

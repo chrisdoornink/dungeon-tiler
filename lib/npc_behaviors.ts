@@ -140,13 +140,13 @@ export function updateDogBehavior(ctx: NPCBehaviorContext): NPCBehaviorResult {
         const currentStep = (npc.memory?.dogStep as number) || 0;
         const nextStep = (currentStep + 1) % 2;
         npc.setMemory("dogStep", nextStep);
-        npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}.png`;
+        npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}-clean.png`;
       } else if (moveX > 0) {
-        npc.sprite = `/images/dog-golden/dog-front-1.png`; // faces right
+        npc.sprite = `/images/dog-golden/dog-front-1-clean.png`; // faces right
       } else if (moveX < 0) {
-        npc.sprite = `/images/dog-golden/dog-front-2.png`; // faces left
+        npc.sprite = `/images/dog-golden/dog-front-2-clean.png`; // faces left
       } else {
-        npc.sprite = `/images/dog-golden/dog-front-4.png`; // faces the camera
+        npc.sprite = `/images/dog-golden/dog-front-4-clean.png`; // faces the camera
       }
 
       return { moved: true };
@@ -276,13 +276,13 @@ function updateDogSprite(npc: NPC, moveY: number, _moveX: number): void {
     const currentStep = (npc.memory?.dogStep as number) || 0;
     const nextStep = (currentStep + 1) % 2;
     npc.setMemory("dogStep", nextStep);
-    npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}.png`;
+    npc.sprite = `/images/dog-golden/dog-back-${nextStep + 1}-clean.png`;
   } else {
     // Moving down, left, or right - alternate between front sprites
     const currentStep = (npc.memory?.dogStep as number) || 0;
     const nextStep = (currentStep + 1) % 4;
     npc.setMemory("dogStep", nextStep);
-    npc.sprite = `/images/dog-golden/dog-front-${nextStep + 1}.png`;
+    npc.sprite = `/images/dog-golden/dog-front-${nextStep + 1}-clean.png`;
   }
 }
 
@@ -302,7 +302,7 @@ function isValidPosition(grid: number[][], y: number, x: number): boolean {
 export function getRandomDogFrontSprite(rng?: () => number): string {
   const random = rng ?? Math.random;
   const index = Math.floor(random() * 4) + 1;
-  return `/images/dog-golden/dog-front-${index}.png`;
+  return `/images/dog-golden/dog-front-${index}-clean.png`;
 }
 
 /**
@@ -311,7 +311,7 @@ export function getRandomDogFrontSprite(rng?: () => number): string {
 export function getRandomDogBackSprite(rng?: () => number): string {
   const random = rng ?? Math.random;
   const index = Math.floor(random() * 2) + 1;
-  return `/images/dog-golden/dog-back-${index}.png`;
+  return `/images/dog-golden/dog-back-${index}-clean.png`;
 }
 
 /** How close an enemy must be (Manhattan) before a family member reacts to it. */

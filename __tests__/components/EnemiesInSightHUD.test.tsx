@@ -53,7 +53,7 @@ describe('HUD: Enemies in sight shows correct stone-goblin front sprite', () => 
     const iconSpans = status.parentElement!.querySelectorAll('span.inline-block');
     expect(iconSpans.length).toBeGreaterThan(0);
     const bg = (iconSpans[0] as HTMLElement).style.backgroundImage;
-    expect(bg).toContain('green-goblin-front.png');
+    expect(bg).toContain('green-goblin-front-clean.png');
 
     // Should show 8 heart icons for enemy health
     const hearts = screen.getAllByAltText('❤️');

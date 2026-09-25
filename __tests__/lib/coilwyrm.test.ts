@@ -1099,10 +1099,10 @@ describe("coilPieceFor picks the piece that connects its neighbours", () => {
       "tail-up", "tail-down", "tail-left", "tail-right",
     ];
     for (const piece of pieces) {
-      expect(fs.existsSync(path.join(dir, `coilwyrm-${piece}.png`))).toBe(true);
+      expect(fs.existsSync(path.join(dir, `coilwyrm-${piece}-clean.png`))).toBe(true);
     }
     for (const head of ["head-front", "head-back", "head-side"]) {
-      expect(fs.existsSync(path.join(dir, `coilwyrm-${head}.png`))).toBe(true);
+      expect(fs.existsSync(path.join(dir, `coilwyrm-${head}-clean.png`))).toBe(true);
     }
   });
 });

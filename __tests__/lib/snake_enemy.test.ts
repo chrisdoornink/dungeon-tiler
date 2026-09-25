@@ -14,9 +14,9 @@ describe('Snake Enemy', () => {
   test('snake should have coiled and moving assets', () => {
     const snake = EnemyRegistry['snake'];
     
-    expect(snake.assets.front).toBe('/images/enemies/snake-coiled-right.png'); // coiled when not moving
-    expect(snake.assets.left).toBe('/images/enemies/snake-moving-left.png'); // moving asset
-    expect(snake.assets.right).toBe('/images/enemies/snake-coiled-right.png'); // coiled when not moving
+    expect(snake.assets.front).toBe('/images/enemies/snake-coiled-right-clean.png'); // coiled when not moving
+    expect(snake.assets.left).toBe('/images/enemies/snake-moving-left-clean.png'); // moving asset
+    expect(snake.assets.right).toBe('/images/enemies/snake-coiled-right-clean.png'); // coiled when not moving
   });
 
   test('snake should have correct spawn configuration', () => {

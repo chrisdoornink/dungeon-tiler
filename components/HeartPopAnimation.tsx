@@ -34,7 +34,7 @@ const HeartPopAnimation: React.FC<HeartPopAnimationProps> = ({
   return (
     <div className={`absolute pointer-events-none ${className}`} style={style}>
       <Image
-        src={assetUrl("/images/presentational/heart-red.png")}
+        src={assetUrl("/images/presentational/heart-red-clean.png")}
         alt="❤️"
         width={16}
         height={16}

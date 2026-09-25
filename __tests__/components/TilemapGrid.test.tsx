@@ -654,7 +654,7 @@ describe('TilemapGrid component', () => {
       const npc = new NPC({
         id: 'npc-test',
         name: 'Elder Rowan',
-        sprite: '/images/npcs/boy-3.png',
+        sprite: '/images/npcs/boy-3-clean.png',
         y: heroY,
         x: heroX + 1,
         facing: Direction.LEFT,
@@ -783,7 +783,7 @@ describe('TilemapGrid component', () => {
       const npc = new NPC({
         id: 'npc-caretaker',
         name: 'Caretaker Lysa',
-        sprite: '/images/npcs/girl-1.png',
+        sprite: '/images/npcs/girl-1-clean.png',
         y: heroY,
         x: heroX + 1,
         facing: Direction.LEFT,

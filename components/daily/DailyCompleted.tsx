@@ -107,25 +107,25 @@ export function buildInventoryEntries(
   const inv: InventoryEntry[] = [];
   if (!game) return inv;
   if (game.hasKey)
-    inv.push({ key: "key", asset: "/images/items/key.png", emoji: "🗝️", alt: "Key" });
+    inv.push({ key: "key", asset: "/images/items/key-clean.png", emoji: "🗝️", alt: "Key" });
   if (game.hasExitKey)
-    inv.push({ key: "exitKey", asset: "/images/items/exit-key.png", emoji: "🔑", alt: "Exit Key" });
+    inv.push({ key: "exitKey", asset: "/images/items/exit-key-clean.png", emoji: "🔑", alt: "Exit Key" });
   if (game.hasSword)
-    inv.push({ key: "sword", asset: "/images/items/sword.png", emoji: "🗡️", alt: "Sword" });
+    inv.push({ key: "sword", asset: "/images/items/sword-clean.png", emoji: "🗡️", alt: "Sword" });
   if (game.hasShield)
-    inv.push({ key: "shield", asset: "/images/items/shield.png", emoji: "🛡️", alt: "Shield" });
+    inv.push({ key: "shield", asset: "/images/items/shield-clean.png", emoji: "🛡️", alt: "Shield" });
   if (game.hasSnakeMedallion)
-    inv.push({ key: "medallion", asset: "/images/items/snake-medallion-blue.png", emoji: "🌀", alt: "Travel Medallion" });
+    inv.push({ key: "medallion", asset: "/images/items/snake-medallion-blue-clean.png", emoji: "🌀", alt: "Travel Medallion" });
   if ((game.rockCount ?? 0) > 0)
-    inv.push({ key: "rock", asset: "/images/items/rock-1.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
+    inv.push({ key: "rock", asset: "/images/items/rock-1-clean.png", emoji: "🪨", alt: "Rock", count: game.rockCount });
   if ((game.runeCount ?? 0) > 0)
     inv.push({ key: "rune", asset: "/images/items/rune1.png", emoji: "💠", alt: "Rune", count: game.runeCount });
   if ((game.bombCount ?? 0) > 0)
-    inv.push({ key: "bomb", asset: "/images/items/bomb-black.png", emoji: "💣", alt: "Bomb", count: game.bombCount });
+    inv.push({ key: "bomb", asset: "/images/items/bomb-black-clean.png", emoji: "💣", alt: "Bomb", count: game.bombCount });
   if ((game.foodCount ?? 0) > 0)
-    inv.push({ key: "food", asset: "/images/items/food-1.png", emoji: "🧀", alt: "Food", count: game.foodCount });
+    inv.push({ key: "food", asset: "/images/items/food-1-clean.png", emoji: "🧀", alt: "Food", count: game.foodCount });
   if ((game.potionCount ?? 0) > 0)
-    inv.push({ key: "potion", asset: "/images/items/meds-1.png", emoji: "🧪", alt: "Potion", count: game.potionCount });
+    inv.push({ key: "potion", asset: "/images/items/meds-1-clean.png", emoji: "🧪", alt: "Potion", count: game.potionCount });
   if ((game.berryCount ?? 0) > 0)
     inv.push({ key: "berry", asset: "/images/items/berry.png", emoji: "🍓", alt: "Belted Berry", count: game.berryCount });
   // Amber Moth: shown only if the rewind was never spent — a run that finished with the
@@ -135,7 +135,7 @@ export function buildInventoryEntries(
   // Pink flaming heart prize: shown only if still HELD at the end (using it
   // consumes it). A trophy for finding the secret realm.
   if ((game.pinkHeartCount ?? 0) > 0)
-    inv.push({ key: "pinkHeart", asset: "/images/items/pink-heart.png", emoji: "💗", alt: "Pink Flaming Heart — secret prize", count: game.pinkHeartCount });
+    inv.push({ key: "pinkHeart", asset: "/images/items/pink-heart-clean.png", emoji: "💗", alt: "Pink Flaming Heart — secret prize", count: game.pinkHeartCount });
   return inv;
 }
 
@@ -316,13 +316,13 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
       case "poison":
         return {
           message: "You succumbed to poison from a snake bite",
-          image: "/images/enemies/snake-coiled-right.png",
+          image: "/images/enemies/snake-coiled-right-clean.png",
           alt: "Poisoned by snake",
         };
       case "bomb":
         return {
           message: "You were caught in your own bomb blast",
-          image: "/images/items/bomb-red.png",
+          image: "/images/items/bomb-red-clean.png",
           alt: "Killed by a bomb",
         };
       case "darkness":
@@ -544,8 +544,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
               className={`w-24 h-24 mx-auto mb-4`}
               style={{
                 backgroundImage: isWin
-                  ? "url(/images/presentational/game-over-win-1.png)"
-                  : `url(/images/presentational/game-over-loss-${defeatImageNum}.png)`,
+                  ? "url(/images/presentational/game-over-win-1-clean.png)"
+                  : `url(/images/presentational/game-over-loss-${defeatImageNum}-clean.png)`,
                 backgroundSize: "contain",
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "center",
@@ -619,8 +619,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                         style={{
                           backgroundImage: `url(${
                             isWin
-                              ? "/images/presentational/game-over-win-1.png"
-                              : "/images/presentational/game-over-loss-1.png"
+                              ? "/images/presentational/game-over-win-1-clean.png"
+                              : "/images/presentational/game-over-loss-1-clean.png"
                           })`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
@@ -751,8 +751,8 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                               style={{
                                 backgroundImage: `url(${
                                   filled
-                                    ? "/images/presentational/heart-red.png"
-                                    : "/images/presentational/heart-empty.png"
+                                    ? "/images/presentational/heart-red-clean.png"
+                                    : "/images/presentational/heart-empty-clean.png"
                                 })`,
                                 backgroundSize: "contain",
                                 backgroundRepeat: "no-repeat",
@@ -775,7 +775,7 @@ export default function DailyCompleted({ data }: DailyCompletedProps) {
                               className="w-5 h-5"
                               style={{
                                 backgroundImage:
-                                  "url(/images/presentational/heart-pink.png)",
+                                  "url(/images/presentational/heart-pink-clean.png)",
                                 backgroundSize: "contain",
                                 backgroundRepeat: "no-repeat",
                                 backgroundPosition: "center",

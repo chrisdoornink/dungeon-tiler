@@ -200,10 +200,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "fire-goblin",
     displayName: "Fire Goblin",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/fire-goblin-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/fire-goblin-right.png"), // mirror right for left
-      right: assetUrl("/images/enemies/fire-goblin/fire-goblin-right.png"),
-      back: assetUrl("/images/enemies/fire-goblin/fire-goblin-back.png"),
+      front: assetUrl("/images/enemies/fire-goblin/fire-goblin-front-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/fire-goblin-right-clean.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/fire-goblin-right-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/fire-goblin-back-clean.png"),
     },
     desiredMinCount: 2,
     desiredMaxCount: 3,
@@ -217,10 +217,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "water-goblin",
     displayName: "Water Goblin",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right.png"), // mirror right for left
-      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right.png"),
-      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back.png"),
+      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-clean.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back-clean.png"),
     },
     desiredMinCount: 1,
     desiredMaxCount: 2,
@@ -233,10 +233,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "water-goblin-spear",
     displayName: "Water Goblin Spearman",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front-spear.png"),
-      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear.png"), // mirror right for left
-      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear.png"),
-      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back-spear.png"),
+      front: assetUrl("/images/enemies/fire-goblin/blue-goblin-front-spear-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear-clean.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/blue-goblin-right-spear-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/blue-goblin-back-spear-clean.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -249,10 +249,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "earth-goblin",
     displayName: "Earth Goblin",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right.png"),
-      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right.png"),
-      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back.png"),
+      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-clean.png"),
+      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back-clean.png"),
     },
     desiredMinCount: 1,
     desiredMaxCount: 2,
@@ -265,10 +265,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "earth-goblin-knives",
     displayName: "Earth Goblin Knifesman",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front-knives.png"),
-      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives.png"),
-      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives.png"),
-      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back-knives.png"),
+      front: assetUrl("/images/enemies/fire-goblin/brown-goblin-front-knives-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives-clean.png"),
+      right: assetUrl("/images/enemies/fire-goblin/brown-goblin-right-knives-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/brown-goblin-back-knives-clean.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -283,10 +283,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     assets: {
       // Ringless art: the goblin and its teleport ring are separate entities
       // now — the ring renders as its own tile subtype with CSS sparkles.
-      front: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left.png"),
-      right: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left.png"),
-      back: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-back.png"),
+      front: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-front-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left-clean.png"),
+      right: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-left-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/pink-goblin-ringless-back-clean.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -771,10 +771,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "ghost",
     displayName: "Lantern Wisp",
     assets: {
-      front: assetUrl("/images/enemies/lantern-wisp.png"),
-      left: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
-      right: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
-      back: assetUrl("/images/enemies/lantern-wisp.png"), // placeholder
+      front: assetUrl("/images/enemies/lantern-wisp-clean.png"),
+      left: assetUrl("/images/enemies/lantern-wisp-clean.png"), // placeholder
+      right: assetUrl("/images/enemies/lantern-wisp-clean.png"), // placeholder
+      back: assetUrl("/images/enemies/lantern-wisp-clean.png"), // placeholder
     },
     desiredMinCount: 0,
     desiredMaxCount: 2,
@@ -796,10 +796,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "stone-goblin",
     displayName: "Stone Goblin",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/green-goblin-front.png"),
-      left: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
-      right: assetUrl("/images/enemies/fire-goblin/green-goblin-right.png"),
-      back: assetUrl("/images/enemies/fire-goblin/green-goblin-back.png"),
+      front: assetUrl("/images/enemies/fire-goblin/green-goblin-front-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/green-goblin-right-clean.png"),
+      right: assetUrl("/images/enemies/fire-goblin/green-goblin-right-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/green-goblin-back-clean.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -811,10 +811,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "white-goblin",
     displayName: "White Goblin",
     assets: {
-      front: assetUrl("/images/enemies/fire-goblin/white-goblins-front-1.png"),
-      back: assetUrl("/images/enemies/fire-goblin/white-goblins-back-1.png"),
-      left: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1.png"), // mirror right for left
-      right: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1.png"),
+      front: assetUrl("/images/enemies/fire-goblin/white-goblins-front-1-clean.png"),
+      back: assetUrl("/images/enemies/fire-goblin/white-goblins-back-1-clean.png"),
+      left: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1-clean.png"), // mirror right for left
+      right: assetUrl("/images/enemies/fire-goblin/white-goblins-right-1-clean.png"),
     },
     desiredMinCount: 0,
     desiredMaxCount: 0, // spawned as groups of 4 by assignment logic
@@ -1084,10 +1084,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     kind: "snake",
     displayName: "Snake",
     assets: {
-      front: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
-      left: assetUrl("/images/enemies/snake-moving-left.png"), // moving asset
-      right: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
-      back: assetUrl("/images/enemies/snake-coiled-right.png"), // coiled when not moving
+      front: assetUrl("/images/enemies/snake-coiled-right-clean.png"), // coiled when not moving
+      left: assetUrl("/images/enemies/snake-moving-left-clean.png"), // moving asset
+      right: assetUrl("/images/enemies/snake-coiled-right-clean.png"), // coiled when not moving
+      back: assetUrl("/images/enemies/snake-coiled-right-clean.png"), // coiled when not moving
     },
     desiredMinCount: 0,
     desiredMaxCount: 1,
@@ -1311,10 +1311,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       // matching the front core's split); the front has heterochromic glowing eyes
       // (blue + red). Distinct left/right art means the sprite must NOT be mirrored
       // by facing — see the no-flip case for 'shaper' in Tile.tsx.
-      front: assetUrl("/images/enemies/bosses/shaper/shaper-front.png"),
-      left: assetUrl("/images/enemies/bosses/shaper/shaper-left.png"),
-      right: assetUrl("/images/enemies/bosses/shaper/shaper-right.png"),
-      back: assetUrl("/images/enemies/bosses/shaper/shaper-back.png"),
+      front: assetUrl("/images/enemies/bosses/shaper/shaper-front-clean.png"),
+      left: assetUrl("/images/enemies/bosses/shaper/shaper-left-clean.png"),
+      right: assetUrl("/images/enemies/bosses/shaper/shaper-right-clean.png"),
+      back: assetUrl("/images/enemies/bosses/shaper/shaper-back-clean.png"),
     },
     base: { health: SHAPER_HP, attack: 0 },
     // Standard melee: once you fight through its terrain and reach it, it dies
@@ -1333,10 +1333,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     // top, back (moving away) exits the bottom, side exits the left. The side art faces RIGHT,
     // so Tile.tsx mirrors it for LEFT.
     assets: {
-      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-front.png"),
-      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side.png"),
-      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side.png"),
-      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-back.png"),
+      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-front-clean.png"),
+      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side-clean.png"),
+      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-side-clean.png"),
+      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-head-back-clean.png"),
     },
     base: { health: COILWYRM_HEAD_HP, attack: COILWYRM_HEAD_ATTACK },
     // The head is ALWAYS killable: COILWYRM_HEADSHOT_DAMAGE per hit, so exactly two hits fell
@@ -1370,10 +1370,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
     // coilPieceFor / Tile.tsx), because a body piece has to connect the two specific edges its
     // neighbours sit on. Facing alone cannot express that.
     assets: {
-      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
-      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
-      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h.png"),
-      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-v.png"),
+      front: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h-clean.png"),
+      left: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h-clean.png"),
+      right: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-h-clean.png"),
+      back: assetUrl("/images/enemies/bosses/coilwyrm/coilwyrm-body-v-clean.png"),
     },
     base: { health: COILWYRM_SEGMENT_HP, attack: 0 },
     movesInLockstep: true, // never freeze a link: it would break the chain
@@ -1412,10 +1412,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       // art, and reusing them meant browsers served the cached placeholders instead of the
       // real art (only the brand-new pose filenames picked up correctly). Any future art
       // pass should likewise land on a filename that has never been served before.
-      front: assetUrl("/images/enemies/bosses/fisher/fisher-stand-front.png"),
-      left: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
-      right: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right.png"),
-      back: assetUrl("/images/enemies/bosses/fisher/fisher-stand-back.png"),
+      front: assetUrl("/images/enemies/bosses/fisher/fisher-stand-front-clean.png"),
+      left: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right-clean.png"),
+      right: assetUrl("/images/enemies/bosses/fisher/fisher-stand-right-clean.png"),
+      back: assetUrl("/images/enemies/bosses/fisher/fisher-stand-back-clean.png"),
     },
     base: { health: FISHER_HP, attack: FISHER_ATTACK },
     // Melee is unreachable by design — the spikes guarantee the hero never stands
@@ -1442,10 +1442,10 @@ export const EnemyRegistry: Record<EnemyKind, EnemyConfig> = {
       // Shaper whose two halves differ). The `quarry-` prefix is deliberate: these names have
       // never been served before, because dropping real art onto a placeholder's filenames is
       // how the Fisher ended up with browsers serving cached placeholders.
-      front: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-front.png"),
-      left: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
-      right: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right.png"),
-      back: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-back.png"),
+      front: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-front-clean.png"),
+      left: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right-clean.png"),
+      right: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-right-clean.png"),
+      back: assetUrl("/images/enemies/bosses/quarrymaster/quarry-stand-back-clean.png"),
     },
     base: { health: QUARRYMASTER_HP, attack: QUARRYMASTER_ATTACK },
     // Ordinary melee, ordinary HP. Reaching him past the cage gates is the whole fight;
@@ -1494,7 +1494,7 @@ export function getEnemyIcon(
     const count = Math.min(4, Math.max(1, swarmCount ?? 1));
     const useFront = facing === "front" || facing === "left" || facing === "right";
     const side = useFront ? "front" : "back";
-    return assetUrl(`/images/enemies/fire-goblin/white-goblins-${side}-${count}.png`);
+    return assetUrl(`/images/enemies/fire-goblin/white-goblins-${side}-${count}-clean.png`);
   }
   return cfg.assets[facing] || cfg.assets.front;
 }

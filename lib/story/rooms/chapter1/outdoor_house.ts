@@ -49,7 +49,7 @@ export function buildOutdoorHouse(): StoryRoom {
   const caretaker = new NPC({
     id: "npc-grounds-caretaker",
     name: "Caretaker Lysa",
-    sprite: "/images/npcs/girl-1.png",
+    sprite: "/images/npcs/girl-1-clean.png",
     y: Math.max(2, Math.floor(SIZE / 2)),
     x: Math.max(2, Math.floor(SIZE / 2)),
     facing: Direction.DOWN,
@@ -93,7 +93,7 @@ export function buildOutdoorHouse(): StoryRoom {
   const kalen = new NPC({
     id: "npc-sanctum-boy",
     name: "Kalen",
-    sprite: "/images/npcs/boy-3.png",
+    sprite: "/images/npcs/boy-3-clean.png",
     y: 3,
     x: 4,
     facing: Direction.DOWN,

@@ -8,7 +8,7 @@ describe("Dog NPC Properties", () => {
     return new NPC({
       id: "npc-dog-golden",
       name: "Golden Dog",
-      sprite: "/images/dog-golden/dog-front-1.png",
+      sprite: "/images/dog-golden/dog-front-1-clean.png",
       y,
       x,
       facing: Direction.DOWN,
@@ -57,7 +57,7 @@ describe("Dog NPC Properties", () => {
   it("should start with front-facing sprite", () => {
     const dog = createDogNPC(2, 2);
     
-    expect(dog.sprite).toMatch(/dog-front-\d\.png$/);
+    expect(dog.sprite).toMatch(/dog-front-\d-clean\.png$/);
   });
 
   it("should support memory for tracking interactions", () => {

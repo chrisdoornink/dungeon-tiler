@@ -35,7 +35,7 @@ export function DeathScreen({ deathCause, onRestart, hasCheckpoint = true }: Dea
         <div
           className="w-32 h-32 animate-float"
           style={{
-            backgroundImage: `url(${assetUrl("/images/items/spirit.png")})`,
+            backgroundImage: `url(${assetUrl("/images/items/spirit-clean.png")})`,
             backgroundSize: 'contain',
             backgroundRepeat: 'no-repeat',
             backgroundPosition: 'center',

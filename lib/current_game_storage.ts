@@ -6,6 +6,7 @@
 import type { GameState } from "./map";
 import { FLOOR, TileSubtype } from "./map/constants";
 import { DateUtils } from "./date_utils";
+import { migrateLegacySpritePaths } from "./legacy_sprite_paths";
 
 const CURRENT_GAME_KEY = "currentGame";
 const DAILY_NEW_GAME_KEY = "currentDailyNewGame";
@@ -213,7 +214,8 @@ export class CurrentGameStorage {
       const raw = window.localStorage.getItem(key);
       if (!raw) return null;
 
-      const parsed = JSON.parse(raw) as StoredGameState;
+      // Saves hold NPC/family sprite paths verbatim; point renamed ones at their new files.
+      const parsed = JSON.parse(migrateLegacySpritePaths(raw)) as StoredGameState;
 
       // Validate that it's a valid game state
       if (

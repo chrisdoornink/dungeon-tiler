@@ -6,7 +6,7 @@ describe("NPC serialization", () => {
     const npc = new NPC({
       id: "npc-test",
       name: "Test NPC",
-      sprite: "/images/hero/hero-front-static.png",
+      sprite: "/images/hero/hero-front-static-clean.png",
       y: 3,
       x: 4,
       facing: Direction.UP,
@@ -55,7 +55,7 @@ describe("NPC interaction events", () => {
     const npc = new NPC({
       id: "solo",
       name: "Solo",
-      sprite: "/images/hero/hero-front-static.png",
+      sprite: "/images/hero/hero-front-static-clean.png",
       y: 1,
       x: 1,
     });
@@ -72,7 +72,7 @@ describe("NPC interaction events", () => {
     const npc = new NPC({
       id: "mentor",
       name: "Mentor",
-      sprite: "/images/hero/hero-front-static.png",
+      sprite: "/images/hero/hero-front-static-clean.png",
       y: 0,
       x: 0,
       interactionHooks: [
@@ -100,7 +100,7 @@ describe("NPC interaction events", () => {
     const npc = new NPC({
       id: "scribe",
       name: "Scribe",
-      sprite: "/images/hero/hero-front-static.png",
+      sprite: "/images/hero/hero-front-static-clean.png",
       y: 0,
       x: 0,
       interactionHooks: [

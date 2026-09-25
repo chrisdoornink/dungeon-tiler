@@ -128,7 +128,7 @@ export default function EndPage() {
       case 'bomb':
         return {
           message: "You were caught in your own bomb blast",
-          image: "/images/items/bomb-red.png",
+          image: "/images/items/bomb-red-clean.png",
           alt: "Killed by a bomb"
         };
       case 'enemy':

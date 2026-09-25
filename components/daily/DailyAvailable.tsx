@@ -60,7 +60,7 @@ export default function DailyAvailable({
           <div
             className="w-14 h-14 sm:w-20 sm:h-20 mx-auto my-3 sm:my-4"
             style={{
-              backgroundImage: "url(/images/hero/hero-front-static.png)",
+              backgroundImage: "url(/images/hero/hero-front-static-clean.png)",
               backgroundSize: "contain",
               backgroundRepeat: "no-repeat",
               backgroundPosition: "center",

@@ -9,7 +9,7 @@ import { assetUrl } from "../lib/asset_url";
 const SWORD_SIDE_OFFSET_PCT = 14; // in from the character's edge
 const SWORD_BOTTOM_PCT = 12; // up from the sprite's floor line
 const SWORD_HEIGHT_PCT = 38; // of the sprite box (parents apply character scale)
-const SWORD_ASPECT = 0.57; // width / height of items/sword.png (279 / 492)
+const SWORD_ASPECT = 0.57; // width / height of items/sword-clean.png (279 / 492)
 
 function renderSwordOverlay(keyPrefix: string): React.ReactElement {
   return (
@@ -22,7 +22,7 @@ function renderSwordOverlay(keyPrefix: string): React.ReactElement {
         right: `${SWORD_SIDE_OFFSET_PCT}%`,
         height: `${SWORD_HEIGHT_PCT}%`,
         width: `${SWORD_HEIGHT_PCT * SWORD_ASPECT}%`,
-        backgroundImage: `url(${assetUrl("/images/items/sword.png")})`,
+        backgroundImage: `url(${assetUrl("/images/items/sword-clean.png")})`,
         backgroundSize: "contain",
         backgroundRepeat: "no-repeat",
         backgroundPosition: "bottom center",
@@ -83,7 +83,7 @@ const FISHER_RENDER_SCALE = 1.2;
 //   0.93 (hero fill) / 0.73 (his fill) = 1.28
 //
 // Re-derive this if the art changes: the numbers come from the opaque bounding box of
-// hero-front-static.png against quarry-stand-front.png. The summon pose fills 84%, so it
+// hero-front-static-clean.png against quarry-stand-front-clean.png. The summon pose fills 84%, so it
 // lands a little taller than the hero — correct, his arms are over his head.
 const QUARRYMASTER_RENDER_SCALE = 1.28;
 // Ceiling on how high a thrown snake arcs (see smoothStepArcStyle). Tiles are 40px, so
@@ -892,14 +892,14 @@ export const Tile: React.FC<TileProps> = ({
 
   const getBedAsset = (subtypes: number[] | undefined): string | null => {
     if (!subtypes) return null;
-    if (subtypes.includes(TileSubtype.BED_EMPTY_1)) return assetUrl('/images/items/beds/bed-1-empty.png');
-    if (subtypes.includes(TileSubtype.BED_EMPTY_2)) return assetUrl('/images/items/beds/bed-2-empty.png');
-    if (subtypes.includes(TileSubtype.BED_EMPTY_3)) return assetUrl('/images/items/beds/bed-3-empty.png');
-    if (subtypes.includes(TileSubtype.BED_EMPTY_4)) return assetUrl('/images/items/beds/bed-4-empty.png');
-    if (subtypes.includes(TileSubtype.BED_FULL_1)) return assetUrl('/images/items/beds/bed-1-full.png');
-    if (subtypes.includes(TileSubtype.BED_FULL_2)) return assetUrl('/images/items/beds/bed-2-full.png');
-    if (subtypes.includes(TileSubtype.BED_FULL_3)) return assetUrl('/images/items/beds/bed-3-full.png');
-    if (subtypes.includes(TileSubtype.BED_FULL_4)) return assetUrl('/images/items/beds/bed-4-full.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_1)) return assetUrl('/images/items/beds/bed-1-empty-clean.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_2)) return assetUrl('/images/items/beds/bed-2-empty-clean.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_3)) return assetUrl('/images/items/beds/bed-3-empty-clean.png');
+    if (subtypes.includes(TileSubtype.BED_EMPTY_4)) return assetUrl('/images/items/beds/bed-4-empty-clean.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_1)) return assetUrl('/images/items/beds/bed-1-full-clean.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_2)) return assetUrl('/images/items/beds/bed-2-full-clean.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_3)) return assetUrl('/images/items/beds/bed-3-full-clean.png');
+    if (subtypes.includes(TileSubtype.BED_FULL_4)) return assetUrl('/images/items/beds/bed-4-full-clean.png');
     return null;
   };
 
@@ -1144,7 +1144,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.overlayIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue-clean.png')})`,
             }}
           />
         )}
@@ -1399,7 +1399,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               data-testid={`subtype-icon-${TileSubtype.WALL_TORCH}`}
               className={`${styles.assetIcon} ${styles.torchSprite}`}
-              style={{ backgroundImage: `url(${assetUrl("/images/items/wall-torch-2-base.png")})` }}
+              style={{ backgroundImage: `url(${assetUrl("/images/items/wall-torch-2-base-clean.png")})` }}
             />
             <PixelFlame
               cell={1.5}
@@ -1522,9 +1522,9 @@ export const Tile: React.FC<TileProps> = ({
               className={`${styles.assetIcon} ${styles.potIcon}${isSnakePot ? ` ${styles.potIconSnake}` : ''}`}
               style={{
                 backgroundImage: `url(${pickVariant([
-                  assetUrl('/images/items/pot-1.png'),
-                  assetUrl('/images/items/pot-2.png'),
-                  assetUrl('/images/items/pot-3.png'),
+                  assetUrl('/images/items/pot-1-clean.png'),
+                  assetUrl('/images/items/pot-2-clean.png'),
+                  assetUrl('/images/items/pot-3-clean.png'),
                 ])})`,
                 ...(isSnakePot
                   ? ({ ['--snake-pot-delay' as string]: `${delayMs}s` } as React.CSSProperties)
@@ -1540,8 +1540,8 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
               backgroundImage: `url(${pickVariant([
-                assetUrl('/images/items/rock-1.png'),
-                assetUrl('/images/items/rock-2.png'),
+                assetUrl('/images/items/rock-1-clean.png'),
+                assetUrl('/images/items/rock-2-clean.png'),
               ])})`,
             }}
           />
@@ -1567,9 +1567,9 @@ export const Tile: React.FC<TileProps> = ({
             className={`${styles.assetIcon} ${styles.foodIcon}`}
             style={{
               backgroundImage: `url(${pickVariant([
-                assetUrl('/images/items/food-1.png'),
-                assetUrl('/images/items/food-2.png'),
-                assetUrl('/images/items/food-3.png'),
+                assetUrl('/images/items/food-1-clean.png'),
+                assetUrl('/images/items/food-2-clean.png'),
+                assetUrl('/images/items/food-3-clean.png'),
               ])})`,
             }}
           />
@@ -1580,7 +1580,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.MED}`}
             className={`${styles.assetIcon} ${styles.medIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/meds-1.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/meds-1-clean.png')})`,
             }}
           />
         )}
@@ -1672,7 +1672,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.TOWN_SIGN}`}
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/town-sign.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/town-sign-clean.png')})`,
             }}
           />
         )}
@@ -1728,7 +1728,7 @@ export const Tile: React.FC<TileProps> = ({
             data-testid={`subtype-icon-${TileSubtype.SNAKE_MEDALLION}`}
             className={`${styles.assetIcon} ${styles.rockIcon}`}
             style={{
-              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue.png')})`,
+              backgroundImage: `url(${assetUrl('/images/items/snake-medallion-blue-clean.png')})`,
             }}
           />
         )}
@@ -1841,7 +1841,7 @@ export const Tile: React.FC<TileProps> = ({
         }
         // Lit torch uses the flameless base sprite; PixelFlame supplies the fire
         const variant = heroTorchLit ? '-noflame' : '-snuff';
-        return assetUrl(`/images/hero/hero-${dir}${equip()}${variant}-static.png`);
+        return assetUrl(`/images/hero/hero-${dir}${equip()}${variant}-static-clean.png`);
       })()
     : '';
 
@@ -2172,7 +2172,7 @@ export const Tile: React.FC<TileProps> = ({
                     : m.facing === 'LEFT' || m.facing === 'RIGHT'
                     ? 'right'
                     : 'front';
-                const src = assetUrl(`/images/enemies/fire-goblin/white-goblins-${dir}-1.png`);
+                const src = assetUrl(`/images/enemies/fire-goblin/white-goblins-${dir}-1-clean.png`);
                 // Side art faces RIGHT; flip the sprite (not the slot offset)
                 // for LEFT so members mirror independently.
                 const base = `translate(${ox}px, ${oy}px) scale(0.68)${
@@ -2333,25 +2333,25 @@ export const Tile: React.FC<TileProps> = ({
                 }
                 if (kind === 'coilwyrm' && enemyCoilHeadPose) {
                   return assetUrl(
-                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilHeadPose.sprite}.png`
+                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilHeadPose.sprite}-clean.png`
                   );
                 }
                 // Coil segments pick their sprite from their neighbours, not their facing.
                 if (kind === 'coilwyrm-coil') {
                   return assetUrl(
-                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilPiece ?? 'body-h'}.png`
+                    `/images/enemies/bosses/coilwyrm/coilwyrm-${enemyCoilPiece ?? 'body-h'}-clean.png`
                   );
                 }
                 // The Fisher swaps to a pose sprite for its readable states — above all the
                 // cocked wind-up, which is the only warning the player gets before a spear.
                 if (kind === 'fisher' && enemyPose) {
-                  return assetUrl(`/images/enemies/bosses/fisher/fisher-${enemyPose}.png`);
+                  return assetUrl(`/images/enemies/bosses/fisher/fisher-${enemyPose}-clean.png`);
                 }
                 // The Quarrymaster throws his arms up on the turn he calls a wave. It is his
                 // only tell, and the reason a separate pose was drawn — the raised-arm
                 // silhouette is the one thing that still reads at 40px.
                 if (kind === 'quarrymaster' && enemyPose === 'summon') {
-                  return assetUrl('/images/enemies/bosses/quarrymaster/quarry-summon-front.png');
+                  return assetUrl('/images/enemies/bosses/quarrymaster/quarry-summon-front-clean.png');
                 }
                 const facing: Facing = toFacing(enemyFacing);
                 // Fire goblins carry an animated torch (see PixelFlame below):
@@ -2359,7 +2359,7 @@ export const Tile: React.FC<TileProps> = ({
                 // for non-game UI (summaries, end screens).
                 if (kind === 'fire-goblin') {
                   const f = facing === 'left' ? 'right' : facing;
-                  return assetUrl(`/images/enemies/fire-goblin/fire-goblin-${f}-base.png`);
+                  return assetUrl(`/images/enemies/fire-goblin/fire-goblin-${f}-base-clean.png`);
                 }
                 return getEnemyIcon(kind, facing);
               })()})`,
@@ -2646,7 +2646,7 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit.png')})`
+                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit-clean.png')})`
                   }}
                   aria-label="checkpoint"
                 />
@@ -2825,7 +2825,7 @@ export const Tile: React.FC<TileProps> = ({
               style={{
                 position: 'absolute',
                 inset: 0,
-                backgroundImage: `url(${assetUrl("/images/items/bookshelf.png")})`,
+                backgroundImage: `url(${assetUrl("/images/items/bookshelf-clean.png")})`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 backgroundRepeat: "no-repeat",
@@ -3009,7 +3009,7 @@ export const Tile: React.FC<TileProps> = ({
             (environment === "outdoor" || environment === "house") && (
               <div
                 className={styles.wallDoorOverlay}
-                style={{ backgroundImage: `url(${assetUrl("/images/door/house-door.png")})` }}
+                style={{ backgroundImage: `url(${assetUrl("/images/door/house-door-clean.png")})` }}
                 aria-hidden="true"
               />
             )}
@@ -3070,7 +3070,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: `url(${assetUrl("/images/hanging-signs/store.png")})`,
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/store-clean.png")})`,
               }}
               data-testid="hanging-sign-store"
               aria-hidden="true"
@@ -3080,7 +3080,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: `url(${assetUrl("/images/hanging-signs/library.png")})`,
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/library-clean.png")})`,
               }}
               data-testid="hanging-sign-library"
               aria-hidden="true"
@@ -3090,7 +3090,7 @@ export const Tile: React.FC<TileProps> = ({
             <div
               className={styles.hangingSign}
               style={{
-                backgroundImage: `url(${assetUrl("/images/hanging-signs/workshop.png")})`,
+                backgroundImage: `url(${assetUrl("/images/hanging-signs/workshop-clean.png")})`,
               }}
               data-testid="hanging-sign-smithy"
               aria-hidden="true"
@@ -3176,12 +3176,12 @@ export const Tile: React.FC<TileProps> = ({
       const x = typeof col === 'number' ? col : 0;
       const seed = (y * 37 + x * 101);
       const flowerAssets = [
-        assetUrl('/images/flowers/flowers-1.png'),
-        assetUrl('/images/flowers/flowers-2.png'),
-        assetUrl('/images/flowers/flowers-3.png'),
-        assetUrl('/images/flowers/flowers-4.png'),
-        assetUrl('/images/flowers/flowers-5.png'),
-        assetUrl('/images/flowers/bush-1.png'),
+        assetUrl('/images/flowers/flowers-1-clean.png'),
+        assetUrl('/images/flowers/flowers-2-clean.png'),
+        assetUrl('/images/flowers/flowers-3-clean.png'),
+        assetUrl('/images/flowers/flowers-4-clean.png'),
+        assetUrl('/images/flowers/flowers-5-clean.png'),
+        assetUrl('/images/flowers/bush-1-clean.png'),
       ];
       const flowerAsset = flowerAssets[Math.abs(seed) % flowerAssets.length];
 
@@ -3214,7 +3214,7 @@ export const Tile: React.FC<TileProps> = ({
                   key="checkpoint"
                   className={styles.checkpointOverlay}
                   style={{
-                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit.png')})`
+                    backgroundImage: `url(${assetUrl('/images/items/checkpoint-unlit-clean.png')})`
                   }}
                   aria-label="checkpoint"
                 />
@@ -3389,10 +3389,10 @@ export const Tile: React.FC<TileProps> = ({
       const x = typeof col === 'number' ? col : 0;
       const seed = (y * 37 + x * 101);
       const treeAssets = [
-        assetUrl('/images/trees/tree-1.png'),
-        assetUrl('/images/trees/tree-2.png'),
-        assetUrl('/images/trees/tree-3.png'),
-        assetUrl('/images/trees/tree-4.png'),
+        assetUrl('/images/trees/tree-1-clean.png'),
+        assetUrl('/images/trees/tree-2-clean.png'),
+        assetUrl('/images/trees/tree-3-clean.png'),
+        assetUrl('/images/trees/tree-4-clean.png'),
       ];
       const treeAsset = treeAssets[Math.abs(seed) % treeAssets.length];
 

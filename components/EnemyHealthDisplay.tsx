@@ -22,7 +22,7 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src={assetUrl("/images/presentational/heart-red.png")}
+          src={assetUrl("/images/presentational/heart-red-clean.png")}
           alt="❤️"
           width={12}
           height={12}
@@ -34,7 +34,7 @@ const EnemyHealthDisplay: React.FC<EnemyHealthDisplayProps> = ({
       hearts.push(
         <Image
           key={i}
-          src={assetUrl("/images/presentational/heart-empty.png")}
+          src={assetUrl("/images/presentational/heart-empty-clean.png")}
           alt="🤍"
           width={12}
           height={12}

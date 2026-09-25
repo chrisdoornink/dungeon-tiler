@@ -73,7 +73,7 @@ export function buildBluffPassageway(): StoryRoom {
   const boy = new NPC({
     id: "npc-sanctum-boy",
     name: "Kalen",
-    sprite: "/images/npcs/boy-3.png",
+    sprite: "/images/npcs/boy-3-clean.png",
     y: boyY,
     x: boyX,
     facing: Direction.RIGHT,

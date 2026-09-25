@@ -35,7 +35,7 @@ export function buildSmithy(): StoryRoom {
   const jorin = new NPC({
     id: "npc-jorin",
     name: "Jorin",
-    sprite: "/images/npcs/torch-town/jorin.png",
+    sprite: "/images/npcs/torch-town/jorin-clean.png",
     y: 2,
     x: 4,
     facing: Direction.DOWN,

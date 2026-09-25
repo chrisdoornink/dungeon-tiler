@@ -135,7 +135,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-dog-golden",
     name: "Golden Dog",
-    sprite: "/images/dog-golden/dog-front-1.png",
+    sprite: "/images/dog-golden/dog-front-1-clean.png",
     y: 14,
     x: 13,
     facing: Direction.DOWN,
@@ -148,7 +148,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-tavi",
     name: "Tavi",
-    sprite: "/images/npcs/torch-town/tavi.png",
+    sprite: "/images/npcs/torch-town/tavi-clean.png",
     y: 13,
     x: 13,
     facing: Direction.LEFT,
@@ -163,7 +163,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-captain-bren",
     name: "Captain Bren",
-    sprite: "/images/npcs/torch-town/captain-bren.png",
+    sprite: "/images/npcs/torch-town/captain-bren-clean.png",
     y: 8,
     x: 29,
     facing: Direction.DOWN,
@@ -174,7 +174,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-yanna",
     name: "Yanna",
-    sprite: "/images/npcs/torch-town/yanna.png",
+    sprite: "/images/npcs/torch-town/yanna-clean.png",
     y: 23,
     x: 24,
     facing: Direction.LEFT,
@@ -185,7 +185,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-rhett",
     name: "Rhett",
-    sprite: "/images/npcs/torch-town/rhett.png",
+    sprite: "/images/npcs/torch-town/rhett-clean.png",
     y: 22,
     x: 26,
     facing: Direction.DOWN,
@@ -196,7 +196,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-mira",
     name: "Mira",
-    sprite: "/images/npcs/torch-town/mira.png",
+    sprite: "/images/npcs/torch-town/mira-clean.png",
     y: 15,
     x: 7,
     facing: Direction.LEFT,
@@ -207,7 +207,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-kira",
     name: "Kira",
-    sprite: "/images/npcs/torch-town/kira.png",
+    sprite: "/images/npcs/torch-town/kira-clean.png",
     y: 10,
     x: 14,
     facing: Direction.RIGHT,
@@ -218,7 +218,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-lio",
     name: "Lio",
-    sprite: "/images/npcs/torch-town/lio.png",
+    sprite: "/images/npcs/torch-town/lio-clean.png",
     y: 15,
     x: 28,
     facing: Direction.DOWN,
@@ -229,7 +229,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-dara",
     name: "Dara",
-    sprite: "/images/npcs/torch-town/dara.png",
+    sprite: "/images/npcs/torch-town/dara-clean.png",
     y: 17,
     x: 12,
     facing: Direction.DOWN,
@@ -240,7 +240,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-sela",
     name: "Sela",
-    sprite: "/images/npcs/torch-town/sela.png",
+    sprite: "/images/npcs/torch-town/sela-clean.png",
     y: 5,
     x: 28,
     facing: Direction.LEFT,
@@ -251,7 +251,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-thane",
     name: "Thane",
-    sprite: "/images/npcs/torch-town/thane.png",
+    sprite: "/images/npcs/torch-town/thane-clean.png",
     y: 5,
     x: 26,
     facing: Direction.RIGHT,
@@ -262,7 +262,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-fenna",
     name: "Old Fenna",
-    sprite: "/images/npcs/torch-town/old-fenna.png",
+    sprite: "/images/npcs/torch-town/old-fenna-clean.png",
     y: 9,
     x: 15,
     facing: Direction.DOWN,
@@ -273,7 +273,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-arin",
     name: "Arin",
-    sprite: "/images/npcs/torch-town/arin.png",
+    sprite: "/images/npcs/torch-town/arin-clean.png",
     y: 19,
     x: 19,
     facing: Direction.LEFT,
@@ -284,7 +284,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-haro",
     name: "Haro",
-    sprite: "/images/npcs/torch-town/haro.png",
+    sprite: "/images/npcs/torch-town/haro-clean.png",
     y: 21,
     x: 25,
     facing: Direction.DOWN,
@@ -295,7 +295,7 @@ export function buildTorchTownNew(): StoryRoom {
   npcs.push(new NPC({
     id: "npc-len",
     name: "Len",
-    sprite: "/images/npcs/torch-town/len.png",
+    sprite: "/images/npcs/torch-town/len-clean.png",
     y: 21,
     x: 24,
     facing: Direction.RIGHT,

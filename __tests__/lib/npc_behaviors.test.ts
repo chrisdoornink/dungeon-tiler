@@ -18,7 +18,7 @@ describe("Dog NPC Behavior", () => {
     return new NPC({
       id: "test-dog",
       name: "Test Dog",
-      sprite: "/images/dog-golden/dog-front-1.png",
+      sprite: "/images/dog-golden/dog-front-1-clean.png",
       y,
       x,
       facing: Direction.DOWN,
@@ -201,7 +201,7 @@ describe("Dog NPC Behavior", () => {
       
       // Should use back sprite when moving up
       if (dog.y < 2) {
-        expect(dog.sprite).toMatch(/dog-back-[12]\.png$/);
+        expect(dog.sprite).toMatch(/dog-back-[12]-clean\.png$/);
       }
     });
 
@@ -222,7 +222,7 @@ describe("Dog NPC Behavior", () => {
       
       // Should use front sprite when moving down
       if (dog.y > 2) {
-        expect(dog.sprite).toMatch(/dog-front-[1-4]\.png$/);
+        expect(dog.sprite).toMatch(/dog-front-[1-4]-clean\.png$/);
       }
     });
 
@@ -278,17 +278,17 @@ describe("Dog NPC Behavior", () => {
       // Moving right -> front-1 (faces right)
       const right = createDogNPC(2, 1);
       updateDogBehavior({ npc: right, grid, player: { y: 2, x: 4 }, npcs: [right], rng });
-      expect(right.sprite).toMatch(/dog-front-1\.png$/);
+      expect(right.sprite).toMatch(/dog-front-1-clean\.png$/);
 
       // Moving left -> front-2 (faces left)
       const left = createDogNPC(2, 3);
       updateDogBehavior({ npc: left, grid, player: { y: 2, x: 0 }, npcs: [left], rng });
-      expect(left.sprite).toMatch(/dog-front-2\.png$/);
+      expect(left.sprite).toMatch(/dog-front-2-clean\.png$/);
 
       // Moving down -> front-4 (faces the camera)
       const down = createDogNPC(1, 2);
       updateDogBehavior({ npc: down, grid, player: { y: 4, x: 2 }, npcs: [down], rng });
-      expect(down.sprite).toMatch(/dog-front-4\.png$/);
+      expect(down.sprite).toMatch(/dog-front-4-clean\.png$/);
     });
 
     it("should alternate back sprites (tail wag) when moving up, tracked in memory", () => {
@@ -309,13 +309,13 @@ describe("Dog NPC Behavior", () => {
       updateDogBehavior(ctx);
 
       expect(typeof dog.memory?.dogStep).toBe("number");
-      expect(dog.sprite).toMatch(/dog-back-[12]\.png$/);
+      expect(dog.sprite).toMatch(/dog-back-[12]-clean\.png$/);
 
       const first = dog.sprite;
       updateDogBehavior(ctx);
 
       // Second upward step swaps to the other back sprite
-      expect(dog.sprite).toMatch(/dog-back-[12]\.png$/);
+      expect(dog.sprite).toMatch(/dog-back-[12]-clean\.png$/);
       expect(dog.sprite).not.toBe(first);
     });
   });
@@ -679,7 +679,7 @@ describe("Dog NPC Behavior", () => {
       updateDogBehavior(ctx);
       
       // Sprite should be updated (front or back depending on direction)
-      expect(dog.sprite).toMatch(/dog-(front|back)-[1-4]\.png$/);
+      expect(dog.sprite).toMatch(/dog-(front|back)-[1-4]-clean\.png$/);
     });
   });
 

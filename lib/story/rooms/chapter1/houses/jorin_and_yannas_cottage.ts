@@ -29,7 +29,7 @@ const VISUAL_MAP = [
 const jorin = new NPC({
   id: "npc-jorin",
   name: "Jorin",
-  sprite: "/images/npcs/torch-town/jorin.png",
+  sprite: "/images/npcs/torch-town/jorin-clean.png",
   y: 3,
   x: 2,
   facing: Direction.DOWN,

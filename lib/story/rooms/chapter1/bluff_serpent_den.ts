@@ -58,7 +58,7 @@ export function buildBluffSerpentDen(): StoryRoom {
   const coiledSnake = new NPC({
     id: "npc-bluff-coiled-snake",
     name: "Coiled Snake",
-    sprite: "/images/enemies/snake-coiled-right.png",
+    sprite: "/images/enemies/snake-coiled-right-clean.png",
     y: npcY,
     x: npcX,
     facing: Direction.LEFT,

@@ -352,11 +352,11 @@
 
 
 .keyIcon {
-  background-image: url("/images/items/key.png");
+  background-image: url("/images/items/key-clean.png");
 }
 
 .exitKeyIcon {
-  background-image: url("/images/items/exit-key.png");
+  background-image: url("/images/items/exit-key-clean.png");
 }
 
 .doorIcon {
@@ -379,7 +379,7 @@
 
 /* Gold chain lock overlay for locked exit */
 .exitLockIcon {
-  background-image: url("/images/door/gold-chain-lock.png");
+  background-image: url("/images/door/gold-chain-lock-clean.png");
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
@@ -396,7 +396,7 @@
 
 /* Pots, Rocks, Food, Meds */
 .potIcon {
-  background-image: url("/images/items/pot-1.png");
+  background-image: url("/images/items/pot-1-clean.png");
 }
 
 /*
@@ -432,19 +432,19 @@
 }
 
 .rockIcon {
-  background-image: url("/images/items/rock-1.png");
+  background-image: url("/images/items/rock-1-clean.png");
 }
 
 .foodIcon {
-  background-image: url("/images/items/food-1.png");
+  background-image: url("/images/items/food-1-clean.png");
 }
 
 .medIcon {
-  background-image: url("/images/items/meds-1.png");
+  background-image: url("/images/items/meds-1-clean.png");
 }
 
 .heartIcon {
-  background-image: url("/images/items/heart.png");
+  background-image: url("/images/items/heart-clean.png");
 }
 
 /* Rune asset */
@@ -454,7 +454,7 @@
 
 /* Pink realm prizes */
 .pinkHeartIcon {
-  background-image: url("/images/items/pink-heart.png");
+  background-image: url("/images/items/pink-heart-clean.png");
 }
 
 .berryIcon {
@@ -571,7 +571,7 @@
 .runeRevealSparkle {
   position: absolute;
   inset: 4px;
-  background-image: url("/images/items/travel-sparkle-large.png");
+  background-image: url("/images/items/travel-sparkle-large-clean.png");
   background-size: contain;
   background-position: center;
   background-repeat: no-repeat;
@@ -582,7 +582,7 @@
 }
 
 .runeRevealSparkleSmall {
-  background-image: url("/images/items/travel-sparkle-small.png");
+  background-image: url("/images/items/travel-sparkle-small-clean.png");
   animation-delay: 140ms;
 }
 
@@ -621,7 +621,7 @@
 
 /* Bomb (revealed in an opened chest) uses the black bomb sprite. */
 .bombIcon {
-  background-image: url("/images/items/bomb-black.png");
+  background-image: url("/images/items/bomb-black-clean.png");
 }
 
 /* Live thrown bomb resting on the floor with a lit fuse: black sprite with the red
@@ -644,11 +644,11 @@
 }
 
 .bombLiveBlack {
-  background-image: url("/images/items/bomb-black.png");
+  background-image: url("/images/items/bomb-black-clean.png");
 }
 
 .bombLiveRed {
-  background-image: url("/images/items/bomb-red.png");
+  background-image: url("/images/items/bomb-red-clean.png");
   animation: bombFlash 0.5s infinite;
 }
 
@@ -700,11 +700,11 @@
 
 /* Sword and Shield assets */
 .swordIcon {
-  background-image: url("/images/items/sword.png");
+  background-image: url("/images/items/sword-clean.png");
 }
 
 .shieldIcon {
-  background-image: url("/images/items/shield.png");
+  background-image: url("/images/items/shield-clean.png");
 }
 
 /* Faulty floor overlay: cracks on floor tiles */

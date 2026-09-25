@@ -29,14 +29,14 @@ const C = {
 
 const ICON = {
   closedChest: "/images/items/closed-chest.png",
-  heart: "/images/items/heart.png",
-  pinkHeart: "/images/items/pink-heart.png",
-  sword: "/images/items/sword.png",
-  shield: "/images/items/shield.png",
-  medallion: "/images/items/snake-medallion-blue.png",
-  portal: "/images/items/portal-static.png",
-  tree: "/images/trees/tree-1.png",
-  bomb: "/images/items/bomb-black.png",
+  heart: "/images/items/heart-clean.png",
+  pinkHeart: "/images/items/pink-heart-clean.png",
+  sword: "/images/items/sword-clean.png",
+  shield: "/images/items/shield-clean.png",
+  medallion: "/images/items/snake-medallion-blue-clean.png",
+  portal: "/images/items/portal-static-clean.png",
+  tree: "/images/trees/tree-1-clean.png",
+  bomb: "/images/items/bomb-black-clean.png",
   amberMoth: "/images/items/amber-moth.png",
 };
 

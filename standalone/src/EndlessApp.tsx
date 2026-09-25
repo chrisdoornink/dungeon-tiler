@@ -169,7 +169,7 @@ export default function EndlessApp() {
               <div
                 className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mt-4"
                 style={{
-                  backgroundImage: `url(${assetUrl("/images/hero/hero-front-static.png")})`,
+                  backgroundImage: `url(${assetUrl("/images/hero/hero-front-static-clean.png")})`,
                   backgroundSize: "contain",
                   backgroundRepeat: "no-repeat",
                   backgroundPosition: "center",

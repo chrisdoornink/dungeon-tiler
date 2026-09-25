@@ -131,7 +131,7 @@ export function buildOutdoorClearing(): StoryRoom {
   const elder = new NPC({
     id: "npc-elder-rowan",
     name: "Elder Rowan",
-    sprite: "/images/npcs/boy-1.png",
+    sprite: "/images/npcs/boy-1-clean.png",
     y: elderY,
     x: elderX,
     facing: Direction.DOWN,

@@ -48,15 +48,15 @@ describe("enemy sprite paths resolve to real files", () => {
 });
 
 describe("the Fisher's pose sprites resolve", () => {
-  // These are built by string interpolation in Tile.tsx (`fisher-${enemyPose}.png`) rather
+  // These are built by string interpolation in Tile.tsx (`fisher-${enemyPose}-clean.png`) rather
   // than declared in the registry, so the check above cannot see them at all.
   const POSES = ["cocked", "pickup", "stalk"] as const;
 
-  it.each(POSES)("fisher-%s.png exists", (pose) => {
+  it.each(POSES)("fisher-%s-clean.png exists", (pose) => {
     const file = path.join(
       PUBLIC_DIR,
       "images/enemies/bosses/fisher",
-      `fisher-${pose}.png`
+      `fisher-${pose}-clean.png`
     );
     expect(fs.existsSync(file)).toBe(true);
     expect(fs.statSync(file).size).toBeGreaterThan(100);

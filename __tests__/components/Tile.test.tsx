@@ -29,7 +29,7 @@ describe('Tile component', () => {
       />
     );
     let heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-snuff-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-snuff-static-clean.png')");
 
     // Right facing with both sword and shield should use '-shield-sword-snuff'
     rerender(
@@ -45,7 +45,7 @@ describe('Tile component', () => {
       />
     );
     heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-shield-sword-snuff-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-shield-sword-snuff-static-clean.png')");
   });
 
   it('adds an exaggerated bottom border and base shadow on walls when there is a floor below (forced perspective)', () => {
@@ -211,7 +211,7 @@ describe('Tile component', () => {
     // Find the hero image overlay
     const heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
     expect(heroImage).toBeInTheDocument();
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-noflame-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-front-noflame-static-clean.png')");
     expect(heroImage).toHaveStyle('transform: none');
   });
 
@@ -230,7 +230,7 @@ describe('Tile component', () => {
     );
     
     let heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-back-noflame-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-back-noflame-static-clean.png')");
     
     // Test RIGHT direction
     rerender(
@@ -244,7 +244,7 @@ describe('Tile component', () => {
     );
     
     heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static-clean.png')");
     expect(heroImage).toHaveStyle('transform: none');
     
     // Test LEFT direction (should use right image with horizontal flip)
@@ -259,7 +259,7 @@ describe('Tile component', () => {
     );
     
     heroImage = screen.getByTestId('tile-0').querySelector(`.heroImage`);
-    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static.png')");
+    expect(heroImage).toHaveStyle("background-image: url('/images/hero/hero-right-noflame-static-clean.png')");
     expect(heroImage).toHaveStyle('transform: scaleX(-1)');
   });
 
@@ -374,7 +374,7 @@ describe('Tile component', () => {
       const mockNpc = new NPC({
         id: 'test-npc',
         name: 'Test NPC',
-        sprite: '/images/npcs/boy-1.png',
+        sprite: '/images/npcs/boy-1-clean.png',
         y: 12,
         x: 3,
         facing: Direction.DOWN,

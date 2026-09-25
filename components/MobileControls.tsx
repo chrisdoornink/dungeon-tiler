@@ -279,7 +279,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'rock',
       testId: 'mobile-action-rock',
-      icon: assetUrl('/images/items/rock-1.png'),
+      icon: assetUrl('/images/items/rock-1-clean.png'),
       count: rockCount ?? 0,
       onUse: onThrowRock,
       label: 'Throw Rock',
@@ -297,7 +297,7 @@ const MobileControls: React.FC<MobileControlsProps> = ({
     {
       key: 'bomb',
       testId: 'mobile-action-bomb',
-      icon: assetUrl('/images/items/bomb-black.png'),
+      icon: assetUrl('/images/items/bomb-black-clean.png'),
       count: bombCount ?? 0,
       onUse: onThrowBomb,
       label: 'Throw Bomb',

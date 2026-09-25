@@ -1,0 +1,95 @@
+{
+  "_comment": "Per-file settings for scripts/clean-sprites.py, keyed by path under public/images (pre-clean name). Anything not listed gets the default 'pixel' profile with an estimated art-pixel size. 'skip' files must not be cleaned: translucent or feathered art, and items/berry.png, whose painted shadow could not be removed without chewing the fruit (kept original after review on 2026-09-24).",
+  "skip": [
+    "door/exit-transparent.png",
+    "floor/crack3.png",
+    "floor/cracks-1.png",
+    "floor/cracks-1-pale.png",
+    "floor/cracks-1-seal.png",
+    "floor/cracks-2.png",
+    "floor/cracks-2-seal.png",
+    "floor/dirt-road-end.png",
+    "floor/dirt-road-i.png",
+    "floor/dirt-road-r.png",
+    "floor/dirt-road-t.png",
+    "items/rune1.png",
+    "items/.png",
+    "enemies/bosses/coilwyrm/sprites-source.png",
+    "family/raw/annie.png",
+    "family/raw/chris-back-and-sides.png",
+    "family/raw/chris-front.png",
+    "family/raw/em-and-claire.png",
+    "items/berry.png"
+  ],
+  "files": {
+    "items/travel-sparkle-large.png": {
+      "profile": "effect"
+    },
+    "items/travel-sparkle-small.png": {
+      "profile": "effect"
+    },
+    "items/portal-static.png": {
+      "profile": "effect"
+    },
+    "items/bam1.png": {
+      "profile": "effect"
+    },
+    "items/bam2.png": {
+      "profile": "effect"
+    },
+    "items/bam3.png": {
+      "profile": "effect"
+    },
+    "enemies/fire-goblin/pink-ring.png": {
+      "profile": "effect"
+    },
+    "enemies/fire-goblin/pink-ring-no-sparkle.png": {
+      "profile": "effect"
+    },
+    "enemies/fire-goblin/blue-ring-no-sparkle.png": {
+      "profile": "effect"
+    },
+    "enemies/fire-goblin/pink-goblin-back.png": {
+      "profile": "soft"
+    },
+    "enemies/fire-goblin/pink-goblin-front.png": {
+      "profile": "soft"
+    },
+    "enemies/fire-goblin/pink-goblin-left.png": {
+      "profile": "soft"
+    },
+    "flowers/flowers-1.png": {
+      "profile": "soft"
+    },
+    "flowers/flowers-2.png": {
+      "profile": "soft"
+    },
+    "flowers/flowers-3.png": {
+      "profile": "soft"
+    },
+    "flowers/flowers-4.png": {
+      "profile": "soft"
+    },
+    "flowers/flowers-5.png": {
+      "profile": "soft"
+    },
+    "items/pink-heart.png": {
+      "profile": "soft"
+    },
+    "presentational/heart-empty.png": {
+      "art_px": 19
+    },
+    "presentational/heart-moss-empty.png": {
+      "art_px": 19
+    },
+    "enemies/stone-exciter-back.png": {
+      "art_px": 55
+    },
+    "family/claire-back.png": {
+      "art_px": 7
+    },
+    "items/pot-3.png": {
+      "textured_backdrop": true
+    }
+  }
+}

@@ -37,7 +37,7 @@ export function buildStore(): StoryRoom {
   const maro = new NPC({
     id: "npc-maro",
     name: "Maro",
-    sprite: "/images/npcs/torch-town/maro.png",
+    sprite: "/images/npcs/torch-town/maro-clean.png",
     y: 2,
     x: 4,
     facing: Direction.DOWN,

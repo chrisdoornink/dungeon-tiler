@@ -83,13 +83,13 @@ export default function RootLayout({
         {/* Exit and lock assets */}
         <link rel="preload" as="image" href="/images/door/exit-dark.png" />
         <link rel="preload" as="image" href="/images/door/exit-transparent.png" />
-        <link rel="preload" as="image" href="/images/door/gold-chain-lock.png" />
+        <link rel="preload" as="image" href="/images/door/gold-chain-lock-clean.png" />
         {/* Torch sprite frames */}
-        <link rel="preload" as="image" href="/images/items/wall-torch-1.png" />
-        <link rel="preload" as="image" href="/images/items/wall-torch-2.png" />
-        <link rel="preload" as="image" href="/images/items/wall-torch-3.png" />
+        <link rel="preload" as="image" href="/images/items/wall-torch-1-clean.png" />
+        <link rel="preload" as="image" href="/images/items/wall-torch-2-clean.png" />
+        <link rel="preload" as="image" href="/images/items/wall-torch-3-clean.png" />
         {/* Hero front static used on intro */}
-        <link rel="preload" as="image" href="/images/hero/hero-front-static.png" />
+        <link rel="preload" as="image" href="/images/hero/hero-front-static-clean.png" />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} ${vt323.variable} ${pressStart2P.className} antialiased`}

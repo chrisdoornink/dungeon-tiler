@@ -1222,7 +1222,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         setBamEffect({
           y: impact.y,
           x: impact.x,
-          src: assetUrl(`/images/items/bam${bamIdx}.png`),
+          src: assetUrl(`/images/items/bam${bamIdx}-clean.png`),
         });
         setTimeout(() => setBamEffect(null), 300);
         triggerScreenShake();
@@ -2005,7 +2005,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         setBamEffect({
           y: impact.y,
           x: impact.x,
-          src: assetUrl(`/images/items/bam${bamIdx}.png`),
+          src: assetUrl(`/images/items/bam${bamIdx}-clean.png`),
         });
         setTimeout(() => setBamEffect(null), 300);
         triggerScreenShake();
@@ -3960,9 +3960,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const yMid = (py + enemy.y) / 2;
           const xMid = (px + enemy.x) / 2;
           const choices = [
-            assetUrl("/images/items/bam1.png"),
-            assetUrl("/images/items/bam2.png"),
-            assetUrl("/images/items/bam3.png"),
+            assetUrl("/images/items/bam1-clean.png"),
+            assetUrl("/images/items/bam2-clean.png"),
+            assetUrl("/images/items/bam3-clean.png"),
           ];
           const src = choices[Math.floor(Math.random() * choices.length)];
           setBamEffect({ y: yMid, x: xMid, src });
@@ -4013,7 +4013,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
           const bamIdx = 1 + Math.floor(Math.random() * 3);
           // A hand-smashed pot should read as a small ping on the pot itself,
           // not an explosion: keep the bam compact and skip the screen shake.
-          setBamEffect({ y: ty, x: tx, src: assetUrl(`/images/items/bam${bamIdx}.png`), size: 20 });
+          setBamEffect({ y: ty, x: tx, src: assetUrl(`/images/items/bam${bamIdx}-clean.png`), size: 20 });
           setTimeout(() => setBamEffect(null), 300);
         }
       }
@@ -4896,13 +4896,13 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
         <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
           <div className="relative w-64 h-64">
             <img
-              src={assetUrl("/images/items/travel-sparkle-large.png")}
+              src={assetUrl("/images/items/travel-sparkle-large-clean.png")}
               alt=""
               className="absolute inset-0 w-full h-full animate-pulse"
               style={{ animationDuration: '0.3s' }}
             />
             <img
-              src={assetUrl("/images/items/travel-sparkle-small.png")}
+              src={assetUrl("/images/items/travel-sparkle-small-clean.png")}
               alt=""
               className="absolute inset-0 w-full h-full animate-ping"
               style={{ animationDuration: '0.6s' }}
@@ -5088,7 +5088,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 28 : 20,
                             height: isCompact ? 28 : 20,
-                            backgroundImage: `url(${assetUrl("/images/items/key.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/key-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5117,7 +5117,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 28 : 20,
                             height: isCompact ? 28 : 20,
-                            backgroundImage: `url(${assetUrl("/images/items/exit-key.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/exit-key-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5141,7 +5141,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 32 : 24,
                             height: isCompact ? 32 : 24,
-                            backgroundImage: `url(${assetUrl("/images/items/sword.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/sword-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5165,7 +5165,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 28 : 20,
                             height: isCompact ? 28 : 20,
-                            backgroundImage: `url(${assetUrl("/images/items/shield.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/shield-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5191,7 +5191,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: isCompact ? 28 : 20,
                             height: isCompact ? 28 : 20,
-                            backgroundImage: `url(${assetUrl("/images/items/snake-medallion-blue.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/snake-medallion-blue-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5228,7 +5228,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/rock-1.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/rock-1-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5312,7 +5312,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/bomb-black.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/bomb-black-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5354,7 +5354,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/food-1.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/food-1-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5396,7 +5396,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/meds-1.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/meds-1-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5532,7 +5532,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             display: "inline-block",
                             width: 32,
                             height: 32,
-                            backgroundImage: `url(${assetUrl("/images/items/pink-heart.png")})`,
+                            backgroundImage: `url(${assetUrl("/images/items/pink-heart-clean.png")})`,
                             backgroundSize: "contain",
                             backgroundRepeat: "no-repeat",
                             backgroundPosition: "center",
@@ -5622,7 +5622,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           width: `${size}px`,
                           height: `${size}px`,
                           zIndex: 11900,
-                          backgroundImage: `url(${assetUrl("/images/items/rock-1.png")})`,
+                          backgroundImage: `url(${assetUrl("/images/items/rock-1-clean.png")})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -5648,7 +5648,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           width: `${size}px`,
                           height: `${size}px`,
                           zIndex: 11900,
-                          backgroundImage: `url(${assetUrl("/images/items/bomb-black.png")})`,
+                          backgroundImage: `url(${assetUrl("/images/items/bomb-black-clean.png")})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -5971,9 +5971,9 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     const tileSize = 40; // px
                     const size = Math.round(tileSize * 3.6); // ~144px, covers 3x3 + spill
                     const bamSrcs = [
-                      assetUrl("/images/items/bam1.png"),
-                      assetUrl("/images/items/bam2.png"),
-                      assetUrl("/images/items/bam3.png"),
+                      assetUrl("/images/items/bam1-clean.png"),
+                      assetUrl("/images/items/bam2-clean.png"),
+                      assetUrl("/images/items/bam3-clean.png"),
                     ];
                     const rots = [-12, 10, 0];
                     const out: React.ReactNode[] = [];
@@ -6159,7 +6159,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           top: `${(b.y + 0.5) * tileSize - size / 2}px`,
                           width: `${size}px`,
                           height: `${size}px`,
-                          backgroundImage: `url(${assetUrl("/images/items/bam2.png")})`,
+                          backgroundImage: `url(${assetUrl("/images/items/bam2-clean.png")})`,
                           backgroundSize: "contain",
                           backgroundRepeat: "no-repeat",
                           backgroundPosition: "center",
@@ -6192,7 +6192,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           <div
                             className="w-full h-full spirit-drift"
                             style={{
-                              backgroundImage: `url(${assetUrl("/images/items/spirit.png")})`,
+                              backgroundImage: `url(${assetUrl("/images/items/spirit-clean.png")})`,
                               backgroundSize: "contain",
                               backgroundRepeat: "no-repeat",
                               backgroundPosition: "center",
@@ -6245,7 +6245,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                       }}
                     >
                       <img
-                        src={assetUrl("/images/presentational/heart-red.png")}
+                        src={assetUrl("/images/presentational/heart-red-clean.png")}
                         alt=""
                         style={{
                           width: "100%",
@@ -6448,7 +6448,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                                 height: "38%",
                                 width: `${38 * 0.57}%`,
                                 backgroundImage: `url(${assetUrl(
-                                  "/images/items/sword.png"
+                                  "/images/items/sword-clean.png"
                                 )})`,
                                 backgroundSize: "contain",
                                 backgroundRepeat: "no-repeat",
@@ -6753,7 +6753,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "rock",
                 label: "Rock",
-                icon: assetUrl("/images/items/rock-1.png"),
+                icon: assetUrl("/images/items/rock-1-clean.png"),
                 count: gameState.rockCount,
                 onUse: handleThrowRock,
               }]
@@ -6771,7 +6771,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "bomb",
                 label: "Bomb",
-                icon: assetUrl("/images/items/bomb-black.png"),
+                icon: assetUrl("/images/items/bomb-black-clean.png"),
                 count: gameState.bombCount,
                 onUse: handleThrowBomb,
               }]
@@ -6780,7 +6780,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "food",
                 label: "Food",
-                icon: assetUrl("/images/items/food-1.png"),
+                icon: assetUrl("/images/items/food-1-clean.png"),
                 count: gameState.foodCount,
                 onUse: handleUseFood,
               }]
@@ -6789,7 +6789,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "potion",
                 label: "Potion",
-                icon: assetUrl("/images/items/meds-1.png"),
+                icon: assetUrl("/images/items/meds-1-clean.png"),
                 count: gameState.potionCount,
                 onUse: handleUsePotion,
               }]
@@ -6807,7 +6807,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "pink-heart",
                 label: "Pink Heart",
-                icon: assetUrl("/images/items/pink-heart.png"),
+                icon: assetUrl("/images/items/pink-heart-clean.png"),
                 count: gameState.pinkHeartCount,
                 onUse: handleUsePinkHeart,
               }]
@@ -6826,7 +6826,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "medallion",
                 label: "Medallion",
-                icon: assetUrl("/images/items/snake-medallion-blue.png"),
+                icon: assetUrl("/images/items/snake-medallion-blue-clean.png"),
                 onUse: handleSnakeMedallionClick,
               }]
             : []),
@@ -6837,18 +6837,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
             ? [{
                 key: "key",
                 label: (gameState.chestKeyCount ?? 0) > 1 ? "Keys" : "Key",
-                icon: assetUrl("/images/items/key.png"),
+                icon: assetUrl("/images/items/key-clean.png"),
                 count: (gameState.chestKeyCount ?? 0) > 0 ? gameState.chestKeyCount : undefined,
               }]
             : []),
           ...(gameState.hasExitKey
-            ? [{ key: "exit-key", label: "Exit Key", icon: assetUrl("/images/items/exit-key.png") }]
+            ? [{ key: "exit-key", label: "Exit Key", icon: assetUrl("/images/items/exit-key-clean.png") }]
             : []),
           ...(gameState.hasSword
-            ? [{ key: "sword", label: "Sword", icon: assetUrl("/images/items/sword.png") }]
+            ? [{ key: "sword", label: "Sword", icon: assetUrl("/images/items/sword-clean.png") }]
             : []),
           ...(gameState.hasShield
-            ? [{ key: "shield", label: "Shield", icon: assetUrl("/images/items/shield.png") }]
+            ? [{ key: "shield", label: "Shield", icon: assetUrl("/images/items/shield-clean.png") }]
             : []),
         ]}
       />
