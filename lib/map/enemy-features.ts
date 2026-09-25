@@ -4,10 +4,52 @@ import type { MapData } from "./types";
 import { getLastRooms } from "./map-generation";
 import { findPlayerPosition } from "./player";
 
+/**
+ * Minimum walking distance, in steps, from the hero's start tile to any snake (loose or
+ * potted) when the spawn buffer is on. Every other enemy kind already spawns 6+ tiles away;
+ * snakes had no buffer at all, so a swarm floor could open with one biting on turn one.
+ */
+export const SNAKE_SPAWN_BUFFER_STEPS = 5;
+
+/**
+ * Daily date gate for the snake spawn buffer. The daily map is generated client-side from the
+ * date, so the date MUST be the day AFTER the merge that ships it (same rule as
+ * SWITCH_GATE_START_DATE). The buffer moves snake positions but no later draw on the floor (see
+ * addSnakesPerRules). The floor-1 colour puzzle and the switch gate both avoid snake tiles,
+ * though, so lib/stats/puzzle_day.ts must pass the flag per replayed date.
+ */
+export const SNAKE_SPAWN_BUFFER_START_DATE = "2026-09-26";
+
+/** Whether a daily date (YYYY-MM-DD, local) keeps snakes back from the hero's start. */
+export function snakeSpawnBufferForDate(dateStr: string): boolean {
+  return dateStr >= SNAKE_SPAWN_BUFFER_START_DATE;
+}
+
+/** Walking steps from `from` to every FLOOR tile (-1 where unreachable). */
+function walkingSteps(mapData: MapData, from: [number, number]): number[][] {
+  const h = mapData.tiles.length;
+  const w = mapData.tiles[0]?.length ?? 0;
+  const dist = mapData.tiles.map((row) => row.map(() => -1));
+  dist[from[0]][from[1]] = 0;
+  const queue: Array<[number, number]> = [from];
+  for (let head = 0; head < queue.length; head++) {
+    const [y, x] = queue[head];
+    for (const [dy, dx] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const ny = y + dy;
+      const nx = x + dx;
+      if (ny < 0 || nx < 0 || ny >= h || nx >= w) continue;
+      if (mapData.tiles[ny][nx] !== FLOOR || dist[ny][nx] !== -1) continue;
+      dist[ny][nx] = dist[y][x] + 1;
+      queue.push([ny, nx]);
+    }
+  }
+  return dist;
+}
+
 export function addSnakesPerRules(
   mapData: MapData,
   enemies: Enemy[],
-  opts?: { rng?: () => number; floor?: number }
+  opts?: { rng?: () => number; floor?: number; minStepsFromPlayer?: number }
 ): Enemy[] {
   const rng = opts?.rng ?? Math.random;
   const floor = opts?.floor ?? 1;
@@ -16,6 +58,13 @@ export function addSnakesPerRules(
   const taken = new Set(out.map((e) => `${e.y},${e.x}`));
   const playerPos = findPlayerPosition(mapData);
   if (playerPos) taken.add(`${playerPos[0]},${playerPos[1]}`);
+
+  // Spawn buffer. Hazard subtypes are walked through on purpose: it can only make a
+  // snake read as closer than it is, never farther.
+  const minSteps = opts?.minStepsFromPlayer ?? 0;
+  const steps = minSteps > 0 && playerPos ? walkingSteps(mapData, playerPos) : null;
+  const tooClose = (y: number, x: number) =>
+    steps !== null && steps[y][x] >= 0 && steps[y][x] < minSteps;
 
   // 5% chance for a rare snake swarm event
   let targetSnakes: number;
@@ -61,11 +110,14 @@ export function addSnakesPerRules(
   shuffle(floorCandidates);
   shuffle(potCandidates);
 
+  // The buffer is applied while placing, NOT by trimming the candidate lists before the
+  // shuffle: a shorter list would shuffle with fewer draws and shift every later roll on
+  // the floor (wisp pots, the switch gate). This way only the snakes themselves move.
   let potsPlaced = 0;
   for (let i = 0; i < potCandidates.length && potsPlaced < potCount; i++) {
     const [y, x] = potCandidates[i];
     const key = `${y},${x}`;
-    if (taken.has(key)) continue;
+    if (taken.has(key) || tooClose(y, x)) continue;
     if ((mapData.subtypes[y][x] ?? []).length > 0) continue;
     mapData.subtypes[y][x] = [TileSubtype.POT, TileSubtype.SNAKE];
     potsPlaced++;
@@ -76,7 +128,7 @@ export function addSnakesPerRules(
   for (let i = 0; i < floorCandidates.length && floorsPlaced < floorCount; i++) {
     const [y, x] = floorCandidates[i];
     const key = `${y},${x}`;
-    if (taken.has(key)) continue;
+    if (taken.has(key) || tooClose(y, x)) continue;
     if ((mapData.subtypes[y][x] ?? []).length > 0) continue;
     const sn = new Enemy({ y, x });
     sn.kind = "snake";

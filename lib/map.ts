@@ -48,7 +48,13 @@ export {
 
 export { addPlayerToMap, addPlayerToMapAwayFromObjectives, findPlayerPosition } from "./map/player";
 
-export { addSnakesPerRules, addSnakePots, addStaticGuardNearKey } from "./map/enemy-features";
+export {
+  addSnakesPerRules,
+  addSnakePots,
+  addStaticGuardNearKey,
+  SNAKE_SPAWN_BUFFER_START_DATE,
+  snakeSpawnBufferForDate,
+} from "./map/enemy-features";
 
 export {
   advanceMachinery,

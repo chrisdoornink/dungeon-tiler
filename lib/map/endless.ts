@@ -6,7 +6,7 @@ import { Direction, TileSubtype } from "./constants";
 import type { GateGroup, MapData } from "./types";
 import { findPlayerPosition } from "./player";
 import { addRunePotsForStoneExciters, generateCompleteMapForFloor } from "./map-features";
-import { addSnakesPerRules } from "./enemy-features";
+import { addSnakesPerRules, SNAKE_SPAWN_BUFFER_STEPS } from "./enemy-features";
 import { stampWispPots, WISP_STANDARD_CONFIG } from "./wisp";
 import { mulberry32, withPatchedMathRandom } from "../rng";
 import { rollEndlessBossOrder, type BossKind } from "../bosses/boss_roster";
@@ -462,8 +462,12 @@ function buildEndlessFloor(
   }
 
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
-  // Snakes get the REAL floor: their spawn rules already scale past floor 6.
-  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
+  // Snakes get the REAL floor: their spawn rules already scale past floor 6. The spawn
+  // buffer needs no date gate here: every endless run has its own seed.
+  const snakesAdded = addSnakesPerRules(withRunes, enemies, {
+    floor,
+    minStepsFromPlayer: SNAKE_SPAWN_BUFFER_STEPS,
+  });
   // Wisp pots last in the seeded stream (same contract as the daily generators).
   stampWispPots(withRunes);
   return { mapData: withRunes, enemies: snakesAdded };

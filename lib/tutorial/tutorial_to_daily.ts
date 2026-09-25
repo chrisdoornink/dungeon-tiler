@@ -3,6 +3,7 @@ import {
   initializeGameStateForMultiTier,
   SWITCH_GATE_START_DATE,
   fisherRetiredForDate,
+  snakeSpawnBufferForDate,
   type GameState,
 } from "../map";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../rng";
@@ -46,6 +47,7 @@ export function buildDailyFloor2FromTutorial(
     return initializeGameStateForMultiTier(1, {
       switchGates: localToday >= SWITCH_GATE_START_DATE,
       fisherRetired: fisherRetiredForDate(localToday),
+      snakeSpawnBuffer: snakeSpawnBufferForDate(localToday),
     });
   });
   if (!floor1) {

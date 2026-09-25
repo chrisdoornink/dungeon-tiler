@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, Suspense } from "react";
-import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateForEndless, initializeGameStateFromMap, SWITCH_GATE_START_DATE, dailyTuningV2ForDate, fisherRetiredForDate, type GameState, tileTypes } from "../lib/map";
+import { generateMap, generateCompleteMap, initializeGameState, initializeGameStateForMultiTier, initializeGameStateForEndless, initializeGameStateFromMap, SWITCH_GATE_START_DATE, dailyTuningV2ForDate, fisherRetiredForDate, snakeSpawnBufferForDate, type GameState, tileTypes } from "../lib/map";
 import { rehydrateEnemies, type PlainEnemy } from "../lib/enemy";
 import { hashStringToSeed, mulberry32, withPatchedMathRandom } from "../lib/rng";
 import { DateUtils } from "../lib/date_utils";
@@ -152,6 +152,7 @@ function GameViewInner({
               switchGates: localToday >= SWITCH_GATE_START_DATE,
               tuningV2: dailyTuningV2ForDate(localToday),
               fisherRetired: fisherRetiredForDate(localToday),
+              snakeSpawnBuffer: snakeSpawnBufferForDate(localToday),
             });
           }
           const gs = initializeGameState();

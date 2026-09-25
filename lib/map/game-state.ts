@@ -81,7 +81,11 @@ import { computeTorchGlow } from "../torch_glow";
 import { addRunePotsForStoneExciters, generateCompleteMap, generateCompleteMapForFloor, allocateChestsAndKeys, rollWaterPlan } from "./map-features";
 import { stampColorSwitchLock } from "./color_switch_puzzle";
 import { stampCipherRoom } from "./cipher_room";
-import { addSnakesPerRules, addStaticGuardNearKey } from "./enemy-features";
+import {
+  addSnakesPerRules,
+  addStaticGuardNearKey,
+  SNAKE_SPAWN_BUFFER_STEPS,
+} from "./enemy-features";
 import {
   advanceMachinery,
   throwToggle,
@@ -2568,6 +2572,12 @@ export interface GameState {
    */
   tuningV2Enabled?: boolean;
   /**
+   * Whether snakes keep SNAKE_SPAWN_BUFFER_STEPS back from the hero's start (see
+   * SNAKE_SPAWN_BUFFER_START_DATE). Set at floor-1 build from the date gate and carried
+   * forward by advanceToNextFloor's spread, like tuningV2Enabled; undefined when off.
+   */
+  snakeSpawnBufferEnabled?: boolean;
+  /**
    * Whether the day's boss roll excludes the Fisher (see FISHER_RETIRED_START_DATE). Set at
    * floor-1 build from the date gate and carried forward by advanceToNextFloor's spread,
    * exactly like tuningV2Enabled — so the roll on floor 3 agrees with whichever cutover this
@@ -3157,10 +3167,17 @@ function addWaterAmbushers(
  *   callers that know the date (GameView and the lib/stats replayers). Unlike switchGates
  *   it changes draws MID-STREAM, so a replayer that forgets it reconstructs a map nobody
  *   played on post-gate dates.
+ * @param opts.snakeSpawnBuffer Keep every snake SNAKE_SPAWN_BUFFER_STEPS walking steps from the
+ *   hero's start. Date-gated by the same callers (SNAKE_SPAWN_BUFFER_START_DATE).
  */
 export function initializeGameStateForMultiTier(
   floor: number = 1,
-  opts: { switchGates?: boolean; tuningV2?: boolean; fisherRetired?: boolean } = {}
+  opts: {
+    switchGates?: boolean;
+    tuningV2?: boolean;
+    fisherRetired?: boolean;
+    snakeSpawnBuffer?: boolean;
+  } = {}
 ): GameState {
   // Compute the chest/key allocation for all floors (sword/shield on 1–4, medallion on 5–7)
   const allocationMap = allocateChestsAndKeys();
@@ -3224,7 +3241,10 @@ export function initializeGameStateForMultiTier(
   }
 
   const withRunes = addRunePotsForStoneExciters(mapData, enemies);
-  const snakesAdded = addSnakesPerRules(withRunes, enemies, { floor });
+  const snakesAdded = addSnakesPerRules(withRunes, enemies, {
+    floor,
+    minStepsFromPlayer: opts.snakeSpawnBuffer ? SNAKE_SPAWN_BUFFER_STEPS : 0,
+  });
 
   // The day's switch gate gets its first shot here. LAST in the floor's RNG stream on purpose —
   // after the map, the seals, the enemies, the runes and the snakes — so switching the feature
@@ -3295,6 +3315,7 @@ export function initializeGameStateForMultiTier(
     // gate has already been spent. advanceToNextFloor reads both.
     switchGatesEnabled: opts.switchGates ? true : undefined,
     tuningV2Enabled: opts.tuningV2 ? true : undefined,
+    snakeSpawnBufferEnabled: opts.snakeSpawnBuffer ? true : undefined,
     bossFisherRetired: opts.fisherRetired ? true : undefined,
     switchGate: gateWiring.switchGate,
     gateGroups: gateWiring.gateGroups,
@@ -3570,7 +3591,10 @@ export function advanceToNextFloor(currentState: GameState, dailySeed: number): 
     addRunePotsForStoneExciters(newMapData, enemies)
   );
   const snakesAdded = withPatchedMathRandom(rng, () =>
-    addSnakesPerRules(withRunes, enemies, { floor: nextFloor })
+    addSnakesPerRules(withRunes, enemies, {
+      floor: nextFloor,
+      minStepsFromPlayer: currentState.snakeSpawnBufferEnabled ? SNAKE_SPAWN_BUFFER_STEPS : 0,
+    })
   );
 
   // Wisp pots for this floor. Immediately BEFORE the switch gate: the gate must stay the floor's
