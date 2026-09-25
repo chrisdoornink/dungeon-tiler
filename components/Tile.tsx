@@ -86,6 +86,17 @@ const FISHER_RENDER_SCALE = 1.2;
 // hero-front-static-clean.png against quarry-stand-front-clean.png. The summon pose fills 84%, so it
 // lands a little taller than the hero — correct, his arms are over his head.
 const QUARRYMASTER_RENDER_SCALE = 1.28;
+// Enemies that never get a light-pass contact shadow: the ghost floats, the Coilwyrm is
+// a tiled body rather than a figure on the floor, and the scaled-up bosses would need
+// shadows sized to each one.
+const LP_SHADOWLESS_KINDS = new Set([
+  'ghost',
+  'coilwyrm',
+  'coilwyrm-coil',
+  'shaper',
+  'fisher',
+  'quarrymaster',
+]);
 // Ceiling on how high a thrown snake arcs (see smoothStepArcStyle). Tiles are 40px, so
 // this keeps a long throw inside roughly one tile of airspace above the flight path.
 const THROWN_ARC_MAX_LIFT_PX = 46;
@@ -2135,7 +2146,7 @@ export const Tile: React.FC<TileProps> = ({
               backgroundPosition: 'center',
               // Same cave dimming as the legacy sprite path
               filter: !environmentConfig.daylight
-                ? 'brightness(var(--enemy-dim, 0.80))'
+                ? 'var(--lp-actor-filter, brightness(var(--enemy-dim, 0.80)))'
                 : undefined,
               animation: isGhost
                 ? 'ghost-flicker 2000ms ease-in-out infinite, ghostFloat 3600ms ease-in-out infinite'
@@ -2182,7 +2193,7 @@ export const Tile: React.FC<TileProps> = ({
                 zIndex: 10500, // above fog (10000), below wall tops (12000)
                 // Same cave dimming as the single-sprite path
                 filter: !environmentConfig.daylight
-                  ? 'brightness(var(--enemy-dim, 0.80))'
+                  ? 'var(--lp-actor-filter, brightness(var(--enemy-dim, 0.80)))'
                   : undefined,
               }}
               data-testid="enemy-sprite"
@@ -2311,6 +2322,20 @@ export const Tile: React.FC<TileProps> = ({
             wisps={enemyStenchWisps}
           />
         )}
+        {((enemyVisible ?? isVisible) === true) &&
+          !LP_SHADOWLESS_KINDS.has(enemyKind ?? '') &&
+          !hasDeepWater(subtype) &&
+          !hasShallowWater(subtype) &&
+          !hasLava(subtype) && (
+          // Light pass contact shadow (hidden unless the game root has .lp-cave). Slides
+          // flat along the floor with the step, never bobbing or arcing with the body.
+          <div
+            key={enemyStep ? `enemy-shadow-step-${enemyStep.seq}` : 'enemy-shadow-static'}
+            className={`lp-shadow${enemyKind === 'snake' ? ' lp-shadow-small' : ''}`}
+            style={enemySliding ? smoothStepStyle(enemyStep, 'none') ?? undefined : undefined}
+            aria-hidden="true"
+          />
+        )}
         {((enemyVisible ?? isVisible) === true) && (
           <div
             // A fresh step re-keys the node so the CSS animation restarts even
@@ -2411,8 +2436,9 @@ export const Tile: React.FC<TileProps> = ({
                   ? '50% 100%'
                   : undefined,
               // Darken non-torch-carrying enemies in cave/underground environments
+              // (the light pass swaps in its actor grade through --lp-actor-filter)
               filter: (!environmentConfig.daylight && enemyKind !== 'fire-goblin')
-                ? 'brightness(var(--enemy-dim, 0.80))'
+                ? 'var(--lp-actor-filter, brightness(var(--enemy-dim, 0.80)))'
                 : undefined,
               // Submersion: an enemy standing in water or lava is clipped like
               // the hero — waist-deep in shallow water (snakes ride lower: top

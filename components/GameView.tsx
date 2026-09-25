@@ -10,6 +10,8 @@ import { trackGameStart } from "../lib/analytics";
 import { computeMapId } from "../lib/map";
 import { assetUrl } from "../lib/asset_url";
 import { TilemapGrid } from "./TilemapGrid";
+import { LightPassBackdrop } from "./LightPassLayers";
+import { readBackdropFlag, readLightPassFlag, type LightBackdrop } from "../lib/light_pass";
 
 export interface GameViewProps {
   algorithm?: string;
@@ -239,6 +241,20 @@ function GameViewInner({
     inBossRoom: !!finalInitialState?.inBossRoom,
   });
 
+  // Torchlight light pass (on by default, `?light=0` opts out): swaps the page backdrop
+  // too, to `?bg=` or "dark". Starts as the default so the server render and first paint
+  // already show it; the mount read only matters for an opt-out or a `?bg=` override.
+  const [lightBackdrop, setLightBackdrop] = useState<LightBackdrop | null>("dark");
+  useEffect(() => {
+    try {
+      setLightBackdrop(
+        readLightPassFlag(window.location.search, window.localStorage)
+          ? readBackdropFlag(window.location.search)
+          : null
+      );
+    } catch {}
+  }, []);
+
   const title = heroLocationTitle({
     floor: heroLocation.floor,
     maxFloors: finalInitialState?.maxFloors ?? 1,
@@ -263,13 +279,21 @@ function GameViewInner({
   return (
     <div
       className="min-h-screen flex flex-row items-start justify-center p-4 max-[600px]:p-2 gap-4 text-white relative"
-      style={{
-        backgroundImage: `url(${assetUrl("/images/presentational/wall-up-close.png")})`,
-        backgroundRepeat: "repeat",
-        backgroundSize: "auto",
-      }}
+      style={
+        lightBackdrop && lightBackdrop !== "classic"
+          ? undefined
+          : {
+              backgroundImage: `url(${assetUrl("/images/presentational/wall-up-close.png")})`,
+              backgroundRepeat: "repeat",
+              backgroundSize: "auto",
+            }
+      }
     >
-      <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+      {lightBackdrop && lightBackdrop !== "classic" ? (
+        <LightPassBackdrop kind={lightBackdrop} />
+      ) : (
+        <div className="absolute inset-0 bg-black/40 pointer-events-none"></div>
+      )}
       <div className="flex flex-col items-center relative z-10">
         <h1 className="text-1xl font-bold text-center mb-4 max-[600px]:mb-1 text-gray-400">
           {title}

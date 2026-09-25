@@ -399,6 +399,11 @@
   background-image: url("/images/items/pot-1-clean.png");
 }
 
+/* Light pass (lib/light_pass.ts): pots are graded into the cave like the actors are. */
+:global(.lp-cave) .potIcon {
+  filter: var(--lp-actor-filter, none);
+}
+
 /*
  * Snake-pot rattle: every ~3s the pot does a sharp little shake, as if the coiled
  * snake inside is shifting and about to strike. It sits perfectly still for most

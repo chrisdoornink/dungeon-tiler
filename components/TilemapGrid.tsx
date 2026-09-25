@@ -171,6 +171,17 @@ import { hasAdBreakHandler, runAdBreak } from "../lib/ad_break";
 import { PinkRealmSparkles } from "./PinkRealmSparkles";
 import { useRenderQuality } from "./useRenderQuality";
 import { assetUrl } from "../lib/asset_url";
+import {
+  DEFAULT_LIGHT_PASS,
+  readLightPassFlag,
+  type LightPassConfig,
+} from "../lib/light_pass";
+import {
+  LightPassGradeFilter,
+  LightPassLayers,
+  collectLightSources,
+  lightPassHeroPx,
+} from "./LightPassLayers";
 
 type DialogueSession = {
   event: NPCInteractionEvent;
@@ -339,6 +350,13 @@ interface TilemapGridProps {
    * the old tiles.
    */
   floorStyle?: FloorStyle;
+  /**
+   * Torchlight light pass (lib/light_pass.ts): grades actors into the lit cave and adds
+   * warm torch pools with a gentle falloff. `true` uses the defaults, an object overrides
+   * them (/test-lighting's sliders), `false` forces it off. When omitted it is on, unless
+   * the player opted out with `?light=0` (persisted).
+   */
+  lightPass?: boolean | Partial<LightPassConfig>;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -358,6 +376,7 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   dailyDateOverride,
   onLocationChange,
   floorStyle: floorStyleProp,
+  lightPass: lightPassProp,
 }) => {
   const router = useRouter();
 
@@ -385,6 +404,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
   }, []);
   const floorStyle: FloorStyle = floorStyleProp ?? urlFloorStyle ?? "generated";
+
+  // Torchlight light pass: on by default. Starts on so the server render and first paint
+  // already have it; the mount read only matters for a persisted `?light=0` opt-out.
+  const [urlLightPass, setUrlLightPass] = useState(true);
+  useEffect(() => {
+    try {
+      setUrlLightPass(readLightPassFlag(window.location.search, window.localStorage));
+    } catch {}
+  }, []);
+  const lightPassConfig: LightPassConfig | null =
+    lightPassProp === false
+      ? null
+      : lightPassProp === true
+      ? DEFAULT_LIGHT_PASS
+      : typeof lightPassProp === "object"
+      ? { ...DEFAULT_LIGHT_PASS, ...lightPassProp }
+      : urlLightPass
+      ? DEFAULT_LIGHT_PASS
+      : null;
 
 
   // Router removed; daily flow handled via onDailyComplete callback
@@ -2340,6 +2378,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   mapDimsRef.current = [mapRows, mapCols];
   // Smooth-mode light overlay anchor; the rAF loop drags it with the hero.
   const smoothLightAnchorRef = useRef<HTMLDivElement | null>(null);
+  // Light pass container; the rAF loop writes the hero's light position onto it.
+  const lightPassLayerRef = useRef<HTMLDivElement | null>(null);
 
   // --- Phase 2: enemies/NPCs slide one tile per turn ---
   // id -> [y, x] as of the previously diffed gameState.
@@ -2792,6 +2832,10 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const suppressDarknessOverlay =
     !inNightmare && (autoPhaseVisibility || (forceDaylight && heroTorchLitState));
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
+  // The light pass grades actors anywhere in the cave (lit or snuffed), but only draws
+  // its pools while the torch is lit: snuffed, the tile darkness system takes over.
+  const lightPassCave = !!lightPassConfig && environment === "cave" && !inNightmare;
+  const lightPassPools = lightPassCave && suppressDarknessOverlay;
   const lastCheckpoint = gameState.lastCheckpoint;
   const heroDeathStateForTiles: HeroDeathState | undefined =
     shouldAnimateHeroDeath && heroDeathPhase !== "idle"
@@ -4514,6 +4558,12 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
       if (v && smoothHeroAnchorRef.current) {
         smoothHeroAnchorRef.current.style.transform = `translate3d(${v[1] * 40}px, ${v[0] * 40}px, 0)`;
       }
+      // The light pass's hero pools follow the same visual position.
+      if (v && lightPassLayerRef.current) {
+        const [lx, ly] = lightPassHeroPx([v[0], v[1]]);
+        lightPassLayerRef.current.style.setProperty("--lp-hx", `${lx}px`);
+        lightPassLayerRef.current.style.setProperty("--lp-hy", `${ly}px`);
+      }
 
       // Hero gait: bob + weight-shift tilt + squash while stepping.
       const spriteEl = smoothHeroSpriteRef.current;
@@ -4828,9 +4878,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
 
   return (
     <div
-      className={`relative${brightMode ? " bright-mode" : ""}`}
+      className={`relative${brightMode ? " bright-mode" : ""}${lightPassCave ? " lp-cave" : ""}`}
       data-fx={renderQuality}
+      // Light pass: actor sprites read `--lp-actor-filter` (falling back to their usual
+      // look when it is unset), and contact shadows read `--lp-shadow`.
+      style={
+        lightPassCave && lightPassConfig
+          ? ({
+              ["--lp-actor-filter" as string]: "url(#torchboy-actor-grade)",
+              ["--lp-shadow" as string]: String(lightPassConfig.shadows),
+            } as React.CSSProperties)
+          : undefined
+      }
     >
+      {lightPassCave && lightPassConfig && <LightPassGradeFilter config={lightPassConfig} />}
       {/* Brightness A/B prototype: highlight-safe shadow-lift curve referenced
           by `.bright-mode .game-scale` in globals.css. Gamma < 1 raises dark
           values toward mid while leaving near-white (candles) almost fixed.
@@ -6328,6 +6389,18 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     floorStyle
                   )}
                 </div>
+                {/* Torchlight light pass: light map + warm pools above the sprites and
+                    wall tops, so actors are lit by the same light as the floor. */}
+                {lightPassPools && lightPassConfig && (
+                  <LightPassLayers
+                    rows={mapRows}
+                    cols={mapCols}
+                    hero={smoothVisualRef.current ?? playerPosition}
+                    sources={collectLightSources(gameState.mapData.subtypes, gameState.enemies)}
+                    config={lightPassConfig}
+                    containerRef={lightPassLayerRef}
+                  />
+                )}
                 {/* Smooth-movement hero: lives INSIDE the map container at the
                     camera's fractional map position (so it stays visually
                     pinned at viewport center) and shares the map's stacking
@@ -6358,6 +6431,20 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                         })(),
                       }}
                     >
+                      {/* Light pass contact shadow: grounds him on the floor.
+                          Not in water, where he is waist- or head-deep. */}
+                      {lightPassCave &&
+                        !(() => {
+                          const subs =
+                            gameState.mapData.subtypes[playerPosition[0]]?.[
+                              playerPosition[1]
+                            ] ?? [];
+                          return (
+                            !subs.includes(TileSubtype.MOVING_PLATFORM) &&
+                            (subs.includes(TileSubtype.DEEP_WATER) ||
+                              subs.includes(TileSubtype.SHALLOW_WATER))
+                          );
+                        })() && <div className="lp-shadow" />}
                       <div
                         style={{
                           position: "absolute",
@@ -6388,26 +6475,6 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                           style={{
                             position: "absolute",
                             inset: 0,
-                            backgroundImage: `url(${
-                              heroOverrideSprite
-                                ? assetUrl(heroOverrideSprite)
-                                : heroSpritePath(
-                                    gameState.playerDirection,
-                                    Boolean(gameState.hasSword),
-                                    Boolean(gameState.hasShield),
-                                    heroFlameLit
-                                  )
-                            })`,
-                            // Override sprites are NPC art: draw at the NPC
-                            // base metric (85% tile height, feet down); the
-                            // parent's scale transform applies heroSpriteScale.
-                            backgroundSize: heroOverrideSprite
-                              ? "auto 85%"
-                              : "contain",
-                            backgroundPosition: heroOverrideSprite
-                              ? "center bottom"
-                              : "center",
-                            backgroundRepeat: "no-repeat",
                             transformOrigin: "50% 100%",
                             // Submersion: wading hides the hero below the waist,
                             // swimming below the head. Keyed off the COMMITTED tile
@@ -6433,6 +6500,37 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                             })(),
                           }}
                         >
+                          {/* The body art sits on its own layer so the light
+                              pass can grade it (--lp-actor-filter) without
+                              touching the torch flame, a sibling below. Unset,
+                              the filter is none. */}
+                          <div
+                            style={{
+                              position: "absolute",
+                              inset: 0,
+                              backgroundImage: `url(${
+                                heroOverrideSprite
+                                  ? assetUrl(heroOverrideSprite)
+                                  : heroSpritePath(
+                                      gameState.playerDirection,
+                                      Boolean(gameState.hasSword),
+                                      Boolean(gameState.hasShield),
+                                      heroFlameLit
+                                    )
+                              })`,
+                              // Override sprites are NPC art: draw at the NPC
+                              // base metric (85% tile height, feet down); the
+                              // parent's scale transform applies heroSpriteScale.
+                              backgroundSize: heroOverrideSprite
+                                ? "auto 85%"
+                                : "contain",
+                              backgroundPosition: heroOverrideSprite
+                                ? "center bottom"
+                                : "center",
+                              backgroundRepeat: "no-repeat",
+                              filter: "var(--lp-actor-filter, none)",
+                            }}
+                          />
                           {/* Armed family hero (Hearth & Home): the game's
                               item sword, riding INSIDE the sprite div so the
                               gait animation, the parent's facing flip, and the

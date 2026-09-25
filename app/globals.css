@@ -181,6 +181,58 @@
   100% { filter: brightness(0.22) saturate(0.88); }
 }
 
+/* ---------------------------------------------------------------------------
+   Torchlight light pass (lib/light_pass.ts, components/LightPassLayers.tsx).
+   Everything here is scoped under `.lp-cave`, which the game root carries in a cave while
+   the pass is on (the default; `?light=0` opts out).
+   --------------------------------------------------------------------------- */
+
+/* Contact shadow under the hero and regular enemies: grounds them on the floor.
+   Sits above floor decals (road overlay 1010) and below items (1030). The strength
+   comes from --lp-shadow on the game root. */
+.lp-shadow { display: none; }
+.lp-cave .lp-shadow {
+  display: block;
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  bottom: 2%;
+  height: 16%;
+  z-index: 1020;
+  pointer-events: none;
+  background: radial-gradient(
+    closest-side,
+    rgba(0, 0, 0, var(--lp-shadow, 0.45)) 0%,
+    rgba(0, 0, 0, calc(var(--lp-shadow, 0.45) * 0.6)) 55%,
+    rgba(0, 0, 0, 0) 100%
+  );
+}
+/* Snakes draw at scale(0.5) around the tile center, so their base sits ~a quarter up. */
+.lp-cave .lp-shadow-small {
+  left: 32%;
+  right: 32%;
+  bottom: 22%;
+  height: 12%;
+}
+
+/* Torch pools breathe: a slow irregular swell in size and strength. */
+@keyframes lpFlicker {
+  0%, 100% { opacity: 0.93; transform: scale(1); }
+  17% { opacity: 1; transform: scale(1.03); }
+  36% { opacity: 0.86; transform: scale(0.985); }
+  52% { opacity: 0.97; transform: scale(1.012); }
+  71% { opacity: 0.9; transform: scale(0.995); }
+  86% { opacity: 0.98; transform: scale(1.02); }
+}
+.lp-flicker {
+  animation: lpFlicker 3.1s ease-in-out infinite;
+  animation-delay: var(--lp-delay, 0s);
+}
+[data-fx="reduced"] .lp-flicker { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .lp-flicker { animation: none; }
+}
+
 /* Nightmare room floor: darken the pink-realm floor (keeping its hue) so it reads as a
    deep, dim version of the realm. The ::before overlay paints above the floor's background
    image but behind the hero/items (later DOM children), so the floor goes dark while the
