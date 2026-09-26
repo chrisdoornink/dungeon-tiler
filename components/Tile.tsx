@@ -39,6 +39,7 @@ import { ColorGlyph } from "./ColorGlyph";
 import type { NPC } from "../lib/npc";
 import type { SmoothEntityStep } from "../lib/smooth_movement";
 import { ENEMY_GAIT, REGULAR_GOBLIN_KINDS } from "../lib/smooth_movement";
+import { sheetCellPosition, type TerrainSheetRef } from "../lib/terrain_sheet";
 import PixelFlame, {
   HERO_FLAME_ANCHOR,
   GOBLIN_FLAME_ANCHOR,
@@ -268,6 +269,10 @@ interface TileProps {
   // Light pass with the torch out: the light map above the grid does the darkening, so
   // skip the per-tile snuff/torch-glow brightness classes.
   lightPassDark?: boolean;
+  // Water/lava sheets (lib/terrain_sheet.ts): when present, this tile draws its cell of the
+  // floor's map-sized pool image instead of the per-tile terrain texture. Land tiles beside
+  // a pool get them too, for the shore that bulges onto them and the wet margin/heat glow.
+  terrainLayers?: { water?: TerrainSheetRef; lava?: TerrainSheetRef };
   heroSpriteOverride?: string; // Static sprite replacing the hero art for all facings (Hearth & Home)
   heroSpriteScale?: number; // Override render height as % of tile (85 = NPC standard, 51 = dog)
   heroArmed?: boolean; // Family hero holds a sword (code-driven overlay, Hearth & Home)
@@ -452,6 +457,7 @@ export const Tile: React.FC<TileProps> = ({
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
   lightPassDark = false,
+  terrainLayers,
   heroSpriteOverride,
   heroSpriteScale,
   heroArmed = false,
@@ -2533,6 +2539,12 @@ export const Tile: React.FC<TileProps> = ({
       const isSteppingStone = hasSteppingStone(subtype);
       const isSpikes = hasSpikes(subtype);
       const isSpikeHoles = hasSpikeHoles(subtype);
+      // Pools drawn from the floor's terrain sheet sit on ordinary floor: the sheet layer
+      // paints the water/lava (with its organic edge) over the floor sheet beneath.
+      const waterSheet = terrainLayers?.water;
+      const lavaSheet = terrainLayers?.lava;
+      const waterOnSheet = !!waterSheet && (isShallowWater || isDeepWater || isSteppingStone);
+      const lavaOnSheet = !!lavaSheet && isLava;
       const floorVariantClass = isDarkness
         ? styles.darkness
         : isOpenAbyss
@@ -2542,16 +2554,48 @@ export const Tile: React.FC<TileProps> = ({
         : isSpikeHoles
         ? styles.spikeHoles
         : isLava
-        ? styles.lava
+        ? lavaOnSheet
+          ? styles.floor
+          : styles.lava
         : isObsidian
         ? styles.obsidian
         : isDeepWater
-        ? styles.deepWater
+        ? waterOnSheet
+          ? styles.floor
+          : styles.deepWater
         : isSteppingStone
-        ? styles.steppingStone
+        ? waterOnSheet
+          ? `${styles.steppingStone} ${styles.steppingStoneOnSheet}`
+          : styles.steppingStone
         : isShallowWater
-        ? styles.shallowWater
+        ? waterOnSheet
+          ? styles.floor
+          : styles.shallowWater
         : styles.floor;
+      // Places this tile's cell of a map-sized terrain sheet, as a background or a mask.
+      const sheetCell = (ref: TerrainSheetRef, as: "background" | "mask"): React.CSSProperties => {
+        const { size, position } = sheetCellPosition(ref, row ?? 0, col ?? 0);
+        // Masks prefer the sheet's water-only mask, so nothing masked to it shows on the
+        // damp margin around the pool.
+        const image = `url(${as === "mask" ? ref.maskUrl ?? ref.url : ref.url})`;
+        return as === "background"
+          ? {
+              backgroundImage: image,
+              backgroundSize: size,
+              backgroundPosition: position,
+              backgroundRepeat: "no-repeat",
+            }
+          : {
+              maskImage: image,
+              maskSize: size,
+              maskPosition: position,
+              maskRepeat: "no-repeat",
+              WebkitMaskImage: image,
+              WebkitMaskSize: size,
+              WebkitMaskPosition: position,
+              WebkitMaskRepeat: "no-repeat",
+            };
+      };
       const floorClasses = `${styles.tileContainer} ${floorVariantClass} ${tierClass}${inNightmare ? " nightmare-floor" : ""}`;
 
       // Map floor variant to NESW asset filename based on neighbors
@@ -2579,13 +2623,11 @@ export const Tile: React.FC<TileProps> = ({
             // spike beds rendered as plain floor). Leave it unset. ANY new terrain that
             // paints itself from a CSS class must be added here or it will silently lose
             // to this inline style — the class is not the thing that wins.
-            ...(isLava ||
+            ...(((isLava && !lavaOnSheet) ||
             isObsidian ||
-            isShallowWater ||
-            isDeepWater ||
-            isSteppingStone ||
+            ((isShallowWater || isDeepWater || isSteppingStone) && !waterOnSheet) ||
             isSpikes ||
-            isSpikeHoles
+            isSpikeHoles)
               ? {
                   backgroundImage: undefined,
                   backgroundSize: "cover",
@@ -2604,10 +2646,29 @@ export const Tile: React.FC<TileProps> = ({
           data-testid={`tile-${tileId}`}
           data-neighbor-code={neighborCode}
         >
+          {/* Terrain sheets: this tile's cell of the floor's water / lava image. Above the
+              floor, below the ripples and bubbles (1020) and items (1030). */}
+          {waterSheet && (
+            <div
+              aria-hidden="true"
+              className={`${styles.terrainSheet}${waterSheet.smooth ? ` ${styles.terrainSheetSmooth}` : ""}`}
+              style={sheetCell(waterSheet, "background")}
+            />
+          )}
+          {lavaSheet && (
+            <div
+              aria-hidden="true"
+              className={`${styles.terrainSheet}${lavaSheet.smooth ? ` ${styles.terrainSheetSmooth}` : ""}`}
+              style={sheetCell(lavaSheet, "background")}
+            />
+          )}
+
           {/* Lava: a bubbling molten surface — a dark crust base (the .lava class) with
               low bubbles that swell and pop (a sparse PixelFlame at cell=2 to match the
-              game's resolution). seed + per-tile horizontal flip break up uniformity. */}
-          {isLava && (
+              game's resolution). seed + per-tile horizontal flip break up uniformity. On a
+              sheet, the bubbles are masked to the pool so none float over its edge. */}
+          {isLava && (() => {
+            const bubbles = (
             <PixelFlame
               cell={1.25}
               palette="lava"
@@ -2624,13 +2685,28 @@ export const Tile: React.FC<TileProps> = ({
                 }`,
               }}
             />
-          )}
+            );
+            return lavaOnSheet && lavaSheet ? (
+              <div className={styles.terrainSheetMask} style={sheetCell(lavaSheet, "mask")}>
+                {bubbles}
+              </div>
+            ) : (
+              bubbles
+            );
+          })()}
 
           {/* Water: low-contrast drifting wave lines over the water base — the same
               tile-filling PixelFlame machinery as lava's bubbles, but a slower cycle.
               Deep water gets fuller waves + a rare single-pixel glint; shallow gets
               shorter, dimmer wave shadows so both tiers read as one body of water. */}
-          {(isDeepWater || isShallowWater) && (
+          {(isDeepWater || isShallowWater) && (() => {
+            // On a sheet, each tile's wave marks get their own flip and phase from a hash of
+            // the tile, so across a pool they stop lining up in rows. (The classic tiles keep
+            // their checkerboard flip.) The frame fills the tile, so it can't be offset.
+            const h = (((row ?? 0) * 73856093) ^ ((col ?? 0) * 19349663)) >>> 0;
+            const orient = waterOnSheet ? h % 4 : (((row ?? 0) + (col ?? 0)) % 2 === 1 ? 1 : 0);
+            const flip = `${orient & 1 ? " scaleX(-1)" : ""}${orient & 2 ? " scaleY(-1)" : ""}`;
+            const ripples = (
             <PixelFlame
               cell={1.25}
               palette="water"
@@ -2639,22 +2715,27 @@ export const Tile: React.FC<TileProps> = ({
               cols={WATER_COLS}
               rows={WATER_ROWS}
               cycleS={WATER_CYCLE_S}
-              seed={(row ?? 0) * 31 + (col ?? 0)}
+              seed={waterOnSheet ? h % 997 : (row ?? 0) * 31 + (col ?? 0)}
               className={styles.waterRipple}
-              style={{
-                transform: `translateX(-50%)${
-                  (((row ?? 0) + (col ?? 0)) % 2 === 1) ? " scaleX(-1)" : ""
-                }`,
-              }}
+              style={{ transform: `translateX(-50%)${flip}` }}
             />
-          )}
+            );
+            return waterOnSheet && waterSheet ? (
+              <div className={styles.terrainSheetMask} style={sheetCell(waterSheet, "mask")}>
+                {ripples}
+              </div>
+            ) : (
+              ripples
+            );
+          })()}
 
           {/* Neighbor-aware terrain edges: shade only where the pool actually ends
               (dark outer rims; deep lightens toward shallow; shallow lightens toward
               shore and darkens toward the deep drop-off). Adjacent same-body tiles
               stay seamless. */}
           {terrainNeighbors &&
-            (isLava || isDeepWater || isShallowWater) &&
+            ((isLava && !lavaOnSheet) ||
+              ((isDeepWater || isShallowWater) && !waterOnSheet)) &&
             renderTerrainEdges(
               isLava ? "lava" : isDeepWater ? "deep" : "shallow",
               terrainNeighbors

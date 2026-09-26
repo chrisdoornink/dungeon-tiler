@@ -1029,6 +1029,41 @@
      edges rendered in Tile.tsx. */
 }
 
+/* Terrain sheets (lib/terrain_sheet.ts): a tile's cell of the floor's map-sized water or
+   lava image, drawn over the floor sheet. Above the floor and its decals, below the
+   ripples/bubbles (1020) and items (1030). */
+.terrainSheet {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1005;
+  /* The water sheet is pixel art at the terrain textures' own 32px-a-tile scale. */
+  image-rendering: pixelated;
+}
+
+/* Procedural sheets (lava, and procedural water) are soft surfaces: scale them smoothly.
+   Doubled class so it wins over the pixelated default of both .terrainSheet and
+   .terrainSheetMask whatever order they are declared in. */
+.terrainSheetSmooth.terrainSheetSmooth {
+  image-rendering: auto;
+}
+
+/* Clips a tile's ripples or bubbles to the pool's shape on its sheet (the wrapper carries
+   the mask; the PixelFlame inside keeps its own positioning). */
+.terrainSheetMask {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1020;
+  image-rendering: pixelated;
+}
+
+/* A stepping stone in a sheet-drawn pool: the tile's base is floor with the sheet's deep
+   water over it, so the stone has to sit above the sheet layer (1005). */
+.steppingStoneOnSheet::after {
+  z-index: 1025;
+}
+
 /* Positions the deep-water ripple overlay (a PixelFlame with WATER_FRAMES); same
    geometry as .lavaFlame. */
 .waterRipple {

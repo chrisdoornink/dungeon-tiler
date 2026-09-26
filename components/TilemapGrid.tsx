@@ -144,6 +144,13 @@ import {
   getEnvironmentConfig,
 } from "../lib/environment";
 import { type FloorStyle, floorShadeMask, parseFloorStyle } from "../lib/floor_sheet";
+import {
+  parseTerrainStyle,
+  terrainSheetsFor,
+  type TerrainShapeConfig,
+  type TerrainSheets,
+  type TerrainStyle,
+} from "../lib/terrain_sheet";
 import HealthDisplay from "./HealthDisplay";
 import EnemyHealthDisplay from "./EnemyHealthDisplay";
 import { ScreenShake } from "./ScreenShake";
@@ -358,6 +365,14 @@ interface TilemapGridProps {
    * the player opted out with `?light=0` (persisted).
    */
   lightPass?: boolean | Partial<LightPassConfig>;
+  /**
+   * Water and lava: "sheet" (lib/terrain_sheet.ts, the default) draws each floor's pools
+   * as one map-sized image with organic edges; "classic" keeps the per-tile textures.
+   * When omitted, a `?terrain=classic` URL flag can still ask for the old look.
+   */
+  terrainStyle?: TerrainStyle;
+  /** Overrides for the terrain sheets' shape knobs (/test-water-edges' sliders). */
+  terrainShape?: Partial<TerrainShapeConfig>;
 }
 
 export const TilemapGrid: React.FC<TilemapGridProps> = ({
@@ -378,6 +393,8 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   onLocationChange,
   floorStyle: floorStyleProp,
   lightPass: lightPassProp,
+  terrainStyle: terrainStyleProp,
+  terrainShape,
 }) => {
   const router = useRouter();
 
@@ -405,6 +422,19 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
     } catch {}
   }, []);
   const floorStyle: FloorStyle = floorStyleProp ?? urlFloorStyle ?? "generated";
+
+  // Water/lava sheets are built in the browser only: an object URL made during the server
+  // render would be baked into the HTML and never load. Until mount (and wherever object
+  // URLs are unavailable) tiles fall back to the classic per-tile textures.
+  const [urlTerrainStyle, setUrlTerrainStyle] = useState<TerrainStyle | null>(null);
+  const [terrainMounted, setTerrainMounted] = useState(false);
+  useEffect(() => {
+    setTerrainMounted(true);
+    try {
+      setUrlTerrainStyle(parseTerrainStyle(new URLSearchParams(window.location.search).get("terrain")));
+    } catch {}
+  }, []);
+  const terrainStyle: TerrainStyle = terrainStyleProp ?? urlTerrainStyle ?? "sheet";
 
   // Torchlight light pass: on by default. Starts on so the server render and first paint
   // already have it; the mount read only matters for a persisted `?light=0` opt-out.
@@ -6404,7 +6434,14 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     !!gameState.activeHeroId && !!gameState.hasSword,
                     floorStyle,
                     lightPassDark,
-                    lightPassActorLit
+                    lightPassActorLit,
+                    terrainStyle === "sheet" && terrainMounted
+                      ? terrainSheetsFor(
+                          gameState.mapData.tiles,
+                          gameState.mapData.subtypes,
+                          terrainShape
+                        )
+                      : null
                   )}
                 </div>
                 {/* Torchlight light pass: light map + warm pools above the sprites and
@@ -7127,7 +7164,10 @@ function renderTileGrid(
   // light map above does the darkening), and draw an enemy/NPC only where `actorLit` says
   // the light reaches its tile.
   lightPassDark: boolean = false,
-  actorLit?: (y: number, x: number) => boolean
+  actorLit?: (y: number, x: number) => boolean,
+  // Water/lava sheets for this floor (lib/terrain_sheet.ts); each tile listed in them
+  // draws its cell of the sheet. Null keeps the classic per-tile terrain.
+  terrainSheets: TerrainSheets | null = null
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7425,6 +7465,13 @@ function renderTileGrid(
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
             lightPassDark={lightPassDark}
+            terrainLayers={(() => {
+              if (!terrainSheets) return undefined;
+              const key = `${rowIndex},${colIndex}`;
+              const water = terrainSheets.waterTiles.has(key) ? terrainSheets.water : undefined;
+              const lava = terrainSheets.lavaTiles.has(key) ? terrainSheets.lava : undefined;
+              return water || lava ? { water, lava } : undefined;
+            })()}
             heroSpriteOverride={isPlayerTile ? heroSpriteOverride : undefined}
             heroSpriteScale={isPlayerTile ? heroSpriteScale : undefined}
             heroArmed={isPlayerTile && !!heroArmedOverride}
