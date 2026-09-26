@@ -80,7 +80,7 @@ export const DEFAULT_LIGHT_PASS: LightPassConfig = {
   flicker: true,
   darkAmbient: 0.06,
   darkHeroRadius: 1.6,
-  darkHeroLevel: 0.2,
+  darkHeroLevel: 0.3,
   darkWallRadius: 3.1,
 };
 
