@@ -265,6 +265,9 @@ interface TileProps {
   neighbors?: NeighborInfo; // Information about neighboring tiles
   playerDirection?: Direction; // Direction the player is facing
   heroTorchLit?: boolean; // Whether the hero's torch is lit (affects hero sprite)
+  // Light pass with the torch out: the light map above the grid does the darkening, so
+  // skip the per-tile snuff/torch-glow brightness classes.
+  lightPassDark?: boolean;
   heroSpriteOverride?: string; // Static sprite replacing the hero art for all facings (Hearth & Home)
   heroSpriteScale?: number; // Override render height as % of tile (85 = NPC standard, 51 = dog)
   heroArmed?: boolean; // Family hero holds a sword (code-driven overlay, Hearth & Home)
@@ -448,6 +451,7 @@ export const Tile: React.FC<TileProps> = ({
   neighbors = { top: null, right: null, bottom: null, left: null },
   playerDirection = Direction.DOWN, // Default to facing down/front
   heroTorchLit = true,
+  lightPassDark = false,
   heroSpriteOverride,
   heroSpriteScale,
   heroArmed = false,
@@ -562,7 +566,7 @@ export const Tile: React.FC<TileProps> = ({
 
   const tierClass = (() => {
     if (!isVisible) return "";
-    if (!heroTorchLit && !suppressDarknessOverlay) {
+    if (!heroTorchLit && !suppressDarknessOverlay && !lightPassDark) {
       if (isPlayerTile) return "fov-tier-snuff-core";
       // Wall torches stay light sources even while snuffed: bright flickering
       // arms, dimmer flickering corners, instead of a hard cross with black
@@ -2183,7 +2187,7 @@ export const Tile: React.FC<TileProps> = ({
       ];
       return (
         <>
-          {enemyAura && (
+          {enemyAura && (enemyVisible ?? isVisible) === true && (
             <div className={styles.exitGlow} aria-hidden="true" />
           )}
           {((enemyVisible ?? isVisible) === true) && (
@@ -2300,7 +2304,7 @@ export const Tile: React.FC<TileProps> = ({
     })();
     return (
       <>
-        {enemyAura && (
+        {enemyAura && (enemyVisible ?? isVisible) === true && (
           <div
             // Slide with the goblin: the aura renders in the destination tile,
             // so without this it snaps a tile ahead while the sprite glides.

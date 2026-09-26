@@ -18,27 +18,34 @@
 // pools follow `--lp-hx` / `--lp-hy` on the container, which the smooth-movement rAF
 // loop writes every frame, so the light stays in his hand mid-step.
 
+// The same layers draw both lighting states. Every pool's size and strength is a CSS
+// width/height and opacity with a transition, so when the torch snuffs the hero's long
+// falloff shrinks to a faint glow and the sconces swell to take over (and back again on a
+// relight) instead of the room cutting between two looks.
+
 import React from "react";
 import { EnemyRegistry, type EnemyKind } from "../lib/enemies/registry";
 import { TileSubtype } from "../lib/map";
 import { assetUrl } from "../lib/asset_url";
 import {
+  HOLE_STOPS,
   actorToneTable,
   ambientRgb,
+  holeFor,
   type LightBackdrop,
   type LightPassConfig,
+  type LightPoint,
+  type LightSourceKind,
+  type PoolSize,
 } from "../lib/light_pass";
 
 const TILE = 40;
 
-export type LightSourceKind = "wall" | "lava" | "carrier";
+// How long a pool takes to grow, shrink or fade when the torch changes state.
+const LIGHT_TRANSITION = "600ms ease-in-out";
 
-export interface LightSource {
+export interface LightSource extends LightPoint {
   key: string;
-  kind: LightSourceKind;
-  /** Light center in map px. */
-  x: number;
-  y: number;
 }
 
 /** The hero's light center in map px for a (possibly fractional) [row, col]. */
@@ -47,7 +54,11 @@ export function lightPassHeroPx(pos: [number, number]): [number, number] {
   return [pos[1] * TILE + TILE / 2, pos[0] * TILE + TILE * 0.35];
 }
 
-/** Wall torches, lava and torch-carrying enemies, as light sources in map px. */
+// Snuffed, his glow sits on his tile's center rather than at the (absent) flame; this
+// shifts it down from the chest-height anchor (matches darkRevealsTile).
+const HERO_DARK_DROP = TILE * 0.15;
+
+/** Wall torches, lava, the dark portal and torch-carrying enemies, in map px. */
 export function collectLightSources(
   subtypes: number[][][] | undefined,
   enemies: ReadonlyArray<{ id: string; kind: string; x: number; y: number }> | undefined
@@ -65,6 +76,8 @@ export function collectLightSources(
           out.push({ key: `wall-${y}-${x}`, kind: "wall", x: (x + 0.5) * TILE, y: (y + 0.9) * TILE });
         } else if (st.includes(TileSubtype.LAVA)) {
           out.push({ key: `lava-${y}-${x}`, kind: "lava", x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
+        } else if (st.includes(TileSubtype.DARK_PORTAL)) {
+          out.push({ key: `portal-${y}-${x}`, kind: "portal", x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
         }
       }
     }
@@ -102,61 +115,64 @@ export function LightPassGradeFilter({ config }: { config: LightPassConfig }) {
   );
 }
 
-// Multiply hole: white holds the scene at full brightness, fading to the ambient fill.
-const HOLE_GRADIENT =
-  "radial-gradient(circle closest-side, #fff 0%, #fff 22%, rgba(255,255,255,0.8) 45%, rgba(255,255,255,0.45) 65%, rgba(255,255,255,0.15) 85%, rgba(255,255,255,0) 100%)";
+// Gradients are drawn at full strength; a pool's strength is its opacity, which is what
+// lets it fade smoothly (gradients themselves don't transition).
+const HOLE_GRADIENT = `radial-gradient(circle closest-side, ${HOLE_STOPS.map(
+  ([t, v]) => `rgba(255,255,255,${v}) ${Math.round(t * 100)}%`
+).join(", ")})`;
 
-function warmGradient(rgb: string, strength: number): string {
-  const a = Math.max(0, Math.min(1, strength));
-  return `radial-gradient(circle closest-side, rgba(${rgb},${a}) 0%, rgba(${rgb},${(a * 0.75).toFixed(3)}) 30%, rgba(${rgb},${(a * 0.35).toFixed(3)}) 65%, rgba(${rgb},0) 100%)`;
+function warmGradient(rgb: string): string {
+  return `radial-gradient(circle closest-side, rgba(${rgb},1) 0%, rgba(${rgb},0.75) 30%, rgba(${rgb},0.35) 65%, rgba(${rgb},0) 100%)`;
 }
 
-function glowGradient(strength: number): string {
-  const a = Math.max(0, Math.min(1, strength));
-  return `radial-gradient(circle closest-side, rgba(255,185,105,${a}) 0%, rgba(255,170,90,${(a * 0.45).toFixed(3)}) 45%, rgba(255,160,80,0) 100%)`;
+const GLOW_GRADIENT =
+  "radial-gradient(circle closest-side, rgba(255,185,105,1) 0%, rgba(255,170,90,0.45) 45%, rgba(255,160,80,0) 100%)";
+
+const AMBER_GRADIENT = warmGradient("255,150,60");
+const LAVA_GRADIENT = warmGradient("255,100,40");
+const PORTAL_GRADIENT = warmGradient("120,200,255");
+
+interface Look {
+  hole: PoolSize;
+  warm: PoolSize & { gradient: string };
+  glow: PoolSize;
 }
 
-const AMBER = "255,150,60";
-const LAVA_RED = "255,100,40";
-
-interface PoolSpec {
-  radius: number; // px
-  background: string;
-}
-
-interface SourceLook {
-  hole: PoolSpec;
-  warm: PoolSpec | null;
-  glow: PoolSpec | null;
-}
-
-function sourceLook(kind: LightSourceKind | "hero", c: LightPassConfig): SourceLook {
+function lookFor(kind: LightSourceKind | "hero", c: LightPassConfig, dark: boolean): Look {
+  const hole = holeFor(kind, c, dark);
   switch (kind) {
     case "hero":
+      // Snuffed, the hero is a faint presence, not a light: no warmth, no flame core.
       return {
-        hole: { radius: c.heroRadius * TILE, background: HOLE_GRADIENT },
-        warm: { radius: c.heroRadius * 0.72 * TILE, background: warmGradient(AMBER, c.heroWarmth) },
-        glow: { radius: 1.6 * TILE, background: glowGradient(c.heroGlow) },
+        hole,
+        warm: { radius: c.heroRadius * 0.72, strength: dark ? 0 : c.heroWarmth, gradient: AMBER_GRADIENT },
+        glow: { radius: 1.6, strength: dark ? 0 : c.heroGlow },
       };
     case "wall":
       return {
-        hole: { radius: c.wallRadius * TILE, background: HOLE_GRADIENT },
-        warm: { radius: c.wallRadius * 0.9 * TILE, background: warmGradient(AMBER, c.wallWarmth) },
-        glow: { radius: 0.9 * TILE, background: glowGradient(c.heroGlow * 0.9) },
+        hole,
+        warm: { radius: hole.radius * 0.9, strength: c.wallWarmth, gradient: AMBER_GRADIENT },
+        glow: { radius: 0.9, strength: c.heroGlow * 0.9 },
       };
     case "carrier":
       return {
-        hole: { radius: c.wallRadius * 0.9 * TILE, background: HOLE_GRADIENT },
-        warm: { radius: c.wallRadius * 0.8 * TILE, background: warmGradient(AMBER, c.wallWarmth * 0.9) },
-        glow: { radius: 0.9 * TILE, background: glowGradient(c.heroGlow * 0.8) },
+        hole,
+        warm: { radius: hole.radius * 0.9, strength: c.wallWarmth * 0.9, gradient: AMBER_GRADIENT },
+        glow: { radius: 0.9, strength: c.heroGlow * 0.8 },
       };
     case "lava":
       // Lava already paints its own glow; it only needs to push back the falloff and
       // tint its surroundings red.
       return {
-        hole: { radius: 1.6 * TILE, background: HOLE_GRADIENT },
-        warm: { radius: 1.5 * TILE, background: warmGradient(LAVA_RED, c.wallWarmth * 0.8) },
-        glow: null,
+        hole,
+        warm: { radius: 1.5, strength: c.wallWarmth * 0.8, gradient: LAVA_GRADIENT },
+        glow: { radius: 0, strength: 0 },
+      };
+    case "portal":
+      return {
+        hole,
+        warm: { radius: 1.6, strength: dark ? 0.35 : 0, gradient: PORTAL_GRADIENT },
+        glow: { radius: 0, strength: 0 },
       };
   }
 }
@@ -169,56 +185,62 @@ function flickerDelay(key: string): string {
 }
 
 function Pool({
-  spec,
+  size,
+  gradient,
   x,
   y,
   follow,
   flicker,
   flickerKey,
   moving,
+  dropY = 0,
 }: {
-  spec: PoolSpec;
+  size: PoolSize;
+  gradient: string;
   x?: number;
   y?: number;
   follow?: boolean;
   flicker: boolean;
   flickerKey: string;
   moving?: boolean;
+  /** Shift the pool down from its anchor (px), transitioned with its size. */
+  dropY?: number;
 }) {
-  const d = spec.radius * 2;
-  // Outer node positions the pool (per frame for the hero, via the container's CSS
-  // variables); the inner node flickers. Kept apart so the flicker's scale is about the
-  // pool's own center instead of multiplying its translate.
-  const position: React.CSSProperties = follow
-    ? {
-        transform: `translate3d(calc(var(--lp-hx) - ${spec.radius}px), calc(var(--lp-hy) - ${spec.radius}px), 0)`,
-        willChange: "transform",
-      }
+  const r = size.radius * TILE;
+  // Three nodes, each owning one kind of motion so none of them fight:
+  //   anchor  a zero-size point at the light (per frame for the hero via the container's
+  //           CSS variables; eased after a torch-carrying goblin's step)
+  //   sizer   the pool's extent and strength, both transitioned
+  //   flicker the breathing animation, scaling about the pool's own center
+  const anchor: React.CSSProperties = follow
+    ? { transform: "translate3d(var(--lp-hx), var(--lp-hy), 0)", willChange: "transform" }
     : {
-        transform: `translate3d(${(x ?? 0) - spec.radius}px, ${(y ?? 0) - spec.radius}px, 0)`,
-        // Torch-carrying goblins step a tile per turn; ease the light after them.
+        transform: `translate3d(${x ?? 0}px, ${y ?? 0}px, 0)`,
         transition: moving ? "transform 220ms ease-out" : undefined,
       };
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: 0,
-        top: 0,
-        width: d,
-        height: d,
-        ...position,
-      }}
-    >
+    <div style={{ position: "absolute", left: 0, top: 0, width: 0, height: 0, ...anchor }}>
       <div
-        className={flicker ? "lp-flicker" : undefined}
         style={{
           position: "absolute",
-          inset: 0,
-          backgroundImage: spec.background,
-          ...(flicker ? ({ ["--lp-delay" as string]: flickerDelay(flickerKey) } as React.CSSProperties) : null),
+          left: -r,
+          top: -r + dropY,
+          width: r * 2,
+          height: r * 2,
+          opacity: Math.max(0, Math.min(1, size.strength)),
+          transition: `left ${LIGHT_TRANSITION}, top ${LIGHT_TRANSITION}, width ${LIGHT_TRANSITION}, height ${LIGHT_TRANSITION}, opacity ${LIGHT_TRANSITION}`,
         }}
-      />
+      >
+        <div
+          className={flicker ? "lp-flicker" : undefined}
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: gradient,
+            ...(flicker ? ({ ["--lp-delay" as string]: flickerDelay(flickerKey) } as React.CSSProperties) : null),
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -230,6 +252,8 @@ export interface LightPassLayersProps {
   hero: [number, number] | null;
   sources: LightSource[];
   config: LightPassConfig;
+  /** Torch out: the near-black far field, the hero's faint glow, sconces at full reach. */
+  dark: boolean;
   containerRef?: React.Ref<HTMLDivElement>;
 }
 
@@ -239,15 +263,20 @@ export function LightPassLayers({
   hero,
   sources,
   config,
+  dark,
   containerRef,
 }: LightPassLayersProps) {
   const width = cols * TILE;
   const height = rows * TILE;
   const heroPx = hero ? lightPassHeroPx(hero) : null;
-  const heroLook = sourceLook("hero", config);
-  const looks = sources.map((s) => ({ s, look: sourceLook(s.kind, config) }));
+  const heroLook = lookFor("hero", config, dark);
+  const looks = sources.map((s) => ({ s, look: lookFor(s.kind, config, dark) }));
 
-  const wrapper = (blend: React.CSSProperties["mixBlendMode"], zIndex: number, background?: string): React.CSSProperties => ({
+  const wrapper = (
+    blend: React.CSSProperties["mixBlendMode"],
+    zIndex: number,
+    background?: string
+  ): React.CSSProperties => ({
     position: "absolute",
     left: 0,
     top: 0,
@@ -257,31 +286,39 @@ export function LightPassLayers({
     mixBlendMode: blend,
     zIndex,
     background,
+    transition: background ? `background-color ${LIGHT_TRANSITION}` : undefined,
     pointerEvents: "none",
   });
+
+  const gradientOf = (which: "hole" | "warm" | "glow", look: Look) =>
+    which === "hole" ? HOLE_GRADIENT : which === "warm" ? look.warm.gradient : GLOW_GRADIENT;
 
   const layer = (which: "hole" | "warm" | "glow") => (
     <>
       {looks.map(({ s, look }) => {
-        const spec = look[which];
-        if (!spec) return null;
+        const size = look[which];
+        if (size.radius <= 0) return null;
         return (
           <Pool
             key={s.key}
-            spec={spec}
+            size={size}
+            gradient={gradientOf(which, look)}
             x={s.x}
             y={s.y}
             moving={s.kind === "carrier"}
-            flicker={config.flicker && s.kind !== "lava"}
+            flicker={config.flicker && s.kind !== "lava" && s.kind !== "portal"}
             flickerKey={`${which}-${s.key}`}
           />
         );
       })}
-      {heroPx && heroLook[which] && (
+      {heroPx && (
         <Pool
-          spec={heroLook[which]!}
+          size={heroLook[which]}
+          gradient={gradientOf(which, heroLook)}
           follow
-          flicker={config.flicker}
+          dropY={dark ? HERO_DARK_DROP : 0}
+          // A torch flickers; a snuffed hero's own faint presence holds steady.
+          flicker={config.flicker && !dark}
           flickerKey={`${which}-hero`}
         />
       )}
@@ -295,6 +332,7 @@ export function LightPassLayers({
       ref={containerRef}
       aria-hidden="true"
       data-testid="light-pass-layers"
+      data-light-dark={dark ? "1" : "0"}
       style={
         {
           position: "absolute",
@@ -308,7 +346,15 @@ export function LightPassLayers({
         } as React.CSSProperties
       }
     >
-      <div style={wrapper("multiply", 12050, ambientRgb(config))}>{layer("hole")}</div>
+      <div
+        style={wrapper(
+          "multiply",
+          12050,
+          ambientRgb({ ambient: dark ? config.darkAmbient : config.ambient, coolness: config.coolness })
+        )}
+      >
+        {layer("hole")}
+      </div>
       <div style={wrapper("soft-light", 12060)}>{layer("warm")}</div>
       <div style={wrapper("screen", 12070)}>{layer("glow")}</div>
     </div>

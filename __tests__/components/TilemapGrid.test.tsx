@@ -53,7 +53,7 @@ describe('TilemapGrid component', () => {
     expect(tiles).toHaveLength(25 * 25);
   });
 
-  it('shows diagonals at tier-1 visibility when the hero torch is snuffed', () => {
+  it('shows diagonals at tier-1 visibility when the hero torch is snuffed (light pass off)', () => {
     // Arrange: 25x25 floor with PLAYER at center and torch unlit
     const size = 25;
     const tiles = Array(size).fill(0).map(() => Array(size).fill(0));
@@ -80,6 +80,7 @@ describe('TilemapGrid component', () => {
         tileTypes={mockTileTypes}
         subtypes={subtypes}
         initialGameState={initialGameState}
+        lightPass={false}
       />
     );
 

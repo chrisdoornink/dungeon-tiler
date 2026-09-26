@@ -173,6 +173,7 @@ import { useRenderQuality } from "./useRenderQuality";
 import { assetUrl } from "../lib/asset_url";
 import {
   DEFAULT_LIGHT_PASS,
+  darkRevealsTile,
   readLightPassFlag,
   type LightPassConfig,
 } from "../lib/light_pass";
@@ -2832,10 +2833,25 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
   const suppressDarknessOverlay =
     !inNightmare && (autoPhaseVisibility || (forceDaylight && heroTorchLitState));
   const heroTorchLitForVisibility = suppressDarknessOverlay ? true : heroTorchLitState;
-  // The light pass grades actors anywhere in the cave (lit or snuffed), but only draws
-  // its pools while the torch is lit: snuffed, the tile darkness system takes over.
+  // The light pass grades actors anywhere in the cave. Its light map runs lit (torch lit
+  // under forceDaylight) or dark (torch out), and in the dark it replaces the per-tile
+  // glow tiers: every tile renders and the light map alone decides what can be seen. A
+  // map reveal (showFullMap) keeps the old full-visibility path.
   const lightPassCave = !!lightPassConfig && environment === "cave" && !inNightmare;
-  const lightPassPools = lightPassCave && suppressDarknessOverlay;
+  const lightPassLit = lightPassCave && suppressDarknessOverlay;
+  const lightPassDark =
+    lightPassCave && !heroTorchLitState && !suppressDarknessOverlay && !gameState.showFullMap;
+  const lightPassSources =
+    lightPassLit || lightPassDark
+      ? collectLightSources(gameState.mapData.subtypes, gameState.enemies)
+      : [];
+  // Torch out: an enemy or NPC is only drawn where the light map reaches it, so the dark
+  // still hides what stands in it.
+  const lightPassActorLit =
+    lightPassDark && lightPassConfig
+      ? (y: number, x: number) =>
+          darkRevealsTile(y, x, playerPosition, lightPassSources, lightPassConfig)
+      : undefined;
   const lastCheckpoint = gameState.lastCheckpoint;
   const heroDeathStateForTiles: HeroDeathState | undefined =
     shouldAnimateHeroDeath && heroDeathPhase !== "idle"
@@ -6386,18 +6402,21 @@ export const TilemapGrid: React.FC<TilemapGridProps> = ({
                     gameState.heroSpriteScale,
                     muralPanels,
                     !!gameState.activeHeroId && !!gameState.hasSword,
-                    floorStyle
+                    floorStyle,
+                    lightPassDark,
+                    lightPassActorLit
                   )}
                 </div>
                 {/* Torchlight light pass: light map + warm pools above the sprites and
                     wall tops, so actors are lit by the same light as the floor. */}
-                {lightPassPools && lightPassConfig && (
+                {(lightPassLit || lightPassDark) && lightPassConfig && (
                   <LightPassLayers
                     rows={mapRows}
                     cols={mapCols}
                     hero={smoothVisualRef.current ?? playerPosition}
-                    sources={collectLightSources(gameState.mapData.subtypes, gameState.enemies)}
+                    sources={lightPassSources}
                     config={lightPassConfig}
+                    dark={lightPassDark}
                     containerRef={lightPassLayerRef}
                   />
                 )}
@@ -7103,7 +7122,12 @@ function renderTileGrid(
   // tile, or one per tile), keyed "y,x".
   muralPanels?: Map<string, number[]>,
   heroArmedOverride?: boolean,
-  floorStyle: FloorStyle = "generated"
+  floorStyle: FloorStyle = "generated",
+  // Light pass, torch out: render every tile at full visibility with no glow tiers (the
+  // light map above does the darkening), and draw an enemy/NPC only where `actorLit` says
+  // the light reaches its tile.
+  lightPassDark: boolean = false,
+  actorLit?: (y: number, x: number) => boolean
 ) {
   const resolvedEnvironment = environment ?? DEFAULT_ENVIRONMENT;
   // Find player position in the grid
@@ -7127,7 +7151,7 @@ function renderTileGrid(
   const visibility = calculateVisibility(
     grid,
     playerPosition,
-    showFullMap,
+    showFullMap || lightPassDark,
     heroTorchLitForVisibility,
     inNightmare
   );
@@ -7135,7 +7159,7 @@ function renderTileGrid(
   // Precompute torch glow positions by scanning for WALL_TORCH subtypes
   const glowMap = new Map<string, number>();
   const torchCarrierPositions = new Set<string>();
-  if (!suppressDarknessOverlay) {
+  if (!suppressDarknessOverlay && !lightPassDark) {
     if (subtypes) {
       for (let y = 0; y < subtypes.length; y++) {
         for (let x = 0; x < subtypes[y].length; x++) {
@@ -7400,13 +7424,14 @@ function renderTileGrid(
             terrainNeighbors={terrainNeighbors}
             playerDirection={isPlayerTile ? playerDirection : undefined}
             heroTorchLit={heroTorchLit}
+            lightPassDark={lightPassDark}
             heroSpriteOverride={isPlayerTile ? heroSpriteOverride : undefined}
             heroSpriteScale={isPlayerTile ? heroSpriteScale : undefined}
             heroArmed={isPlayerTile && !!heroArmedOverride}
             heroTorchSnuffing={isPlayerTile ? heroTorchSnuffing : false}
             heroPoisoned={isPlayerTile ? heroPoisoned : false}
             hasEnemy={hasEnemy}
-            enemyVisible={isVisible}
+            enemyVisible={isVisible && (!actorLit || actorLit(rowIndex, colIndex))}
             enemyFacing={enemyAtTile?.facing}
             enemyKind={enemyAtTile?.kind}
             // The head sprite is chosen by where its NECK is, not by where it is looking — it
@@ -7494,7 +7519,9 @@ function renderTileGrid(
               return d <= 2;
             })()}
             npc={npcAtTile}
-            npcVisible={npcAtTile ? isVisible : undefined}
+            npcVisible={
+              npcAtTile ? isVisible && (!actorLit || actorLit(rowIndex, colIndex)) : undefined
+            }
             npcInteractable={npcInteractable}
             hasSword={hasSword}
             hasShield={hasShield}

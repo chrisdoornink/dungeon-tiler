@@ -28,7 +28,15 @@ import {
 
 type NumericKey = Exclude<keyof LightPassConfig, "flicker">;
 
-const SLIDERS: Array<{ key: NumericKey; label: string; min: number; max: number; step: number; hint: string }> = [
+const SLIDERS: Array<{
+  key: NumericKey;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  hint: string;
+  section?: string;
+}> = [
   { key: "ambient", label: "Ambient", min: 0.25, max: 1, step: 0.01, hint: "far-field brightness (1 = no falloff)" },
   { key: "coolness", label: "Coolness", min: 0, max: 2, step: 0.05, hint: "how blue-green the dark leans" },
   { key: "heroRadius", label: "Torch reach", min: 2, max: 14, step: 0.25, hint: "tiles until the hero's light fades" },
@@ -39,6 +47,10 @@ const SLIDERS: Array<{ key: NumericKey; label: string; min: number; max: number;
   { key: "actorCeiling", label: "Actor highlights", min: 0.4, max: 1, step: 0.01, hint: "brightest a sprite may get (1 = off)" },
   { key: "actorSaturation", label: "Actor saturation", min: 0.3, max: 1.2, step: 0.01, hint: "1 = unchanged" },
   { key: "shadows", label: "Contact shadows", min: 0, max: 1, step: 0.01, hint: "0 = none" },
+  { key: "darkAmbient", label: "Dark ambient", min: 0, max: 0.3, step: 0.01, hint: "unlit floor with the torch out (0 = black)", section: "Torch out (K toggles the torch)" },
+  { key: "darkHeroRadius", label: "Hero glow reach", min: 1, max: 4, step: 0.1, hint: "tiles of the snuffed hero's own glow" },
+  { key: "darkHeroLevel", label: "Hero glow level", min: 0.2, max: 1, step: 0.01, hint: "brightness at his feet" },
+  { key: "darkWallRadius", label: "Dark sconce reach", min: 1, max: 6, step: 0.1, hint: "tiles a wall torch lights in the dark" },
 ];
 
 const FLOORS = [1, 2, 3] as const;
@@ -78,7 +90,20 @@ function TestLightingInner() {
   });
   const [date, setDate] = useState(() => params.get("date") ?? todayDateStr());
   const [lightOn, setLightOn] = useState(() => params.get("light") !== "0");
-  const [torchLit, setTorchLit] = useState(true);
+  // The torch changes live through TilemapGrid's externalAction, so the snuff/relight
+  // transition plays instead of the floor remounting. The action SETS the wanted state
+  // rather than toggling: a remounted grid (new floor, restart) replays the latest action,
+  // and replaying a toggle would flip the torch behind your back.
+  const [torchAction, setTorchAction] = useState<{
+    seq: number;
+    lit: boolean;
+    apply: (s: GameState) => GameState;
+  }>({ seq: 0, lit: true, apply: (s) => s });
+  const toggleTorch = () =>
+    setTorchAction((a) => {
+      const lit = !a.lit;
+      return { seq: a.seq + 1, lit, apply: (s) => ({ ...s, heroTorchLit: lit }) };
+    });
   const [backdrop, setBackdrop] = useState<LightBackdrop>(() => {
     const b = params.get("bg") as LightBackdrop | null;
     return b && LIGHT_BACKDROPS.includes(b) ? b : "dark";
@@ -94,19 +119,16 @@ function TestLightingInner() {
   // belong to the game (sliders blur themselves on release so they don't eat them).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "l" && e.key !== "L") return;
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return;
-      setLightOn((v) => !v);
+      if (e.key === "l" || e.key === "L") setLightOn((v) => !v);
+      if (e.key === "k" || e.key === "K") toggleTorch();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const state = useMemo(() => {
-    const gs = buildFloor(date, floor);
-    return { ...gs, heroTorchLit: torchLit };
-  }, [date, floor, torchLit]);
+  const state = useMemo(() => buildFloor(date, floor), [date, floor]);
 
   const changed = (Object.keys(DEFAULT_LIGHT_PASS) as Array<keyof LightPassConfig>).filter(
     (k) => config[k] !== DEFAULT_LIGHT_PASS[k]
@@ -182,10 +204,15 @@ function TestLightingInner() {
           onChange={(e) => setDate(e.target.value)}
           style={{ background: "#222", color: "#fff", border: "1px solid #555", padding: "1px 4px", fontSize: "12px" }}
         />
-        <label style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          <input type="checkbox" checked={torchLit} onChange={(e) => setTorchLit(e.target.checked)} />
-          Torch lit
-        </label>
+        <button
+          style={buttonStyle(false)}
+          onClick={(e) => {
+            toggleTorch();
+            e.currentTarget.blur();
+          }}
+        >
+          Douse / relight torch (K)
+        </button>
         <span style={{ color: "#666" }}>|</span>
         {LIGHT_BACKDROPS.map((b) => (
           <button key={b} style={buttonStyle(backdrop === b)} onClick={() => setBackdrop(b)}>
@@ -219,6 +246,11 @@ function TestLightingInner() {
           <>
             {SLIDERS.map((s) => (
               <div key={s.key} style={{ marginTop: 8, opacity: lightOn ? 1 : 0.45 }}>
+                {s.section && (
+                  <div style={{ margin: "14px 0 6px", color: "#d9a15a", borderTop: "1px solid #444", paddingTop: 8 }}>
+                    {s.section}
+                  </div>
+                )}
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
                   <span style={{ color: config[s.key] !== DEFAULT_LIGHT_PASS[s.key] ? "#f0c070" : "#fff" }}>
                     {s.label}
@@ -263,11 +295,12 @@ function TestLightingInner() {
 
       <div className="relative z-10" style={{ paddingTop: "44px" }}>
         <TilemapGrid
-          key={`${date}-${floor}-${torchLit}-${run}`}
+          key={`${date}-${floor}-${run}`}
           tileTypes={tileTypes}
           initialGameState={state}
           storageSlot="test"
           lightPass={lightOn ? config : false}
+          externalAction={torchAction}
           onWin={() => setRun((r) => r + 1)}
           onDeath={() => setRun((r) => r + 1)}
         />
