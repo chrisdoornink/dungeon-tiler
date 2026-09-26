@@ -40,9 +40,9 @@ export interface LightPassConfig {
   heroWarmth: number;
   /** 0-1: strength of the hot screen-blended glow right at the torch. */
   heroGlow: number;
-  /** Tiles a wall torch's light reaches. */
+  /** Tiles a wall torch's light reaches, whether the hero's torch is lit or out. */
   wallRadius: number;
-  /** 0-1: warmth of a wall torch's pool. */
+  /** 0-1: warmth of a wall torch's pool (diluted near the hero's lit torch). */
   wallWarmth: number;
   /** 0.4-1: the brightest an actor highlight may be after grading (1 = ungraded). */
   actorCeiling: number;
@@ -58,21 +58,20 @@ export interface LightPassConfig {
   darkHeroRadius: number;
   /** Torch out: brightness at the hero's feet (his glow's peak). */
   darkHeroLevel: number;
-  /** Torch out: tiles a wall torch lights, now that it is the only light. */
-  darkWallRadius: number;
 }
 
 // Tuned by eye on /test-lighting (2026-09-25): a dark, cool far field with one long,
-// nearly neutral torch falloff rather than a warm amber pool, tight sconce pools, and
-// actors pulled down to the room's range. Torch out: a faint far field, the hero barely
-// there, and the sconces reaching about three tiles as the room's only real light.
+// nearly neutral torch falloff rather than a warm amber pool, and actors pulled down to
+// the room's range. Torch out: a faint far field and the hero barely there. Sconces reach
+// about three tiles in both states: they are the same lamps whatever the hero's torch is
+// doing (the reach was tuned with the torch out, where they are the only light).
 export const DEFAULT_LIGHT_PASS: LightPassConfig = {
   ambient: 0.44,
   coolness: 1,
   heroRadius: 10,
   heroWarmth: 0.03,
   heroGlow: 0.1,
-  wallRadius: 1,
+  wallRadius: 3.1,
   wallWarmth: 0.45,
   actorCeiling: 0.65,
   actorSaturation: 0.86,
@@ -81,7 +80,6 @@ export const DEFAULT_LIGHT_PASS: LightPassConfig = {
   darkAmbient: 0.06,
   darkHeroRadius: 1.6,
   darkHeroLevel: 0.3,
-  darkWallRadius: 3.1,
 };
 
 /**
@@ -170,6 +168,10 @@ export interface PoolSize {
 /**
  * The multiply hole for a light, lit or dark. Strength 0 keeps a pool mounted but unseen,
  * so the renderer can fade it in and out when the torch snuffs or relights.
+ *
+ * Only the hero's own light depends on his torch. Every other light is a fixed lamp and
+ * looks identical in both states; giving sconces a bigger reach in the dark made them
+ * bloom the moment the torch went out, reading as two different lighting models.
  */
 export function holeFor(kind: LightSourceKind | "hero", c: LightPassConfig, dark: boolean): PoolSize {
   switch (kind) {
@@ -178,11 +180,11 @@ export function holeFor(kind: LightSourceKind | "hero", c: LightPassConfig, dark
         ? { radius: c.darkHeroRadius, strength: c.darkHeroLevel }
         : { radius: c.heroRadius, strength: 1 };
     case "wall":
-      return { radius: dark ? c.darkWallRadius : c.wallRadius, strength: 1 };
+      return { radius: c.wallRadius, strength: 1 };
     case "carrier":
-      return { radius: (dark ? c.darkWallRadius : c.wallRadius) * 0.9, strength: 1 };
+      return { radius: c.wallRadius * 0.9, strength: 1 };
     case "lava":
-      return { radius: dark ? Math.max(1.6, c.darkWallRadius * 0.6) : 1.6, strength: 1 };
+      return { radius: Math.max(1.6, c.wallRadius * 0.6), strength: 1 };
     case "portal":
       // The douse-to-see portal only exists in the dark.
       return { radius: 1.4, strength: dark ? 0.9 : 0 };

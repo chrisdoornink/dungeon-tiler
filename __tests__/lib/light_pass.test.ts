@@ -149,12 +149,19 @@ describe("lightLevelAt (torch out)", () => {
     expect(lightLevelAt(x, y, [], null, c, true)).toBe(c.darkAmbient);
   });
 
-  it("is fully lit beside a wall torch and fades out by its dark reach", () => {
+  it("is fully lit beside a wall torch and fades out by its reach", () => {
     const torch = { kind: "wall" as const, x: 5.5 * tile, y: 5.9 * tile };
     const [nx, ny] = at(5, 6);
     expect(lightLevelAt(nx, ny, [torch], null, c, true)).toBe(1);
-    const [fx, fy] = at(5, 6 + Math.ceil(c.darkWallRadius) + 1);
+    const [fx, fy] = at(5, 6 + Math.ceil(c.wallRadius) + 1);
     expect(lightLevelAt(fx, fy, [torch], null, c, true)).toBe(c.darkAmbient);
+  });
+
+  it("gives every lamp but the hero the same pool whether his torch is lit or out", () => {
+    for (const kind of ["wall", "carrier", "lava"] as const) {
+      expect(holeFor(kind, c, true)).toEqual(holeFor(kind, c, false));
+    }
+    expect(holeFor("hero", c, true)).not.toEqual(holeFor("hero", c, false));
   });
 
   it("peaks at the snuffed hero's own level on his tile", () => {

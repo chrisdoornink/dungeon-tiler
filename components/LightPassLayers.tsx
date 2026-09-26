@@ -18,10 +18,12 @@
 // pools follow `--lp-hx` / `--lp-hy` on the container, which the smooth-movement rAF
 // loop writes every frame, so the light stays in his hand mid-step.
 
-// The same layers draw both lighting states. Every pool's size and strength is a CSS
-// width/height and opacity with a transition, so when the torch snuffs the hero's long
-// falloff shrinks to a faint glow and the sconces swell to take over (and back again on a
-// relight) instead of the room cutting between two looks.
+// The same layers draw both lighting states, and only two things differ between them:
+// the far field and the hero's own light. Sconces, lava, torch-carrying goblins and the
+// portal are fixed lamps that look the same either way. Every pool's size and strength is
+// a CSS width/height and opacity with a transition, so when the torch snuffs, the hero's
+// long falloff shrinks to a faint glow and the lamps are left as the room's light (and
+// back again on a relight) instead of the room cutting between two looks.
 
 import React from "react";
 import { EnemyRegistry, type EnemyKind } from "../lib/enemies/registry";
@@ -127,6 +129,15 @@ function warmGradient(rgb: string): string {
 
 const GLOW_GRADIENT =
   "radial-gradient(circle closest-side, rgba(255,185,105,1) 0%, rgba(255,170,90,0.45) 45%, rgba(255,160,80,0) 100%)";
+
+// The hero's light, drawn into the soft-light group as neutral grey over the lamps' warm
+// pools. Soft-light with 50% grey is the identity, so this changes nothing on its own; it
+// only thins the amber beneath it. Light mixes in proportion: where the hero's torch is as
+// bright as a sconce, half the light there is the sconce's, so it keeps half its tint.
+const WASH_GRADIENT = `radial-gradient(circle closest-side, ${HOLE_STOPS.map(
+  ([t, v]) => `rgba(128,128,128,${v}) ${Math.round(t * 100)}%`
+).join(", ")})`;
+const HERO_WASH = 0.5;
 
 const AMBER_GRADIENT = warmGradient("255,150,60");
 const LAVA_GRADIENT = warmGradient("255,100,40");
@@ -311,6 +322,19 @@ export function LightPassLayers({
           />
         );
       })}
+      {heroPx && which === "warm" && (
+        <Pool
+          size={{
+            radius: heroLook.hole.radius,
+            strength: heroLook.hole.strength * HERO_WASH,
+          }}
+          gradient={WASH_GRADIENT}
+          follow
+          dropY={dark ? HERO_DARK_DROP : 0}
+          flicker={config.flicker && !dark}
+          flickerKey="wash-hero"
+        />
+      )}
       {heroPx && (
         <Pool
           size={heroLook[which]}

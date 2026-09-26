@@ -42,15 +42,14 @@ const SLIDERS: Array<{
   { key: "heroRadius", label: "Torch reach", min: 2, max: 14, step: 0.25, hint: "tiles until the hero's light fades" },
   { key: "heroWarmth", label: "Torch warmth", min: 0, max: 1, step: 0.01, hint: "amber soft-light pool" },
   { key: "heroGlow", label: "Torch glow", min: 0, max: 0.6, step: 0.01, hint: "hot core at the flame" },
-  { key: "wallRadius", label: "Sconce reach", min: 0.5, max: 5, step: 0.1, hint: "tiles a wall torch lights" },
-  { key: "wallWarmth", label: "Sconce warmth", min: 0, max: 1, step: 0.01, hint: "wall torch pool" },
+  { key: "wallRadius", label: "Sconce reach", min: 0.5, max: 6, step: 0.1, hint: "tiles a wall torch lights (torch lit or out)" },
+  { key: "wallWarmth", label: "Sconce warmth", min: 0, max: 1, step: 0.01, hint: "wall torch pool; your lit torch dilutes it nearby" },
   { key: "actorCeiling", label: "Actor highlights", min: 0.4, max: 1, step: 0.01, hint: "brightest a sprite may get (1 = off)" },
   { key: "actorSaturation", label: "Actor saturation", min: 0.3, max: 1.2, step: 0.01, hint: "1 = unchanged" },
   { key: "shadows", label: "Contact shadows", min: 0, max: 1, step: 0.01, hint: "0 = none" },
   { key: "darkAmbient", label: "Dark ambient", min: 0, max: 0.3, step: 0.01, hint: "unlit floor with the torch out (0 = black)", section: "Torch out (K toggles the torch)" },
   { key: "darkHeroRadius", label: "Hero glow reach", min: 1, max: 4, step: 0.1, hint: "tiles of the snuffed hero's own glow" },
   { key: "darkHeroLevel", label: "Hero glow level", min: 0.2, max: 1, step: 0.01, hint: "brightness at his feet" },
-  { key: "darkWallRadius", label: "Dark sconce reach", min: 1, max: 6, step: 0.1, hint: "tiles a wall torch lights in the dark" },
 ];
 
 const FLOORS = [1, 2, 3] as const;
