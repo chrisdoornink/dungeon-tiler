@@ -7,9 +7,10 @@ import {
   buildMoatApproach,
   buildDousePortalApproach,
   buildBombSealApproach,
-  stampBossEntranceOnFloor,
+  stampBossEntranceWithFallback,
 } from "../../lib/bosses/boss_entrances";
 import { generateCompleteMapForFloor, rollWaterPlan } from "../../lib/map/map-features";
+import { mulberry32, withPatchedMathRandom } from "../../lib/rng";
 
 const SHAPER_ARENA_SIZE = 25;
 
@@ -411,38 +412,62 @@ describe("a douse day's portal is reachable IN THE DARK", () => {
     expect(dark.has(`${py},${px}`)).toBe(true);
   }
 
-  // Both sweeps are deliberately long. The rule this replaced left the portal
-  // unreachable on ~6% of generated floor 3s, so a handful of iterations would catch a
-  // regression only about half the time; 40 + 60 puts detection over 99%.
+  // Both sweeps are deliberately long, and seeded, so every run checks the same floors.
+  // The rule this replaced left the portal unreachable on ~6% of generated floor 3s; a
+  // regression that bad would have to miss all 100 floors, which happens ~0.2% of the time.
   test("holds for the harness room, torches and all", () => {
-    for (let i = 0; i < 40; i++) {
-      assertDarkPathToPortal(buildDousePortalApproach().mapData);
+    for (let seed = 1; seed <= 40; seed++) {
+      withPatchedMathRandom(mulberry32(seed), () => {
+        assertDarkPathToPortal(buildDousePortalApproach().mapData);
+      });
     }
   });
 
+  // About 1 floor 3 in 600 has no spot for the portal (the pool lands in a nook whose only
+  // way out is an item tile or a relight), and the daily hands those days a different
+  // entrance. 722 and 1486 were two such floors when this was written, so the fallback
+  // branch below actually runs; if generation changes and they place, the test still holds.
+  const DAILY_SEEDS = [...Array.from({ length: 60 }, (_, i) => i + 1), 722, 1486];
+
   test("holds when stamped onto a daily floor 3, water and lava and all", () => {
-    for (let i = 0; i < 60; i++) {
-      // Same terrain options the daily passes (game-state.ts): floor 3 always rolls for
-      // lava, and water is a weighted size tier. Both change the pool geometry the dark
-      // route has to thread, so a sweep without them is not the production case.
-      const map = generateCompleteMapForFloor(
-        { chests: 0, keys: 0, chestContents: [] },
-        3,
-        { includeLava: true, waterPlan: rollWaterPlan(3) ?? undefined }
-      );
-      const { placed } = stampBossEntranceOnFloor(map, "douse");
-      // Never bail: a bossless day would rewrite what past dates replay to
-      // (lib/stats/boss_day.ts reads entranceKind straight off the regenerated floor).
-      expect(placed).toBe(true);
-      assertDarkPathToPortal(map);
+    let douseDays = 0;
+    for (const seed of DAILY_SEEDS) {
+      withPatchedMathRandom(mulberry32(seed), () => {
+        // Same terrain options the daily passes (game-state.ts): floor 3 always rolls for
+        // lava, and water is a weighted size tier. Both change the pool geometry the dark
+        // route has to thread, so a sweep without them is not the production case.
+        const map = generateCompleteMapForFloor(
+          { chests: 0, keys: 0, chestContents: [] },
+          3,
+          { includeLava: true, waterPlan: rollWaterPlan(3) ?? undefined }
+        );
+        // The daily's own entry point, fallback and all.
+        const placed = stampBossEntranceWithFallback(map, "douse", mulberry32(~seed));
+        // Never bail: a bossless day would rewrite what past dates replay to
+        // (lib/stats/boss_day.ts reads entranceKind straight off the regenerated floor).
+        expect(placed).not.toBeNull();
+        if (placed!.kind !== "douse") {
+          // A floor with no spot for the portal still gets a door, and never a bomb door
+          // on a day that may not hand out a bomb.
+          expect(placed!.kind).not.toBe("bomb");
+          return;
+        }
+        douseDays++;
+        assertDarkPathToPortal(map);
+      });
     }
+    // The fallback is for the odd floor. If douse stopped placing on most floors, the
+    // sweep would pass on fallbacks alone and never check a dark route.
+    expect(douseDays).toBeGreaterThanOrEqual(DAILY_SEEDS.length * 0.9);
   });
 
   test("the portal itself never sits on a tile that relights", () => {
-    for (let i = 0; i < 8; i++) {
-      const map = buildDousePortalApproach().mapData;
-      const [py, px] = findAll(map, TileSubtype.DARK_PORTAL)[0];
-      expect(relightsAt(map, py, px)).toBe(false);
+    for (let seed = 1; seed <= 8; seed++) {
+      withPatchedMathRandom(mulberry32(seed), () => {
+        const map = buildDousePortalApproach().mapData;
+        const [py, px] = findAll(map, TileSubtype.DARK_PORTAL)[0];
+        expect(relightsAt(map, py, px)).toBe(false);
+      });
     }
   });
 });

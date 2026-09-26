@@ -29,6 +29,9 @@ export type MoatElement = "lava" | "water";
 /** Boss-entrance levels are haunted: this many ghosts prowl the L3-sized rooms. */
 const GHOST_COUNT = 3;
 
+/** Fresh floors the douse harness may roll before it settles for one with no portal. */
+const DOUSE_HARNESS_ATTEMPTS = 20;
+
 /** Place up to `count` ghosts on empty floor tiles, away from the hero + each other. */
 function placeGhosts(map: MapData, count: number, hy: number, hx: number): Enemy[] {
   const cands: Array<[number, number]> = [];
@@ -848,15 +851,26 @@ function placeDarkPortal(map: MapData, hy: number, hx: number): void {
  * arrangement that CANNOT reproduce the failure that matters: a torch beside the only
  * corridor back, relighting the hero and leaving the portal inert. placeDarkPortal now
  * guarantees a route that stays dark, and this harness is where that gets played.
+ *
+ * About 1 floor 3 in 600 has no spot for the portal: the pool lands in a nook whose only
+ * way out is an item tile or a relight, so placeDarkPortal declines. The daily hands those
+ * floors a different entrance (stampBossEntranceWithFallback); this harness has nothing to
+ * fall back to, so it rolls a fresh floor rather than serve a room with no portal in it.
  */
 export function buildDousePortalApproach(): GameState {
-  const map = generateCompleteMapForFloor(
-    { chests: 0, keys: 0, chestContents: [] },
-    3
+  let map: MapData;
+  let hy: number;
+  let hx: number;
+  let attempts = 0;
+  do {
+    map = generateCompleteMapForFloor({ chests: 0, keys: 0, chestContents: [] }, 3);
+    [hy, hx] = findPlayerPos(map);
+    stampCornerWaterPatch(map, hy, hx);
+    placeDarkPortal(map, hy, hx);
+  } while (
+    countSubtype(map, TileSubtype.DARK_PORTAL) === 0 &&
+    ++attempts < DOUSE_HARNESS_ATTEMPTS
   );
-  const [hy, hx] = findPlayerPos(map);
-  stampCornerWaterPatch(map, hy, hx);
-  placeDarkPortal(map, hy, hx);
   const ghosts = placeGhosts(map, GHOST_COUNT, hy, hx);
 
   return approachState(
